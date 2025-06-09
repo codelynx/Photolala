@@ -1,0 +1,72 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXGroup section */
+		CC72EFC62DF6C4D600E1C25A = {
+			isa = PBXGroup;
+			children = (
+			);
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXProject section */
+		CC72EFC72DF6C4D600E1C25A /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = 1;
+				LastUpgradeCheck = 1640;
+			};
+			buildConfigurationList = CC72EFCA2DF6C4D600E1C25A /* Build configuration list for PBXProject "Photolala" */;
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+				Base,
+			);
+			mainGroup = CC72EFC62DF6C4D600E1C25A;
+			minimizedProjectReferenceProxies = 1;
+			preferredProjectObjectVersion = 77;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+			);
+		};
+/* End PBXProject section */
+
+/* Begin XCBuildConfiguration section */
+		CC72EFCB2DF6C4D600E1C25A /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				DEVELOPMENT_TEAM = 2P97EM4L4N;
+			};
+			name = Debug;
+		};
+		CC72EFCC2DF6C4D600E1C25A /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				DEVELOPMENT_TEAM = 2P97EM4L4N;
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		CC72EFCA2DF6C4D600E1C25A /* Build configuration list for PBXProject "Photolala" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				CC72EFCB2DF6C4D600E1C25A /* Debug */,
+				CC72EFCC2DF6C4D600E1C25A /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = CC72EFC72DF6C4D600E1C25A /* Project object */;
+}
