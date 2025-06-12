@@ -6,27 +6,31 @@
 //
 
 import SwiftUI
-import SwiftData
 
 @main
 struct photolalaApp: App {
-    var sharedModelContainer: ModelContainer = {
-        let schema = Schema([
-            Item.self,
-        ])
-        let modelConfiguration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
-
-        do {
-            return try ModelContainer(for: schema, configurations: [modelConfiguration])
-        } catch {
-            fatalError("Could not create ModelContainer: \(error)")
-        }
-    }()
-
-    var body: some Scene {
-        WindowGroup {
-            ContentView()
-        }
-        .modelContainer(sharedModelContainer)
-    }
+	var body: some Scene {
+		#if os(macOS)
+		WindowGroup("Welcome") {
+			WelcomeView()
+		}
+		.windowResizability(.contentSize)
+		
+		WindowGroup("Photo Browser", for: URL.self) { $folderURL in
+			if let folderURL {
+				PhotoBrowserView(folderURL: folderURL)
+			} else {
+				Text("No folder selected")
+					.foregroundStyle(.secondary)
+					.frame(minWidth: 400, minHeight: 300)
+			}
+		}
+		#else
+		WindowGroup {
+			NavigationStack {
+				WelcomeView()
+			}
+		}
+		#endif
+	}
 }

@@ -6,6 +6,10 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		CCFACC112DFACC3300798EB9 /* Photos in Resources */ = {isa = PBXBuildFile; fileRef = CCFACC102DFACC2B00798EB9 /* Photos */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXContainerItemProxy section */
 		CC72EFE22DF6C68F00E1C25A /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
@@ -27,6 +31,7 @@
 		CC72EFD12DF6C68D00E1C25A /* photolala.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = photolala.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		CC72EFE12DF6C68F00E1C25A /* photolalaTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = photolalaTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		CC72EFEB2DF6C68F00E1C25A /* photolalaUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = photolalaUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		CCFACC102DFACC2B00798EB9 /* Photos */ = {isa = PBXFileReference; lastKnownFileType = folder; path = Photos; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -79,6 +84,7 @@
 				CC72EFE42DF6C68F00E1C25A /* photolalaTests */,
 				CC72EFEE2DF6C68F00E1C25A /* photolalaUITests */,
 				CC72EFD22DF6C68D00E1C25A /* Products */,
+				CCFACC102DFACC2B00798EB9 /* Photos */,
 			);
 			sourceTree = "<group>";
 		};
@@ -212,6 +218,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				CCFACC112DFACC3300798EB9 /* Photos in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

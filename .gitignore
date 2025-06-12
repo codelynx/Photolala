@@ -94,3 +94,5 @@ iOSInjectionProject/
 
 # Custom untracked directory
 untracked/
+
+Photos/**

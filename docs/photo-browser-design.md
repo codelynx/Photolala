@@ -2,147 +2,243 @@
 
 ## Overview
 
-A photo browser application similar to Adobe Bridge that allows users to browse and view their photo collections efficiently across Apple platforms.
+Photolala is a cross-platform photo browser application similar to Adobe Bridge that allows users to browse and view their photo collections efficiently across Apple platforms. It uses a window-per-folder architecture where each window displays photos from a single directory.
 
 ## Platform Support
 
 ### Target Platforms
-- **macOS**: Full-featured desktop experience with keyboard shortcuts and multi-window support
-- **iOS**: Touch-optimized interface for iPhone and iPad
-- **tvOS**: Big screen browsing with remote control navigation
-- **visionOS** (future consideration): To be designed separately due to unique spatial computing requirements
+- **macOS 14.0+**: Full-featured desktop experience with keyboard shortcuts and multi-window support
+- **iOS 18.5+**: Touch-optimized interface for iPhone and iPad
 
-### Platform-Specific Considerations
+### Platform-Specific Features
 
 #### macOS
-- Drag and drop support
-- Multiple windows for comparing photos
+- Multiple windows (one per folder)
 - Keyboard shortcuts for navigation
-- Right-click context menus
-- Integration with Finder
+- Right-click context menus  
+- Drag and drop folder to open
+- No window persistence (fresh start each time)
+- Welcome screen with "Select Folder" button
 
 #### iOS/iPadOS
-- Touch gestures (pinch to zoom, swipe to navigate)
-- Split-screen support on iPad
-- Share sheet integration
-- Photos app extension support
-- iCloud Photo Library awareness
+- Welcome screen with folder selection
+- iPad: Multiple scenes for browsing different folders
+- Touch gestures (pinch to zoom, swipe to navigate) (LATER)
+- Photos Library integration
 
-#### tvOS
-- Focus-based navigation
-- Remote control gestures
-- Slideshow mode optimized for TV viewing
-- Limited file system access (streaming from other devices)
+## Core Architecture
+
+### Database-Free Design
+- **No SwiftData/CoreData** - Simple file-based approach
+- **PhotoRepresentation** struct instead of @Model class
+- **SimplePhotoScanner** for directory scanning
+- **File system as source of truth**
+
+### Key Models
+
+```swift
+// Lightweight metadata representation
+struct PhotoRepresentation: Identifiable, Hashable {
+    let filePath: String              // Single source of truth
+    let fileSize: Int64
+    let createdDate: Date
+    let modifiedDate: Date
+    
+    var photoIdentifier: PhotoIdentifier?  // Content-based ID
+    var imageHeader: Data?            // First 64KB for metadata
+    var imageWidth: Int?
+    var imageHeight: Int?
+    
+    // Computed properties
+    var id: String { filePath }
+    var fileName: String { /* from filePath */ }
+    var directoryPath: String { /* from filePath */ }
+    var cacheKey: String { /* from photoIdentifier */ }
+}
+
+// Content-based identification
+enum PhotoIdentifier {
+    case contentHash(md5: String, byteSize: Int64)
+    case photoLibrary(assetId: String)
+    
+    var string: String { /* "md5~hash~size" format */ }
+}
+```
 
 ## Core Features
 
-### 1. Directory Selection and Scanning
-- User selects a root directory to browse (platform-dependent):
-  - **macOS**: Full file system access via NSOpenPanel
-  - **iOS**: Document browser or Photos library access
-  - **tvOS**: Browse shared folders from paired devices or network shares
-- System recursively scans for all image files (JPEG, PNG, HEIF, RAW formats)
-- Support for common photo formats used by cameras and phones
+### 1. Directory Scanning
+- **SimplePhotoScanner** for fast file discovery
+- Scan single directory (no recursion by default)
+- Support common formats: JPEG, PNG, HEIF, HEIC, TIFF, GIF, WebP
+- Network drive support (with loading indicators)
+- `.photolala` footprint files for instant loading
 
-### 2. View Modes
-- **Directory View**: Maintains folder hierarchy, showing photos organized by their directory structure
-- **Flat View**: Shows all photos in one continuous grid, ignoring directory structure
-- Toggle between views with a simple UI control
+### 2. Thumbnail System
+- **Content-based caching**: `~/Library/Caches/Photolala/Thumbnails/`
+- **Cache key**: Based on file content (MD5 hash + size)
+- **Size**: 256px on longest edge, maintaining aspect ratio
+- **Format**: JPEG with 0.8 quality
+- **Single loading path**: NativePhotoGrid → ThumbnailService
+- **Passive display**: ThumbnailView just shows cached thumbnails
 
-### 3. Thumbnail Management
-- Generate thumbnails for fast browsing of large photo collections
-- Cache thumbnails for performance
+### 3. User Interface
+- **NativePhotoGrid**: Native collection view for performance
+- **Adjustable grid size**: 2-10 columns
+- **Scale modes**: Fill or Fit
+- **Selection support**: Single and multi-select
+- **LoadingManager**: Priority-based thumbnail loading
+- **PhotoDetailView**: Full-screen viewing with zoom
 
-#### Storage Options to Consider:
-1. **File System Cache**
-   - Store thumbnails in a hidden directory (e.g., `~/Library/Caches/Photolala/`)
-   - Pros: Simple, direct file access
-   - Cons: Manual cache management needed
+### 4. Performance Optimizations
+- **Lazy loading**: Only load visible thumbnails
+- **Priority system**: Visible > Prefetch > Background
+- **Memory efficient**: Thumbnails released when scrolled away
+- **Native collection views**: Handle 100K+ photos
+- **Footprint files**: Instant directory loading
 
-2. **SwiftData/Core Data**
-   - Store thumbnails as binary data with metadata
-   - Pros: Integrated querying, automatic memory management
-   - Cons: Database size concerns with many images
+## Loading Strategy
 
-3. **Hybrid Approach**
-   - Store thumbnail file paths and metadata in SwiftData
-   - Store actual thumbnail images in file system
-   - Pros: Best of both worlds
-   - Cons: More complex implementation
+1. **Check `.photolala` footprint file**
+   - CSV format: `filename,size,modified,headerMD5,width,height`
+   - Provides instant photo list without scanning
 
-### 4. User Interface
-- Grid layout similar to Photos.app
-- Adjustable thumbnail sizes
-- Smooth scrolling with lazy loading
-- Quick preview on selection
-- Full-screen view mode
+2. **Quick scan for UI responsiveness**
+   - Create PhotoRepresentation with basic file info
+   - Display grid immediately
+   - Load thumbnails on demand
 
-### 5. Performance Considerations
-- Asynchronous image loading and thumbnail generation
-- Progressive loading for large directories
-- Memory-efficient handling of large collections
-- Background thumbnail generation
+3. **Progressive enhancement**
+   - Calculate content identifiers in background
+   - Generate missing thumbnails as needed
+   - Update `.photolala` file for next time
 
-## Technical Architecture
+4. **Thumbnail loading flow**
+   ```
+   Cell appears → Check disk cache → Display if found
+                                  → Generate if missing
+   ```
 
-### Shared Codebase Strategy
-- Use SwiftUI for maximum code sharing across platforms
-- Platform-specific UI adaptations using conditional compilation
-- Shared data models and business logic
-- Platform-specific features isolated in separate modules
+## Implementation Phases
 
-### Data Model
-```
-Photo
-- id: UUID
-- filePath: String
-- fileName: String
-- directoryPath: String
-- dateCreated: Date
-- dateModified: Date
-- fileSize: Int64
-- imageWidth: Int?
-- imageHeight: Int?
-- thumbnailPath: String?
-- isFavorite: Bool
-- tags: [String]
+### Phase 1: Core Foundation ✅ (Completed)
+- [x] Basic project structure with macOS/iOS targets
+- [x] PhotoRepresentation model (no database)
+- [x] SimplePhotoScanner for directory listing
+- [x] Basic MainWindowView
+- [x] Window-per-folder architecture
+- [x] Welcome screen with folder selection
 
-Directory
-- path: String
-- name: String
-- photoCount: Int
-- lastScanned: Date
-```
+### Phase 2: Thumbnail System 🚧 (In Progress)
+- [x] ThumbnailService with disk caching
+- [x] Content-based cache keys (MD5 + fileSize)
+- [x] Single loading path (NativePhotoGrid → ThumbnailService)
+- [ ] Complete removal of SwiftData dependencies
+- [ ] Fix remaining Photo → PhotoRepresentation references
+- [ ] Memory cache layer for performance
 
-### Key Components
-1. **PhotoScanner**: Discovers and indexes photos
-2. **ThumbnailGenerator**: Creates and caches thumbnails
-3. **PhotoGridView**: Main browsing interface
-4. **PhotoDetailView**: Full-screen photo viewer
-5. **DirectoryTreeView**: Hierarchical folder browser
+### Phase 3: Grid View Polish 📋
+- [ ] Smooth scrolling with 10K+ photos
+- [ ] Progressive loading indicators
+- [ ] Selection persistence during scroll
+- [ ] Grid size adjustment (2-10 columns)
+- [ ] Scale mode toggle (Fill/Fit)
+- [ ] Platform-specific optimizations
 
-## Future Enhancements
-- Photo organization tools (move, copy, rename)
-- Tagging and categorization
-- Search functionality
-- EXIF data viewing
-- Basic editing capabilities
-- Export and sharing options
+### Phase 4: Footprint System 📋
+- [ ] `.photolala` file format implementation
+- [ ] Fast directory loading from footprint
+- [ ] Background footprint updates
+- [ ] Incremental scanning for changes
+- [ ] Network drive optimizations
 
-## Questions for Discussion
-1. Should we prioritize SwiftData or file system for thumbnail storage?
-2. What should be the default thumbnail size(s) for each platform?
-3. Should we support RAW formats initially or add later?
-4. How should we handle duplicate photos?
-5. What metadata should we extract and display?
-6. Should thumbnails be generated on-demand or pre-generated?
-7. How to handle photo access on iOS/tvOS with limited file system access?
-8. Should we support iCloud Photos integration on iOS/macOS?
-9. What navigation patterns work best for tvOS remote control?
-10. Should we build platform-specific features first or focus on shared functionality?
+### Phase 5: Photo Detail View 📋
+- [ ] Full-screen photo viewer
+- [ ] Smooth transitions from grid
+- [ ] Zoom and pan gestures
+- [ ] Previous/Next navigation
+- [ ] Basic metadata display
+- [ ] Platform-specific controls
+
+### Phase 6: Advanced Features 📋
+- [ ] Multi-selection operations
+- [ ] Keyboard shortcuts (macOS)
+- [ ] Touch gestures (iOS)
+- [ ] Search and filtering
+- [ ] Sort options (name, date, size)
+- [ ] Export/sharing
+
+### Phase 7: Performance & Polish 📋
+- [ ] Handle 100K+ photo directories
+- [ ] Memory usage optimization
+- [ ] Background task management
+- [ ] Error handling and recovery
+- [ ] Accessibility support
+- [ ] App icon and launch screen
+
+### Phase 8: Future Enhancements 🔮
+- [ ] EXIF metadata panel
+- [ ] Folder tree navigation
+- [ ] Tags and ratings system
+- [ ] Duplicate detection
+- [ ] Basic editing tools
+- [ ] iCloud sync support
+
+## Current Implementation Status
+
+### ✅ Completed
+- PhotoRepresentation model (no database)
+- SimplePhotoScanner (file-based)
+- MainWindowView without SwiftData
+- ThumbnailService with disk caching
+- NativePhotoGrid with platform adaptations
+- Window-per-folder architecture
+- Photos Library integration (iOS/macOS)
+
+### 🚧 In Progress
+- No migration we have never released the service
+
+### 📋 Future Enhancements
+- EXIF metadata viewing
+- Search and filtering
+- Folder tree navigation
+- Export/sharing features
+- Tags and ratings (using .photolala files)
+
+## Technical Decisions
+
+### Why No Database?
+- **Simplicity**: File system is the source of truth
+- **Reliability**: No database corruption
+- **Performance**: No ORM overhead
+- **Portability**: Just files, no migration issues
+
+### Content-Based Identification
+- **Deduplication**: Same photo identified even if moved/renamed
+- **Stable cache keys**: Thumbnails persist across moves
+- **Format**: `"md5~{hash}~{fileSize}"`
+
+### Window-Per-Folder
+- **Simple mental model**: One window = one folder
+- **Multi-tasking**: Compare folders side by side
+- **No state management**: Each window is independent
+
+## Platform Differences
+
+### macOS
+- NSCollectionView with NSViewRepresentable
+- Multiple windows via WindowGroup
+- File system access via NSOpenPanel
+
+### iOS
+- UICollectionView with UIViewRepresentable  
+- Navigation-based UI
+- Limited file access (document picker)
 
 ## Next Steps
-1. Finalize storage approach for thumbnails
-2. Define specific image formats to support
-3. Create UI mockups
-4. Set up project structure with appropriate targets
+
+1. Complete PhotoRepresentation migration
+2. Remove remaining SwiftData code
+3. Implement .photolala footprint optimization
+4. Add progressive metadata loading
+5. Polish platform-specific features
