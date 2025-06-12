@@ -10,6 +10,9 @@ import SwiftUI
 struct PhotoNavigationView: View {
 	let folderURL: URL
 	@State private var navigationPath = NavigationPath()
+	#if os(macOS)
+	@Environment(\.openWindow) private var openWindow
+	#endif
 	
 	var body: some View {
 		NavigationStack(path: $navigationPath) {
@@ -25,9 +28,6 @@ struct PhotoNavigationView: View {
 				}
 			)
 			.navigationTitle(folderURL.lastPathComponent)
-			#if os(macOS)
-			.navigationSubtitle(folderURL.path)
-			#endif
 				.toolbar {
 					ToolbarItem(placement: .navigation) {
 						Button(action: goBack) {
@@ -36,11 +36,23 @@ struct PhotoNavigationView: View {
 						.disabled(navigationPath.isEmpty)
 					}
 					
+					#if os(macOS)
 					ToolbarItem(placement: .primaryAction) {
-						Button(action: openSubfolder) {
-							Label("Open Folder", systemImage: "folder")
+						Menu {
+							Button("Open in New Window") {
+								openInNewWindow()
+							}
+							
+							Divider()
+							
+							Button("Select Folder...") {
+								selectNewFolder()
+							}
+						} label: {
+							Label("Open", systemImage: "folder")
 						}
 					}
+					#endif
 				}
 				.navigationDestination(for: URL.self) { url in
 					PhotoCollectionView(
@@ -70,10 +82,36 @@ struct PhotoNavigationView: View {
 		}
 	}
 	
-	private func openSubfolder() {
-		// Example: Navigate to a subfolder
-		// You would implement folder selection here
+	#if os(macOS)
+	private func openInNewWindow() {
+		// Get current folder from navigation path or use root
+		let currentFolder = getCurrentFolder()
+		openWindow(value: currentFolder)
 	}
+	
+	private func selectNewFolder() {
+		let panel = NSOpenPanel()
+		panel.canChooseFiles = false
+		panel.canChooseDirectories = true
+		panel.allowsMultipleSelection = false
+		panel.message = "Select a folder to browse"
+		panel.prompt = "Open"
+		
+		panel.begin { response in
+			if response == .OK, let url = panel.url {
+				// Navigate to the selected folder
+				navigationPath.append(url)
+			}
+		}
+	}
+	
+	private func getCurrentFolder() -> URL {
+		// If we have items in navigation path, get the last one
+		// Otherwise use the root folder
+		// This is simplified - you might need to track the path more carefully
+		return folderURL
+	}
+	#endif
 }
 
 // Navigation destination for photo details

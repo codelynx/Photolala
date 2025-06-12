@@ -11,14 +11,18 @@ import SwiftUI
 struct photolalaApp: App {
 	var body: some Scene {
 		#if os(macOS)
-		WindowGroup("Welcome") {
-			WelcomeView()
+		// Main window - opens on launch
+		WindowGroup("Photolala") {
+			DefaultPhotoBrowserView()
 		}
-		.windowResizability(.contentSize)
+		.commands {
+			PhotolalaCommands()
+		}
 		
+		// Additional windows for opening folders
 		WindowGroup("Photo Browser", for: URL.self) { $folderURL in
 			if let folderURL {
-				PhotoBrowserView(folderURL: folderURL)
+				PhotoNavigationView(folderURL: folderURL)
 			} else {
 				Text("No folder selected")
 					.foregroundStyle(.secondary)
@@ -26,6 +30,7 @@ struct photolalaApp: App {
 			}
 		}
 		#else
+		// iOS/iPadOS keeps the welcome view for now
 		WindowGroup {
 			NavigationStack {
 				WelcomeView()
