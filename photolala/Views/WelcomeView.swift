@@ -11,8 +11,6 @@ struct WelcomeView: View {
 	@State private var selectedFolder: URL?
 	@State private var showingFolderPicker = false
 	@State private var navigateToPhotoBrowser = false
-	@State private var showingSamplePhotos = false
-	@State private var showingResourceTest = false
 	#if os(macOS)
 	@Environment(\.openWindow) private var openWindow
 	#endif
@@ -45,24 +43,6 @@ struct WelcomeView: View {
 			.buttonStyle(.borderedProminent)
 			#endif
 			
-			// Sample photos button (for testing)
-			Button(action: openSamplePhotos) {
-				Label("View Sample Photos", systemImage: "photo.on.rectangle")
-					.frame(minWidth: 200)
-			}
-			.controlSize(.regular)
-			#if os(macOS)
-			.buttonStyle(.bordered)
-			#endif
-			
-			// Test resources button
-			Button(action: testResources) {
-				Label("Test Resources", systemImage: "hammer.circle")
-					.frame(minWidth: 200)
-			}
-			.controlSize(.small)
-			.foregroundStyle(.secondary)
-			
 			// Selected folder display
 			if let folder = selectedFolder {
 				VStack(spacing: 8) {
@@ -91,7 +71,7 @@ struct WelcomeView: View {
 		#if os(iOS)
 		.navigationDestination(isPresented: $navigateToPhotoBrowser) {
 			if let folder = selectedFolder {
-				PhotoBrowserView(folderURL: folder)
+				PhotoBrowserView(directoryPath: folder.path as NSString)
 			}
 		}
 		#endif
@@ -113,12 +93,11 @@ struct WelcomeView: View {
 		}
 		#elseif os(iOS)
 		.sheet(isPresented: $showingFolderPicker) {
-			DocumentPickerView(selectedFolder: $selectedFolder)
+			DocumentPickerView(selectedFolder: $selectedFolder) { url in
+				openPhotoBrowser(for: url)
+			}
 		}
 		#endif
-		.sheet(isPresented: $showingResourceTest) {
-			ResourceTestView()
-		}
 	}
 	
 	private func selectFolder() {
@@ -136,27 +115,6 @@ struct WelcomeView: View {
 		navigateToPhotoBrowser = true
 		#endif
 	}
-	
-	private func openSamplePhotos() {
-		// Check if Photos resource exists
-		ResourceHelper.checkPhotosResource()
-		
-		// Try to open the Photos resource directory
-		if let photosURL = Bundle.main.url(forResource: "Photos", withExtension: nil) {
-			selectedFolder = photosURL
-			openPhotoBrowser(for: photosURL)
-		} else {
-			print("Photos resource directory not found")
-			// Use virtual bundle photos URL as fallback
-			let bundleURL = BundlePhotosHelper.virtualBundlePhotosURL
-			selectedFolder = bundleURL
-			openPhotoBrowser(for: bundleURL)
-		}
-	}
-	
-	private func testResources() {
-		showingResourceTest = true
-	}
 }
 
 #if os(iOS)
@@ -165,6 +123,7 @@ import UIKit
 struct DocumentPickerView: UIViewControllerRepresentable {
 	@Binding var selectedFolder: URL?
 	@Environment(\.dismiss) private var dismiss
+	let onSelectFolder: (URL) -> Void
 	
 	func makeUIViewController(context: Context) -> UIDocumentPickerViewController {
 		let picker = UIDocumentPickerViewController(forOpeningContentTypes: [.folder])
@@ -194,6 +153,7 @@ struct DocumentPickerView: UIViewControllerRepresentable {
 					// Keep access for later use
 					url.stopAccessingSecurityScopedResource()
 				}
+				parent.onSelectFolder(url)
 			}
 			parent.dismiss()
 		}

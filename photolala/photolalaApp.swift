@@ -14,7 +14,7 @@ struct photolalaApp: App {
 		// Folder browser windows only - no default window
 		WindowGroup("Photolala", for: URL.self) { $folderURL in
 			if let folderURL {
-				PhotoNavigationView(folderURL: folderURL)
+				PhotoBrowserView(directoryPath: folderURL.path as NSString)
 			} else {
 				Text("No folder selected")
 					.foregroundStyle(.secondary)

@@ -10,17 +10,17 @@ import SwiftUI
 import AppKit
 
 class PhotoCollectionViewController: NSViewController {
-	let folderURL: URL
-	var photos: [URL] = []
-	var onSelectPhoto: ((URL, [URL]) -> Void)?
-	var onSelectFolder: ((URL) -> Void)?
+	let directoryPath: NSString
+	var photos: [PhotoRepresentation] = []
+	var onSelectPhoto: ((PhotoRepresentation, [PhotoRepresentation]) -> Void)?
+	var onSelectFolder: ((PhotoRepresentation) -> Void)?
 	
 	@IBOutlet weak var collectionView: NSCollectionView!
 	
-	init(folderURL: URL) {
-		self.folderURL = folderURL
+	init(directoryPath: NSString) {
+		self.directoryPath = directoryPath
 		super.init(nibName: nil, bundle: nil)
-		self.title = folderURL.lastPathComponent
+		self.title = directoryPath.lastPathComponent
 	}
 	
 	required init?(coder: NSCoder) {
@@ -80,26 +80,15 @@ class PhotoCollectionViewController: NSViewController {
 	}
 	
 	private func loadPhotos() {
-		// For bundle resources
-		if folderURL.scheme == "bundle-photos" {
-			photos = BundlePhotosHelper.getAllBundlePhotos()
-		} else {
-			// For regular directories
-			do {
-				let contents = try FileManager.default.contentsOfDirectory(
-					at: folderURL,
-					includingPropertiesForKeys: [.isRegularFileKey],
-					options: [.skipsHiddenFiles]
-				)
-				
-				let imageExtensions = ["jpg", "jpeg", "png", "heic", "heif", "tiff", "bmp"]
-				photos = contents.filter { url in
-					imageExtensions.contains(url.pathExtension.lowercased())
-				}
-			} catch {
-				print("Error loading photos: \(error)")
-			}
+		// Use DirectoryScanner to get PhotoRepresentation objects
+		photos = DirectoryScanner.scanDirectory(atPath: directoryPath)
+		
+		// Print the representations
+		print("\n=== Directory: \(directoryPath.lastPathComponent) ===")
+		for photo in photos {
+			print("PhotoRepresentation: \(photo.filename) -> \(photo.filePath)")
 		}
+		print("=== Total: \(photos.count) photos ===\n")
 		
 		collectionView.reloadData()
 	}
@@ -112,7 +101,8 @@ extension PhotoCollectionViewController: NSCollectionViewDataSource {
 	
 	func collectionView(_ collectionView: NSCollectionView, itemForRepresentedObjectAt indexPath: IndexPath) -> NSCollectionViewItem {
 		let item = collectionView.makeItem(withIdentifier: NSUserInterfaceItemIdentifier("PhotoItem"), for: indexPath) as! PhotoCollectionViewItem
-		item.photoURL = photos[indexPath.item]
+		let photo = photos[indexPath.item]
+		item.photoRepresentation = photo
 		return item
 	}
 }
@@ -129,15 +119,17 @@ extension PhotoCollectionViewController: NSCollectionViewDelegate {
 			// Handle double-click
 			let point = collectionView.convert(event.locationInWindow, from: nil)
 			if let indexPath = collectionView.indexPathForItem(at: point) {
-				let photoURL = photos[indexPath.item]
+				let photo = photos[indexPath.item]
+				let photoURL = photo.fileURL
 				
 				// Check if it's a directory
 				var isDirectory: ObjCBool = false
 				if FileManager.default.fileExists(atPath: photoURL.path, isDirectory: &isDirectory) {
 					if isDirectory.boolValue {
-						onSelectFolder?(photoURL)
+						onSelectFolder?(photo)
 					} else {
-						onSelectPhoto?(photoURL, photos)
+						// Convert PhotoRepresentations back to URLs for now
+						onSelectPhoto?(photo, photos)
 					}
 				}
 			}
@@ -147,7 +139,7 @@ extension PhotoCollectionViewController: NSCollectionViewDelegate {
 
 // Collection View Item
 class PhotoCollectionViewItem: NSCollectionViewItem {
-	var photoURL: URL? {
+	var photoRepresentation: PhotoRepresentation? {
 		didSet {
 			loadThumbnail()
 		}
@@ -177,7 +169,8 @@ class PhotoCollectionViewItem: NSCollectionViewItem {
 	}
 	
 	private func loadThumbnail() {
-		guard let url = photoURL else { return }
+		guard let photoRep = photoRepresentation else { return }
+		let url = photoRep.fileURL
 		
 		// Simple thumbnail loading for now
 		DispatchQueue.global(qos: .userInitiated).async {
@@ -192,12 +185,12 @@ class PhotoCollectionViewItem: NSCollectionViewItem {
 
 // SwiftUI Hosting View
 struct PhotoCollectionView: NSViewControllerRepresentable {
-	let folderURL: URL
-	var onSelectPhoto: ((URL, [URL]) -> Void)?
-	var onSelectFolder: ((URL) -> Void)?
+	let directoryPath: NSString
+	var onSelectPhoto: ((PhotoRepresentation, [PhotoRepresentation]) -> Void)?
+	var onSelectFolder: ((PhotoRepresentation) -> Void)?
 	
 	func makeNSViewController(context: Context) -> PhotoCollectionViewController {
-		let controller = PhotoCollectionViewController(folderURL: folderURL)
+		let controller = PhotoCollectionViewController(directoryPath: directoryPath)
 		controller.onSelectPhoto = onSelectPhoto
 		controller.onSelectFolder = onSelectFolder
 		return controller
@@ -214,16 +207,16 @@ import UIKit
 
 // iOS Implementation
 class PhotoCollectionViewController: UIViewController {
-	let folderURL: URL
-	var photos: [URL] = []
+	let directoryPath: NSString
+	var photos: [PhotoRepresentation] = []
 	var collectionView: UICollectionView!
-	var onSelectPhoto: ((URL, [URL]) -> Void)?
-	var onSelectFolder: ((URL) -> Void)?
+	var onSelectPhoto: ((PhotoRepresentation, [PhotoRepresentation]) -> Void)?
+	var onSelectFolder: ((PhotoRepresentation) -> Void)?
 	
-	init(folderURL: URL) {
-		self.folderURL = folderURL
+	init(directoryPath: NSString) {
+		self.directoryPath = directoryPath
 		super.init(nibName: nil, bundle: nil)
-		self.title = folderURL.lastPathComponent
+		self.title = directoryPath.lastPathComponent
 	}
 	
 	required init?(coder: NSCoder) {
@@ -255,25 +248,15 @@ class PhotoCollectionViewController: UIViewController {
 	}
 	
 	private func loadPhotos() {
-		// Similar to macOS implementation
-		if folderURL.scheme == "bundle-photos" {
-			photos = BundlePhotosHelper.getAllBundlePhotos()
-		} else {
-			do {
-				let contents = try FileManager.default.contentsOfDirectory(
-					at: folderURL,
-					includingPropertiesForKeys: [.isRegularFileKey],
-					options: [.skipsHiddenFiles]
-				)
-				
-				let imageExtensions = ["jpg", "jpeg", "png", "heic", "heif", "tiff", "bmp"]
-				photos = contents.filter { url in
-					imageExtensions.contains(url.pathExtension.lowercased())
-				}
-			} catch {
-				print("Error loading photos: \(error)")
-			}
+		// Use DirectoryScanner to get PhotoRepresentation objects
+		photos = DirectoryScanner.scanDirectory(atPath: directoryPath)
+		
+		// Print the representations
+		print("\n=== Directory: \(directoryPath.lastPathComponent) ===")
+		for photo in photos {
+			print("PhotoRepresentation: \(photo.filename) -> \(photo.filePath)")
 		}
+		print("=== Total: \(photos.count) photos ===\n")
 		
 		collectionView.reloadData()
 	}
@@ -286,22 +269,25 @@ extension PhotoCollectionViewController: UICollectionViewDataSource {
 	
 	func collectionView(_ collectionView: UICollectionView, cellForItemAt indexPath: IndexPath) -> UICollectionViewCell {
 		let cell = collectionView.dequeueReusableCell(withReuseIdentifier: "PhotoCell", for: indexPath) as! PhotoCollectionViewCell
-		cell.photoURL = photos[indexPath.item]
+		let photo = photos[indexPath.item]
+		cell.photoRepresentation = photo
 		return cell
 	}
 }
 
 extension PhotoCollectionViewController: UICollectionViewDelegate {
 	func collectionView(_ collectionView: UICollectionView, didSelectItemAt indexPath: IndexPath) {
-		let photoURL = photos[indexPath.item]
+		let photo = photos[indexPath.item]
+		let photoURL = photo.fileURL
 		
 		// Check if it's a directory
 		var isDirectory: ObjCBool = false
 		if FileManager.default.fileExists(atPath: photoURL.path, isDirectory: &isDirectory) {
 			if isDirectory.boolValue {
-				onSelectFolder?(photoURL)
+				onSelectFolder?(photo)
 			} else {
-				onSelectPhoto?(photoURL, photos)
+				// Convert PhotoRepresentations back to URLs for now
+				onSelectPhoto?(photo, photos)
 			}
 		}
 	}
@@ -309,7 +295,7 @@ extension PhotoCollectionViewController: UICollectionViewDelegate {
 
 // Collection View Cell
 class PhotoCollectionViewCell: UICollectionViewCell {
-	var photoURL: URL? {
+	var photoRepresentation: PhotoRepresentation? {
 		didSet {
 			loadThumbnail()
 		}
@@ -345,11 +331,11 @@ class PhotoCollectionViewCell: UICollectionViewCell {
 	}
 	
 	private func loadThumbnail() {
-		guard let url = photoURL else { return }
+		guard let fileURL = photoRepresentation?.fileURL else { return }
 		
 		// Simple thumbnail loading for now
 		DispatchQueue.global(qos: .userInitiated).async {
-			if let data = try? Data(contentsOf: url),
+			if let data = try? Data(contentsOf: fileURL),
 			   let image = UIImage(data: data) {
 				DispatchQueue.main.async {
 					self.imageView.image = image
@@ -361,12 +347,12 @@ class PhotoCollectionViewCell: UICollectionViewCell {
 
 // SwiftUI Hosting View
 struct PhotoCollectionView: UIViewControllerRepresentable {
-	let folderURL: URL
-	var onSelectPhoto: ((URL, [URL]) -> Void)?
-	var onSelectFolder: ((URL) -> Void)?
+	let directoryPath: NSString
+	var onSelectPhoto: ((PhotoRepresentation, [PhotoRepresentation]) -> Void)?
+	var onSelectFolder: ((PhotoRepresentation) -> Void)?
 	
 	func makeUIViewController(context: Context) -> PhotoCollectionViewController {
-		let controller = PhotoCollectionViewController(folderURL: folderURL)
+		let controller = PhotoCollectionViewController(directoryPath: directoryPath)
 		controller.onSelectPhoto = onSelectPhoto
 		controller.onSelectFolder = onSelectFolder
 		return controller

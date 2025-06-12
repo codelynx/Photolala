@@ -2,6 +2,10 @@
 
 This directory contains planning and design documents for the Photolala project.
 
+## Current Status
+
+📊 **See [`project-status.md`](./project-status.md) for the latest implementation status and recent changes.**
+
 ## Purpose
 
 Before implementing major features, we will:
@@ -11,7 +15,24 @@ Before implementing major features, we will:
 
 ## Document Structure
 
-- Feature specifications
-- Technical design documents
-- Architecture decisions
-- API documentation (when applicable)
+### Status & Planning
+- [`project-status.md`](./project-status.md) - Current implementation status and recent changes
+- [`implementation-roadmap.md`](./implementation-roadmap.md) - Overall project roadmap
+- [`development-plan-2025-06.md`](./development-plan-2025-06.md) - Current development plan
+
+### Architecture & Design
+- [`photo-browser-design.md`](./photo-browser-design.md) - Core photo browser architecture
+- [`window-per-folder-architecture.md`](./window-per-folder-architecture.md) - macOS window management
+- [`native-collection-view-design.md`](./native-collection-view-design.md) - Native collection view implementation
+- [`cross-platform-folder-selection-design.md`](./cross-platform-folder-selection-design.md) - Folder selection across platforms
+
+### Implementation Notes
+- [`phase1-implementation-notes.md`](./phase1-implementation-notes.md) - Phase 1 implementation details
+- [`phase2-implementation-notes.md`](./phase2-implementation-notes.md) - Phase 2 implementation details
+- [`implementation-notes-phase3-4.md`](./implementation-notes-phase3-4.md) - Phase 3 & 4 implementation
+
+### Technical Specifications
+- [`photolala-footprint-design.md`](./photolala-footprint-design.md) - .photolala file format
+- [`thumbnail-system-architecture.md`](./thumbnail-system-architecture.md) - Thumbnail generation system
+- [`loading-system-implementation-notes.md`](./loading-system-implementation-notes.md) - Loading and priority system
+- [`security-scoped-resources-implementation.md`](./security-scoped-resources-implementation.md) - Security and permissions

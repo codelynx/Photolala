@@ -8,13 +8,17 @@
 import SwiftUI
 
 struct PhotoBrowserView: View {
-	let folderURL: URL
+	let directoryPath: NSString
 	
 	var body: some View {
-		PhotoNavigationView(folderURL: folderURL)
+		PhotoCollectionView(directoryPath: directoryPath)
+			.navigationTitle(directoryPath.lastPathComponent)
+			#if os(macOS)
+			.navigationSubtitle(directoryPath as String)
+			#endif
 	}
 }
 
 #Preview {
-	PhotoBrowserView(folderURL: URL(fileURLWithPath: "/Users/example/Pictures"))
+	PhotoBrowserView(directoryPath: "/Users/example/Pictures")
 }
