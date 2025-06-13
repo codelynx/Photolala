@@ -6,20 +6,29 @@
 //
 
 import Foundation
+import SwiftUI
 
 #if canImport(AppKit)
 import AppKit
-typealias XViewController = NSViewController
-typealias XWindow = NSWindow
-typealias XImage = NSImage
-typealias XColor = NSColor
+public typealias XViewController = NSViewController
+public typealias XWindow = NSWindow
+public typealias XImage = NSImage
+public typealias XColor = NSColor
+public typealias XCollectionView = NSCollectionView
+public typealias XCollectionViewDelegate = NSCollectionViewDelegate
+public typealias XCollectionViewDataSource = NSCollectionViewDataSource
+public typealias XViewControllerRepresentable = NSViewControllerRepresentable
 #endif
 
 #if canImport(UIKit)
 import UIKit
-typealias XViewController = UIViewController
-typealias XWindow = UIWindow
-typealias XImage = UIImage
-typealias XColor = UIColor
+public typealias XViewController = UIViewController
+public typealias XWindow = UIWindow
+public typealias XImage = UIImage
+public typealias XColor = UIColor
+public typealias XCollectionView = UICollectionView
+public typealias XCollectionViewDelegate = UICollectionViewDelegate
+public typealias XCollectionViewDataSource = UICollectionViewDataSource
+public typealias XViewControllerRepresentable = UIViewControllerRepresentable
 #endif
 

@@ -30,33 +30,39 @@ Photolala is a cross-platform photo browser application similar to Adobe Bridge 
 
 ### Database-Free Design
 - **No SwiftData/CoreData** - Simple file-based approach
-- **PhotoRepresentation** struct instead of @Model class
-- **SimplePhotoScanner** for directory scanning
+- **PhotoRepresentation** as @Observable class for reactive UI
+- **DirectoryScanner** for directory scanning
 - **File system as source of truth**
 
 ### Key Models
 
 ```swift
 // Lightweight metadata representation
-struct PhotoRepresentation: Identifiable, Hashable {
-    let filePath: String              // Single source of truth
-    let fileSize: Int64
-    let createdDate: Date
-    let modifiedDate: Date
+@Observable
+class PhotoRepresentation: Identifiable, Hashable {
+    let directoryPath: NSString
+    let filename: String
     
-    var photoIdentifier: PhotoIdentifier?  // Content-based ID
-    var imageHeader: Data?            // First 64KB for metadata
-    var imageWidth: Int?
-    var imageHeight: Int?
+    // Observable properties for UI updates
+    var thumbnail: XImage?
+    var isLoadingThumbnail = false
     
     // Computed properties
-    var id: String { filePath }
-    var fileName: String { /* from filePath */ }
-    var directoryPath: String { /* from filePath */ }
-    var cacheKey: String { /* from photoIdentifier */ }
+    var filePath: NSString { directoryPath.appendingPathComponent(filename) as NSString }
+    var fileURL: URL { URL(fileURLWithPath: filePath as String) }
+    var id: String { filePath as String }
+    
+    // Future properties (not yet implemented)
+    // var fileSize: Int64
+    // var createdDate: Date
+    // var modifiedDate: Date
+    // var photoIdentifier: PhotoIdentifier?  // Content-based ID
+    // var imageHeader: Data?            // First 64KB for metadata
+    // var imageWidth: Int?
+    // var imageHeight: Int?
 }
 
-// Content-based identification
+// Content-based identification (future implementation)
 enum PhotoIdentifier {
     case contentHash(md5: String, byteSize: Int64)
     case photoLibrary(assetId: String)
@@ -123,11 +129,12 @@ enum PhotoIdentifier {
 
 ### Phase 1: Core Foundation ✅ (Completed)
 - [x] Basic project structure with macOS/iOS targets
-- [x] PhotoRepresentation model (no database)
-- [x] SimplePhotoScanner for directory listing
-- [x] Basic MainWindowView
+- [x] PhotoRepresentation model as @Observable class
+- [x] DirectoryScanner for directory listing
+- [x] PhotoBrowserView with native collection views
 - [x] Window-per-folder architecture
 - [x] Welcome screen with folder selection
+- [x] Cross-platform PhotoCollectionViewController
 
 ### Phase 2: Thumbnail System 🚧 (In Progress)
 - [x] ThumbnailService with disk caching
@@ -187,13 +194,13 @@ enum PhotoIdentifier {
 ## Current Implementation Status
 
 ### ✅ Completed
-- PhotoRepresentation model (no database)
-- SimplePhotoScanner (file-based)
-- MainWindowView without SwiftData
-- ThumbnailService with disk caching
-- NativePhotoGrid with platform adaptations
+- PhotoRepresentation model as @Observable class
+- DirectoryScanner (file-based)
+- PhotoBrowserView with native collection views
+- Consolidated PhotoCollectionViewController (cross-platform)
 - Window-per-folder architecture
-- Photos Library integration (iOS/macOS)
+- Basic folder navigation
+- Cross-platform type aliases (XPlatform.swift)
 
 ### 🚧 In Progress
 - No migration we have never released the service

@@ -8,14 +8,19 @@
 import SwiftUI
 #if os(macOS)
 import AppKit
+#else
+import UIKit
+#endif
 
-class PhotoCollectionViewController: NSViewController {
+// MARK: - PhotoCollectionViewController
+
+class PhotoCollectionViewController: XViewController {
 	let directoryPath: NSString
 	var photos: [PhotoRepresentation] = []
 	var onSelectPhoto: ((PhotoRepresentation, [PhotoRepresentation]) -> Void)?
 	var onSelectFolder: ((PhotoRepresentation) -> Void)?
 	
-	@IBOutlet weak var collectionView: NSCollectionView!
+	var collectionView: XCollectionView!
 	
 	init(directoryPath: NSString) {
 		self.directoryPath = directoryPath
@@ -27,6 +32,9 @@ class PhotoCollectionViewController: NSViewController {
 		fatalError("init(coder:) has not been implemented")
 	}
 	
+	// MARK: - View Lifecycle
+	
+#if os(macOS)
 	override func loadView() {
 		// Create the main view
 		view = NSView()
@@ -40,7 +48,7 @@ class PhotoCollectionViewController: NSViewController {
 		scrollView.hasHorizontalScroller = false
 		scrollView.autohidesScrollers = true
 		
-		let collectionView = NSCollectionView()
+		let collectionView = XCollectionView()
 		collectionView.collectionViewLayout = createLayout()
 		collectionView.delegate = self
 		collectionView.dataSource = self
@@ -78,6 +86,33 @@ class PhotoCollectionViewController: NSViewController {
 		flowLayout.minimumLineSpacing = 8
 		return flowLayout
 	}
+#else
+	override func viewDidLoad() {
+		super.viewDidLoad()
+		setupCollectionView()
+		loadPhotos()
+	}
+	
+	private func setupCollectionView() {
+		let layout = UICollectionViewFlowLayout()
+		layout.itemSize = CGSize(width: 150, height: 150)
+		layout.sectionInset = UIEdgeInsets(top: 10, left: 10, bottom: 10, right: 10)
+		layout.minimumInteritemSpacing = 8
+		layout.minimumLineSpacing = 8
+		
+		collectionView = XCollectionView(frame: view.bounds, collectionViewLayout: layout)
+		collectionView.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+		collectionView.backgroundColor = .systemBackground
+		collectionView.dataSource = self
+		collectionView.delegate = self
+		
+		collectionView.register(PhotoCollectionViewCell.self, forCellWithReuseIdentifier: "PhotoCell")
+		
+		view.addSubview(collectionView)
+	}
+#endif
+	
+	// MARK: - Private Methods
 	
 	private func loadPhotos() {
 		// Use DirectoryScanner to get PhotoRepresentation objects
@@ -92,26 +127,61 @@ class PhotoCollectionViewController: NSViewController {
 		
 		collectionView.reloadData()
 	}
+	
+	// MARK: - Navigation
+	
+	private func handleSelection(at indexPath: IndexPath) {
+		let photo = photos[indexPath.item]
+		let photoURL = photo.fileURL
+		
+		// Check if it's a directory
+		var isDirectory: ObjCBool = false
+		if FileManager.default.fileExists(atPath: photoURL.path, isDirectory: &isDirectory) {
+			if isDirectory.boolValue {
+				onSelectFolder?(photo)
+			} else {
+				onSelectPhoto?(photo, photos)
+			}
+		}
+	}
 }
 
-extension PhotoCollectionViewController: NSCollectionViewDataSource {
-	func collectionView(_ collectionView: NSCollectionView, numberOfItemsInSection section: Int) -> Int {
+// MARK: - Data Source
+
+extension PhotoCollectionViewController: XCollectionViewDataSource {
+
+	func collectionView(_ collectionView: XCollectionView, numberOfItemsInSection section: Int) -> Int {
 		return photos.count
 	}
 	
+	#if os(macOS)
 	func collectionView(_ collectionView: NSCollectionView, itemForRepresentedObjectAt indexPath: IndexPath) -> NSCollectionViewItem {
 		let item = collectionView.makeItem(withIdentifier: NSUserInterfaceItemIdentifier("PhotoItem"), for: indexPath) as! PhotoCollectionViewItem
 		let photo = photos[indexPath.item]
 		item.photoRepresentation = photo
 		return item
 	}
+	#endif
+
+	#if os(iOS)
+	func collectionView(_ collectionView: UICollectionView, cellForItemAt indexPath: IndexPath) -> UICollectionViewCell {
+		let cell = collectionView.dequeueReusableCell(withReuseIdentifier: "PhotoCell", for: indexPath) as! PhotoCollectionViewCell
+		let photo = photos[indexPath.item]
+		cell.photoRepresentation = photo
+		return cell
+	}
+	#endif
+
 }
 
-extension PhotoCollectionViewController: NSCollectionViewDelegate {
-	func collectionView(_ collectionView: NSCollectionView, didSelectItemsAt indexPaths: Set<IndexPath>) {
+// MARK: - Delegate
+
+extension PhotoCollectionViewController: XCollectionViewDelegate {
+	internal func collectionView(_ collectionView: XCollectionView, didSelectItemsAt indexPaths: Set<IndexPath>) {
 		// Handle selection
 	}
 	
+	#if os(macOS)
 	override func mouseDown(with event: NSEvent) {
 		super.mouseDown(with: event)
 		
@@ -119,25 +189,20 @@ extension PhotoCollectionViewController: NSCollectionViewDelegate {
 			// Handle double-click
 			let point = collectionView.convert(event.locationInWindow, from: nil)
 			if let indexPath = collectionView.indexPathForItem(at: point) {
-				let photo = photos[indexPath.item]
-				let photoURL = photo.fileURL
-				
-				// Check if it's a directory
-				var isDirectory: ObjCBool = false
-				if FileManager.default.fileExists(atPath: photoURL.path, isDirectory: &isDirectory) {
-					if isDirectory.boolValue {
-						onSelectFolder?(photo)
-					} else {
-						// Convert PhotoRepresentations back to URLs for now
-						onSelectPhoto?(photo, photos)
-					}
-				}
+				handleSelection(at: indexPath)
 			}
 		}
 	}
+	#endif
+
+	private func collectionView(_ collectionView: XCollectionView, didSelectItemAt indexPath: IndexPath) {
+		handleSelection(at: indexPath)
+	}
 }
 
-// Collection View Item
+// MARK: - Collection View Items
+
+#if os(macOS)
 class PhotoCollectionViewItem: NSCollectionViewItem {
 	var photoRepresentation: PhotoRepresentation? {
 		didSet {
@@ -155,7 +220,7 @@ class PhotoCollectionViewItem: NSCollectionViewItem {
 		imageView.layer?.cornerRadius = 8
 		imageView.layer?.masksToBounds = true
 		imageView.layer?.borderWidth = 1
-		imageView.layer?.borderColor = NSColor.separatorColor.cgColor
+		imageView.layer?.borderColor = XColor.separatorColor.cgColor
 		
 		self.imageView = imageView
 		view.addSubview(imageView)
@@ -174,7 +239,7 @@ class PhotoCollectionViewItem: NSCollectionViewItem {
 		
 		// Simple thumbnail loading for now
 		DispatchQueue.global(qos: .userInitiated).async {
-			if let image = NSImage(contentsOf: url) {
+			if let image = XImage(contentsOf: url) {
 				DispatchQueue.main.async {
 					self.imageView?.image = image
 				}
@@ -182,118 +247,7 @@ class PhotoCollectionViewItem: NSCollectionViewItem {
 		}
 	}
 }
-
-// SwiftUI Hosting View
-struct PhotoCollectionView: NSViewControllerRepresentable {
-	let directoryPath: NSString
-	var onSelectPhoto: ((PhotoRepresentation, [PhotoRepresentation]) -> Void)?
-	var onSelectFolder: ((PhotoRepresentation) -> Void)?
-	
-	func makeNSViewController(context: Context) -> PhotoCollectionViewController {
-		let controller = PhotoCollectionViewController(directoryPath: directoryPath)
-		controller.onSelectPhoto = onSelectPhoto
-		controller.onSelectFolder = onSelectFolder
-		return controller
-	}
-	
-	func updateNSViewController(_ nsViewController: PhotoCollectionViewController, context: Context) {
-		nsViewController.onSelectPhoto = onSelectPhoto
-		nsViewController.onSelectFolder = onSelectFolder
-	}
-}
-
 #else
-import UIKit
-
-// iOS Implementation
-class PhotoCollectionViewController: UIViewController {
-	let directoryPath: NSString
-	var photos: [PhotoRepresentation] = []
-	var collectionView: UICollectionView!
-	var onSelectPhoto: ((PhotoRepresentation, [PhotoRepresentation]) -> Void)?
-	var onSelectFolder: ((PhotoRepresentation) -> Void)?
-	
-	init(directoryPath: NSString) {
-		self.directoryPath = directoryPath
-		super.init(nibName: nil, bundle: nil)
-		self.title = directoryPath.lastPathComponent
-	}
-	
-	required init?(coder: NSCoder) {
-		fatalError("init(coder:) has not been implemented")
-	}
-	
-	override func viewDidLoad() {
-		super.viewDidLoad()
-		setupCollectionView()
-		loadPhotos()
-	}
-	
-	private func setupCollectionView() {
-		let layout = UICollectionViewFlowLayout()
-		layout.itemSize = CGSize(width: 150, height: 150)
-		layout.sectionInset = UIEdgeInsets(top: 10, left: 10, bottom: 10, right: 10)
-		layout.minimumInteritemSpacing = 8
-		layout.minimumLineSpacing = 8
-		
-		collectionView = UICollectionView(frame: view.bounds, collectionViewLayout: layout)
-		collectionView.autoresizingMask = [.flexibleWidth, .flexibleHeight]
-		collectionView.backgroundColor = .systemBackground
-		collectionView.dataSource = self
-		collectionView.delegate = self
-		
-		collectionView.register(PhotoCollectionViewCell.self, forCellWithReuseIdentifier: "PhotoCell")
-		
-		view.addSubview(collectionView)
-	}
-	
-	private func loadPhotos() {
-		// Use DirectoryScanner to get PhotoRepresentation objects
-		photos = DirectoryScanner.scanDirectory(atPath: directoryPath)
-		
-		// Print the representations
-		print("\n=== Directory: \(directoryPath.lastPathComponent) ===")
-		for photo in photos {
-			print("PhotoRepresentation: \(photo.filename) -> \(photo.filePath)")
-		}
-		print("=== Total: \(photos.count) photos ===\n")
-		
-		collectionView.reloadData()
-	}
-}
-
-extension PhotoCollectionViewController: UICollectionViewDataSource {
-	func collectionView(_ collectionView: UICollectionView, numberOfItemsInSection section: Int) -> Int {
-		return photos.count
-	}
-	
-	func collectionView(_ collectionView: UICollectionView, cellForItemAt indexPath: IndexPath) -> UICollectionViewCell {
-		let cell = collectionView.dequeueReusableCell(withReuseIdentifier: "PhotoCell", for: indexPath) as! PhotoCollectionViewCell
-		let photo = photos[indexPath.item]
-		cell.photoRepresentation = photo
-		return cell
-	}
-}
-
-extension PhotoCollectionViewController: UICollectionViewDelegate {
-	func collectionView(_ collectionView: UICollectionView, didSelectItemAt indexPath: IndexPath) {
-		let photo = photos[indexPath.item]
-		let photoURL = photo.fileURL
-		
-		// Check if it's a directory
-		var isDirectory: ObjCBool = false
-		if FileManager.default.fileExists(atPath: photoURL.path, isDirectory: &isDirectory) {
-			if isDirectory.boolValue {
-				onSelectFolder?(photo)
-			} else {
-				// Convert PhotoRepresentations back to URLs for now
-				onSelectPhoto?(photo, photos)
-			}
-		}
-	}
-}
-
-// Collection View Cell
 class PhotoCollectionViewCell: UICollectionViewCell {
 	var photoRepresentation: PhotoRepresentation? {
 		didSet {
@@ -317,7 +271,7 @@ class PhotoCollectionViewCell: UICollectionViewCell {
 		imageView.clipsToBounds = true
 		imageView.layer.cornerRadius = 8
 		imageView.layer.borderWidth = 1
-		imageView.layer.borderColor = UIColor.separator.cgColor
+		imageView.layer.borderColor = XColor.separator.cgColor
 		
 		contentView.addSubview(imageView)
 		imageView.translatesAutoresizingMaskIntoConstraints = false
@@ -336,7 +290,7 @@ class PhotoCollectionViewCell: UICollectionViewCell {
 		// Simple thumbnail loading for now
 		DispatchQueue.global(qos: .userInitiated).async {
 			if let data = try? Data(contentsOf: fileURL),
-			   let image = UIImage(data: data) {
+			   let image = XImage(data: data) {
 				DispatchQueue.main.async {
 					self.imageView.image = image
 				}
@@ -344,13 +298,30 @@ class PhotoCollectionViewCell: UICollectionViewCell {
 		}
 	}
 }
+#endif
 
-// SwiftUI Hosting View
-struct PhotoCollectionView: UIViewControllerRepresentable {
+// MARK: - SwiftUI Hosting View
+
+struct PhotoCollectionView: XViewControllerRepresentable {
 	let directoryPath: NSString
 	var onSelectPhoto: ((PhotoRepresentation, [PhotoRepresentation]) -> Void)?
 	var onSelectFolder: ((PhotoRepresentation) -> Void)?
 	
+	#if os(macOS)
+	func makeNSViewController(context: Context) -> PhotoCollectionViewController {
+		let controller = PhotoCollectionViewController(directoryPath: directoryPath)
+		controller.onSelectPhoto = onSelectPhoto
+		controller.onSelectFolder = onSelectFolder
+		return controller
+	}
+	
+	func updateNSViewController(_ nsViewController: PhotoCollectionViewController, context: Context) {
+		nsViewController.onSelectPhoto = onSelectPhoto
+		nsViewController.onSelectFolder = onSelectFolder
+	}
+	#endif
+
+	#if os(iOS)
 	func makeUIViewController(context: Context) -> PhotoCollectionViewController {
 		let controller = PhotoCollectionViewController(directoryPath: directoryPath)
 		controller.onSelectPhoto = onSelectPhoto
@@ -362,6 +333,6 @@ struct PhotoCollectionView: UIViewControllerRepresentable {
 		uiViewController.onSelectPhoto = onSelectPhoto
 		uiViewController.onSelectFolder = onSelectFolder
 	}
+	#endif
+	
 }
-
-#endif

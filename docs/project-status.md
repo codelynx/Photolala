@@ -11,6 +11,9 @@ Last Updated: June 12, 2025
   - `directoryPath: NSString` - Directory path 
   - `filename: String` - Filename only
   - Computed properties for `fileURL` and `filePath`
+  - Changed to @Observable class (from struct) for reactive updates
+  - Added `thumbnail: XImage?` property for caching thumbnails
+  - Added `isLoadingThumbnail: Bool` for loading state
   - Designed for efficient memory usage with large collections
 
 #### Services
@@ -23,9 +26,11 @@ Last Updated: June 12, 2025
 #### UI Components
 - **PhotoCollectionViewController**: Native collection view implementation
   - Cross-platform (NSCollectionView on macOS, UICollectionView on iOS)
+  - Consolidated into single file with platform conditionals
   - Uses PhotoRepresentation instead of URLs
   - Basic thumbnail loading (placeholder implementation)
   - Supports selection callbacks for photos and folders
+  - Fixed crash issue by removing @IBOutlet (views created programmatically)
   
 - **PhotoBrowserView**: SwiftUI wrapper for PhotoCollectionViewController
   - Simple integration point between SwiftUI and native views
@@ -61,6 +66,8 @@ Last Updated: June 12, 2025
    - Removed complex Photo model with SwiftData dependencies
    - Implemented lightweight PhotoRepresentation
    - Separated directory path and filename for efficiency
+   - Changed from struct to @Observable class for reactive UI updates
+   - Added thumbnail and isLoadingThumbnail properties for future thumbnail support
 
 2. **Implemented DirectoryScanner**:
    - Replaces previous scanning implementations
@@ -71,6 +78,9 @@ Last Updated: June 12, 2025
    - Migrated from URL arrays to PhotoRepresentation arrays
    - Fixed type mismatches throughout the codebase
    - Maintained platform-specific implementations
+   - Consolidated macOS and iOS PhotoCollectionViewController into single file
+   - Added cross-platform type aliases (XCollectionView, XViewController, etc.)
+   - Fixed @IBOutlet crash issue - removed IBOutlet since views are created programmatically
 
 4. **Simplified Navigation**:
    - Removed PhotoNavigationView (was causing build issues)
@@ -85,6 +95,11 @@ Last Updated: June 12, 2025
 6. **iOS Navigation Enhancement**:
    - Added automatic navigation after folder selection
    - Better user experience - no extra tap needed
+
+7. **Cross-Platform Improvements**:
+   - Enhanced XPlatform.swift with collection view type aliases
+   - Better code reuse between macOS and iOS
+   - Unified delegate and data source protocols
 
 ### 🐛 Known Issues
 
@@ -139,10 +154,12 @@ Last Updated: June 12, 2025
 - Various test/sample code
 
 **Modified:**
-- `photolala/Views/PhotoCollectionViewController.swift` - Uses PhotoRepresentation
+- `photolala/Views/PhotoCollectionViewController.swift` - Consolidated platform implementations
 - `photolala/Views/PhotoBrowserView.swift` - Simplified implementation
 - `photolala/Views/WelcomeView.swift` - Removed test buttons, added iOS auto-navigation
 - `photolala/photolalaApp.swift` - Uses PhotoBrowserView directly
+- `photolala/Models/PhotoRepresentation.swift` - Changed to @Observable class
+- `photolala/Utilities/XPlatform.swift` - Added collection view type aliases
 
 ### 🔧 Technical Decisions
 
