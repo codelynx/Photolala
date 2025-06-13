@@ -123,6 +123,20 @@ Last Updated: June 12, 2025
      - macOS: Relies on NSImage's automatic orientation handling
    - Updated collection view cells to use async/await with PhotoManager
 
+10. **Added Thumbnail Display Options (June 13 - Session 3)**:
+   - Created ThumbnailDisplaySettings model:
+     - Display modes: Scale to Fit vs Scale to Fill
+     - Predefined sizes: Small (64px), Medium (128px), Large (256px)
+     - Per-window settings (not global)
+   - Added toolbar controls:
+     - Display mode toggle button
+     - Size picker (segmented control on macOS, menu on iOS)
+   - Implemented dynamic layout updates:
+     - Collection view resizes cells when settings change
+     - Visible items update display mode immediately
+   - Each window maintains independent display settings
+   - Cross-platform toolbar implementation in SwiftUI
+
 ### 🐛 Known Issues
 
 1. ~~Thumbnail loading is inefficient (loads full images)~~ ✅ Fixed with PhotoManager
@@ -169,17 +183,20 @@ Last Updated: June 12, 2025
 
 **Added:**
 - `photolala/Models/PhotoRepresentation.swift`
+- `photolala/Models/ThumbnailDisplaySettings.swift` - Display mode and size settings
 - `photolala/Services/DirectoryScanner.swift`
 - `photolala/Services/PhotoManager.swift` - Thumbnail generation and caching
 - `docs/project-status.md` (this file)
+- `docs/thumbnail-display-options-design.md` - Design for display options feature
+- `docs/thumbnail-display-implementation-plan.md` - Implementation plan
 
 **Removed:**
 - `photolala/Views/PhotoNavigationView.swift`
 - Various test/sample code
 
 **Modified:**
-- `photolala/Views/PhotoCollectionViewController.swift` - Consolidated platform implementations
-- `photolala/Views/PhotoBrowserView.swift` - Simplified implementation
+- `photolala/Views/PhotoCollectionViewController.swift` - Consolidated platform implementations, added display settings support
+- `photolala/Views/PhotoBrowserView.swift` - Simplified implementation, added toolbar with display options
 - `photolala/Views/WelcomeView.swift` - Removed test buttons, added iOS auto-navigation
 - `photolala/photolalaApp.swift` - Uses PhotoBrowserView directly
 - `photolala/Models/PhotoRepresentation.swift` - Changed to @Observable class

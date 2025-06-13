@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import Observation
 #if os(macOS)
 import AppKit
 #else
@@ -16,6 +17,7 @@ import UIKit
 
 class PhotoCollectionViewController: XViewController {
 	let directoryPath: NSString
+	weak var settings: ThumbnailDisplaySettings?
 
 	@MainActor
 	var photos: [PhotoRepresentation] = []
@@ -78,11 +80,14 @@ class PhotoCollectionViewController: XViewController {
 	override func viewDidLoad() {
 		super.viewDidLoad()
 		loadPhotos()
+		setupSettingsObserver()
+		setupToolbar()
 	}
 	
 	private func createLayout() -> NSCollectionViewLayout {
 		let flowLayout = NSCollectionViewFlowLayout()
-		flowLayout.itemSize = NSSize(width: 150, height: 150)
+		let cellSize = settings?.thumbnailSize ?? ThumbnailSize.defaultValue
+		flowLayout.itemSize = NSSize(width: cellSize, height: cellSize)
 		flowLayout.sectionInset = NSEdgeInsets(top: 10, left: 10, bottom: 10, right: 10)
 		flowLayout.minimumInteritemSpacing = 8
 		flowLayout.minimumLineSpacing = 8
@@ -93,11 +98,14 @@ class PhotoCollectionViewController: XViewController {
 		super.viewDidLoad()
 		setupCollectionView()
 		loadPhotos()
+		setupSettingsObserver()
+		setupToolbar()
 	}
 	
 	private func setupCollectionView() {
 		let layout = UICollectionViewFlowLayout()
-		layout.itemSize = CGSize(width: 150, height: 150)
+		let cellSize = settings?.thumbnailSize ?? ThumbnailSize.defaultValue
+		layout.itemSize = CGSize(width: cellSize, height: cellSize)
 		layout.sectionInset = UIEdgeInsets(top: 10, left: 10, bottom: 10, right: 10)
 		layout.minimumInteritemSpacing = 8
 		layout.minimumLineSpacing = 8
@@ -130,6 +138,64 @@ class PhotoCollectionViewController: XViewController {
 		}
 	}
 	
+	private func setupSettingsObserver() {
+		// Observe settings changes when settings object is available
+		guard let settings = settings else { return }
+		
+		withObservationTracking {
+			_ = settings.displayMode
+			_ = settings.thumbnailSize
+		} onChange: { [weak self] in
+			Task { @MainActor in
+				self?.updateCollectionViewLayout()
+				self?.setupSettingsObserver() // Re-subscribe
+			}
+		}
+	}
+	
+	func updateCollectionViewLayout() {
+		guard let settings = settings else { return }
+		
+		#if os(macOS)
+		if let flowLayout = collectionView.collectionViewLayout as? NSCollectionViewFlowLayout {
+			let cellSize = settings.thumbnailSize
+			flowLayout.itemSize = NSSize(width: cellSize, height: cellSize)
+			
+			// Update all visible items
+			for item in collectionView.visibleItems() {
+				if let photoItem = item as? PhotoCollectionViewItem {
+					photoItem.settings = settings
+					photoItem.updateDisplayMode()
+				}
+			}
+		}
+		#else
+		if let flowLayout = collectionView.collectionViewLayout as? UICollectionViewFlowLayout {
+			let cellSize = settings.thumbnailSize
+			flowLayout.itemSize = CGSize(width: cellSize, height: cellSize)
+			
+			// Update all visible cells
+			for cell in collectionView.visibleCells {
+				if let photoCell = cell as? PhotoCollectionViewCell {
+					photoCell.settings = settings
+					photoCell.updateDisplayMode()
+				}
+			}
+		}
+		#endif
+		
+		collectionView.reloadData()
+	}
+	
+	private func setupToolbar() {
+		// Toolbar is now handled by SwiftUI in PhotoBrowserView
+	}
+	
+	@objc private func toggleDisplayMode() {
+		guard let settings = settings else { return }
+		settings.displayMode = settings.displayMode == .scaleToFit ? .scaleToFill : .scaleToFit
+	}
+	
 	// MARK: - Navigation
 	
 	private func handleSelection(at indexPath: IndexPath) {
@@ -160,6 +226,7 @@ extension PhotoCollectionViewController: XCollectionViewDataSource {
 	func collectionView(_ collectionView: NSCollectionView, itemForRepresentedObjectAt indexPath: IndexPath) -> NSCollectionViewItem {
 		let item = collectionView.makeItem(withIdentifier: NSUserInterfaceItemIdentifier("PhotoItem"), for: indexPath) as! PhotoCollectionViewItem
 		let photo = photos[indexPath.item]
+		item.settings = settings
 		item.photoRepresentation = photo
 		return item
 	}
@@ -169,6 +236,7 @@ extension PhotoCollectionViewController: XCollectionViewDataSource {
 	func collectionView(_ collectionView: UICollectionView, cellForItemAt indexPath: IndexPath) -> UICollectionViewCell {
 		let cell = collectionView.dequeueReusableCell(withReuseIdentifier: "PhotoCell", for: indexPath) as! PhotoCollectionViewCell
 		let photo = photos[indexPath.item]
+		cell.settings = settings
 		cell.photoRepresentation = photo
 		return cell
 	}
@@ -206,6 +274,7 @@ extension PhotoCollectionViewController: XCollectionViewDelegate {
 
 #if os(macOS)
 class PhotoCollectionViewItem: NSCollectionViewItem {
+	weak var settings: ThumbnailDisplaySettings?
 	var photoRepresentation: PhotoRepresentation? {
 		didSet {
 			loadThumbnail()
@@ -250,7 +319,7 @@ class PhotoCollectionViewItem: NSCollectionViewItem {
 					do {
 						let photoRep = photoRepresentation
 						let thumbnail = try await PhotoManager.shared.thumbnail(for: photoRep)
-						self.update(thumbnail: thumbnail, for: photoRepresentation)
+						self.updateThumbnail(thumbnail: thumbnail, for: photoRepresentation)
 					} catch {
 						// Silent fail for thumbnails
 					}
@@ -280,15 +349,28 @@ class PhotoCollectionViewItem: NSCollectionViewItem {
 	}
 	
 	@MainActor
-	func update(thumbnail: XImage?, for photoRep: PhotoRepresentation) {
+	func updateThumbnail(thumbnail: XImage?, for photoRep: PhotoRepresentation) {
 		if photoRepresentation == photoRep {
 			imageView?.image = thumbnail
+		}
+	}
+	
+	@MainActor
+	func updateDisplayMode() {
+		guard let imageView = imageView, let settings = settings else { return }
+		
+		switch settings.displayMode {
+		case .scaleToFit:
+			imageView.imageScaling = .scaleProportionallyUpOrDown
+		case .scaleToFill:
+			imageView.imageScaling = .scaleAxesIndependently
 		}
 	}
 
 }
 #else
 class PhotoCollectionViewCell: UICollectionViewCell {
+	weak var settings: ThumbnailDisplaySettings?
 	var photoRepresentation: PhotoRepresentation? {
 		didSet {
 			loadThumbnail()
@@ -307,7 +389,7 @@ class PhotoCollectionViewCell: UICollectionViewCell {
 	}
 	
 	private func setupViews() {
-		imageView.contentMode = .scaleAspectFill
+		updateDisplayMode()
 		imageView.clipsToBounds = true
 		imageView.layer.cornerRadius = 8
 		imageView.layer.borderWidth = 1
@@ -337,6 +419,17 @@ class PhotoCollectionViewCell: UICollectionViewCell {
 			}
 		}
 	}
+	
+	func updateDisplayMode() {
+		guard let settings = settings else { return }
+		
+		switch settings.displayMode {
+		case .scaleToFit:
+			imageView.contentMode = .scaleAspectFit
+		case .scaleToFill:
+			imageView.contentMode = .scaleAspectFill
+		}
+	}
 }
 #endif
 
@@ -344,34 +437,43 @@ class PhotoCollectionViewCell: UICollectionViewCell {
 
 struct PhotoCollectionView: XViewControllerRepresentable {
 	let directoryPath: NSString
+	let settings: ThumbnailDisplaySettings
 	var onSelectPhoto: ((PhotoRepresentation, [PhotoRepresentation]) -> Void)?
 	var onSelectFolder: ((PhotoRepresentation) -> Void)?
 	
 	#if os(macOS)
 	func makeNSViewController(context: Context) -> PhotoCollectionViewController {
 		let controller = PhotoCollectionViewController(directoryPath: directoryPath)
+		controller.settings = settings
 		controller.onSelectPhoto = onSelectPhoto
 		controller.onSelectFolder = onSelectFolder
 		return controller
 	}
 	
 	func updateNSViewController(_ nsViewController: PhotoCollectionViewController, context: Context) {
+		nsViewController.settings = settings
 		nsViewController.onSelectPhoto = onSelectPhoto
 		nsViewController.onSelectFolder = onSelectFolder
+		// Trigger layout update when settings change
+		nsViewController.updateCollectionViewLayout()
 	}
 	#endif
 
 	#if os(iOS)
 	func makeUIViewController(context: Context) -> PhotoCollectionViewController {
 		let controller = PhotoCollectionViewController(directoryPath: directoryPath)
+		controller.settings = settings
 		controller.onSelectPhoto = onSelectPhoto
 		controller.onSelectFolder = onSelectFolder
 		return controller
 	}
 	
 	func updateUIViewController(_ uiViewController: PhotoCollectionViewController, context: Context) {
+		uiViewController.settings = settings
 		uiViewController.onSelectPhoto = onSelectPhoto
 		uiViewController.onSelectFolder = onSelectFolder
+		// Trigger layout update when settings change
+		uiViewController.updateCollectionViewLayout()
 	}
 	#endif
 	
