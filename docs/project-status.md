@@ -153,6 +153,13 @@ Last Updated: June 12, 2025
      - Large: Spacious layout with prominent rounded corners
    - Added app icon from legacy branch (sunflower image)
 
+12. **Disabled Window Restoration (June 13)**:
+   - Added NSApplicationDelegate to control state restoration
+   - Implemented applicationSupportsSecureRestorableState returning false
+   - Windows no longer automatically restore on app launch
+   - Users start with a clean state each time
+   - Added Photos library entitlement for future features
+
 ### 🐛 Known Issues
 
 1. ~~Thumbnail loading is inefficient (loads full images)~~ ✅ Fixed with PhotoManager
@@ -226,3 +233,4 @@ Last Updated: June 12, 2025
 4. **Clean Code**: Removed temporary debugging print statements
 5. **Per-Window Settings**: Each window has independent display settings for flexibility
 6. **Enum-Based Configuration**: ThumbnailOption encapsulates all size-related layout properties
+7. **No Window Restoration**: App starts fresh each time for cleaner user experience

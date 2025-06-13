@@ -7,9 +7,22 @@
 
 import SwiftUI
 
+#if os(macOS)
+class AppDelegate: NSObject, NSApplicationDelegate {
+	func applicationSupportsSecureRestorableState(_ app: NSApplication) -> Bool {
+		// Disable window restoration
+		return false
+	}
+}
+#endif
+
 @main
 struct photolalaApp: App {
 	let photoManager = PhotoManager.shared
+	
+	#if os(macOS)
+	@NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
+	#endif
 	
 	init() {
 		print("[photolalaApp] App initialized")
