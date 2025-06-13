@@ -53,5 +53,4 @@ class DirectoryScanner {
 		return photos
 	}
 
-
 }

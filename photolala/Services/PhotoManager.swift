@@ -10,27 +10,27 @@ import CryptoKit
 
 class PhotoManager {
 
+	typealias XThumbnail = XImage
+
 	enum Identifier {
-		case md5(Insecure.MD5Digest, Int) // universal photo identifier
+		case md5(Insecure.MD5Digest) // universal photo identifier
 		case applePhotoLibrary(String) // unique device wide
 		var string: String {
 			switch self {
-			case .md5(let digest, let index):
-				return "md5#\(digest)#\(index)"
-			case .applePhotoLibrary(let identifier):
-				return "apl#\(identifier)"
+			case .md5(let digest): return "md5#\(digest)"
+			case .applePhotoLibrary(let identifier): return "apl#\(identifier)"
 			}
 		}
 		init?(string: String) {
-			let components = string.split(separator: "#")
-			switch components.count {
-			case 3 where components[0] == "md5":
+			let components = string.split(separator: "#").map { String($0) }
+			guard components.count == 2 else { return nil }
+			switch components[0].lowercased() {
+			case "md5":
 				guard let data = Data(hexadecimalString: String(components[1])),
-					  let md5 = Insecure.MD5Digest(rawBytes: data),
-					  let size = Int(String(components[2]))
+					  let md5 = Insecure.MD5Digest(rawBytes: data)
 				else { return nil }
-				self = .md5(md5, size)
-			case 2 where components[0] == "apl":
+				self = .md5(md5)
+			case "apl":
 				self = .applePhotoLibrary(String(components[1]))
 			default:
 				return nil
@@ -39,36 +39,59 @@ class PhotoManager {
 	}
 
 	static let shared = PhotoManager()
-	private(set) lazy var photolalaStoragePath: NSString = {
-		let directoryPath = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first!.appendingPathComponent("Photolala").path
-		do { try FileManager.default.createDirectory(atPath: directoryPath, withIntermediateDirectories: true) }
-		catch { fatalError("cannot create directory: \(directoryPath), \(error)") }
-		return directoryPath as NSString
-	}()
-	private(set) lazy var thumbnailStoragePath: NSString = {
-		let directoryPath = self.photolalaStoragePath.appendingPathComponent("thumbnails")
-		do { try FileManager.default.createDirectory(atPath: directoryPath, withIntermediateDirectories: true) }
-		catch { fatalError("cannot create directory: \(directoryPath), \(error)") }
-		return directoryPath as NSString
-	}()
-	func thumbnailFilePath(for identifier: PhotoManager.Identifier) -> String {
-		return self.thumbnailStoragePath.appendingPathComponent(identifier.string).appending(".jpg")
+
+	func thumbnailURL(for identifier: Identifier) -> URL {
+		let filePath = self.thumbnailStoragePath.appendingPathComponent(identifier.string).appending(".jpg")
+		return URL(fileURLWithPath: filePath)
 	}
 	
 	private func error(message: String) ->Error {
 		return NSError(domain: "PhotoManager", code: -1, userInfo: [NSLocalizedDescriptionKey: message])
 	}
 
-	func computeMD5(_ data: Data) -> Insecure.MD5Digest {
+	func md5Digest(of data: Data) -> Insecure.MD5Digest {
 		return Insecure.MD5.hash(data: data)
 	}
 	
-	func thumbnail(rawData: Data) throws -> XImage? {
-		guard let image = XImage(data: rawData) else {
+	private let imageCache = NSCache<NSString, XImage>() // filePath: XImage
+	private let thumbnailCache = NSCache<NSString, XThumbnail>() // PhotoManager.Identifier: XThumbnail
+	private let queue = DispatchQueue(label: "com.photolala.PhotoManager", attributes: .concurrent)
+	
+	func loadImage(for photo: PhotoRepresentation) async throws -> XImage? {
+		return try await withCheckedThrowingContinuation { continuation in
+			queue.async {
+				do {
+					let result = try self.syncLoadImage(for: photo)
+					continuation.resume(returning: result)
+				} catch {
+					continuation.resume(throwing: error)
+				}
+			}
+		}
+	}
+	
+	private func syncLoadImage(for photo: PhotoRepresentation) throws -> XImage? {
+		if let image = imageCache.object(forKey: photo.id as NSString) {
+			return image
+		}
+		let imageData = try Data(contentsOf: URL(fileURLWithPath: photo.filePath))
+		if let image = XImage(data: imageData) {
+			let identifier = PhotoManager.Identifier.md5(md5Digest(of: imageData))
+			if self.hasThumbnail(for: identifier) == false {
+				try self.prepareThumbnail(from: imageData)
+			}
+			return image
+		}
+		else { return nil }
+	}
+
+	@discardableResult
+	func prepareThumbnail(from data: Data) throws -> XThumbnail? {
+		guard let image = XImage(data: data) else {
 			throw error(message: "Unable to create image from data")
 		}
-		let md5 = computeMD5(rawData)
-		let identifier = PhotoManager.Identifier.md5(md5, rawData.count)
+		let md5 = md5Digest(of: data)
+		let identifier = PhotoManager.Identifier.md5(md5)
 
 		// Scale so that the shorter side becomes 256 pixels
 		let originalSize = image.size
@@ -104,9 +127,12 @@ class PhotoManager {
 		guard let jpegData = rep.representation(using: .jpeg, properties: [:]) else {
 			throw error(message: "Unable to write JPEG data")
 		}
-		let thumbnailFilePath = self.thumbnailFilePath(for: identifier)
-		try jpegData.write(to: URL(filePath: thumbnailFilePath))
-		return NSImage(cgImage: croppedCG, size: NSSize(width: cropWidth, height: cropHeight))
+		let thumbnailFilePath = self.thumbnailURL(for: identifier).path
+		try jpegData.write(to: URL(fileURLWithPath: thumbnailFilePath))
+		// Create and cache the thumbnail
+		let thumbnail = NSImage(cgImage: croppedCG, size: NSSize(width: cropWidth, height: cropHeight))
+		imageCache.setObject(thumbnail, forKey: identifier.string as NSString)
+		return thumbnail
 #else
 		// Resize on iOS
 		UIGraphicsBeginImageContextWithOptions(scaledSize, false, 0.0)
@@ -134,23 +160,76 @@ class PhotoManager {
 		guard let jpegData = finalImage.jpegData(compressionQuality: 0.8) else {
 			throw error(message: "Unable to write JPEG data")
 		}
-		let thumbnailFilePath = self.thumbnailFilePath(for: identifier)
-		try jpegData.write(to: URL(fileURLWithPath: thumbnailFilePath) as URL)
+		let thumbnailFilePath = self.thumbnailURL(for: identifier).path
+		try jpegData.write(to: URL(fileURLWithPath: thumbnailFilePath))
+		// Cache the generated thumbnail
+		thumbnailCache.setObject(finalImage, forKey: identifier.string as NSString)
 		return finalImage
 #endif
 	}
-	
-	func thumbnail(for identifier: PhotoManager.Identifier) -> XImage? {
-		let filePath = self.thumbnailFilePath(for: identifier)
-		if FileManager.default.fileExists(atPath: filePath) {
-			if let data = try? Data(contentsOf: URL(filePath: filePath)),
-			   let image = XImage(data: data) {
-				return image
+
+	func thumbnail(for identifier: Identifier) throws -> XThumbnail? {
+		if let thumbnail = self.thumbnailCache.object(forKey: identifier.string as NSString) {
+			return thumbnail
+		}
+		if self.hasThumbnail(for: identifier) {
+			let data = try Data(contentsOf: self.thumbnailURL(for: identifier))
+			if let thumbnail = XImage(data: data) {
+				self.thumbnailCache.setObject(thumbnail, forKey: identifier.string as NSString)
+				return thumbnail as XThumbnail
 			}
 		}
+		// can't find filepath from identifier
 		return nil
 	}
 	
+	func thumbnail(for photoRep: PhotoRepresentation) async throws -> XThumbnail? {
+		return try await withCheckedThrowingContinuation { continuation in
+			queue.async {
+				do {
+					let result = try self.syncThumbnail(for: photoRep)
+					continuation.resume(returning: result)
+				} catch {
+					continuation.resume(throwing: error)
+				}
+			}
+		}
+	}
+	
+	private func syncThumbnail(for photoRep: PhotoRepresentation) throws -> XThumbnail? {
+		let imageData = try Data(contentsOf: photoRep.fileURL)
+		let identifier = Identifier.md5(md5Digest(of: imageData))
+		if let cached = thumbnailCache.object(forKey: identifier.string as NSString) {
+			return cached
+		}
+		if hasThumbnail(for: identifier) {
+			let data = try Data(contentsOf: thumbnailURL(for: identifier))
+			if let thumbnail = XImage(data: data) {
+				thumbnailCache.setObject(thumbnail, forKey: identifier.string as NSString)
+				return thumbnail
+			}
+		}
+		return try prepareThumbnail(from: imageData)
+	}
+	
+	func hasThumbnail(for identifier: Identifier) -> Bool {
+		return FileManager.default.fileExists(atPath: self.thumbnailURL(for: identifier).path)
+	}
 
-	private init() {}
+	private let photolalaStoragePath: NSString
+	private let thumbnailStoragePath: NSString
+
+	private init() {
+		let photolalaStoragePath = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first!.appendingPathComponent("Photolala").path
+		do { try FileManager.default.createDirectory(atPath: photolalaStoragePath, withIntermediateDirectories: true) }
+		catch { fatalError("\(error): cannot create photolala storage directory: \(photolalaStoragePath)") }
+		self.photolalaStoragePath = photolalaStoragePath as NSString
+
+		let thumbnailStoragePath = (photolalaStoragePath as NSString).appendingPathComponent("thumbnails")
+		do { try FileManager.default.createDirectory(atPath: thumbnailStoragePath, withIntermediateDirectories: true) }
+		catch { fatalError("\(error): cannot create thumbnail directory: \(thumbnailStoragePath)") }
+		self.thumbnailStoragePath = thumbnailStoragePath as NSString
+		
+		print("photolala storage directory: \(photolalaStoragePath)")
+	}
 }

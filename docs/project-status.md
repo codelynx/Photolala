@@ -60,7 +60,7 @@ Last Updated: June 12, 2025
 3. **Metadata Extraction**: PhotoRepresentation prepared for expansion
 4. **Performance Optimization**: No caching or lazy loading yet
 
-### 📝 Recent Changes (June 12, 2025)
+### 📝 Recent Changes (June 13, 2025)
 
 1. **Refactored Photo Model**:
    - Removed complex Photo model with SwiftData dependencies
@@ -101,17 +101,26 @@ Last Updated: June 12, 2025
    - Better code reuse between macOS and iOS
    - Unified delegate and data source protocols
 
+8. **Implemented PhotoManager (June 13)**:
+   - Content-based identification using MD5 digest
+   - Dual caching system: full images by path, thumbnails by content
+   - Async/await API with thread safety via DispatchQueue
+   - Automatic thumbnail generation (256px short side, max 512px)
+   - Disk cache in ~/Library/Caches/Photolala/thumbnails/
+   - Cross-platform image handling for macOS and iOS
+
 ### 🐛 Known Issues
 
-1. Thumbnail loading is inefficient (loads full images)
-2. No image caching mechanism
+1. ~~Thumbnail loading is inefficient (loads full images)~~ ✅ Fixed with PhotoManager
+2. ~~No image caching mechanism~~ ✅ Fixed with dual NSCache system
 3. No metadata display
 4. No photo detail view implementation
 5. No error handling for invalid image files
+6. Swift 6 Sendable warnings for NSImage/UIImage
 
 ### 🎯 Next Steps
 
-1. **Implement Proper Thumbnail System**:
+1. **~~Implement Proper Thumbnail System~~** ✅ Completed with PhotoManager:
    - Generate actual thumbnails
    - Add caching mechanism
    - Implement lazy loading
@@ -138,7 +147,7 @@ Last Updated: June 12, 2025
 
 ### 💻 Build Status
 
-- ✅ macOS: Building successfully
+- ✅ macOS: Building successfully (with Sendable warnings)
 - ✅ iOS: Building successfully  
 - ❓ tvOS: Not tested recently
 
@@ -147,6 +156,7 @@ Last Updated: June 12, 2025
 **Added:**
 - `photolala/Models/PhotoRepresentation.swift`
 - `photolala/Services/DirectoryScanner.swift`
+- `photolala/Services/PhotoManager.swift` - Thumbnail generation and caching
 - `docs/project-status.md` (this file)
 
 **Removed:**

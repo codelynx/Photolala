@@ -121,8 +121,9 @@ enum PhotoIdentifier {
 
 4. **Thumbnail loading flow**
    ```
-   Cell appears → Check disk cache → Display if found
-                                  → Generate if missing
+   Cell appears → Check memory cache → Display if found
+                → Check disk cache → Load & cache if found
+                → Generate thumbnail → Save to disk & cache
    ```
 
 ## Implementation Phases
@@ -136,13 +137,13 @@ enum PhotoIdentifier {
 - [x] Welcome screen with folder selection
 - [x] Cross-platform PhotoCollectionViewController
 
-### Phase 2: Thumbnail System 🚧 (In Progress)
-- [x] ThumbnailService with disk caching
-- [x] Content-based cache keys (MD5 + fileSize)
-- [x] Single loading path (NativePhotoGrid → ThumbnailService)
-- [ ] Complete removal of SwiftData dependencies
-- [ ] Fix remaining Photo → PhotoRepresentation references
-- [ ] Memory cache layer for performance
+### Phase 2: Thumbnail System ✅ (Completed)
+- [x] PhotoManager with disk caching
+- [x] Content-based cache keys (MD5 digest)
+- [x] Dual cache system (images by path, thumbnails by content)
+- [x] Async/await API with thread safety
+- [x] Memory cache layer using NSCache
+- [x] Automatic thumbnail generation (256px/512px max)
 
 ### Phase 3: Grid View Polish 📋
 - [ ] Smooth scrolling with 10K+ photos
@@ -201,6 +202,9 @@ enum PhotoIdentifier {
 - Window-per-folder architecture
 - Basic folder navigation
 - Cross-platform type aliases (XPlatform.swift)
+- PhotoManager with thumbnail generation and caching
+- Async/await support for image loading
+- Dual caching system (memory + disk)
 
 ### 🚧 In Progress
 - No migration we have never released the service
@@ -244,8 +248,10 @@ enum PhotoIdentifier {
 
 ## Next Steps
 
-1. Complete PhotoRepresentation migration
-2. Remove remaining SwiftData code
+1. ~~Complete PhotoRepresentation migration~~ ✅
+2. ~~Implement thumbnail system~~ ✅
 3. Implement .photolala footprint optimization
 4. Add progressive metadata loading
 5. Polish platform-specific features
+6. Add loading indicators for thumbnails
+7. Implement photo detail view

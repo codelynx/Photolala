@@ -22,8 +22,13 @@ class PhotoManager {
     static let shared = PhotoManager()
     
     // Storage paths
-    private(set) lazy var photolalaStoragePath: NSString
-    private(set) lazy var thumbnailStoragePath: NSString
+    private let photolalaStoragePath: NSString
+    private let thumbnailStoragePath: NSString
+    
+    // Caching
+    private let imageCache = NSCache<NSString, XImage>()
+    private let thumbnailCache = NSCache<NSString, XThumbnail>()
+    private let queue = DispatchQueue(label: "com.photolala.PhotoManager", attributes: .concurrent)
 }
 ```
 
@@ -32,7 +37,7 @@ class PhotoManager {
 ```swift
 // Photo identifier types
 enum Identifier {
-    case md5(Insecure.MD5Digest, Int) // universal photo identifier
+    case md5(Insecure.MD5Digest) // universal photo identifier (size removed)
     case applePhotoLibrary(String) // unique device wide
     
     var string: String { /* implementation */ }
@@ -60,26 +65,28 @@ typealias XImage = UIImage
 
 ```swift
 extension PhotoManager {
+    /// Load thumbnail for a photo representation (async)
+    /// - Parameter photoRep: The photo representation
+    /// - Returns: The thumbnail image
+    /// - Throws: Error if thumbnail loading fails
+    func thumbnail(for photoRep: PhotoRepresentation) async throws -> XThumbnail?
+    
+    /// Load full image for a photo representation (async)
+    /// - Parameter photo: The photo representation
+    /// - Returns: The full image
+    /// - Throws: Error if image loading fails
+    func loadImage(for photo: PhotoRepresentation) async throws -> XImage?
+    
     /// Generate a thumbnail from raw image data
-    /// - Parameter rawData: The raw image data
+    /// - Parameter data: The raw image data
     /// - Returns: The generated thumbnail image
     /// - Throws: Error if thumbnail generation fails
-    func thumbnail(rawData: Data) throws -> XImage?
+    func prepareThumbnail(from data: Data) throws -> XThumbnail?
     
-    /// Load thumbnail from disk cache
+    /// Check if thumbnail exists on disk
     /// - Parameter identifier: The photo identifier
-    /// - Returns: The cached thumbnail if exists, nil otherwise
-    func thumbnail(for identifier: PhotoManager.Identifier) -> XImage?
-    
-    /// Get the file path for a thumbnail
-    /// - Parameter identifier: The photo identifier
-    /// - Returns: The file path where the thumbnail is/will be stored
-    func thumbnailFilePath(for identifier: PhotoManager.Identifier) -> String
-    
-    /// Compute MD5 hash for data
-    /// - Parameter data: The data to hash
-    /// - Returns: MD5 digest
-    func computeMD5(_ data: Data) -> Insecure.MD5Digest
+    /// - Returns: true if thumbnail exists
+    func hasThumbnail(for identifier: Identifier) -> Bool
 }
 ```
 
@@ -94,13 +101,11 @@ let cacheKey = identifier.string + ".jpg"
 
 ### 2. Memory Cache
 
-*Note: Not currently implemented in PhotoManager*
-
-Future enhancement:
-- Use `NSCache` for automatic memory management
-- Set cost limits based on device memory
-- Respond to memory warnings
-- Cache based on pixel count (width × height × 4 bytes)
+✅ **Implemented with dual cache system:**
+- `imageCache`: Caches full images by file path
+- `thumbnailCache`: Caches thumbnails by content identifier
+- Uses `NSCache` for automatic memory management
+- Thread-safe with concurrent dispatch queue
 
 ### 3. Disk Cache
 
@@ -150,10 +155,10 @@ Future enhancement for better responsiveness during scrolling and user interacti
 
 ### What's Not Yet Implemented
 
-1. **Memory Cache**: No in-memory caching with NSCache
-2. **Async API**: Currently only synchronous operations
+1. ~~**Memory Cache**: No in-memory caching with NSCache~~ ✅ Implemented
+2. ~~**Async API**: Currently only synchronous operations~~ ✅ Implemented
 3. **Request Coalescing**: No prevention of duplicate work
-4. **Collection View Integration**: Views currently load full images
+4. ~~**Collection View Integration**: Views currently load full images~~ ✅ Implemented
 
 ## Usage Examples
 
@@ -264,11 +269,11 @@ private func loadThumbnail() {
 - MD5-based identification ✅
 - Platform-specific image resizing ✅
 
-### Phase 2: Collection View Integration (Current Focus)
-- Update collection views to use PhotoManager
-- Add memory caching with NSCache
-- Implement proper error handling
-- Add loading placeholders
+### Phase 2: Collection View Integration ✅
+- Update collection views to use PhotoManager ✅
+- Add memory caching with NSCache ✅
+- Implement proper error handling ✅
+- Add loading placeholders (partial - uses PhotoRepresentation.thumbnail)
 
 ### Phase 3: Advanced Features
 - Async/await API for better performance

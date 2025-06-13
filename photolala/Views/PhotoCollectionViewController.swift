@@ -16,6 +16,8 @@ import UIKit
 
 class PhotoCollectionViewController: XViewController {
 	let directoryPath: NSString
+
+	@MainActor
 	var photos: [PhotoRepresentation] = []
 	var onSelectPhoto: ((PhotoRepresentation, [PhotoRepresentation]) -> Void)?
 	var onSelectFolder: ((PhotoRepresentation) -> Void)?
@@ -112,20 +114,29 @@ class PhotoCollectionViewController: XViewController {
 	}
 #endif
 	
+	@MainActor
+	func reloadData() {
+		collectionView.reloadData()
+	}
+	
 	// MARK: - Private Methods
 	
 	private func loadPhotos() {
-		// Use DirectoryScanner to get PhotoRepresentation objects
-		photos = DirectoryScanner.scanDirectory(atPath: directoryPath)
-		
-		// Print the representations
-		print("\n=== Directory: \(directoryPath.lastPathComponent) ===")
-		for photo in photos {
-			print("PhotoRepresentation: \(photo.filename) -> \(photo.filePath)")
+		Task {
+			// Use DirectoryScanner to get PhotoRepresentation objects
+			self.photos = DirectoryScanner.scanDirectory(atPath: directoryPath)
+			self.reloadData()
+
+
+			// Print the representations
+			print("\n=== Directory: \(directoryPath.lastPathComponent) ===")
+			for photo in photos {
+				print("PhotoRepresentation: \(photo.filename) -> \(photo.filePath)")
+			}
+			print("=== Total: \(photos.count) photos ===\n")
+			
+			self.reloadData()
 		}
-		print("=== Total: \(photos.count) photos ===\n")
-		
-		collectionView.reloadData()
 	}
 	
 	// MARK: - Navigation
@@ -232,10 +243,42 @@ class PhotoCollectionViewItem: NSCollectionViewItem {
 			imageView.bottomAnchor.constraint(equalTo: view.bottomAnchor)
 		])
 	}
-	
+
+	func configure(with photoRep: PhotoRepresentation) {
+		self.photoRepresentation = photoRep
+	}
+
+	override func viewWillLayout() {
+		super.viewWillLayout()
+		if let photoRepresentation = self.photoRepresentation {
+			if let thumbnail = photoRepresentation.thumbnail {
+				imageView?.image = thumbnail
+			}
+			else {
+				Task {
+					do {
+						let photoRep = photoRepresentation
+						let thumbnail = try await PhotoManager.shared.thumbnail(for: photoRep)
+						self.update(thumbnail: thumbnail, for: photoRepresentation)
+					} catch {
+						print("Failed to load thumbnail: \(error)")
+					}
+				}
+			}
+		}
+	}
+
+	override func prepareForReuse() {
+		super.prepareForReuse()
+		self.imageView?.image = nil
+		self.photoRepresentation = nil
+	}
+
 	private func loadThumbnail() {
 		guard let photoRep = photoRepresentation else { return }
 		let url = photoRep.fileURL
+		
+		
 		
 		// Simple thumbnail loading for now
 		DispatchQueue.global(qos: .userInitiated).async {
@@ -246,6 +289,14 @@ class PhotoCollectionViewItem: NSCollectionViewItem {
 			}
 		}
 	}
+	
+	@MainActor
+	func update(thumbnail: XImage?, for photoRep: PhotoRepresentation) {
+		if photoRepresentation == photoRep {
+			imageView?.image = thumbnail
+		}
+	}
+
 }
 #else
 class PhotoCollectionViewCell: UICollectionViewCell {
