@@ -86,11 +86,18 @@ class PhotoCollectionViewController: XViewController {
 	
 	private func createLayout() -> NSCollectionViewLayout {
 		let flowLayout = NSCollectionViewFlowLayout()
-		let cellSize = settings?.thumbnailSize ?? ThumbnailSize.defaultValue
+		let thumbnailOption = settings?.thumbnailOption ?? .default
+		let cellSize = thumbnailOption.size
+		
 		flowLayout.itemSize = NSSize(width: cellSize, height: cellSize)
-		flowLayout.sectionInset = NSEdgeInsets(top: 10, left: 10, bottom: 10, right: 10)
-		flowLayout.minimumInteritemSpacing = 8
-		flowLayout.minimumLineSpacing = 8
+		flowLayout.sectionInset = NSEdgeInsets(
+			top: thumbnailOption.sectionInset,
+			left: thumbnailOption.sectionInset,
+			bottom: thumbnailOption.sectionInset,
+			right: thumbnailOption.sectionInset
+		)
+		flowLayout.minimumInteritemSpacing = thumbnailOption.spacing
+		flowLayout.minimumLineSpacing = thumbnailOption.spacing
 		return flowLayout
 	}
 #else
@@ -104,11 +111,18 @@ class PhotoCollectionViewController: XViewController {
 	
 	private func setupCollectionView() {
 		let layout = UICollectionViewFlowLayout()
-		let cellSize = settings?.thumbnailSize ?? ThumbnailSize.defaultValue
+		let thumbnailOption = settings?.thumbnailOption ?? .default
+		let cellSize = thumbnailOption.size
+		
 		layout.itemSize = CGSize(width: cellSize, height: cellSize)
-		layout.sectionInset = UIEdgeInsets(top: 10, left: 10, bottom: 10, right: 10)
-		layout.minimumInteritemSpacing = 8
-		layout.minimumLineSpacing = 8
+		layout.sectionInset = UIEdgeInsets(
+			top: thumbnailOption.sectionInset,
+			left: thumbnailOption.sectionInset,
+			bottom: thumbnailOption.sectionInset,
+			right: thumbnailOption.sectionInset
+		)
+		layout.minimumInteritemSpacing = thumbnailOption.spacing
+		layout.minimumLineSpacing = thumbnailOption.spacing
 		
 		collectionView = XCollectionView(frame: view.bounds, collectionViewLayout: layout)
 		collectionView.autoresizingMask = [.flexibleWidth, .flexibleHeight]
@@ -156,29 +170,48 @@ class PhotoCollectionViewController: XViewController {
 	func updateCollectionViewLayout() {
 		guard let settings = settings else { return }
 		
+		let thumbnailOption = settings.thumbnailOption
+		let cellSize = thumbnailOption.size
+		
 		#if os(macOS)
 		if let flowLayout = collectionView.collectionViewLayout as? NSCollectionViewFlowLayout {
-			let cellSize = settings.thumbnailSize
 			flowLayout.itemSize = NSSize(width: cellSize, height: cellSize)
+			flowLayout.sectionInset = NSEdgeInsets(
+				top: thumbnailOption.sectionInset,
+				left: thumbnailOption.sectionInset,
+				bottom: thumbnailOption.sectionInset,
+				right: thumbnailOption.sectionInset
+			)
+			flowLayout.minimumInteritemSpacing = thumbnailOption.spacing
+			flowLayout.minimumLineSpacing = thumbnailOption.spacing
 			
 			// Update all visible items
 			for item in collectionView.visibleItems() {
 				if let photoItem = item as? PhotoCollectionViewItem {
 					photoItem.settings = settings
 					photoItem.updateDisplayMode()
+					photoItem.updateCornerRadius()
 				}
 			}
 		}
 		#else
 		if let flowLayout = collectionView.collectionViewLayout as? UICollectionViewFlowLayout {
-			let cellSize = settings.thumbnailSize
 			flowLayout.itemSize = CGSize(width: cellSize, height: cellSize)
+			flowLayout.sectionInset = UIEdgeInsets(
+				top: thumbnailOption.sectionInset,
+				left: thumbnailOption.sectionInset,
+				bottom: thumbnailOption.sectionInset,
+				right: thumbnailOption.sectionInset
+			)
+			flowLayout.minimumInteritemSpacing = thumbnailOption.spacing
+			flowLayout.minimumLineSpacing = thumbnailOption.spacing
 			
 			// Update all visible cells
 			for cell in collectionView.visibleCells {
 				if let photoCell = cell as? PhotoCollectionViewCell {
 					photoCell.settings = settings
 					photoCell.updateDisplayMode()
+					photoCell.updateCornerRadius()
 				}
 			}
 		}
@@ -228,6 +261,7 @@ extension PhotoCollectionViewController: XCollectionViewDataSource {
 		let photo = photos[indexPath.item]
 		item.settings = settings
 		item.photoRepresentation = photo
+		item.updateCornerRadius()
 		return item
 	}
 	#endif
@@ -238,6 +272,7 @@ extension PhotoCollectionViewController: XCollectionViewDataSource {
 		let photo = photos[indexPath.item]
 		cell.settings = settings
 		cell.photoRepresentation = photo
+		cell.updateCornerRadius()
 		return cell
 	}
 	#endif
@@ -288,7 +323,6 @@ class PhotoCollectionViewItem: NSCollectionViewItem {
 		imageView.translatesAutoresizingMaskIntoConstraints = false
 		imageView.imageScaling = .scaleProportionallyUpOrDown
 		imageView.wantsLayer = true
-		imageView.layer?.cornerRadius = 8
 		imageView.layer?.masksToBounds = true
 		imageView.layer?.borderWidth = 1
 		imageView.layer?.borderColor = XColor.separatorColor.cgColor
@@ -366,6 +400,11 @@ class PhotoCollectionViewItem: NSCollectionViewItem {
 			imageView.imageScaling = .scaleAxesIndependently
 		}
 	}
+	
+	func updateCornerRadius() {
+		guard let imageView = imageView, let settings = settings else { return }
+		imageView.layer?.cornerRadius = settings.thumbnailOption.cornerRadius
+	}
 
 }
 #else
@@ -391,7 +430,6 @@ class PhotoCollectionViewCell: UICollectionViewCell {
 	private func setupViews() {
 		updateDisplayMode()
 		imageView.clipsToBounds = true
-		imageView.layer.cornerRadius = 8
 		imageView.layer.borderWidth = 1
 		imageView.layer.borderColor = XColor.separator.cgColor
 		
@@ -429,6 +467,11 @@ class PhotoCollectionViewCell: UICollectionViewCell {
 		case .scaleToFill:
 			imageView.contentMode = .scaleAspectFill
 		}
+	}
+	
+	func updateCornerRadius() {
+		guard let settings = settings else { return }
+		imageView.layer.cornerRadius = settings.thumbnailOption.cornerRadius
 	}
 }
 #endif

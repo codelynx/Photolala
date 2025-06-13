@@ -38,23 +38,23 @@ struct PhotoBrowserView: View {
 					// Size menu for iOS
 					Menu {
 						Button("Small") {
-							settings.thumbnailSize = ThumbnailSize.small.value
+							settings.thumbnailOption = .small
 						}
 						Button("Medium") {
-							settings.thumbnailSize = ThumbnailSize.medium.value
+							settings.thumbnailOption = .medium
 						}
 						Button("Large") {
-							settings.thumbnailSize = ThumbnailSize.large.value
+							settings.thumbnailOption = .large
 						}
 					} label: {
 						Image(systemName: "slider.horizontal.3")
 					}
 					#else
 					// Size picker for macOS
-					Picker("Size", selection: $settings.thumbnailSize) {
-						Text("Small").tag(ThumbnailSize.small.value)
-						Text("Medium").tag(ThumbnailSize.medium.value)
-						Text("Large").tag(ThumbnailSize.large.value)
+					Picker("Size", selection: $settings.thumbnailOption) {
+						Text("Small").tag(ThumbnailOption.small)
+						Text("Medium").tag(ThumbnailOption.medium)
+						Text("Large").tag(ThumbnailOption.large)
 					}
 					.pickerStyle(.segmented)
 					.help("Thumbnail size")

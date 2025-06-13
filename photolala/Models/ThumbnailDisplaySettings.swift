@@ -21,12 +21,14 @@ enum ThumbnailDisplayMode: String, CaseIterable {
 	}
 }
 
-enum ThumbnailSize: CaseIterable {
+enum ThumbnailOption: CaseIterable {
 	case small
 	case medium
 	case large
 	
-	var value: CGFloat {
+	static var `default`: ThumbnailOption { .medium }
+	
+	var size: CGFloat {
 		switch self {
 		case .small: return 64
 		case .medium: return 128
@@ -42,23 +44,41 @@ enum ThumbnailSize: CaseIterable {
 		}
 	}
 	
-	static var defaultValue: CGFloat { Self.medium.value }
+	var spacing: CGFloat {
+		switch self {
+		case .small: return 2
+		case .medium: return 4
+		case .large: return 8
+		}
+	}
+	
+	var cornerRadius: CGFloat {
+		switch self {
+		case .small: return 0
+		case .medium: return 6
+		case .large: return 12
+		}
+	}
+	
+	var sectionInset: CGFloat {
+		switch self {
+		case .small: return 4
+		case .medium: return 8
+		case .large: return 12
+		}
+	}
 }
 
 @Observable
 class ThumbnailDisplaySettings {
 	var displayMode: ThumbnailDisplayMode = .scaleToFit
-	var thumbnailSize: CGFloat = ThumbnailSize.large.value // Default to Large (256px)
+	var thumbnailOption: ThumbnailOption = .default
+	
+	var thumbnailSize: CGFloat {
+		thumbnailOption.size
+	}
 	
 	init() {
 		// No UserDefaults - each window gets its own settings
-	}
-	
-	func setPresetSize(_ size: ThumbnailSize) {
-		thumbnailSize = size.value
-	}
-	
-	func currentPresetSize() -> ThumbnailSize? {
-		return ThumbnailSize.allCases.first { $0.value == thumbnailSize }
 	}
 }

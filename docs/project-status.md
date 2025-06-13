@@ -137,6 +137,22 @@ Last Updated: June 12, 2025
    - Each window maintains independent display settings
    - Cross-platform toolbar implementation in SwiftUI
 
+11. **Enhanced Thumbnail Display System (June 13 - Session 4)**:
+   - Renamed ThumbnailSize to ThumbnailOption for better semantics
+   - Added dynamic layout properties to ThumbnailOption:
+     - spacing: 2px (small), 4px (medium), 8px (large)
+     - cornerRadius: 0px (small), 6px (medium), 12px (large)
+     - sectionInset: 4px (small), 8px (medium), 12px (large)
+   - Simplified settings architecture:
+     - Store ThumbnailOption directly instead of CGFloat size
+     - Removed unnecessary conversion methods
+     - Added default property (medium) for consistency
+   - Visual refinements:
+     - Small: Compact grid with no rounded corners
+     - Medium: Balanced layout with subtle rounding
+     - Large: Spacious layout with prominent rounded corners
+   - Added app icon from legacy branch (sunflower image)
+
 ### 🐛 Known Issues
 
 1. ~~Thumbnail loading is inefficient (loads full images)~~ ✅ Fixed with PhotoManager
@@ -208,3 +224,5 @@ Last Updated: June 12, 2025
 2. **Native Collection Views**: Better performance for large collections
 3. **Simple Start**: Focus on basic functionality before optimization
 4. **Clean Code**: Removed temporary debugging print statements
+5. **Per-Window Settings**: Each window has independent display settings for flexibility
+6. **Enum-Based Configuration**: ThumbnailOption encapsulates all size-related layout properties
