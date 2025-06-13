@@ -197,9 +197,11 @@ Phase 1 is complete when:
 1. ✅ App launches without database
 2. ✅ Can select and open a folder
 3. ✅ Shows photos in a grid
-4. ✅ Basic thumbnails display
+4. ✅ Proper thumbnails with caching (PhotoManager)
 5. ✅ Works on both macOS and iOS
 6. ✅ No SwiftData dependencies
+7. ✅ Efficient thumbnail generation (256x256 to 256x512)
+8. ✅ EXIF orientation handling
 
 ## Lessons Learned
 

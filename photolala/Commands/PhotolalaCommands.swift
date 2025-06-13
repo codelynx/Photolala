@@ -38,6 +38,7 @@ struct PhotolalaCommands: Commands {
 		
 		panel.begin { response in
 			if response == .OK, let url = panel.url {
+				print("[PhotolalaCommands] Opening folder: \(url.path)")
 				// Open new window with the selected folder
 				openWindow(value: url)
 			}

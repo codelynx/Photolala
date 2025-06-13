@@ -20,7 +20,6 @@ Last Updated: June 12, 2025
 - **DirectoryScanner**: Scans directories for image files
   - Supports common image formats (jpg, jpeg, png, heic, heif, tiff, bmp, gif, webp)
   - Creates PhotoRepresentation objects
-  - Console logging for debugging
   - Uses NSString for path manipulation (user's choice)
 
 #### UI Components
@@ -55,10 +54,10 @@ Last Updated: June 12, 2025
 
 ### 🚧 In Progress / Placeholder Implementations
 
-1. **Thumbnail Loading**: Currently loads full images (needs optimization)
+1. ~~**Thumbnail Loading**: Currently loads full images (needs optimization)~~ ✅ Fixed
 2. **Photo Detail View**: Not yet implemented
 3. **Metadata Extraction**: PhotoRepresentation prepared for expansion
-4. **Performance Optimization**: No caching or lazy loading yet
+4. ~~**Performance Optimization**: No caching or lazy loading yet~~ ✅ Implemented dual caching
 
 ### 📝 Recent Changes (June 13, 2025)
 
@@ -72,7 +71,6 @@ Last Updated: June 12, 2025
 2. **Implemented DirectoryScanner**:
    - Replaces previous scanning implementations
    - Simple, focused on file discovery
-   - Console output for debugging
 
 3. **Updated Collection Views**:
    - Migrated from URL arrays to PhotoRepresentation arrays
@@ -101,13 +99,29 @@ Last Updated: June 12, 2025
    - Better code reuse between macOS and iOS
    - Unified delegate and data source protocols
 
-8. **Implemented PhotoManager (June 13)**:
+8. **Implemented PhotoManager with Complete Thumbnail System (June 13)**:
    - Content-based identification using MD5 digest
    - Dual caching system: full images by path, thumbnails by content
-   - Async/await API with thread safety via DispatchQueue
-   - Automatic thumbnail generation (256px short side, max 512px)
+   - Async/await API with thread safety via DispatchQueue (QoS: .userInitiated)
+   - Proper thumbnail generation:
+     - Scales shorter side to 256px maintaining aspect ratio
+     - Center-crops longer side to max 512px if needed
+     - EXIF orientation handling (automatic on macOS, manual on iOS)
    - Disk cache in ~/Library/Caches/Photolala/thumbnails/
-   - Cross-platform image handling for macOS and iOS
+   - Cross-platform implementation without priority inversions
+   - Collection views now use PhotoManager instead of loading full images
+
+9. **Fixed Thumbnail Generation Issues (June 13 - Session 2)**:
+   - Fixed incorrect thumbnail URL generation (was adding '#' character)
+   - Fixed caching to use thumbnailCache instead of imageCache
+   - Resolved priority inversion warnings:
+     - Set PhotoManager queue to .userInitiated QoS
+     - Replaced lockFocus/unlockFocus with Core Graphics on macOS
+     - Used NSBitmapImageRep for thread-safe rendering
+   - Added proper EXIF orientation handling:
+     - iOS: Normalizes orientation before scaling/cropping
+     - macOS: Relies on NSImage's automatic orientation handling
+   - Updated collection view cells to use async/await with PhotoManager
 
 ### 🐛 Known Issues
 
@@ -176,4 +190,4 @@ Last Updated: June 12, 2025
 1. **NSString for Paths**: User specifically requested NSString for directory paths
 2. **Native Collection Views**: Better performance for large collections
 3. **Simple Start**: Focus on basic functionality before optimization
-4. **Console Logging**: Temporary debugging aid, will be removed later
+4. **Clean Code**: Removed temporary debugging print statements

@@ -34,20 +34,16 @@ class DirectoryScanner {
 				
 				// Check if it's an image file
 				let fileExtension = fileURL.pathExtension.lowercased()
+				
 				if imageExtensions.contains(fileExtension) {
 					let filename = fileURL.lastPathComponent
 					let photo = PhotoRepresentation(directoryPath: path, filename: filename)
 					photos.append(photo)
-					
-					// Print for debugging
-					print("Found photo: \(photo.filename) at \(photo.filePath)")
 				}
 			}
 			
-			print("Total photos found: \(photos.count)")
-			
 		} catch {
-			print("Error scanning directory: \(error)")
+			print("[DirectoryScanner] Error scanning directory: \(error.localizedDescription)")
 		}
 		
 		return photos

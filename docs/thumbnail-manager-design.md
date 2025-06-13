@@ -28,7 +28,11 @@ class PhotoManager {
     // Caching
     private let imageCache = NSCache<NSString, XImage>()
     private let thumbnailCache = NSCache<NSString, XThumbnail>()
-    private let queue = DispatchQueue(label: "com.photolala.PhotoManager", attributes: .concurrent)
+    
+    // Thread safety with proper QoS to avoid priority inversions
+    private let queue = DispatchQueue(label: "com.photolala.PhotoManager", 
+                                     qos: .userInitiated, 
+                                     attributes: .concurrent)
 }
 ```
 
@@ -54,9 +58,10 @@ typealias XImage = UIImage
 
 ## Thumbnail Size Strategy
 
-- Shorter side (width or height) is set to 256 pixels
-- Aspect ratio is preserved with a maximum of 512 pixels for the longer side
-- If the longer side exceeds 512 pixels after scaling, it's cropped to fit
+- Shorter side (width or height) is scaled to 256 pixels
+- Aspect ratio is preserved during scaling
+- If the longer side exceeds 512 pixels after scaling, it's center-cropped to 512 pixels
+- This ensures thumbnails are between 256x256 and 256x512 (or 512x256) pixels
 
 
 ## API Design
@@ -117,16 +122,25 @@ The cache directory structure is created automatically on first use.
 
 ### 4. Thumbnail Generation
 
-Implemented platform-specific thumbnail generation:
-- **macOS**: Uses NSImage resizing with lockFocus/unlockFocus
-- **iOS**: Uses UIGraphicsBeginImageContext for resizing
+Implemented platform-specific thumbnail generation with EXIF orientation support:
+
+**macOS**:
+- NSImage automatically handles EXIF orientation when created from data
+- Uses NSBitmapImageRep with NSGraphicsContext for thread-safe rendering
+- Avoids lockFocus/unlockFocus to prevent priority inversions
+
+**iOS**:
+- First normalizes image orientation by drawing into a graphics context
+- Uses Core Graphics for efficient scaling and cropping
+- Preserves proper orientation for photos with EXIF metadata
 
 The process:
 1. Load the image from raw data
 2. Calculate MD5 hash for unique identification
-3. Scale so the shorter side becomes 256 pixels
-4. Crop the longer side to maximum 512 pixels
-5. Save as JPEG to disk cache
+3. Handle EXIF orientation (platform-specific)
+4. Scale so the shorter side becomes 256 pixels
+5. Center-crop the longer side to maximum 512 pixels
+6. Save as JPEG to disk cache (0.8 compression on iOS)
 
 ### 5. Request Coalescing
 
@@ -179,49 +193,32 @@ if let cachedThumbnail = PhotoManager.shared.thumbnail(for: identifier) {
 }
 ```
 
-### Current Collection View Implementation
+### Current Collection View Implementation ✅
+
+Collection views now properly use PhotoManager for efficient thumbnail loading:
 
 ```swift
 // PhotoCollectionViewItem (macOS) / PhotoCollectionViewCell (iOS)
 private func loadThumbnail() {
     guard let photoRep = photoRepresentation else { return }
-    let url = photoRep.fileURL
     
-    // Currently loading full images - needs update to use PhotoManager
-    DispatchQueue.global(qos: .userInitiated).async {
-        if let image = XImage(contentsOf: url) {
-            DispatchQueue.main.async {
-                self.imageView?.image = image
-            }
-        }
-    }
-}
-```
-
-### Next Steps for Integration
-
-1. **Update Collection View Items** to use PhotoManager:
-```swift
-private func loadThumbnail() {
-    guard let photoRep = photoRepresentation else { return }
-    
-    DispatchQueue.global(qos: .userInitiated).async {
+    Task { @MainActor in
         do {
-            let data = try Data(contentsOf: photoRep.fileURL)
-            if let thumbnail = try PhotoManager.shared.thumbnail(rawData: data) {
-                DispatchQueue.main.async {
-                    self.imageView?.image = thumbnail
-                }
+            if let thumbnail = try await PhotoManager.shared.thumbnail(for: photoRep) {
+                self.imageView?.image = thumbnail
             }
         } catch {
-            // Handle error
+            // Silently ignore thumbnail loading errors
         }
     }
 }
 ```
 
-2. **Add Memory Cache** to PhotoManager
-3. **Implement Async/Await API** for better integration
+Key improvements:
+- Uses async/await for clean asynchronous code
+- PhotoManager handles all caching and generation
+- Proper error handling without crashing
+- Thread-safe with automatic main thread dispatch
 
 ## Performance Considerations
 

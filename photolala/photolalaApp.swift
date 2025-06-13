@@ -9,6 +9,12 @@ import SwiftUI
 
 @main
 struct photolalaApp: App {
+	let photoManager = PhotoManager.shared
+	
+	init() {
+		print("[photolalaApp] App initialized")
+	}
+	
 	var body: some Scene {
 		#if os(macOS)
 		// Folder browser windows only - no default window

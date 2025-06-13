@@ -33,6 +33,18 @@ Before implementing major features, we will:
 
 ### Technical Specifications
 - [`photolala-footprint-design.md`](./photolala-footprint-design.md) - .photolala file format
+- [`thumbnail-manager-design.md`](./thumbnail-manager-design.md) - **PhotoManager implementation** ✅
 - [`thumbnail-system-architecture.md`](./thumbnail-system-architecture.md) - Thumbnail generation system
 - [`loading-system-implementation-notes.md`](./loading-system-implementation-notes.md) - Loading and priority system
 - [`security-scoped-resources-implementation.md`](./security-scoped-resources-implementation.md) - Security and permissions
+
+## Recent Major Updates (June 13, 2025)
+
+### PhotoManager Implementation Complete ✅
+- Dual caching system (memory + disk)
+- Proper thumbnail scaling (256px short side, 512px max)
+- EXIF orientation handling
+- Thread-safe with priority inversion fixes
+- Collection views now use thumbnails instead of full images
+
+See [`project-status.md`](./project-status.md) for full details.

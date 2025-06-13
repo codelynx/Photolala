@@ -122,19 +122,10 @@ class PhotoCollectionViewController: XViewController {
 	// MARK: - Private Methods
 	
 	private func loadPhotos() {
-		Task {
+		Task { @MainActor in
 			// Use DirectoryScanner to get PhotoRepresentation objects
-			self.photos = DirectoryScanner.scanDirectory(atPath: directoryPath)
-			self.reloadData()
-
-
-			// Print the representations
-			print("\n=== Directory: \(directoryPath.lastPathComponent) ===")
-			for photo in photos {
-				print("PhotoRepresentation: \(photo.filename) -> \(photo.filePath)")
-			}
-			print("=== Total: \(photos.count) photos ===\n")
-			
+			let scannedPhotos = DirectoryScanner.scanDirectory(atPath: directoryPath)
+			self.photos = scannedPhotos
 			self.reloadData()
 		}
 	}
@@ -188,9 +179,9 @@ extension PhotoCollectionViewController: XCollectionViewDataSource {
 // MARK: - Delegate
 
 extension PhotoCollectionViewController: XCollectionViewDelegate {
-	internal func collectionView(_ collectionView: XCollectionView, didSelectItemsAt indexPaths: Set<IndexPath>) {
-		// Handle selection
-	}
+//	internal func collectionView(_ collectionView: XCollectionView, didSelectItemsAt indexPaths: Set<IndexPath>) {
+//		// Handle selection
+//	}
 	
 	#if os(macOS)
 	override func mouseDown(with event: NSEvent) {
@@ -206,7 +197,7 @@ extension PhotoCollectionViewController: XCollectionViewDelegate {
 	}
 	#endif
 
-	private func collectionView(_ collectionView: XCollectionView, didSelectItemAt indexPath: IndexPath) {
+	internal func collectionView(_ collectionView: XCollectionView, didSelectItemAt indexPath: IndexPath) {
 		handleSelection(at: indexPath)
 	}
 }
@@ -261,7 +252,7 @@ class PhotoCollectionViewItem: NSCollectionViewItem {
 						let thumbnail = try await PhotoManager.shared.thumbnail(for: photoRep)
 						self.update(thumbnail: thumbnail, for: photoRepresentation)
 					} catch {
-						print("Failed to load thumbnail: \(error)")
+						// Silent fail for thumbnails
 					}
 				}
 			}
@@ -276,16 +267,14 @@ class PhotoCollectionViewItem: NSCollectionViewItem {
 
 	private func loadThumbnail() {
 		guard let photoRep = photoRepresentation else { return }
-		let url = photoRep.fileURL
 		
-		
-		
-		// Simple thumbnail loading for now
-		DispatchQueue.global(qos: .userInitiated).async {
-			if let image = XImage(contentsOf: url) {
-				DispatchQueue.main.async {
-					self.imageView?.image = image
+		Task { @MainActor in
+			do {
+				if let thumbnail = try await PhotoManager.shared.thumbnail(for: photoRep) {
+					self.imageView?.image = thumbnail
 				}
+			} catch {
+				// Silently ignore thumbnail loading errors
 			}
 		}
 	}
@@ -336,15 +325,15 @@ class PhotoCollectionViewCell: UICollectionViewCell {
 	}
 	
 	private func loadThumbnail() {
-		guard let fileURL = photoRepresentation?.fileURL else { return }
+		guard let photoRep = photoRepresentation else { return }
 		
-		// Simple thumbnail loading for now
-		DispatchQueue.global(qos: .userInitiated).async {
-			if let data = try? Data(contentsOf: fileURL),
-			   let image = XImage(data: data) {
-				DispatchQueue.main.async {
-					self.imageView.image = image
+		Task { @MainActor in
+			do {
+				if let thumbnail = try await PhotoManager.shared.thumbnail(for: photoRep) {
+					self.imageView.image = thumbnail
 				}
+			} catch {
+				// Silently ignore thumbnail loading errors
 			}
 		}
 	}
