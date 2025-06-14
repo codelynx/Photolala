@@ -16,12 +16,26 @@ class PhotoReference: Identifiable, Hashable {
 	let filename: String
 	var thumbnail: XImage?
 	var thumbnailLoadingState: LoadingState = .idle
+	var metadata: PhotoMetadata?
+	var metadataLoadingState: LoadingState = .idle
+	var fileModificationDate: Date?  // Quick access for initial sorting
 	
-	enum LoadingState {
+	enum LoadingState: Equatable {
 		case idle
 		case loading
 		case loaded
 		case failed(Error)
+		
+		static func == (lhs: LoadingState, rhs: LoadingState) -> Bool {
+			switch (lhs, rhs) {
+			case (.idle, .idle), (.loading, .loading), (.loaded, .loaded):
+				return true
+			case (.failed(_), .failed(_)):
+				return true // Consider all failures equal for simplicity
+			default:
+				return false
+			}
+		}
 	}
 	
 	// Computed property for file URL
@@ -33,9 +47,22 @@ class PhotoReference: Identifiable, Hashable {
 		directoryPath.appendingPathComponent(filename)
 	}
 	
+	
 	init(directoryPath: NSString, filename: String) {
 		self.directoryPath = directoryPath
 		self.filename = filename
+		// Load file modification date immediately (fast operation)
+		loadFileModificationDate()
+	}
+	
+	private func loadFileModificationDate() {
+		do {
+			let attributes = try FileManager.default.attributesOfItem(atPath: filePath)
+			self.fileModificationDate = attributes[.modificationDate] as? Date
+		} catch {
+			// Silently fail, will use current date as fallback
+			print("[PhotoReference] Failed to get file date for \(filename): \(error)")
+		}
 	}
 	
 	// Hashable
@@ -47,6 +74,51 @@ class PhotoReference: Identifiable, Hashable {
 	// Equatable
 	static func == (lhs: PhotoReference, rhs: PhotoReference) -> Bool {
 		lhs.directoryPath == rhs.directoryPath && lhs.filename == rhs.filename
+	}
+	
+	// Metadata loading
+	func loadMetadata() async throws -> PhotoMetadata? {
+		guard metadata == nil else { return metadata }
+		metadataLoadingState = .loading
+		
+		do {
+			metadata = try await PhotoManager.shared.metadata(for: self)
+			metadataLoadingState = .loaded
+			return metadata
+		} catch {
+			metadataLoadingState = .failed(error)
+			throw error
+		}
+	}
+	
+	// Combined loading for efficiency
+	func loadPhotoData() async throws {
+		// Skip if already loading or loaded
+		guard thumbnailLoadingState != .loading && metadataLoadingState != .loading else { return }
+		
+		// Skip if both already loaded
+		if thumbnail != nil && metadata != nil { return }
+		
+		thumbnailLoadingState = .loading
+		metadataLoadingState = .loading
+		
+		do {
+			let (loadedThumbnail, loadedMetadata) = try await PhotoManager.shared.loadPhotoData(for: self)
+			
+			if let loadedThumbnail = loadedThumbnail {
+				self.thumbnail = loadedThumbnail
+				self.thumbnailLoadingState = .loaded
+			}
+			
+			if let loadedMetadata = loadedMetadata {
+				self.metadata = loadedMetadata
+				self.metadataLoadingState = .loaded
+			}
+		} catch {
+			thumbnailLoadingState = .failed(error)
+			metadataLoadingState = .failed(error)
+			throw error
+		}
 	}
 
 	/*

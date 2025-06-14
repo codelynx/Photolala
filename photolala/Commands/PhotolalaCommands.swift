@@ -21,6 +21,22 @@ struct PhotolalaCommands: Commands {
 			Divider()
 		}
 		
+		// Edit menu customization
+		CommandGroup(after: .pasteboard) {
+			Divider()
+			
+			Button("Select All") {
+				// This will be handled by the standard menu implementation
+			}
+			.keyboardShortcut("A", modifiers: .command)
+			
+			Button("Deselect All") {
+				// This will be handled by focused values in the view
+				NotificationCenter.default.post(name: .deselectAll, object: nil)
+			}
+			.keyboardShortcut("D", modifiers: .command)
+		}
+		
 		// View menu
 		CommandMenu("View") {
 			Button("Cache Statistics...") {
@@ -75,4 +91,10 @@ struct PhotolalaCommands: Commands {
 		window.isReleasedWhenClosed = false
 	}
 	#endif
+}
+
+// MARK: - Notification Names
+
+extension Notification.Name {
+	static let deselectAll = Notification.Name("com.electricwoods.photolala.deselectAll")
 }

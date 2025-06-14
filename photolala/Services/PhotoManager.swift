@@ -84,6 +84,7 @@ class PhotoManager {
 	
 	private let imageCache = NSCache<NSString, XImage>() // filePath: XImage
 	private let thumbnailCache = NSCache<NSString, XThumbnail>() // PhotoManager.Identifier: XThumbnail
+	private let metadataCache = NSCache<NSString, PhotoMetadata>() // filePath: PhotoMetadata
 	private let queue = DispatchQueue(label: "com.photolala.PhotoManager", qos: .userInitiated, attributes: .concurrent)
 	
 	func loadImage(for photo: PhotoReference) async throws -> XImage? {
@@ -382,7 +383,8 @@ class PhotoManager {
 	}
 
 	private let photolalaStoragePath: NSString
-	private let thumbnailStoragePath: NSString
+	private let thumbnailStoragePath: NSString  // Keep for backward compatibility
+	private let cacheDirectoryPath: NSString
 
 	private init() {
 		let photolalaStoragePath = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first!.appendingPathComponent("Photolala").path
@@ -391,10 +393,25 @@ class PhotoManager {
 		self.photolalaStoragePath = photolalaStoragePath as NSString
 		print("photolala directory: \(photolalaStoragePath)")
 
-		let thumbnailStoragePath = (photolalaStoragePath as NSString).appendingPathComponent("thumbnails")
-		do { try FileManager.default.createDirectory(atPath: thumbnailStoragePath, withIntermediateDirectories: true) }
-		catch { fatalError("\(error): cannot create thumbnail directory: \(thumbnailStoragePath)") }
-		self.thumbnailStoragePath = thumbnailStoragePath as NSString
+		// Migration: Check if 'thumbnails' directory exists and rename to 'cache'
+		let oldThumbnailPath = (photolalaStoragePath as NSString).appendingPathComponent("thumbnails")
+		let newCachePath = (photolalaStoragePath as NSString).appendingPathComponent("cache")
+		
+		if FileManager.default.fileExists(atPath: oldThumbnailPath) && !FileManager.default.fileExists(atPath: newCachePath) {
+			do {
+				try FileManager.default.moveItem(atPath: oldThumbnailPath, toPath: newCachePath)
+				print("[PhotoManager] Migrated thumbnails directory to cache directory")
+			} catch {
+				print("[PhotoManager] Failed to migrate thumbnails directory: \(error)")
+			}
+		}
+		
+		// Create cache directory if needed
+		do { try FileManager.default.createDirectory(atPath: newCachePath, withIntermediateDirectories: true) }
+		catch { fatalError("\(error): cannot create cache directory: \(newCachePath)") }
+		
+		self.cacheDirectoryPath = newCachePath as NSString
+		self.thumbnailStoragePath = newCachePath as NSString  // Point to same location for backward compatibility
 
 		// Configure cache limits based on available memory
 		let totalMemory = ProcessInfo.processInfo.physicalMemory
@@ -528,6 +545,34 @@ class PhotoManager {
 		return min(Double(totalMemory) / Double(8 * 1024 * 1024 * 1024), 4.0) // Scale up to 4x for 32GB+ machines
 	}
 	
+	// MARK: - Metadata Support
+	
+	enum CacheType {
+		case thumbnail
+		case metadata
+		
+		var fileExtension: String {
+			switch self {
+			case .thumbnail: return "jpg"
+			case .metadata: return "plist"
+			}
+		}
+	}
+	
+	private func cacheURL(for identifier: Identifier, type: CacheType) -> URL {
+		let fileName = identifier.string + "." + type.fileExtension
+		let filePath = (self.cacheDirectoryPath as NSString).appendingPathComponent(fileName)
+		return URL(fileURLWithPath: filePath)
+	}
+	
+	private func parseEXIFDate(_ dateString: String) -> Date? {
+		// EXIF date format: "yyyy:MM:dd HH:mm:ss"
+		let formatter = DateFormatter()
+		formatter.dateFormat = "yyyy:MM:dd HH:mm:ss"
+		formatter.timeZone = TimeZone(secondsFromGMT: 0)
+		return formatter.date(from: dateString)
+	}
+	
 	// MARK: - Public API for Statistics
 	
 	struct CacheStatisticsReport {
@@ -578,6 +623,201 @@ class PhotoManager {
 			totalMemory: ProcessInfo.processInfo.physicalMemory,
 			imageCacheLimit: imageCacheLimit
 		)
+	}
+	
+	// MARK: - Metadata Extraction
+	
+	private func extractMetadata(from imageData: Data, fileURL: URL) throws -> PhotoMetadata {
+		// Get file attributes
+		let attributes = try FileManager.default.attributesOfItem(atPath: fileURL.path)
+		let fileModificationDate = attributes[.modificationDate] as? Date ?? Date()
+		let fileSize = attributes[.size] as? Int64 ?? 0
+		
+		// Extract EXIF using ImageIO
+		guard let imageSource = CGImageSourceCreateWithData(imageData as CFData, nil),
+			  let properties = CGImageSourceCopyPropertiesAtIndex(imageSource, 0, nil) as? [String: Any] else {
+			// Return basic metadata if image properties can't be read
+			return PhotoMetadata(
+				dateTaken: nil,
+				fileModificationDate: fileModificationDate,
+				fileSize: fileSize,
+				pixelWidth: nil,
+				pixelHeight: nil,
+				cameraMake: nil,
+				cameraModel: nil,
+				orientation: nil,
+				gpsLatitude: nil,
+				gpsLongitude: nil
+			)
+		}
+		
+		// Extract various metadata
+		var dateTaken: Date?
+		if let exif = properties[kCGImagePropertyExifDictionary as String] as? [String: Any],
+		   let dateString = exif[kCGImagePropertyExifDateTimeOriginal as String] as? String {
+			dateTaken = parseEXIFDate(dateString)
+		}
+		
+		let pixelWidth = properties[kCGImagePropertyPixelWidth as String] as? Int
+		let pixelHeight = properties[kCGImagePropertyPixelHeight as String] as? Int
+		let orientation = properties[kCGImagePropertyOrientation as String] as? Int
+		
+		// Camera info
+		var cameraMake: String?
+		var cameraModel: String?
+		if let tiff = properties[kCGImagePropertyTIFFDictionary as String] as? [String: Any] {
+			cameraMake = tiff[kCGImagePropertyTIFFMake as String] as? String
+			cameraModel = tiff[kCGImagePropertyTIFFModel as String] as? String
+		}
+		
+		// GPS info - handle coordinate conversion
+		var gpsLatitude: Double?
+		var gpsLongitude: Double?
+		if let gps = properties[kCGImagePropertyGPSDictionary as String] as? [String: Any] {
+			if let lat = gps[kCGImagePropertyGPSLatitude as String] as? Double,
+			   let latRef = gps[kCGImagePropertyGPSLatitudeRef as String] as? String {
+				gpsLatitude = latRef == "S" ? -lat : lat
+			}
+			if let lon = gps[kCGImagePropertyGPSLongitude as String] as? Double,
+			   let lonRef = gps[kCGImagePropertyGPSLongitudeRef as String] as? String {
+				gpsLongitude = lonRef == "W" ? -lon : lon
+			}
+		}
+		
+		return PhotoMetadata(
+			dateTaken: dateTaken,
+			fileModificationDate: fileModificationDate,
+			fileSize: fileSize,
+			pixelWidth: pixelWidth,
+			pixelHeight: pixelHeight,
+			cameraMake: cameraMake,
+			cameraModel: cameraModel,
+			orientation: orientation,
+			gpsLatitude: gpsLatitude,
+			gpsLongitude: gpsLongitude
+		)
+	}
+	
+	// Combined thumbnail and metadata loading for efficiency
+	func loadPhotoData(for photo: PhotoReference) async throws -> (thumbnail: XThumbnail?, metadata: PhotoMetadata?) {
+		return try await withCheckedThrowingContinuation { continuation in
+			queue.async {
+				do {
+					let result = try self.syncLoadPhotoData(for: photo)
+					continuation.resume(returning: result)
+				} catch {
+					continuation.resume(throwing: error)
+				}
+			}
+		}
+	}
+	
+	private func syncLoadPhotoData(for photo: PhotoReference) throws -> (thumbnail: XThumbnail?, metadata: PhotoMetadata?) {
+		// Load image data once
+		let imageData = try Data(contentsOf: photo.fileURL)
+		let identifier = Identifier.md5(md5Digest(of: imageData))
+		
+		// Try to get both from cache
+		var thumbnail: XThumbnail?
+		var metadata: PhotoMetadata?
+		
+		// Check thumbnail cache
+		if let cachedThumbnail = thumbnailCache.object(forKey: identifier.string as NSString) {
+			thumbnail = cachedThumbnail
+		} else {
+			// Generate thumbnail
+			thumbnail = try? prepareThumbnail(from: imageData)
+			if let thumbnail = thumbnail {
+				// Save to cache and disk
+				thumbnailCache.setObject(thumbnail, forKey: identifier.string as NSString)
+				let thumbnailURL = cacheURL(for: identifier, type: .thumbnail)
+				if let jpegData = thumbnail.jpegData(compressionQuality: 0.8) {
+					try? jpegData.write(to: thumbnailURL)
+				}
+			}
+		}
+		
+		// Check metadata cache
+		if let cachedMetadata = metadataCache.object(forKey: photo.filePath as NSString) {
+			metadata = cachedMetadata
+		} else {
+			// Extract metadata
+			metadata = try extractMetadata(from: imageData, fileURL: photo.fileURL)
+			// Save to cache and disk
+			metadataCache.setObject(metadata!, forKey: photo.filePath as NSString)
+			let metadataURL = cacheURL(for: identifier, type: .metadata)
+			let encoder = PropertyListEncoder()
+			let metadataData = try encoder.encode(metadata!)
+			try metadataData.write(to: metadataURL)
+		}
+		
+		return (thumbnail, metadata)
+	}
+	
+	// Public API for metadata
+	func metadata(for photo: PhotoReference) async throws -> PhotoMetadata? {
+		return try await withCheckedThrowingContinuation { continuation in
+			queue.async {
+				do {
+					let result = try self.syncMetadata(for: photo)
+					continuation.resume(returning: result)
+				} catch {
+					continuation.resume(throwing: error)
+				}
+			}
+		}
+	}
+	
+	private func syncMetadata(for photo: PhotoReference) throws -> PhotoMetadata? {
+		// Check memory cache first
+		if let cached = metadataCache.object(forKey: photo.filePath as NSString) {
+			stats.thumbnailHits += 1  // Reuse thumbnail stats for now
+			return cached
+		}
+		
+		stats.thumbnailMisses += 1
+		
+		// Load image data (needed for MD5)
+		// TODO: Phase 2 optimization - use file attributes for cache key
+		let imageData = try Data(contentsOf: photo.fileURL)
+		let identifier = Identifier.md5(md5Digest(of: imageData))
+		let metadataURL = cacheURL(for: identifier, type: .metadata)
+		
+		// Check disk cache
+		if FileManager.default.fileExists(atPath: metadataURL.path) {
+			let data = try Data(contentsOf: metadataURL)
+			let metadata = try PropertyListDecoder().decode(PhotoMetadata.self, from: data)
+			metadataCache.setObject(metadata, forKey: photo.filePath as NSString)
+			stats.diskReads += 1
+			return metadata
+		}
+		
+		// Extract metadata
+		let metadata = try extractMetadata(from: imageData, fileURL: photo.fileURL)
+		
+		// Save to disk
+		let encoder = PropertyListEncoder()
+		let metadataData = try encoder.encode(metadata)
+		try metadataData.write(to: metadataURL)
+		stats.diskWrites += 1
+		
+		// Cache in memory
+		metadataCache.setObject(metadata, forKey: photo.filePath as NSString)
+		
+		// If we're extracting metadata, might as well generate thumbnail too
+		// Check if thumbnail exists
+		let thumbnailURL = cacheURL(for: identifier, type: .thumbnail)
+		if !FileManager.default.fileExists(atPath: thumbnailURL.path) {
+			// Generate and save thumbnail
+			if let thumbnail = try? prepareThumbnail(from: imageData) {
+				if let jpegData = thumbnail.jpegData(compressionQuality: 0.8) {
+					try? jpegData.write(to: thumbnailURL)
+					thumbnailCache.setObject(thumbnail, forKey: identifier.string as NSString)
+				}
+			}
+		}
+		
+		return metadata
 	}
 	
 }

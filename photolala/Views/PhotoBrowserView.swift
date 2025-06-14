@@ -92,6 +92,9 @@ struct PhotoBrowserView: View {
 #if os(macOS)
 		.navigationSubtitle(directoryPath as String)
 #endif
+		.onReceive(NotificationCenter.default.publisher(for: .deselectAll)) { _ in
+			selectionManager.clearSelection()
+		}
 		.toolbar {
 #if os(iOS)
 			ToolbarItem(placement: .navigationBarTrailing) {
@@ -147,6 +150,35 @@ struct PhotoBrowserView: View {
 				}
 				.pickerStyle(.segmented)
 				.help("Thumbnail size")
+#endif
+				
+				// Sort picker
+#if os(iOS)
+				Menu {
+					ForEach(PhotoSortOption.allCases, id: \.self) { option in
+						Button(action: {
+							settings.sortOption = option
+						}) {
+							Label(option.rawValue, systemImage: option.systemImage)
+							if option == settings.sortOption {
+								Image(systemName: "checkmark")
+							}
+						}
+					}
+				} label: {
+					Label("Sort", systemImage: settings.sortOption.systemImage)
+				}
+#else
+				// macOS: Use a picker with menu style
+				Picker("Sort", selection: $settings.sortOption) {
+					ForEach(PhotoSortOption.allCases, id: \.self) { option in
+						Text(option.rawValue)
+							.tag(option)
+					}
+				}
+				.pickerStyle(.menu)
+				.frame(width: 150)
+				.help("Sort photos by")
 #endif
 			}
 		}

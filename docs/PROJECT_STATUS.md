@@ -280,28 +280,37 @@ Last Updated: June 14, 2025
    - Escape to close (macOS), X button or swipe down (iOS)
    - Keyboard navigation with arrow keys
    - Auto-hiding overlay controls
+   - ~~Metadata HUD display~~ ✅ Added with 'i' key toggle
 
 4. **Add Selection Operations**:
-   - Selection count display
+   - ~~Selection count display~~ ✅ Completed
+   - ~~Deselect All functionality~~ ✅ Added with Cmd+D
    - Context menu for selected items
    - Basic operations (Copy, Move, Delete)
    - Prepare for Star/Flag/Label features
 
 5. **Enhance PhotoReference**:
-   - Add file size property
-   - Add creation date
-   - Add basic EXIF data
+   - ~~Add file size property~~ ✅ Available via PhotoMetadata
+   - ~~Add creation/modification date~~ ✅ Available via PhotoMetadata
+   - ~~Add basic EXIF data~~ ✅ PhotoMetadata extracts EXIF
    - ~~Consider renaming to PhotoReference~~ ✅ Already renamed throughout codebase
 
 6. **Performance Optimization**:
-   - Implement virtualized scrolling
-   - Add memory management
+   - ~~Implement virtualized scrolling~~ ✅ Using LazyHStack for thumbnail strip
+   - ~~Add memory management~~ ✅ Cache limits based on RAM
    - Background queue for scanning
+   - Replace thumbnail strip with collection view for very large sets (TODO added)
 
 7. **Error Handling**:
    - Handle corrupted images
    - Handle access permissions
    - User-friendly error messages
+
+8. **Sort and Filter**:
+   - ~~Sort by date~~ ✅ Implemented (using file dates)
+   - Sort by size
+   - Filter by file type
+   - Search functionality
 
 ### 💻 Build Status
 
@@ -315,6 +324,8 @@ Last Updated: June 14, 2025
 - `photolala/Models/PhotoReference.swift`
 - `photolala/Models/ThumbnailDisplaySettings.swift` - Display mode and size settings
 - `photolala/Models/SelectionManager.swift` - Selection state management
+- `photolala/Models/PhotoMetadata.swift` - Metadata storage class
+- `photolala/Models/PhotoSortOption.swift` - Sort options enum
 - `photolala/Services/DirectoryScanner.swift`
 - `photolala/Services/PhotoManager.swift` - Thumbnail generation and caching (enhanced with statistics)
 - `photolala/Views/PhotoPreviewView.swift` - Full image preview with zoom/pan
@@ -325,6 +336,7 @@ Last Updated: June 14, 2025
 - `docs/selection-and-preview-design.md` - Design for selection and preview features
 - `docs/photo-preview-implementation.md` - Implementation plan for preview feature
 - `docs/planning/photo-loading-enhancements.md` - Performance optimization plan
+- `docs/planning/sort-by-date-feature.md` - Design for sort by date feature
 - `docs/cache-statistics-guide.md` - Guide for using cache statistics
 
 **Removed:**
@@ -332,14 +344,15 @@ Last Updated: June 14, 2025
 - Various test/sample code
 
 **Modified:**
-- `photolala/Views/PhotoCollectionViewController.swift` - Added selection support, iOS selection mode, prefetching delegates
-- `photolala/Views/PhotoBrowserView.swift` - Added SelectionManager, iOS selection mode, preview presentation
+- `photolala/Views/PhotoCollectionViewController.swift` - Added selection support, iOS selection mode, prefetching delegates, sort support
+- `photolala/Views/PhotoBrowserView.swift` - Added SelectionManager, iOS selection mode, preview presentation, sort picker
 - `photolala/Views/WelcomeView.swift` - Removed test buttons, added iOS auto-navigation
 - `photolala/Views/PhotoPreviewView.swift` - Added image preloading for adjacent photos
 - `photolala/photolalaApp.swift` - Added NSApplicationDelegate for window restoration control
-- `photolala/Models/PhotoReference.swift` - Changed to @Observable class, renamed from PhotoRepresentation
-- `photolala/Utilities/XPlatform.swift` - Added collection view type aliases
-- `photolala/Services/PhotoManager.swift` - Enhanced with statistics, prefetching, and performance monitoring
+- `photolala/Models/PhotoReference.swift` - Changed to @Observable class, renamed from PhotoRepresentation, added metadata support
+- `photolala/Models/ThumbnailDisplaySettings.swift` - Added sortOption property
+- `photolala/Utilities/XPlatform.swift` - Added collection view type aliases, jpegData extension
+- `photolala/Services/PhotoManager.swift` - Enhanced with statistics, prefetching, performance monitoring, metadata extraction
 - `photolala/Commands/PhotolalaCommands.swift` - Added View menu with Cache Statistics command
 - All files using PhotoRepresentation - Updated to use PhotoReference
 
@@ -363,6 +376,66 @@ Last Updated: June 14, 2025
      - Thumbnails prefetch before becoming visible
      - Adjacent images preload during preview navigation
      - Reduced loading delays and smoother user experience
+
+18. **Implemented Sort by Date Feature (June 14 - Session 10)**:
+   - Created PhotoMetadata class for storing file metadata:
+     - Stores comprehensive metadata but only using file dates for now
+     - NSObject subclass for NSCache compatibility
+     - Includes properties for future EXIF data extraction
+   - Enhanced PhotoReference with metadata support:
+     - Added fileModificationDate loaded immediately in init
+     - Added metadata property and loading states
+     - Added loadPhotoData() for combined thumbnail/metadata loading
+   - Created PhotoSortOption enum:
+     - Three options: Name, Date (Oldest First), Date (Newest First)
+     - Uses file system dates only (no EXIF extraction yet)
+     - Integrated with ThumbnailDisplaySettings
+   - Updated PhotoManager:
+     - Migrated cache directory from 'thumbnails' to 'cache'
+     - Added metadata extraction alongside thumbnail generation
+     - Stores metadata as .plist files in cache directory
+     - Added metadata() and loadPhotoData() public APIs
+   - Added sort picker to PhotoBrowserView toolbar:
+     - macOS: Menu-style picker showing sort options
+     - iOS: Dropdown menu with icons and checkmarks
+     - Updates collection view automatically when changed
+   - PhotoCollectionViewController changes:
+     - Applies sorting when loading photos
+     - Re-sorts when sort option changes
+     - Shows placeholders immediately while loading
+   - Note: Date sorting has issues but will be addressed later
+
+19. **Added Metadata HUD to Photo Preview (June 14 - Session 11)**:
+   - Created toggleable metadata overlay for photo preview:
+     - Shows filename, dimensions, file size, date, and camera info
+     - Semi-transparent black background with rounded corners
+     - Positioned to avoid toolbar overlap using shared constants
+   - Toggle methods:
+     - Keyboard shortcut 'i' for info
+     - Info button in control strip (filled icon when active)
+     - Smooth fade in/out animation
+   - Metadata loading:
+     - Loads asynchronously when image loads
+     - Shows file modification date immediately if available
+     - Displays full metadata when loaded from PhotoManager
+   - UI improvements:
+     - Removed file path display per user request
+     - Repositioned HUD closer to center to avoid toolbar overlap
+     - Added shared constants for toolbar height (44pt) and margin (8pt)
+   - Performance optimizations for thumbnail strip:
+     - Changed HStack to LazyHStack for lazy loading
+     - Added task cancellation when thumbnails scroll off-screen
+     - Added TODO for future collection view implementation
+   - Cross-platform support for both macOS and iOS
+
+20. **Added Deselect All Feature (June 14 - Session 11)**:
+   - Added "Deselect All" menu command in Edit menu with Cmd+D shortcut
+   - Implemented notification system for cross-window deselect functionality
+   - PhotoBrowserView listens for deselect notification
+   - PhotoCollectionViewController handles deselect for both platforms:
+     - macOS: Clears selection manager and native collection view
+     - iOS: Deselects items and updates UI in selection mode
+   - iOS maintains existing "Deselect All" button in selection mode
 
 ### 🔧 Technical Decisions
 
