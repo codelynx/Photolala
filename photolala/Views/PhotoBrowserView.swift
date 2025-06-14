@@ -92,6 +92,9 @@ struct PhotoBrowserView: View {
 #if os(macOS)
 		.navigationSubtitle(directoryPath as String)
 #endif
+		.onReceive(NotificationCenter.default.publisher(for: .deselectAll)) { _ in
+			selectionManager.clearSelection()
+		}
 		.toolbar {
 #if os(iOS)
 			ToolbarItem(placement: .navigationBarTrailing) {

@@ -49,6 +49,10 @@ class PhotoCollectionViewController: XViewController {
 		fatalError("init(coder:) has not been implemented")
 	}
 	
+	deinit {
+		NotificationCenter.default.removeObserver(self)
+	}
+	
 	// MARK: - View Lifecycle
 	
 #if os(macOS)
@@ -96,6 +100,14 @@ class PhotoCollectionViewController: XViewController {
 		loadPhotos()
 		setupSettingsObserver()
 		setupToolbar()
+		
+		// Listen for deselect all notification
+		NotificationCenter.default.addObserver(
+			self,
+			selector: #selector(handleDeselectAll),
+			name: .deselectAll,
+			object: nil
+		)
 	}
 	
 	override func viewDidAppear() {
@@ -132,6 +144,14 @@ class PhotoCollectionViewController: XViewController {
 		loadPhotos()
 		setupSettingsObserver()
 		setupToolbar()
+		
+		// Listen for deselect all notification
+		NotificationCenter.default.addObserver(
+			self,
+			selector: #selector(handleDeselectAll),
+			name: .deselectAll,
+			object: nil
+		)
 	}
 	
 	private func setupCollectionView() {
@@ -341,6 +361,25 @@ class PhotoCollectionViewController: XViewController {
 	@objc private func toggleDisplayMode() {
 		guard let settings = settings else { return }
 		settings.displayMode = settings.displayMode == .scaleToFit ? .scaleToFill : .scaleToFit
+	}
+	
+	@objc private func handleDeselectAll() {
+		selectionManager?.clearSelection()
+		
+		#if os(macOS)
+		// Clear native collection view selection
+		collectionView.deselectAll(nil)
+		#else
+		// If in selection mode, update UI
+		if isSelectionMode {
+			// Deselect all items in collection view
+			for indexPath in collectionView.indexPathsForSelectedItems ?? [] {
+				collectionView.deselectItem(at: indexPath, animated: true)
+			}
+			updateSelectionTitle()
+			updateToolbarButtons()
+		}
+		#endif
 	}
 	
 	// MARK: - iOS Selection Mode
