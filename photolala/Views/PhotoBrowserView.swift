@@ -11,19 +11,48 @@ import Observation
 struct PhotoBrowserView: View {
 	let directoryPath: NSString
 	@State private var settings = ThumbnailDisplaySettings()
+	@State private var selectionManager = SelectionManager()
+	@State private var isSelectionModeActive = false
+	@State private var photosCount = 0
 	
 	init(directoryPath: NSString) {
 		self.directoryPath = directoryPath
 	}
 	
 	var body: some View {
-		PhotoCollectionView(directoryPath: directoryPath, settings: settings)
-			.navigationTitle(directoryPath.lastPathComponent)
-			#if os(macOS)
-			.navigationSubtitle(directoryPath as String)
+		Group {
+			#if os(iOS)
+			PhotoCollectionView(
+				directoryPath: directoryPath,
+				settings: settings,
+				selectionManager: selectionManager,
+				isSelectionModeActive: $isSelectionModeActive,
+				photosCount: $photosCount
+			)
+			#else
+			PhotoCollectionView(
+				directoryPath: directoryPath,
+				settings: settings,
+				selectionManager: selectionManager
+			)
 			#endif
-			.toolbar {
-				ToolbarItemGroup(placement: .automatic) {
+		}
+		.navigationTitle(directoryPath.lastPathComponent)
+		#if os(macOS)
+		.navigationSubtitle(directoryPath as String)
+		#endif
+		.toolbar {
+			#if os(iOS)
+			ToolbarItem(placement: .navigationBarTrailing) {
+				if photosCount > 0 && !isSelectionModeActive {
+					Button("Select") {
+						isSelectionModeActive = true
+					}
+				}
+			}
+			#endif
+			
+			ToolbarItemGroup(placement: .automatic) {
 					// Display mode toggle
 					Button(action: {
 						settings.displayMode = settings.displayMode == .scaleToFit ? .scaleToFill : .scaleToFit

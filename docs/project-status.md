@@ -1,6 +1,6 @@
 # Photolala Project Status
 
-Last Updated: June 12, 2025
+Last Updated: June 13, 2025
 
 ## Current Implementation Status
 
@@ -58,6 +58,29 @@ Last Updated: June 12, 2025
 2. **Photo Detail View**: Not yet implemented
 3. **Metadata Extraction**: PhotoRepresentation prepared for expansion
 4. ~~**Performance Optimization**: No caching or lazy loading yet~~ ✅ Implemented dual caching
+
+### 📝 Recent Changes (June 13, 2025)
+
+14. **Implemented iOS Selection Mode (June 13 - Session 6)**:
+   - Added proper iOS selection mode pattern:
+     - "Select" button in navigation bar (via SwiftUI toolbar)
+     - Enter/exit selection mode with UI transitions
+     - Cancel and Select All buttons replace navigation items
+     - Bottom toolbar with Share and Delete actions
+   - Visual implementation:
+     - Checkbox overlays on thumbnails (SF Symbols)
+     - circle (unselected) → checkmark.circle.fill (selected)
+     - 24pt checkbox in top-right corner of cells
+     - Blue tint color for selected state
+   - SwiftUI/UIKit integration architecture:
+     - Select button placed in PhotoBrowserView's toolbar (not UIViewController)
+     - Bidirectional state binding: isSelectionModeActive, photosCount
+     - Callbacks: onPhotosLoaded, onSelectionModeChanged
+   - Interactions:
+     - Tap to toggle selection in selection mode
+     - Normal tap navigation disabled during selection
+     - Selection count displayed in navigation title
+     - Toolbar actions show alerts (placeholder for future implementation)
 
 ### 📝 Recent Changes (June 13, 2025)
 
@@ -160,6 +183,31 @@ Last Updated: June 12, 2025
    - Users start with a clean state each time
    - Added Photos library entitlement for future features
 
+13. **Implemented Selection System (June 13 - Session 5)**:
+   - Created SelectionManager class (per-window):
+     - Tracks selectedItems, anchorItem, and focusedItem
+     - Methods for single/multi/range selection
+     - Designed for keyboard and mouse interactions
+   - Visual feedback implementation:
+     - Selected: 3px blue border + light blue background
+     - Focus: 2px system focus color border (for keyboard navigation)
+   - Integration approach simplified:
+     - Initially tried custom keyboard/mouse handling
+     - Discovered conflict with NSCollectionView's built-in selection
+     - Pivoted to using native collection view selection
+     - SelectionManager now syncs with collection view state
+   - What works (via NSCollectionView):
+     - Single click selection
+     - Cmd+click toggle selection
+     - Shift+click range selection
+     - Arrow key navigation
+     - Shift+arrow extending selection
+   - Trade-offs accepted:
+     - Less control over exact selection behavior
+     - Some edge cases don't work as originally designed
+     - Simpler, more maintainable code
+     - Platform-consistent behavior
+
 ### 🐛 Known Issues
 
 1. ~~Thumbnail loading is inefficient (loads full images)~~ ✅ Fixed with PhotoManager
@@ -171,27 +219,33 @@ Last Updated: June 12, 2025
 
 ### 🎯 Next Steps
 
-1. **~~Implement Proper Thumbnail System~~** ✅ Completed with PhotoManager:
-   - Generate actual thumbnails
-   - Add caching mechanism
-   - Implement lazy loading
+1. **~~Implement Proper Thumbnail System~~** ✅ Completed with PhotoManager
+2. **~~Implement Selection System~~** ✅ Completed (Phase 1-2, including iOS selection mode)
 
-2. **Add Photo Detail View**:
-   - Full-size image display
-   - Zoom functionality
-   - Basic metadata display
+3. **Add Photo Preview/Detail View** (Phase 3):
+   - Double-click to open full image view
+   - Navigation between selected photos
+   - Basic zoom and pan
+   - Escape to close
 
-3. **Enhance PhotoRepresentation**:
+4. **Add Selection Operations**:
+   - Selection count display
+   - Context menu for selected items
+   - Basic operations (Copy, Move, Delete)
+   - Prepare for Star/Flag/Label features
+
+5. **Enhance PhotoRepresentation**:
    - Add file size property
    - Add creation date
    - Add basic EXIF data
+   - Consider renaming to PhotoReference
 
-4. **Performance Optimization**:
+6. **Performance Optimization**:
    - Implement virtualized scrolling
    - Add memory management
    - Background queue for scanning
 
-5. **Error Handling**:
+7. **Error Handling**:
    - Handle corrupted images
    - Handle access permissions
    - User-friendly error messages
@@ -207,21 +261,23 @@ Last Updated: June 12, 2025
 **Added:**
 - `photolala/Models/PhotoRepresentation.swift`
 - `photolala/Models/ThumbnailDisplaySettings.swift` - Display mode and size settings
+- `photolala/Models/SelectionManager.swift` - Selection state management
 - `photolala/Services/DirectoryScanner.swift`
 - `photolala/Services/PhotoManager.swift` - Thumbnail generation and caching
 - `docs/project-status.md` (this file)
 - `docs/thumbnail-display-options-design.md` - Design for display options feature
 - `docs/thumbnail-display-implementation-plan.md` - Implementation plan
+- `docs/selection-and-preview-design.md` - Design for selection and preview features
 
 **Removed:**
 - `photolala/Views/PhotoNavigationView.swift`
 - Various test/sample code
 
 **Modified:**
-- `photolala/Views/PhotoCollectionViewController.swift` - Consolidated platform implementations, added display settings support
-- `photolala/Views/PhotoBrowserView.swift` - Simplified implementation, added toolbar with display options
+- `photolala/Views/PhotoCollectionViewController.swift` - Added selection support, iOS selection mode with checkboxes
+- `photolala/Views/PhotoBrowserView.swift` - Added SelectionManager, iOS selection mode state and toolbar
 - `photolala/Views/WelcomeView.swift` - Removed test buttons, added iOS auto-navigation
-- `photolala/photolalaApp.swift` - Uses PhotoBrowserView directly
+- `photolala/photolalaApp.swift` - Added NSApplicationDelegate for window restoration control
 - `photolala/Models/PhotoRepresentation.swift` - Changed to @Observable class
 - `photolala/Utilities/XPlatform.swift` - Added collection view type aliases
 
@@ -234,3 +290,7 @@ Last Updated: June 12, 2025
 5. **Per-Window Settings**: Each window has independent display settings for flexibility
 6. **Enum-Based Configuration**: ThumbnailOption encapsulates all size-related layout properties
 7. **No Window Restoration**: App starts fresh each time for cleaner user experience
+8. **Native Collection View Selection**: Chose simplicity over custom behavior
+   - Use NSCollectionView's built-in selection mechanism
+   - Trade control for maintainability and platform consistency
+   - SelectionManager syncs with collection view state
