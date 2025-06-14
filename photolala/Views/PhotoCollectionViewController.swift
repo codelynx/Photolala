@@ -445,16 +445,20 @@ class PhotoCollectionViewController: XViewController {
 	
 	// MARK: - Navigation
 	
-	private func handleNavigation(at indexPath: IndexPath) {
+	func handleNavigation(at indexPath: IndexPath) {
 		let photo = photos[indexPath.item]
 		let photoURL = photo.fileURL
+		
+		print("[PhotoCollectionViewController] handleNavigation called for: \(photo.filename)")
 		
 		// Check if it's a directory
 		var isDirectory: ObjCBool = false
 		if FileManager.default.fileExists(atPath: photoURL.path, isDirectory: &isDirectory) {
 			if isDirectory.boolValue {
+				print("[PhotoCollectionViewController] It's a directory, calling onSelectFolder")
 				onSelectFolder?(photo)
 			} else {
+				print("[PhotoCollectionViewController] It's a photo, calling onSelectPhoto")
 				onSelectPhoto?(photo, photos)
 			}
 		}
@@ -506,17 +510,37 @@ extension PhotoCollectionViewController: XCollectionViewDelegate {
 	
 	#if os(macOS)
 	override func mouseDown(with event: NSEvent) {
-		super.mouseDown(with: event)
+		print("[PhotoCollectionViewController] mouseDown called, clickCount: \(event.clickCount)")
 		
-		let point = collectionView.convert(event.locationInWindow, from: nil)
-		
+		// Don't call super to prevent default selection behavior on double-click
 		if event.clickCount == 2 {
-			// Handle double-click for navigation/preview
-			if let indexPath = collectionView.indexPathForItem(at: point) {
+			let locationInView = view.convert(event.locationInWindow, from: nil)
+			let locationInCollectionView = collectionView.convert(locationInView, from: view)
+			
+			print("[PhotoCollectionViewController] Double-click at location: \(locationInCollectionView)")
+			
+			if let indexPath = collectionView.indexPathForItem(at: locationInCollectionView) {
+				print("[PhotoCollectionViewController] Double-click on item at indexPath: \(indexPath)")
 				handleNavigation(at: indexPath)
+				return
 			}
 		}
-		// Let NSCollectionView handle single clicks for selection
+		
+		// For single clicks, let the collection view handle it
+		super.mouseDown(with: event)
+	}
+	
+	override func keyDown(with event: NSEvent) {
+		// Check for Return/Enter key
+		if event.keyCode == 36 { // Return key
+			// Get the first selected item
+			if let indexPath = collectionView.selectionIndexPaths.first {
+				handleNavigation(at: indexPath)
+				return
+			}
+		}
+		// Let NSCollectionView handle other keys (arrows, etc.)
+		super.keyDown(with: event)
 	}
 	#endif
 
@@ -638,6 +662,23 @@ class PhotoCollectionViewItem: NSCollectionViewItem {
 
 	func configure(with photoRep: PhotoReference) {
 		self.photoRepresentation = photoRep
+	}
+	
+	override func mouseDown(with event: NSEvent) {
+		print("[PhotoCollectionViewItem] mouseDown, clickCount: \(event.clickCount)")
+		
+		if event.clickCount == 2 {
+			// Find the collection view controller and call its navigation handler
+			if let collectionView = self.collectionView,
+			   let viewController = collectionView.delegate as? PhotoCollectionViewController,
+			   let indexPath = collectionView.indexPath(for: self) {
+				print("[PhotoCollectionViewItem] Double-click detected, calling handleNavigation")
+				viewController.handleNavigation(at: indexPath)
+				return
+			}
+		}
+		
+		super.mouseDown(with: event)
 	}
 
 	override func viewWillLayout() {

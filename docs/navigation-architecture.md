@@ -1,5 +1,7 @@
 # Navigation and Window Architecture
 
+Last Updated: June 14, 2025
+
 ## Overview
 
 Photolala uses platform-appropriate navigation patterns, with a focus on macOS conventions for desktop usage and iOS patterns for mobile devices.
@@ -51,7 +53,7 @@ struct PhotolalaCommands: Commands {
 
 ### Single Window Approach
 - **Welcome Screen**: Initial folder selection interface
-- **NavigationStack**: Single stack for entire app
+- **NavigationStack**: Single stack for entire app at root level
 - **Push/Pop Navigation**: Standard iOS navigation patterns
 - **Touch Interaction**: Tap to navigate (vs double-click on macOS)
 
@@ -59,6 +61,11 @@ struct PhotolalaCommands: Commands {
 - Document picker for folder selection
 - Security-scoped bookmarks for persistent access
 - Recent folders list (future enhancement)
+
+### Photo Preview Navigation (Updated June 14, 2025)
+- **Navigation Fix**: PhotoBrowserView uses `.navigationDestination(item:)` instead of its own NavigationStack
+- **State Management**: `@State private var selectedPhotoNavigation: PreviewNavigation?`
+- **Seamless Integration**: Works within parent NavigationStack from app root
 
 ## Cross-Platform Components
 
@@ -80,33 +87,57 @@ struct PhotolalaCommands: Commands {
 
 ### macOS
 ```
-App Launch → DefaultPhotoBrowserView → Pictures Folder (or empty state)
+App Launch → No default window (as of June 2025)
      ↓
-File → Open Folder (⌘O) → NSOpenPanel → Navigate to selected folder
+File → Open Folder (⌘O) → NSOpenPanel → Open new window with folder
+     ↓
+Each window has NavigationStack → PhotoBrowserView
      ↓
 Double-click folder → Push to NavigationStack
      ↓
-Double-click photo → Push PhotoDetailView
+Double-click photo → Push PhotoPreviewView
+     ↓
+Selection mode: Select photos → Eye button → Preview selected photos
 ```
 
 ### iOS
 ```
-App Launch → WelcomeView → Select Folder → Document Picker
+App Launch → NavigationStack (root) → WelcomeView
      ↓
-NavigationStack → PhotoNavigationView → PhotoCollectionView
+Select Folder → Document Picker → Auto-navigate to PhotoBrowserView
      ↓
-Tap folder → Push to NavigationStack
+PhotoBrowserView (within parent NavigationStack)
      ↓
-Tap photo → Push PhotoDetailView
+Tap folder → Push new PhotoBrowserView
+     ↓
+Tap photo → Set selectedPhotoNavigation → Push PhotoPreviewView
+     ↓
+Selection mode: Select photos → Eye button → Preview selected photos
 ```
+
+## Selection Preview Feature (Added June 14, 2025)
+
+### Overview
+- **Eye Button**: Appears in toolbar when photos are selected
+- **Consistent Behavior**: Works identically on macOS and iOS
+- **Smart Preview**: Shows only selected photos when selection exists
+
+### Implementation
+- **PhotoBrowserView**: Added `previewSelectedPhotos()` method
+- **Sorting**: Selected photos shown in alphabetical order by filename
+- **UI Integration**: Eye icon with "Preview" label in toolbar
+- **Platform Help**: macOS shows "Preview selected photos" tooltip
 
 ## Key Design Decisions
 
 1. **No Welcome on macOS**: Professional apps should open ready to work
 2. **Menu-Driven Operations**: Standard macOS pattern for file operations
-3. **NavigationStack Everywhere**: Consistent navigation model across platforms
+3. **NavigationStack Architecture**: 
+   - macOS: Each window has its own NavigationStack
+   - iOS: Single root NavigationStack, views use `.navigationDestination(item:)`
 4. **Native Collection Views**: Better performance for large photo collections
 5. **Window Per Folder**: Allows comparing multiple folders side-by-side
+6. **Selection Preview**: Separate action for previewing selected photos
 
 ## Future Enhancements
 

@@ -71,6 +71,44 @@ class PhotoManager {
 		}
 	}
 	
+	func loadFullImage(for photo: PhotoReference) async throws -> XImage? {
+		return try await withCheckedThrowingContinuation { continuation in
+			queue.async {
+				do {
+					print("[PhotoManager] loadFullImage for: \(photo.filename), path: \(photo.filePath)")
+					
+					// Check if we have it in cache
+					if let cachedImage = self.imageCache.object(forKey: photo.filePath as NSString) {
+						print("[PhotoManager] Found cached image for: \(photo.filename)")
+						continuation.resume(returning: cachedImage)
+						return
+					}
+					
+					// Load from disk
+					let url = photo.fileURL
+					print("[PhotoManager] Loading from disk: \(url.path)")
+					let data = try Data(contentsOf: url)
+					print("[PhotoManager] Loaded \(data.count) bytes")
+					
+					guard let image = XImage(data: data) else {
+						print("[PhotoManager] Failed to create image from data")
+						throw NSError(domain: "PhotoManager", code: 2, userInfo: [NSLocalizedDescriptionKey: "Unable to create image from data"])
+					}
+					
+					print("[PhotoManager] Successfully created image, size: \(image.size)")
+					
+					// Cache it
+					self.imageCache.setObject(image, forKey: photo.filePath as NSString)
+					
+					continuation.resume(returning: image)
+				} catch {
+					print("[PhotoManager] Error loading image: \(error)")
+					continuation.resume(throwing: error)
+				}
+			}
+		}
+	}
+	
 	private func syncLoadImage(for photo: PhotoReference) throws -> XImage? {
 		if let image = imageCache.object(forKey: photo.id as NSString) {
 			return image

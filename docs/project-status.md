@@ -1,6 +1,6 @@
 # Photolala Project Status
 
-Last Updated: June 13, 2025
+Last Updated: June 14, 2025
 
 ## Current Implementation Status
 
@@ -86,6 +86,53 @@ Last Updated: June 13, 2025
      - Normal tap navigation disabled during selection
      - Selection count displayed in navigation title
      - Toolbar actions show alerts (placeholder for future implementation)
+
+15. **Implemented Photo Preview/Detail View (June 13 - Session 7)**:
+   - Created PhotoPreviewView with full image display:
+     - Cross-platform implementation (sheet on macOS, fullScreenCover on iOS)
+     - Loads full-resolution images with caching via PhotoManager
+     - Shows loading indicator and error states
+   - Navigation features:
+     - If selection exists: navigates only between selected photos
+     - If no selection: navigates through all photos in folder
+     - Arrow keys (left/right) on macOS
+     - Swipe gestures on iOS
+     - Previous/Next buttons with visual indicators
+   - Zoom and pan functionality:
+     - NSScrollView with magnification on macOS
+     - UIScrollView with pinch zoom on iOS
+     - Double-tap/click to toggle between fit and 2x zoom
+     - Reset zoom button in overlay controls
+   - User interface:
+     - Auto-hiding overlay controls (3-second timer)
+     - Close button (X) and Escape key support
+     - Current photo indicator ("3 of 10")
+     - Platform-specific presentation (sheet vs full screen)
+   - Integration:
+     - Double-click opens preview on macOS (already implemented)
+     - Single tap opens preview on iOS (non-selection mode)
+     - PhotoBrowserView manages preview state and photo selection
+
+16. **Fixed iOS Navigation and Added Selection Preview (June 14 - Session 8)**:
+   - Fixed iOS navigation issues:
+     - PhotoBrowserView was inside parent NavigationStack but trying to use its own
+     - Changed from NavigationPath to @State with .navigationDestination(item:)
+     - Now properly navigates to PhotoPreviewView on iOS
+   - Enhanced PhotoPreviewView for cross-platform compatibility:
+     - Initially had black screen issue on macOS despite successful image loading
+     - Rewrote from NSViewRepresentable/UIViewRepresentable to pure SwiftUI
+     - Added platform-specific Image initialization helper
+     - Implemented gestures: MagnificationGesture for zoom, DragGesture for pan
+     - Double-tap to toggle zoom, proper centering and aspect ratio
+   - Added preview button for selected photos:
+     - Eye icon button appears in toolbar when photos are selected
+     - Works on both macOS and iOS
+     - Previews only the selected photos in alphabetical order
+     - Allows users to preview selection without losing it
+   - Selection mode behavior:
+     - Normal mode: tap/double-click opens preview directly
+     - Selection mode: tap/click selects, eye button previews selection
+     - Consistent behavior across platforms
 
 ### 📝 Recent Changes (June 13, 2025)
 
@@ -218,7 +265,7 @@ Last Updated: June 13, 2025
 1. ~~Thumbnail loading is inefficient (loads full images)~~ ✅ Fixed with PhotoManager
 2. ~~No image caching mechanism~~ ✅ Fixed with dual NSCache system
 3. No metadata display
-4. No photo detail view implementation
+4. ~~No photo detail view implementation~~ ✅ Fixed with PhotoPreviewView
 5. No error handling for invalid image files
 6. Swift 6 Sendable warnings for NSImage/UIImage
 
@@ -226,12 +273,13 @@ Last Updated: June 13, 2025
 
 1. **~~Implement Proper Thumbnail System~~** ✅ Completed with PhotoManager
 2. **~~Implement Selection System~~** ✅ Completed (Phase 1-2, including iOS selection mode)
-
-3. **Add Photo Preview/Detail View** (Phase 3):
-   - Double-click to open full image view
-   - Navigation between selected photos
-   - Basic zoom and pan
-   - Escape to close
+3. **~~Add Photo Preview/Detail View~~** ✅ Completed (Phase 3):
+   - Double-click (macOS) / tap (iOS) to open full image view
+   - Navigation between selected photos (if selection exists, shows only selected)
+   - Basic zoom and pan (pinch/scroll wheel, double-tap/click to toggle)
+   - Escape to close (macOS), X button or swipe down (iOS)
+   - Keyboard navigation with arrow keys
+   - Auto-hiding overlay controls
 
 4. **Add Selection Operations**:
    - Selection count display
@@ -269,10 +317,12 @@ Last Updated: June 13, 2025
 - `photolala/Models/SelectionManager.swift` - Selection state management
 - `photolala/Services/DirectoryScanner.swift`
 - `photolala/Services/PhotoManager.swift` - Thumbnail generation and caching
+- `photolala/Views/PhotoPreviewView.swift` - Full image preview with zoom/pan
 - `docs/project-status.md` (this file)
 - `docs/thumbnail-display-options-design.md` - Design for display options feature
 - `docs/thumbnail-display-implementation-plan.md` - Implementation plan
 - `docs/selection-and-preview-design.md` - Design for selection and preview features
+- `docs/photo-preview-implementation.md` - Implementation plan for preview feature
 
 **Removed:**
 - `photolala/Views/PhotoNavigationView.swift`
@@ -280,11 +330,12 @@ Last Updated: June 13, 2025
 
 **Modified:**
 - `photolala/Views/PhotoCollectionViewController.swift` - Added selection support, iOS selection mode with border-based selection
-- `photolala/Views/PhotoBrowserView.swift` - Added SelectionManager, iOS selection mode state and toolbar
+- `photolala/Views/PhotoBrowserView.swift` - Added SelectionManager, iOS selection mode, preview presentation
 - `photolala/Views/WelcomeView.swift` - Removed test buttons, added iOS auto-navigation
 - `photolala/photolalaApp.swift` - Added NSApplicationDelegate for window restoration control
 - `photolala/Models/PhotoReference.swift` - Changed to @Observable class, renamed from PhotoRepresentation
 - `photolala/Utilities/XPlatform.swift` - Added collection view type aliases
+- `photolala/Services/PhotoManager.swift` - Added loadFullImage method for preview
 - All files using PhotoRepresentation - Updated to use PhotoReference
 
 ### 🔧 Technical Decisions
