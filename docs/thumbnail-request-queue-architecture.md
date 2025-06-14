@@ -103,7 +103,7 @@ protocol ThumbnailObserver: AnyObject {
 class PhotoGridViewModel: ObservableObject, ThumbnailObserver {
 	@Published var thumbnails: [UniversalPhotoIdentifier: XImage] = [:]
 	
-	func loadThumbnail(for photo: PhotoRepresentation) {
+	func loadThumbnail(for photo: PhotoReference) {
 		guard let photoID = photo.universalPhotoID else { return }
 		
 		Task {

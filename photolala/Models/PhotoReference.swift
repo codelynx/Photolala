@@ -1,5 +1,5 @@
 //
-//  PhotoRepresentation.swift
+//  PhotoReference.swift
 //  Photolala
 //
 //  Created by Kaz Yoshikawa on 2025/06/12.
@@ -10,7 +10,7 @@ import Observation
 import SwiftUI
 
 @Observable
-class PhotoRepresentation: Identifiable, Hashable {
+class PhotoReference: Identifiable, Hashable {
 	var id: String { filePath }
 	let directoryPath: NSString
 	let filename: String
@@ -45,7 +45,7 @@ class PhotoRepresentation: Identifiable, Hashable {
 	}
 	
 	// Equatable
-	static func == (lhs: PhotoRepresentation, rhs: PhotoRepresentation) -> Bool {
+	static func == (lhs: PhotoReference, rhs: PhotoReference) -> Bool {
 		lhs.directoryPath == rhs.directoryPath && lhs.filename == rhs.filename
 	}
 

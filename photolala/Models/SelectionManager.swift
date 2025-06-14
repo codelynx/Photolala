@@ -12,13 +12,13 @@ import Observation
 @Observable
 class SelectionManager {
 	/// Currently selected photos
-	private(set) var selectedItems: Set<PhotoRepresentation> = []
+	private(set) var selectedItems: Set<PhotoReference> = []
 	
 	/// Anchor point for range selections (Shift+click/arrow)
-	private(set) var anchorItem: PhotoRepresentation?
+	private(set) var anchorItem: PhotoReference?
 	
 	/// Currently focused item for keyboard navigation
-	private(set) var focusedItem: PhotoRepresentation?
+	private(set) var focusedItem: PhotoReference?
 	
 	/// Number of selected items
 	var selectionCount: Int {
@@ -31,19 +31,19 @@ class SelectionManager {
 	}
 	
 	/// Check if an item is selected
-	func isSelected(_ item: PhotoRepresentation) -> Bool {
+	func isSelected(_ item: PhotoReference) -> Bool {
 		selectedItems.contains(item)
 	}
 	
 	/// Add item to selection
-	func addToSelection(_ item: PhotoRepresentation) {
+	func addToSelection(_ item: PhotoReference) {
 		selectedItems.insert(item)
 		anchorItem = item
 		focusedItem = item
 	}
 	
 	/// Remove item from selection
-	func removeFromSelection(_ item: PhotoRepresentation) {
+	func removeFromSelection(_ item: PhotoReference) {
 		selectedItems.remove(item)
 		if anchorItem == item {
 			anchorItem = selectedItems.first
@@ -54,7 +54,7 @@ class SelectionManager {
 	}
 	
 	/// Toggle selection of an item (for Cmd+click or Space key)
-	func toggleSelection(_ item: PhotoRepresentation) {
+	func toggleSelection(_ item: PhotoReference) {
 		if isSelected(item) {
 			removeFromSelection(item)
 		} else {
@@ -63,7 +63,7 @@ class SelectionManager {
 	}
 	
 	/// Add item to selection without changing anchor (used internally for range selection)
-	private func addToSelectionWithoutAnchor(_ item: PhotoRepresentation) {
+	private func addToSelectionWithoutAnchor(_ item: PhotoReference) {
 		selectedItems.insert(item)
 		focusedItem = item
 	}
@@ -76,14 +76,14 @@ class SelectionManager {
 	}
 	
 	/// Set single selection (clear others and set anchor)
-	func setSingleSelection(_ item: PhotoRepresentation) {
+	func setSingleSelection(_ item: PhotoReference) {
 		selectedItems = [item]
 		anchorItem = item
 		focusedItem = item
 	}
 	
 	/// Select range of items from anchor to target
-	func selectRange(to: PhotoRepresentation, in items: [PhotoRepresentation]) {
+	func selectRange(to: PhotoReference, in items: [PhotoReference]) {
 		guard let anchor = anchorItem,
 			  let fromIndex = items.firstIndex(of: anchor),
 			  let toIndex = items.firstIndex(of: to) else {
@@ -103,7 +103,7 @@ class SelectionManager {
 	}
 	
 	/// Update focused item without changing selection
-	func setFocusedItem(_ item: PhotoRepresentation?) {
+	func setFocusedItem(_ item: PhotoReference?) {
 		focusedItem = item
 	}
 	

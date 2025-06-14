@@ -13,7 +13,7 @@ Phase 1 establishes the fundamental architecture of Photolala as a database-free
   - File system is the source of truth
   - No migration headaches
   - Easier debugging (just files)
-- **Implementation**: `PhotoRepresentation` struct with computed properties
+- **Implementation**: `PhotoReference` struct with computed properties
 
 ### 2. Window-Per-Folder Design
 - **Decision**: Each window shows one folder's contents
@@ -26,10 +26,10 @@ Phase 1 establishes the fundamental architecture of Photolala as a database-free
 
 ## Core Components Implemented
 
-### 1. PhotoRepresentation Model
+### 1. PhotoReference Model
 
 ```swift
-struct PhotoRepresentation: Identifiable, Hashable {
+struct PhotoReference: Identifiable, Hashable {
     // Core stored properties (minimal)
     let filePath: String
     let fileSize: Int64
@@ -61,10 +61,10 @@ struct PhotoRepresentation: Identifiable, Hashable {
 actor SimplePhotoScanner {
     static let shared = SimplePhotoScanner()
     
-    func scanDirectory(_ directoryURL: URL) async throws -> [PhotoRepresentation] {
+    func scanDirectory(_ directoryURL: URL) async throws -> [PhotoReference] {
         // 1. List directory contents
         // 2. Filter for image files
-        // 3. Create PhotoRepresentation for each
+        // 3. Create PhotoReference for each
         // 4. Return sorted array
     }
 }
@@ -83,7 +83,7 @@ Photolala/
 ├── photolala/
 │   ├── PhotolalaApp.swift          # App entry, no ModelContainer
 │   ├── Models/
-│   │   ├── PhotoRepresentation.swift
+│   │   ├── PhotoReference.swift
 │   │   ├── PhotoIdentifier.swift
 │   │   └── Directory.swift         # Simple struct, not @Model
 │   ├── Views/
@@ -141,7 +141,7 @@ struct PhotolalaApp: App {
 ```swift
 struct MainWindowView: View {
     let folderURL: URL
-    @State private var photos: [PhotoRepresentation] = []
+    @State private var photos: [PhotoReference] = []
     @State private var isScanning = false
     
     var body: some View {

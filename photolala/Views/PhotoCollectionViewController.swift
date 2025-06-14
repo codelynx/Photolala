@@ -21,9 +21,9 @@ class PhotoCollectionViewController: XViewController {
 	weak var selectionManager: SelectionManager?
 
 	@MainActor
-	var photos: [PhotoRepresentation] = []
-	var onSelectPhoto: ((PhotoRepresentation, [PhotoRepresentation]) -> Void)?
-	var onSelectFolder: ((PhotoRepresentation) -> Void)?
+	var photos: [PhotoReference] = []
+	var onSelectPhoto: ((PhotoReference, [PhotoReference]) -> Void)?
+	var onSelectFolder: ((PhotoReference) -> Void)?
 	
 	var collectionView: XCollectionView!
 	
@@ -171,13 +171,23 @@ class PhotoCollectionViewController: XViewController {
 		actionToolbar = UIToolbar()
 		actionToolbar.translatesAutoresizingMaskIntoConstraints = false
 		actionToolbar.isHidden = true
+		
+		// Set toolbar appearance for consistent background
+		let toolbarAppearance = UIToolbarAppearance()
+		toolbarAppearance.configureWithOpaqueBackground()
+		toolbarAppearance.backgroundColor = .systemBackground
+		actionToolbar.standardAppearance = toolbarAppearance
+		actionToolbar.scrollEdgeAppearance = toolbarAppearance
+		actionToolbar.compactAppearance = toolbarAppearance
+		actionToolbar.compactScrollEdgeAppearance = toolbarAppearance
+		
 		view.addSubview(actionToolbar)
 		
 		// Setup toolbar constraints
 		NSLayoutConstraint.activate([
 			actionToolbar.leadingAnchor.constraint(equalTo: view.leadingAnchor),
 			actionToolbar.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-			actionToolbar.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor)
+			actionToolbar.bottomAnchor.constraint(equalTo: view.bottomAnchor)
 		])
 		
 		// Configure toolbar items
@@ -198,7 +208,7 @@ class PhotoCollectionViewController: XViewController {
 	
 	private func loadPhotos() {
 		Task { @MainActor in
-			// Use DirectoryScanner to get PhotoRepresentation objects
+			// Use DirectoryScanner to get PhotoReference objects
 			let scannedPhotos = DirectoryScanner.scanDirectory(atPath: directoryPath)
 			self.photos = scannedPhotos
 			self.reloadData()
@@ -309,7 +319,7 @@ class PhotoCollectionViewController: XViewController {
 		contentInset.bottom = 44 // toolbar height
 		collectionView.contentInset = contentInset
 		
-		// Update visible cells to show checkboxes
+		// Update visible cells for selection mode
 		for cell in collectionView.visibleCells {
 			if let photoCell = cell as? PhotoCollectionViewCell {
 				photoCell.setSelectionMode(true)
@@ -597,7 +607,7 @@ extension PhotoCollectionViewController: XCollectionViewDelegate {
 class PhotoCollectionViewItem: NSCollectionViewItem {
 	weak var settings: ThumbnailDisplaySettings?
 	weak var selectionManager: SelectionManager?
-	var photoRepresentation: PhotoRepresentation? {
+	var photoRepresentation: PhotoReference? {
 		didSet {
 			loadThumbnail()
 			updateSelectionState()
@@ -626,7 +636,7 @@ class PhotoCollectionViewItem: NSCollectionViewItem {
 		])
 	}
 
-	func configure(with photoRep: PhotoRepresentation) {
+	func configure(with photoRep: PhotoReference) {
 		self.photoRepresentation = photoRep
 	}
 
@@ -671,7 +681,7 @@ class PhotoCollectionViewItem: NSCollectionViewItem {
 	}
 	
 	@MainActor
-	func updateThumbnail(thumbnail: XImage?, for photoRep: PhotoRepresentation) {
+	func updateThumbnail(thumbnail: XImage?, for photoRep: PhotoReference) {
 		if photoRepresentation == photoRep {
 			imageView?.image = thumbnail
 		}
@@ -729,7 +739,7 @@ class PhotoCollectionViewItem: NSCollectionViewItem {
 class PhotoCollectionViewCell: UICollectionViewCell {
 	weak var settings: ThumbnailDisplaySettings?
 	weak var selectionManager: SelectionManager?
-	var photoRepresentation: PhotoRepresentation? {
+	var photoRepresentation: PhotoReference? {
 		didSet {
 			loadThumbnail()
 			updateSelectionState()
@@ -816,36 +826,26 @@ class PhotoCollectionViewCell: UICollectionViewCell {
 		let isFocused = selectionManager.focusedItem == photoRep
 		
 		if isInSelectionMode {
-			// In selection mode, show checkbox instead of border
+			// In selection mode, use tinted border for selection
+			if isSelected {
+				imageView.layer.borderWidth = 4
+				imageView.layer.borderColor = UIColor.systemBlue.cgColor
+				contentView.backgroundColor = UIColor.systemBlue.withAlphaComponent(0.15)
+			} else {
+				imageView.layer.borderWidth = 1
+				imageView.layer.borderColor = XColor.separator.cgColor
+				contentView.backgroundColor = UIColor.clear
+			}
+			
+			// Hide checkbox since we're using border selection
+			checkboxImageView.isHidden = true
+		} else {
+			// Normal mode - no selection visible on iOS
 			imageView.layer.borderWidth = 1
 			imageView.layer.borderColor = XColor.separator.cgColor
 			contentView.backgroundColor = UIColor.clear
-			
-			// Update checkbox image
-			if isSelected {
-				checkboxImageView.image = UIImage(systemName: "checkmark.circle.fill")
-				checkboxImageView.tintColor = UIColor.systemBlue
-			} else {
-				checkboxImageView.image = UIImage(systemName: "circle")
-				checkboxImageView.tintColor = UIColor.secondaryLabel
-			}
-		} else {
-			// Normal mode - use border to show selection
-			imageView.layer.borderWidth = isSelected ? 3 : 1
-			imageView.layer.borderColor = isSelected ? UIColor.systemBlue.cgColor : XColor.separator.cgColor
-			
-			// Update background for better visibility
-			contentView.backgroundColor = isSelected ? UIColor.systemBlue.withAlphaComponent(0.1) : UIColor.clear
-			
-			// Add focus ring
-			if isFocused {
-				// Create focus ring effect
-				contentView.layer.borderWidth = 2
-				contentView.layer.borderColor = UIColor.label.cgColor
-				contentView.layer.cornerRadius = 4
-			} else {
-				contentView.layer.borderWidth = 0
-			}
+			contentView.layer.borderWidth = 0
+			checkboxImageView.isHidden = true
 		}
 	}
 	
@@ -860,7 +860,6 @@ class PhotoCollectionViewCell: UICollectionViewCell {
 	
 	func setSelectionMode(_ enabled: Bool) {
 		isInSelectionMode = enabled
-		checkboxImageView.isHidden = !enabled
 		updateSelectionState()
 	}
 }
@@ -872,8 +871,8 @@ struct PhotoCollectionView: XViewControllerRepresentable {
 	let directoryPath: NSString
 	let settings: ThumbnailDisplaySettings
 	let selectionManager: SelectionManager
-	var onSelectPhoto: ((PhotoRepresentation, [PhotoRepresentation]) -> Void)?
-	var onSelectFolder: ((PhotoRepresentation) -> Void)?
+	var onSelectPhoto: ((PhotoReference, [PhotoReference]) -> Void)?
+	var onSelectFolder: ((PhotoReference) -> Void)?
 	#if os(iOS)
 	@Binding var isSelectionModeActive: Bool
 	@Binding var photosCount: Int

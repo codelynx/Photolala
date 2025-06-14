@@ -30,7 +30,7 @@ Photolala is a cross-platform photo browser application similar to Adobe Bridge 
 
 ### Database-Free Design
 - **No SwiftData/CoreData** - Simple file-based approach
-- **PhotoRepresentation** as @Observable class for reactive UI
+- **PhotoReference** as @Observable class for reactive UI
 - **DirectoryScanner** for directory scanning
 - **File system as source of truth**
 
@@ -39,7 +39,7 @@ Photolala is a cross-platform photo browser application similar to Adobe Bridge 
 ```swift
 // Lightweight metadata representation
 @Observable
-class PhotoRepresentation: Identifiable, Hashable {
+class PhotoReference: Identifiable, Hashable {
     let directoryPath: NSString
     let filename: String
     
@@ -110,7 +110,7 @@ enum PhotoIdentifier {
    - Provides instant photo list without scanning
 
 2. **Quick scan for UI responsiveness**
-   - Create PhotoRepresentation with basic file info
+   - Create PhotoReference with basic file info
    - Display grid immediately
    - Load thumbnails on demand
 
@@ -130,7 +130,7 @@ enum PhotoIdentifier {
 
 ### Phase 1: Core Foundation ✅ (Completed)
 - [x] Basic project structure with macOS/iOS targets
-- [x] PhotoRepresentation model as @Observable class
+- [x] PhotoReference model as @Observable class
 - [x] DirectoryScanner for directory listing
 - [x] PhotoBrowserView with native collection views
 - [x] Window-per-folder architecture
@@ -195,7 +195,7 @@ enum PhotoIdentifier {
 ## Current Implementation Status
 
 ### ✅ Completed
-- PhotoRepresentation model as @Observable class
+- PhotoReference model as @Observable class
 - DirectoryScanner (file-based)
 - PhotoBrowserView with native collection views
 - Consolidated PhotoCollectionViewController (cross-platform)
@@ -248,7 +248,7 @@ enum PhotoIdentifier {
 
 ## Next Steps
 
-1. ~~Complete PhotoRepresentation migration~~ ✅
+1. ~~Complete PhotoReference migration~~ ✅
 2. ~~Implement thumbnail system~~ ✅
 3. Implement .photolala footprint optimization
 4. Add progressive metadata loading

@@ -2,12 +2,12 @@
 
 ## Overview
 
-While PhotoRepresentation remains a simple struct (no database), we'll use SwiftData to store thumbnail metadata for performance and rich querying capabilities.
+While PhotoReference remains a simple struct (no database), we'll use SwiftData to store thumbnail metadata for performance and rich querying capabilities.
 
 ## Architecture
 
 ```
-PhotoRepresentation (Struct)          ThumbnailMetadata (@Model)
+PhotoReference (Struct)          ThumbnailMetadata (@Model)
 ├── filePath                         ├── universalPhotoID (unique)
 ├── fileSize                         ├── fileSize
 ├── createdDate                      ├── imageWidth
@@ -69,10 +69,10 @@ final class ThumbnailMetadata {
 }
 ```
 
-## Integration with PhotoRepresentation
+## Integration with PhotoReference
 
 ```swift
-extension PhotoRepresentation {
+extension PhotoReference {
     /// Get or create thumbnail metadata
     func thumbnailMetadata(in context: ModelContext) async -> ThumbnailMetadata? {
         guard let identifier = photoIdentifier else { return nil }
@@ -122,7 +122,7 @@ actor ThumbnailService {
         self.modelContainer = try! ModelContainer(for: schema, configurations: [config])
     }
     
-    func thumbnail(for photo: PhotoRepresentation) async -> XImage? {
+    func thumbnail(for photo: PhotoReference) async -> XImage? {
         // 1. Check if thumbnail exists on disk using contentID
         guard let identifier = photo.photoIdentifier else { return nil }
         
@@ -148,7 +148,7 @@ actor ThumbnailService {
         return thumbnail
     }
     
-    private func storeMetadata(for photo: PhotoRepresentation, thumbnail: XImage) async {
+    private func storeMetadata(for photo: PhotoReference, thumbnail: XImage) async {
         let context = modelContainer.mainContext
         
         guard let identifier = photo.photoIdentifier else { return }
@@ -211,7 +211,7 @@ let largePhotos = try context.fetch(
 
 ## Benefits of This Hybrid Approach
 
-1. **PhotoRepresentation stays simple** - Just a struct for current files
+1. **PhotoReference stays simple** - Just a struct for current files
 2. **Rich metadata for thumbnails** - Tags, ratings, favorites
 3. **Fast queries** - Find photos by metadata without scanning
 4. **Persistent user data** - Ratings/tags survive file moves

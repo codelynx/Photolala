@@ -74,13 +74,13 @@ extension PhotoManager {
     /// - Parameter photoRep: The photo representation
     /// - Returns: The thumbnail image
     /// - Throws: Error if thumbnail loading fails
-    func thumbnail(for photoRep: PhotoRepresentation) async throws -> XThumbnail?
+    func thumbnail(for photoRep: PhotoReference) async throws -> XThumbnail?
     
     /// Load full image for a photo representation (async)
     /// - Parameter photo: The photo representation
     /// - Returns: The full image
     /// - Throws: Error if image loading fails
-    func loadImage(for photo: PhotoRepresentation) async throws -> XImage?
+    func loadImage(for photo: PhotoReference) async throws -> XImage?
     
     /// Generate a thumbnail from raw image data
     /// - Parameter data: The raw image data
@@ -270,7 +270,7 @@ Key improvements:
 - Update collection views to use PhotoManager ✅
 - Add memory caching with NSCache ✅
 - Implement proper error handling ✅
-- Add loading placeholders (partial - uses PhotoRepresentation.thumbnail)
+- Add loading placeholders (partial - uses PhotoReference.thumbnail)
 
 ### Phase 3: Advanced Features
 - Async/await API for better performance

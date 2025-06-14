@@ -7,7 +7,7 @@ Last Updated: June 13, 2025
 ### ✅ Completed Features
 
 #### Core Models
-- **PhotoRepresentation**: Lightweight file representation model
+- **PhotoReference**: Lightweight file representation model
   - `directoryPath: NSString` - Directory path 
   - `filename: String` - Filename only
   - Computed properties for `fileURL` and `filePath`
@@ -19,14 +19,14 @@ Last Updated: June 13, 2025
 #### Services
 - **DirectoryScanner**: Scans directories for image files
   - Supports common image formats (jpg, jpeg, png, heic, heif, tiff, bmp, gif, webp)
-  - Creates PhotoRepresentation objects
+  - Creates PhotoReference objects
   - Uses NSString for path manipulation (user's choice)
 
 #### UI Components
 - **PhotoCollectionViewController**: Native collection view implementation
   - Cross-platform (NSCollectionView on macOS, UICollectionView on iOS)
   - Consolidated into single file with platform conditionals
-  - Uses PhotoRepresentation instead of URLs
+  - Uses PhotoReference instead of URLs
   - Basic thumbnail loading (placeholder implementation)
   - Supports selection callbacks for photos and folders
   - Fixed crash issue by removing @IBOutlet (views created programmatically)
@@ -56,7 +56,7 @@ Last Updated: June 13, 2025
 
 1. ~~**Thumbnail Loading**: Currently loads full images (needs optimization)~~ ✅ Fixed
 2. **Photo Detail View**: Not yet implemented
-3. **Metadata Extraction**: PhotoRepresentation prepared for expansion
+3. **Metadata Extraction**: PhotoReference prepared for expansion
 4. ~~**Performance Optimization**: No caching or lazy loading yet~~ ✅ Implemented dual caching
 
 ### 📝 Recent Changes (June 13, 2025)
@@ -67,11 +67,16 @@ Last Updated: June 13, 2025
      - Enter/exit selection mode with UI transitions
      - Cancel and Select All buttons replace navigation items
      - Bottom toolbar with Share and Delete actions
-   - Visual implementation:
-     - Checkbox overlays on thumbnails (SF Symbols)
-     - circle (unselected) → checkmark.circle.fill (selected)
-     - 24pt checkbox in top-right corner of cells
-     - Blue tint color for selected state
+   - Visual implementation (refined during session):
+     - Initially implemented checkbox overlays (SF Symbols)
+     - Changed to border-based selection per user preference:
+       - 4px blue border for selected items
+       - 15% blue background tint for selected items
+       - 1px separator color border for unselected items in selection mode
+     - Fixed toolbar background color consistency with safe area:
+       - Used UIToolbarAppearance with configureWithOpaqueBackground()
+       - Set explicit backgroundColor to .systemBackground
+     - Removed iOS focus ring (no keyboard navigation on touch devices)
    - SwiftUI/UIKit integration architecture:
      - Select button placed in PhotoBrowserView's toolbar (not UIViewController)
      - Bidirectional state binding: isSelectionModeActive, photosCount
@@ -86,7 +91,7 @@ Last Updated: June 13, 2025
 
 1. **Refactored Photo Model**:
    - Removed complex Photo model with SwiftData dependencies
-   - Implemented lightweight PhotoRepresentation
+   - Implemented lightweight PhotoReference
    - Separated directory path and filename for efficiency
    - Changed from struct to @Observable class for reactive UI updates
    - Added thumbnail and isLoadingThumbnail properties for future thumbnail support
@@ -96,7 +101,7 @@ Last Updated: June 13, 2025
    - Simple, focused on file discovery
 
 3. **Updated Collection Views**:
-   - Migrated from URL arrays to PhotoRepresentation arrays
+   - Migrated from URL arrays to PhotoReference arrays
    - Fixed type mismatches throughout the codebase
    - Maintained platform-specific implementations
    - Consolidated macOS and iOS PhotoCollectionViewController into single file
@@ -234,11 +239,11 @@ Last Updated: June 13, 2025
    - Basic operations (Copy, Move, Delete)
    - Prepare for Star/Flag/Label features
 
-5. **Enhance PhotoRepresentation**:
+5. **Enhance PhotoReference**:
    - Add file size property
    - Add creation date
    - Add basic EXIF data
-   - Consider renaming to PhotoReference
+   - ~~Consider renaming to PhotoReference~~ ✅ Already renamed throughout codebase
 
 6. **Performance Optimization**:
    - Implement virtualized scrolling
@@ -259,7 +264,7 @@ Last Updated: June 13, 2025
 ### 📁 File Structure Changes
 
 **Added:**
-- `photolala/Models/PhotoRepresentation.swift`
+- `photolala/Models/PhotoReference.swift`
 - `photolala/Models/ThumbnailDisplaySettings.swift` - Display mode and size settings
 - `photolala/Models/SelectionManager.swift` - Selection state management
 - `photolala/Services/DirectoryScanner.swift`
@@ -274,12 +279,13 @@ Last Updated: June 13, 2025
 - Various test/sample code
 
 **Modified:**
-- `photolala/Views/PhotoCollectionViewController.swift` - Added selection support, iOS selection mode with checkboxes
+- `photolala/Views/PhotoCollectionViewController.swift` - Added selection support, iOS selection mode with border-based selection
 - `photolala/Views/PhotoBrowserView.swift` - Added SelectionManager, iOS selection mode state and toolbar
 - `photolala/Views/WelcomeView.swift` - Removed test buttons, added iOS auto-navigation
 - `photolala/photolalaApp.swift` - Added NSApplicationDelegate for window restoration control
-- `photolala/Models/PhotoRepresentation.swift` - Changed to @Observable class
+- `photolala/Models/PhotoReference.swift` - Changed to @Observable class, renamed from PhotoRepresentation
 - `photolala/Utilities/XPlatform.swift` - Added collection view type aliases
+- All files using PhotoRepresentation - Updated to use PhotoReference
 
 ### 🔧 Technical Decisions
 

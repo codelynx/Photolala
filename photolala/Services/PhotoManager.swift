@@ -58,7 +58,7 @@ class PhotoManager {
 	private let thumbnailCache = NSCache<NSString, XThumbnail>() // PhotoManager.Identifier: XThumbnail
 	private let queue = DispatchQueue(label: "com.photolala.PhotoManager", qos: .userInitiated, attributes: .concurrent)
 	
-	func loadImage(for photo: PhotoRepresentation) async throws -> XImage? {
+	func loadImage(for photo: PhotoReference) async throws -> XImage? {
 		return try await withCheckedThrowingContinuation { continuation in
 			queue.async {
 				do {
@@ -71,7 +71,7 @@ class PhotoManager {
 		}
 	}
 	
-	private func syncLoadImage(for photo: PhotoRepresentation) throws -> XImage? {
+	private func syncLoadImage(for photo: PhotoReference) throws -> XImage? {
 		if let image = imageCache.object(forKey: photo.id as NSString) {
 			return image
 		}
@@ -228,7 +228,7 @@ class PhotoManager {
 		return nil
 	}
 	
-	func thumbnail(for photoRep: PhotoRepresentation) async throws -> XThumbnail? {
+	func thumbnail(for photoRep: PhotoReference) async throws -> XThumbnail? {
 		return try await withCheckedThrowingContinuation { continuation in
 			queue.async {
 				do {
@@ -241,7 +241,7 @@ class PhotoManager {
 		}
 	}
 	
-	private func syncThumbnail(for photoRep: PhotoRepresentation) throws -> XThumbnail? {
+	private func syncThumbnail(for photoRep: PhotoReference) throws -> XThumbnail? {
 		let imageData = try Data(contentsOf: photoRep.fileURL)
 		let identifier = Identifier.md5(md5Digest(of: imageData))
 		if let cached = thumbnailCache.object(forKey: identifier.string as NSString) {

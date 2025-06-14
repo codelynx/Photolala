@@ -69,20 +69,20 @@ Preview functionality allows users to:
 ```swift
 @Observable
 class SelectionManager {
-    var selectedItems: Set<PhotoRepresentation> = []  // Note: Consider renaming PhotoRepresentation to PhotoReference
-    var lastSelectedItem: PhotoRepresentation?
-    var focusedItem: PhotoRepresentation?
+    var selectedItems: Set<PhotoReference> = []  // Note: Consider renaming PhotoReference to PhotoReference
+    var lastSelectedItem: PhotoReference?
+    var focusedItem: PhotoReference?
 
-    func select(_ item: PhotoRepresentation) {
+    func select(_ item: PhotoReference) {
         selectedItems.insert(item)
         lastSelectedItem = item
     }
 
-    func deselect(_ item: PhotoRepresentation) {
+    func deselect(_ item: PhotoReference) {
         selectedItems.remove(item)
     }
 
-    func toggleSelection(_ item: PhotoRepresentation) {
+    func toggleSelection(_ item: PhotoReference) {
         if selectedItems.contains(item) {
             deselect(item)
         } else {
@@ -90,7 +90,7 @@ class SelectionManager {
         }
     }
 
-    func selectRange(from: PhotoRepresentation, to: PhotoRepresentation, in items: [PhotoRepresentation]) {
+    func selectRange(from: PhotoReference, to: PhotoReference, in items: [PhotoReference]) {
         // Implement range selection logic
     }
 
@@ -137,7 +137,7 @@ extension PhotoCollectionViewController: UICollectionViewDelegate {
 import QuickLookUI
 
 class PreviewManager: QLPreviewControllerDataSource {
-    var items: [PhotoRepresentation] = []
+    var items: [PhotoReference] = []
     var currentIndex: Int = 0
 
     func numberOfPreviewItems(in controller: QLPreviewController) -> Int {
@@ -153,7 +153,7 @@ class PreviewManager: QLPreviewControllerDataSource {
 #### Custom Preview View
 ```swift
 struct PhotoPreviewView: View {
-    let photo: PhotoRepresentation
+    let photo: PhotoReference
     @State private var scale: CGFloat = 1.0
     @State private var offset: CGSize = .zero
 
@@ -406,11 +406,12 @@ struct PhotoPreviewView: View {
 - "Select" button in navigation bar (SwiftUI toolbar)
 - Enter/exit selection mode with UI changes
 - Cancel and Select All buttons in navigation bar
-- Checkbox overlays on thumbnails (circle/checkmark.circle.fill)
+- Border-based selection (4px blue border + 15% blue background tint)
 - Bottom toolbar with Share and Delete actions
+- Fixed toolbar background color consistency with safe area
 - Selection count display in navigation title
 - Proper touch interactions (tap to toggle selection)
-- Visual feedback with blue checkmarks and tinted overlay
+- Removed focus ring for iOS (no keyboard navigation)
 
 ### Phase 3: Full Image Preview ❌ NOT STARTED
 - Double-click currently navigates folders, not preview
@@ -472,10 +473,11 @@ The iOS selection mode required a different approach than originally planned due
      - `onSelectionModeChanged: ((Bool) -> Void)?` - syncs selection mode state
 
 3. **Visual Implementation**:
-   - Checkbox overlay added to PhotoCollectionViewCell
-   - Uses SF Symbols (circle/checkmark.circle.fill)
-   - 24pt checkbox in top-right corner
-   - Blue tint for selected state
+   - Border-based selection (replaced checkbox overlays)
+   - 4px blue border for selected items
+   - 15% blue background tint for selected items
+   - 1px separator color border for unselected items in selection mode
+   - Removed iOS focus ring (not needed for touch interface)
 
 ### Next Steps
 To continue development:
@@ -492,9 +494,9 @@ To continue development:
 3. Should we add a selection mode toggle for iOS?
 4. What metadata should be displayed in preview?
 5. Should preview support editing operations?
-6. Should we rename PhotoRepresentation to PhotoReference throughout the codebase?
-   - This would better reflect that it's a reference to a photo file rather than the photo data itself
-   - Impact would be significant as it affects many files and APIs
+6. ~~Should we rename PhotoRepresentation to PhotoReference throughout the codebase?~~ ✅ COMPLETED
+   - Renamed throughout the codebase to better reflect it's a reference to a photo file
+   - All files and APIs have been updated to use PhotoReference
 
 ## Additional Concerns
 

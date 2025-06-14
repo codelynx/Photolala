@@ -85,7 +85,7 @@ enum ThumbnailDisplayMode: String, CaseIterable {
 #### Cell Configuration
 ```swift
 // PhotoCollectionViewCell
-func configure(with photo: PhotoRepresentation, displayMode: ThumbnailDisplayMode) {
+func configure(with photo: PhotoReference, displayMode: ThumbnailDisplayMode) {
     switch displayMode {
     case .scaleToFit:
         imageView.contentMode = .scaleAspectFit

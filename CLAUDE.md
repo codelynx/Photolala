@@ -32,7 +32,7 @@ xcodebuild -scheme photolala test
 ```
 Photolala/
 ├── photolala/              # Main app target
-│   ├── Models/            # Data models (PhotoRepresentation, Directory)
+│   ├── Models/            # Data models (PhotoReference, Directory)
 │   ├── Views/             # SwiftUI views
 │   ├── ViewModels/        # Observable view models
 │   ├── Services/          # Business logic
