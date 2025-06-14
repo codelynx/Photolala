@@ -11,6 +11,34 @@ import CryptoKit
 class PhotoManager {
 
 	typealias XThumbnail = XImage
+	
+	// MARK: - Cache Statistics
+	private struct CacheStatistics {
+		var imageHits = 0
+		var imageMisses = 0
+		var thumbnailHits = 0
+		var thumbnailMisses = 0
+		var diskReads = 0
+		var diskWrites = 0
+		var totalLoadTime: TimeInterval = 0
+		var loadCount = 0
+		
+		var averageLoadTime: TimeInterval {
+			loadCount > 0 ? totalLoadTime / Double(loadCount) : 0
+		}
+		
+		var imageHitRate: Double {
+			let total = imageHits + imageMisses
+			return total > 0 ? Double(imageHits) / Double(total) : 0
+		}
+		
+		var thumbnailHitRate: Double {
+			let total = thumbnailHits + thumbnailMisses
+			return total > 0 ? Double(thumbnailHits) / Double(total) : 0
+		}
+	}
+	
+	private var stats = CacheStatistics()
 
 	enum Identifier {
 		case md5(Insecure.MD5Digest) // universal photo identifier
@@ -75,27 +103,40 @@ class PhotoManager {
 		return try await withCheckedThrowingContinuation { continuation in
 			queue.async {
 				do {
+					let startTime = Date()
 					print("[PhotoManager] loadFullImage for: \(photo.filename), path: \(photo.filePath)")
 					
 					// Check if we have it in cache
 					if let cachedImage = self.imageCache.object(forKey: photo.filePath as NSString) {
-						print("[PhotoManager] Found cached image for: \(photo.filename)")
+						self.stats.imageHits += 1
+						let loadTime = Date().timeIntervalSince(startTime)
+						print("[PhotoManager] ✅ CACHE HIT - Image: \(photo.filename) (Load time: \(String(format: "%.3f", loadTime))s)")
 						continuation.resume(returning: cachedImage)
 						return
 					}
 					
+					// Cache miss
+					self.stats.imageMisses += 1
+					
 					// Load from disk
 					let url = photo.fileURL
-					print("[PhotoManager] Loading from disk: \(url.path)")
+					print("[PhotoManager] ❌ CACHE MISS - Loading from disk: \(url.path)")
+					let diskStartTime = Date()
 					let data = try Data(contentsOf: url)
-					print("[PhotoManager] Loaded \(data.count) bytes")
+					let diskReadTime = Date().timeIntervalSince(diskStartTime)
+					self.stats.diskReads += 1
+					print("[PhotoManager] 💾 DISK READ - \(data.count / 1024 / 1024)MB in \(String(format: "%.3f", diskReadTime))s")
 					
 					guard let image = XImage(data: data) else {
 						print("[PhotoManager] Failed to create image from data")
 						throw NSError(domain: "PhotoManager", code: 2, userInfo: [NSLocalizedDescriptionKey: "Unable to create image from data"])
 					}
 					
-					print("[PhotoManager] Successfully created image, size: \(image.size)")
+					let totalTime = Date().timeIntervalSince(startTime)
+					self.stats.totalLoadTime += totalTime
+					self.stats.loadCount += 1
+					
+					print("[PhotoManager] Successfully created image, size: \(image.size), total time: \(String(format: "%.3f", totalTime))s")
 					
 					// Cache it
 					self.imageCache.setObject(image, forKey: photo.filePath as NSString)
@@ -280,19 +321,60 @@ class PhotoManager {
 	}
 	
 	private func syncThumbnail(for photoRep: PhotoReference) throws -> XThumbnail? {
-		let imageData = try Data(contentsOf: photoRep.fileURL)
-		let identifier = Identifier.md5(md5Digest(of: imageData))
-		if let cached = thumbnailCache.object(forKey: identifier.string as NSString) {
+		let startTime = Date()
+		
+		// First check memory cache with file path (faster)
+		let cacheKey = photoRep.filePath as NSString
+		if let cached = thumbnailCache.object(forKey: cacheKey) {
+			self.stats.thumbnailHits += 1
+			let loadTime = Date().timeIntervalSince(startTime)
+			print("[PhotoManager] ✅ THUMBNAIL CACHE HIT - \(photoRep.filename) (Load time: \(String(format: "%.3f", loadTime))s)")
 			return cached
 		}
+		
+		// Cache miss
+		self.stats.thumbnailMisses += 1
+		print("[PhotoManager] ❌ THUMBNAIL CACHE MISS - \(photoRep.filename)")
+		
+		// Load image data for MD5
+		let md5StartTime = Date()
+		let imageData = try Data(contentsOf: photoRep.fileURL)
+		let md5Time = Date().timeIntervalSince(md5StartTime)
+		print("[PhotoManager] 📊 MD5 computation - Read \(imageData.count / 1024)KB in \(String(format: "%.3f", md5Time))s")
+		
+		let identifier = Identifier.md5(md5Digest(of: imageData))
+		
+		// Check disk cache
 		if hasThumbnail(for: identifier) {
+			let diskStartTime = Date()
 			let data = try Data(contentsOf: thumbnailURL(for: identifier))
+			let diskTime = Date().timeIntervalSince(diskStartTime)
+			self.stats.diskReads += 1
+			print("[PhotoManager] 💾 THUMBNAIL DISK READ - \(data.count / 1024)KB in \(String(format: "%.3f", diskTime))s")
+			
 			if let thumbnail = XImage(data: data) {
-				thumbnailCache.setObject(thumbnail, forKey: identifier.string as NSString)
+				// Cache in memory with file path as key
+				thumbnailCache.setObject(thumbnail, forKey: cacheKey)
 				return thumbnail
 			}
 		}
-		return try prepareThumbnail(from: imageData)
+		
+		// Generate new thumbnail
+		print("[PhotoManager] 🔨 GENERATING NEW THUMBNAIL - \(photoRep.filename)")
+		let generateStartTime = Date()
+		let thumbnail = try prepareThumbnail(from: imageData)
+		let generateTime = Date().timeIntervalSince(generateStartTime)
+		self.stats.diskWrites += 1
+		
+		// IMPORTANT: Cache the thumbnail with file path as key for fast lookup
+		if let thumbnail = thumbnail {
+			thumbnailCache.setObject(thumbnail, forKey: cacheKey)
+		}
+		
+		let totalTime = Date().timeIntervalSince(startTime)
+		print("[PhotoManager] ⏱️ THUMBNAIL TOTAL TIME - \(photoRep.filename): \(String(format: "%.3f", totalTime))s (generate: \(String(format: "%.3f", generateTime))s)")
+		
+		return thumbnail
 	}
 	
 	func hasThumbnail(for identifier: Identifier) -> Bool {
@@ -314,6 +396,188 @@ class PhotoManager {
 		catch { fatalError("\(error): cannot create thumbnail directory: \(thumbnailStoragePath)") }
 		self.thumbnailStoragePath = thumbnailStoragePath as NSString
 
-		self.imageCache.countLimit = 16
+		// Configure cache limits based on available memory
+		let totalMemory = ProcessInfo.processInfo.physicalMemory
+		let memoryBudget = totalMemory / 4 // Use up to 25% of physical memory
+		
+		// Image cache: Limited for preview navigation (±2-3 images from current)
+		// Scale from 16 (base) to 64 (high-end machines) based on available memory
+		let baseImageCount = 16
+		let scaleFactor = min(totalMemory / (8 * 1024 * 1024 * 1024), 4) // Scale up to 4x for 32GB+ machines
+		self.imageCache.countLimit = Int(Double(baseImageCount) * Double(scaleFactor))
+		self.imageCache.totalCostLimit = Int(memoryBudget)
+		
+		// Thumbnail cache: assume 100KB per thumbnail
+		let averageThumbnailSize: UInt64 = 100 * 1024
+		self.thumbnailCache.countLimit = 1000
+		self.thumbnailCache.totalCostLimit = 100 * 1024 * 1024 // 100MB max
+		
+		print("[PhotoManager] Cache configured - Images: \(self.imageCache.countLimit) items, \(memoryBudget / 1024 / 1024)MB")
+		print("[PhotoManager] Cache configured - Thumbnails: \(self.thumbnailCache.countLimit) items, 100MB")
 	}
+	
+	// MARK: - Prefetching
+	
+	func prefetchThumbnails(for photos: [PhotoReference]) async {
+		// Process in parallel but limit concurrency
+		await withTaskGroup(of: Void.self) { group in
+			for photo in photos {
+				group.addTask { [weak self] in
+					do {
+						_ = try await self?.thumbnail(for: photo)
+					} catch {
+						// Silently ignore prefetch errors
+						print("[PhotoManager] Prefetch thumbnail failed for \(photo.filename): \(error)")
+					}
+				}
+			}
+		}
+	}
+	
+	func prefetchImages(for photos: [PhotoReference], priority: TaskPriority = .medium) async {
+		// Limit concurrent full image loads to prevent memory spikes
+		let maxConcurrent = 2
+		
+		await withTaskGroup(of: Void.self) { group in
+			for (index, photo) in photos.enumerated() {
+				// Limit concurrent operations
+				if index >= maxConcurrent {
+					await group.next()
+				}
+				
+				group.addTask(priority: priority) { [weak self] in
+					do {
+						_ = try await self?.loadFullImage(for: photo)
+					} catch {
+						// Silently ignore prefetch errors
+						print("[PhotoManager] Prefetch image failed for \(photo.filename): \(error)")
+					}
+				}
+			}
+		}
+	}
+	
+	// Cancel all pending operations for cleanup
+	func cancelAllPrefetches() {
+		// This would require tracking tasks, implement later if needed
+	}
+	
+	// MARK: - Cache Statistics
+	
+	func printCacheStatistics() {
+		print("\n📊 ========== PHOTOMANAGER CACHE STATISTICS ==========")
+		print("📸 Images:")
+		print("   • Cache hits: \(stats.imageHits)")
+		print("   • Cache misses: \(stats.imageMisses)")
+		print("   • Hit rate: \(String(format: "%.1f%%", stats.imageHitRate * 100))")
+		print("   • Current cache count: \(getCurrentCacheCount())")
+		print("   • Cache limit: \(imageCache.countLimit)")
+		
+		print("\n🖼️ Thumbnails:")
+		print("   • Cache hits: \(stats.thumbnailHits)")
+		print("   • Cache misses: \(stats.thumbnailMisses)")
+		print("   • Hit rate: \(String(format: "%.1f%%", stats.thumbnailHitRate * 100))")
+		
+		print("\n💾 Disk Operations:")
+		print("   • Disk reads: \(stats.diskReads)")
+		print("   • Disk writes: \(stats.diskWrites)")
+		
+		print("\n⏱️ Performance:")
+		print("   • Total operations: \(stats.loadCount)")
+		print("   • Average load time: \(String(format: "%.3f", stats.averageLoadTime))s")
+		print("   • Total time spent loading: \(String(format: "%.3f", stats.totalLoadTime))s")
+		
+		print("\n💻 Memory:")
+		print("   • Process memory: \(getMemoryUsage())")
+		print("   • Cache memory budget: \(imageCache.totalCostLimit / 1024 / 1024)MB")
+		print("====================================================\n")
+	}
+	
+	func resetStatistics() {
+		stats = CacheStatistics()
+		print("[PhotoManager] 🔄 Cache statistics reset")
+	}
+	
+	private func getCurrentCacheCount() -> Int {
+		// This is an approximation since NSCache doesn't expose count
+		return min(stats.imageHits + stats.imageMisses, imageCache.countLimit)
+	}
+	
+	private func getMemoryUsage() -> String {
+		var info = mach_task_basic_info()
+		var count = mach_msg_type_number_t(MemoryLayout<mach_task_basic_info>.size) / 4
+		
+		let result = withUnsafeMutablePointer(to: &info) {
+			$0.withMemoryRebound(to: integer_t.self, capacity: 1) {
+				task_info(mach_task_self_,
+						 task_flavor_t(MACH_TASK_BASIC_INFO),
+						 $0,
+						 &count)
+			}
+		}
+		
+		if result == KERN_SUCCESS {
+			let usedMemory = Double(info.resident_size) / 1024.0 / 1024.0
+			return String(format: "%.1fMB", usedMemory)
+		}
+		return "Unknown"
+	}
+	
+	private func getMemoryScaleFactor() -> Double {
+		let totalMemory = ProcessInfo.processInfo.physicalMemory
+		return min(Double(totalMemory) / Double(8 * 1024 * 1024 * 1024), 4.0) // Scale up to 4x for 32GB+ machines
+	}
+	
+	// MARK: - Public API for Statistics
+	
+	struct CacheStatisticsReport {
+		let imageHits: Int
+		let imageMisses: Int
+		let thumbnailHits: Int
+		let thumbnailMisses: Int
+		let diskReads: Int
+		let diskWrites: Int
+		let totalLoadTime: TimeInterval
+		let loadCount: Int
+		let averageLoadTime: TimeInterval
+		let imageHitRate: Double
+		let thumbnailHitRate: Double
+	}
+	
+	struct MemoryUsageInfo {
+		let processMemory: String
+		let cacheBudget: Int
+		let totalMemory: UInt64
+		let imageCacheLimit: Int
+	}
+	
+	func getCacheStatistics() -> CacheStatisticsReport {
+		return CacheStatisticsReport(
+			imageHits: stats.imageHits,
+			imageMisses: stats.imageMisses,
+			thumbnailHits: stats.thumbnailHits,
+			thumbnailMisses: stats.thumbnailMisses,
+			diskReads: stats.diskReads,
+			diskWrites: stats.diskWrites,
+			totalLoadTime: stats.totalLoadTime,
+			loadCount: stats.loadCount,
+			averageLoadTime: stats.averageLoadTime,
+			imageHitRate: stats.imageHitRate,
+			thumbnailHitRate: stats.thumbnailHitRate
+		)
+	}
+	
+	func getMemoryUsageInfo() -> MemoryUsageInfo {
+		let memoryScale = getMemoryScaleFactor()
+		let baseCount = 16
+		let imageCacheLimit = min(baseCount * Int(memoryScale), 64)
+		
+		return MemoryUsageInfo(
+			processMemory: getMemoryUsage(),
+			cacheBudget: imageCache.totalCostLimit,
+			totalMemory: ProcessInfo.processInfo.physicalMemory,
+			imageCacheLimit: imageCacheLimit
+		)
+	}
+	
 }

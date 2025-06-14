@@ -21,6 +21,16 @@ struct PhotolalaCommands: Commands {
 			Divider()
 		}
 		
+		// View menu
+		CommandMenu("View") {
+			Button("Cache Statistics...") {
+				#if os(macOS)
+				showCacheStatistics()
+				#endif
+			}
+			.keyboardShortcut("I", modifiers: [.command, .shift])
+		}
+		
 		// Window menu customization
 		CommandGroup(replacing: .windowSize) {
 			// Custom window commands if needed
@@ -45,4 +55,24 @@ struct PhotolalaCommands: Commands {
 		}
 		#endif
 	}
+	
+	#if os(macOS)
+	private func showCacheStatistics() {
+		let window = NSWindow(
+			contentRect: NSRect(x: 0, y: 0, width: 500, height: 600),
+			styleMask: [.titled, .closable, .resizable],
+			backing: .buffered,
+			defer: false
+		)
+		
+		window.title = "Cache Statistics"
+		window.center()
+		window.contentView = NSHostingView(rootView: CacheStatisticsView())
+		window.makeKeyAndOrderFront(nil)
+		
+		// Keep window in front but not floating
+		window.level = .normal
+		window.isReleasedWhenClosed = false
+	}
+	#endif
 }

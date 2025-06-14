@@ -35,7 +35,6 @@ class PhotoCollectionViewController: XViewController {
 	var selectAllButton: UIBarButtonItem!
 	var actionToolbar: UIToolbar!
 	var onPhotosLoaded: ((Int) -> Void)?
-	var onPhotosLoadedWithReferences: (([PhotoReference]) -> Void)?
 	var onSelectionModeChanged: ((Bool) -> Void)?
 	#endif
 	
@@ -69,6 +68,7 @@ class PhotoCollectionViewController: XViewController {
 		collectionView.collectionViewLayout = createLayout()
 		collectionView.delegate = self
 		collectionView.dataSource = self
+		collectionView.prefetchDataSource = self
 		collectionView.isSelectable = true
 		collectionView.allowsMultipleSelection = true
 		collectionView.backgroundColors = [.clear]
@@ -153,6 +153,7 @@ class PhotoCollectionViewController: XViewController {
 		collectionView.backgroundColor = .systemBackground
 		collectionView.dataSource = self
 		collectionView.delegate = self
+		collectionView.prefetchDataSource = self
 		collectionView.allowsMultipleSelectionDuringEditing = true
 		
 		collectionView.register(PhotoCollectionViewCell.self, forCellWithReuseIdentifier: "PhotoCell")
@@ -627,6 +628,42 @@ extension PhotoCollectionViewController: XCollectionViewDelegate {
 	}
 	#endif
 }
+
+// MARK: - Prefetching Support
+
+#if os(macOS)
+extension PhotoCollectionViewController: NSCollectionViewPrefetching {
+	func collectionView(_ collectionView: NSCollectionView, prefetchItemsAt indexPaths: [IndexPath]) {
+		let photos = indexPaths.compactMap { indexPath in
+			indexPath.item < self.photos.count ? self.photos[indexPath.item] : nil
+		}
+		
+		Task {
+			await PhotoManager.shared.prefetchThumbnails(for: photos)
+		}
+	}
+	
+	func collectionView(_ collectionView: NSCollectionView, cancelPrefetchingForItemsAt indexPaths: [IndexPath]) {
+		// Could implement cancellation if we track tasks
+	}
+}
+#else
+extension PhotoCollectionViewController: UICollectionViewDataSourcePrefetching {
+	func collectionView(_ collectionView: UICollectionView, prefetchItemsAt indexPaths: [IndexPath]) {
+		let photos = indexPaths.compactMap { indexPath in
+			indexPath.item < self.photos.count ? self.photos[indexPath.item] : nil
+		}
+		
+		Task {
+			await PhotoManager.shared.prefetchThumbnails(for: photos)
+		}
+	}
+	
+	func collectionView(_ collectionView: UICollectionView, cancelPrefetchingForItemsAt indexPaths: [IndexPath]) {
+		// Could implement cancellation if we track tasks
+	}
+}
+#endif
 
 // MARK: - Collection View Items
 

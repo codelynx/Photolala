@@ -236,6 +236,8 @@ struct PhotoPreviewView: View {
 					await MainActor.run {
 						self.currentImage = image
 						self.isLoadingImage = false
+						// Preload adjacent images after current image loads
+						self.preloadAdjacentImages()
 					}
 				} else {
 					print("[PhotoPreviewView] loadFullImage returned nil for: \(photo.filename)")
@@ -328,6 +330,25 @@ struct PhotoPreviewView: View {
 					showThumbnailStrip = false
 				}
 			}
+		}
+	}
+	
+	private func preloadAdjacentImages() {
+		// Preload ±2 images from current
+		var indicesToPreload: [Int] = []
+		
+		// Add previous images
+		if currentIndex - 2 >= 0 { indicesToPreload.append(currentIndex - 2) }
+		if currentIndex - 1 >= 0 { indicesToPreload.append(currentIndex - 1) }
+		
+		// Add next images
+		if currentIndex + 1 < photos.count { indicesToPreload.append(currentIndex + 1) }
+		if currentIndex + 2 < photos.count { indicesToPreload.append(currentIndex + 2) }
+		
+		let photosToPreload = indicesToPreload.map { photos[$0] }
+		
+		Task {
+			await PhotoManager.shared.prefetchImages(for: photosToPreload, priority: .low)
 		}
 	}
 }

@@ -316,27 +316,53 @@ Last Updated: June 14, 2025
 - `photolala/Models/ThumbnailDisplaySettings.swift` - Display mode and size settings
 - `photolala/Models/SelectionManager.swift` - Selection state management
 - `photolala/Services/DirectoryScanner.swift`
-- `photolala/Services/PhotoManager.swift` - Thumbnail generation and caching
+- `photolala/Services/PhotoManager.swift` - Thumbnail generation and caching (enhanced with statistics)
 - `photolala/Views/PhotoPreviewView.swift` - Full image preview with zoom/pan
+- `photolala/Views/CacheStatisticsView.swift` - Cache performance monitoring UI
 - `docs/project-status.md` (this file)
 - `docs/thumbnail-display-options-design.md` - Design for display options feature
 - `docs/thumbnail-display-implementation-plan.md` - Implementation plan
 - `docs/selection-and-preview-design.md` - Design for selection and preview features
 - `docs/photo-preview-implementation.md` - Implementation plan for preview feature
+- `docs/planning/photo-loading-enhancements.md` - Performance optimization plan
+- `docs/cache-statistics-guide.md` - Guide for using cache statistics
 
 **Removed:**
 - `photolala/Views/PhotoNavigationView.swift`
 - Various test/sample code
 
 **Modified:**
-- `photolala/Views/PhotoCollectionViewController.swift` - Added selection support, iOS selection mode with border-based selection
+- `photolala/Views/PhotoCollectionViewController.swift` - Added selection support, iOS selection mode, prefetching delegates
 - `photolala/Views/PhotoBrowserView.swift` - Added SelectionManager, iOS selection mode, preview presentation
 - `photolala/Views/WelcomeView.swift` - Removed test buttons, added iOS auto-navigation
+- `photolala/Views/PhotoPreviewView.swift` - Added image preloading for adjacent photos
 - `photolala/photolalaApp.swift` - Added NSApplicationDelegate for window restoration control
 - `photolala/Models/PhotoReference.swift` - Changed to @Observable class, renamed from PhotoRepresentation
 - `photolala/Utilities/XPlatform.swift` - Added collection view type aliases
-- `photolala/Services/PhotoManager.swift` - Added loadFullImage method for preview
+- `photolala/Services/PhotoManager.swift` - Enhanced with statistics, prefetching, and performance monitoring
+- `photolala/Commands/PhotolalaCommands.swift` - Added View menu with Cache Statistics command
 - All files using PhotoRepresentation - Updated to use PhotoReference
+
+17. **Implemented Photo Loading Enhancements (June 14 - Session 9)**:
+   - Phase 1 Quick Wins completed:
+     - Smart cache limits based on available RAM (16-64 images)
+     - Collection view prefetching for smooth scrolling
+     - Preview image preloading (±2 images from current)
+     - Cache statistics tracking and monitoring
+   - Added PhotoManager enhancements:
+     - Detailed performance logging with timing
+     - Cache hit/miss statistics
+     - Disk read/write tracking
+     - Memory usage monitoring
+   - Added CacheStatisticsView:
+     - Real-time display of cache performance
+     - Shows hit rates, disk operations, memory usage
+     - Reset statistics button
+   - Added View menu with Cache Statistics command (⌘⇧I)
+   - Performance improvements:
+     - Thumbnails prefetch before becoming visible
+     - Adjacent images preload during preview navigation
+     - Reduced loading delays and smoother user experience
 
 ### 🔧 Technical Decisions
 
@@ -351,3 +377,5 @@ Last Updated: June 14, 2025
    - Use NSCollectionView's built-in selection mechanism
    - Trade control for maintainability and platform consistency
    - SelectionManager syncs with collection view state
+9. **Memory-Aware Caching**: Dynamic cache sizing based on available RAM
+10. **Performance Monitoring**: Built-in statistics for optimization feedback

@@ -38,6 +38,16 @@ struct PhotoBrowserView: View {
 			handleSpaceKeyPress()
 			return .handled
 		}
+		.onKeyPress(keys: ["s"]) { _ in
+			// Print cache statistics
+			PhotoManager.shared.printCacheStatistics()
+			return .handled
+		}
+		.onKeyPress(keys: ["r"]) { _ in
+			// Reset cache statistics
+			PhotoManager.shared.resetStatistics()
+			return .handled
+		}
 #else
 		collectionContent
 			.navigationDestination(item: $selectedPhotoNavigation) { navigation in
