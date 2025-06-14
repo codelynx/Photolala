@@ -19,6 +19,7 @@ class PhotoCollectionViewController: XViewController {
 	let directoryPath: NSString
 	weak var settings: ThumbnailDisplaySettings?
 	weak var selectionManager: SelectionManager?
+	private var lastSortOption: PhotoSortOption?
 
 	@MainActor
 	var photos: [PhotoReference] = []
@@ -213,7 +214,10 @@ class PhotoCollectionViewController: XViewController {
 		Task { @MainActor in
 			// Use DirectoryScanner to get PhotoReference objects
 			let scannedPhotos = DirectoryScanner.scanDirectory(atPath: directoryPath)
-			self.photos = scannedPhotos
+			
+			// Apply sorting based on current settings
+			let sortedPhotos = settings?.sortOption.sort(scannedPhotos) ?? scannedPhotos
+			self.photos = sortedPhotos
 			self.reloadData()
 			
 			// Notify SwiftUI about photos loaded
@@ -221,7 +225,34 @@ class PhotoCollectionViewController: XViewController {
 			self.onPhotosLoaded?(self.photos.count)
 			#endif
 			self.onPhotosLoadedWithReferences?(self.photos)
+			
+			// No need for metadata loading - we're using file dates only
 		}
+	}
+	
+	
+	private func moveItem(from oldIndex: Int, to newIndex: Int) {
+		#if os(macOS)
+		collectionView.performBatchUpdates({
+			let oldIndexPath = IndexPath(item: oldIndex, section: 0)
+			let newIndexPath = IndexPath(item: newIndex, section: 0)
+			collectionView.moveItem(at: oldIndexPath, to: newIndexPath)
+		}, completionHandler: nil)
+		#else
+		collectionView.performBatchUpdates({
+			let oldIndexPath = IndexPath(item: oldIndex, section: 0)
+			let newIndexPath = IndexPath(item: newIndex, section: 0)
+			collectionView.moveItem(at: oldIndexPath, to: newIndexPath)
+		}, completion: nil)
+		#endif
+	}
+	
+	private func applySorting() {
+		guard let settings = settings else { return }
+		
+		// Apply the new sort using file system dates only
+		photos = settings.sortOption.sort(photos)
+		reloadData()
 	}
 	
 	private func setupSettingsObserver() {
@@ -231,9 +262,20 @@ class PhotoCollectionViewController: XViewController {
 		withObservationTracking {
 			_ = settings.displayMode
 			_ = settings.thumbnailSize
+			_ = settings.sortOption
 		} onChange: { [weak self] in
 			Task { @MainActor in
-				self?.updateCollectionViewLayout()
+				let oldSortOption = self?.lastSortOption
+				let newSortOption = settings.sortOption
+				
+				// If sort option changed, re-sort photos
+				if oldSortOption != newSortOption {
+					self?.lastSortOption = newSortOption
+					self?.applySorting()
+				} else {
+					// Otherwise just update layout
+					self?.updateCollectionViewLayout()
+				}
 				self?.setupSettingsObserver() // Re-subscribe
 			}
 		}
@@ -723,22 +765,7 @@ class PhotoCollectionViewItem: NSCollectionViewItem {
 
 	override func viewWillLayout() {
 		super.viewWillLayout()
-		if let photoRepresentation = self.photoRepresentation {
-			if let thumbnail = photoRepresentation.thumbnail {
-				imageView?.image = thumbnail
-			}
-			else {
-				Task {
-					do {
-						let photoRep = photoRepresentation
-						let thumbnail = try await PhotoManager.shared.thumbnail(for: photoRep)
-						self.updateThumbnail(thumbnail: thumbnail, for: photoRepresentation)
-					} catch {
-						// Silent fail for thumbnails
-					}
-				}
-			}
-		}
+		// Thumbnail loading is handled in loadThumbnail() called from photoRepresentation didSet
 	}
 
 	override func prepareForReuse() {
@@ -750,13 +777,33 @@ class PhotoCollectionViewItem: NSCollectionViewItem {
 	private func loadThumbnail() {
 		guard let photoRep = photoRepresentation else { return }
 		
+		// Show placeholder immediately
+		imageView?.image = nil
+		imageView?.layer?.backgroundColor = XColor.quaternaryLabelColor.cgColor
+		
+		// If thumbnail already exists, use it
+		if let thumbnail = photoRep.thumbnail {
+			imageView?.image = thumbnail
+			imageView?.layer?.backgroundColor = nil
+			return
+		}
+		
+		// Start loading thumbnail only
 		Task { @MainActor in
 			do {
+				// Load thumbnail
 				if let thumbnail = try await PhotoManager.shared.thumbnail(for: photoRep) {
+					// Update if we're still showing the same photo
+					guard self.photoRepresentation === photoRep else { return }
+					
+					photoRep.thumbnail = thumbnail
 					self.imageView?.image = thumbnail
+					self.imageView?.layer?.backgroundColor = nil
 				}
 			} catch {
-				// Silently ignore thumbnail loading errors
+				// Show error state
+				guard self.photoRepresentation === photoRep else { return }
+				self.imageView?.layer?.backgroundColor = XColor.systemRed.withAlphaComponent(0.1).cgColor
 			}
 		}
 	}
@@ -872,13 +919,33 @@ class PhotoCollectionViewCell: UICollectionViewCell {
 	private func loadThumbnail() {
 		guard let photoRep = photoRepresentation else { return }
 		
+		// Show placeholder immediately
+		imageView.image = nil
+		imageView.backgroundColor = XColor.quaternaryLabel
+		
+		// If thumbnail already exists, use it
+		if let thumbnail = photoRep.thumbnail {
+			imageView.image = thumbnail
+			imageView.backgroundColor = nil
+			return
+		}
+		
+		// Start loading thumbnail only
 		Task { @MainActor in
 			do {
+				// Load thumbnail
 				if let thumbnail = try await PhotoManager.shared.thumbnail(for: photoRep) {
+					// Update if we're still showing the same photo
+					guard self.photoRepresentation === photoRep else { return }
+					
+					photoRep.thumbnail = thumbnail
 					self.imageView.image = thumbnail
+					self.imageView.backgroundColor = nil
 				}
 			} catch {
-				// Silently ignore thumbnail loading errors
+				// Show error state
+				guard self.photoRepresentation === photoRep else { return }
+				self.imageView.backgroundColor = XColor.systemRed.withAlphaComponent(0.1)
 			}
 		}
 	}

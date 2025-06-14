@@ -31,7 +31,12 @@ Historical design documents and implementation notes:
   - `navigation-architecture.md` - Original navigation design
 
 ### Planning
-- *Currently empty - future roadmap documents will go here*
+Future features and enhancements:
+
+- **[planning/photo-loading-enhancements.md](./planning/photo-loading-enhancements.md)** - Performance optimization plan (Phase 1 completed)
+- **[planning/sort-by-date-feature.md](./planning/sort-by-date-feature.md)** - Sort by date feature design (implemented)
+- **[planning/enhanced-preview-features.md](./planning/enhanced-preview-features.md)** - Enhanced preview with thumbnail strip
+- **[planning/thumbnail-strip-design.md](./planning/thumbnail-strip-design.md)** - Thumbnail strip design for preview
 
 ## About This Structure
 

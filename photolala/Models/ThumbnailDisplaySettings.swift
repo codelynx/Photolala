@@ -73,6 +73,7 @@ enum ThumbnailOption: CaseIterable {
 class ThumbnailDisplaySettings {
 	var displayMode: ThumbnailDisplayMode = .scaleToFit
 	var thumbnailOption: ThumbnailOption = .default
+	var sortOption: PhotoSortOption = .filename
 	
 	var thumbnailSize: CGFloat {
 		thumbnailOption.size

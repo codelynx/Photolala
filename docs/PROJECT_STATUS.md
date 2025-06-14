@@ -315,6 +315,8 @@ Last Updated: June 14, 2025
 - `photolala/Models/PhotoReference.swift`
 - `photolala/Models/ThumbnailDisplaySettings.swift` - Display mode and size settings
 - `photolala/Models/SelectionManager.swift` - Selection state management
+- `photolala/Models/PhotoMetadata.swift` - Metadata storage class
+- `photolala/Models/PhotoSortOption.swift` - Sort options enum
 - `photolala/Services/DirectoryScanner.swift`
 - `photolala/Services/PhotoManager.swift` - Thumbnail generation and caching (enhanced with statistics)
 - `photolala/Views/PhotoPreviewView.swift` - Full image preview with zoom/pan
@@ -325,6 +327,7 @@ Last Updated: June 14, 2025
 - `docs/selection-and-preview-design.md` - Design for selection and preview features
 - `docs/photo-preview-implementation.md` - Implementation plan for preview feature
 - `docs/planning/photo-loading-enhancements.md` - Performance optimization plan
+- `docs/planning/sort-by-date-feature.md` - Design for sort by date feature
 - `docs/cache-statistics-guide.md` - Guide for using cache statistics
 
 **Removed:**
@@ -332,14 +335,15 @@ Last Updated: June 14, 2025
 - Various test/sample code
 
 **Modified:**
-- `photolala/Views/PhotoCollectionViewController.swift` - Added selection support, iOS selection mode, prefetching delegates
-- `photolala/Views/PhotoBrowserView.swift` - Added SelectionManager, iOS selection mode, preview presentation
+- `photolala/Views/PhotoCollectionViewController.swift` - Added selection support, iOS selection mode, prefetching delegates, sort support
+- `photolala/Views/PhotoBrowserView.swift` - Added SelectionManager, iOS selection mode, preview presentation, sort picker
 - `photolala/Views/WelcomeView.swift` - Removed test buttons, added iOS auto-navigation
 - `photolala/Views/PhotoPreviewView.swift` - Added image preloading for adjacent photos
 - `photolala/photolalaApp.swift` - Added NSApplicationDelegate for window restoration control
-- `photolala/Models/PhotoReference.swift` - Changed to @Observable class, renamed from PhotoRepresentation
-- `photolala/Utilities/XPlatform.swift` - Added collection view type aliases
-- `photolala/Services/PhotoManager.swift` - Enhanced with statistics, prefetching, and performance monitoring
+- `photolala/Models/PhotoReference.swift` - Changed to @Observable class, renamed from PhotoRepresentation, added metadata support
+- `photolala/Models/ThumbnailDisplaySettings.swift` - Added sortOption property
+- `photolala/Utilities/XPlatform.swift` - Added collection view type aliases, jpegData extension
+- `photolala/Services/PhotoManager.swift` - Enhanced with statistics, prefetching, performance monitoring, metadata extraction
 - `photolala/Commands/PhotolalaCommands.swift` - Added View menu with Cache Statistics command
 - All files using PhotoRepresentation - Updated to use PhotoReference
 
@@ -363,6 +367,34 @@ Last Updated: June 14, 2025
      - Thumbnails prefetch before becoming visible
      - Adjacent images preload during preview navigation
      - Reduced loading delays and smoother user experience
+
+18. **Implemented Sort by Date Feature (June 14 - Session 10)**:
+   - Created PhotoMetadata class for storing file metadata:
+     - Stores comprehensive metadata but only using file dates for now
+     - NSObject subclass for NSCache compatibility
+     - Includes properties for future EXIF data extraction
+   - Enhanced PhotoReference with metadata support:
+     - Added fileModificationDate loaded immediately in init
+     - Added metadata property and loading states
+     - Added loadPhotoData() for combined thumbnail/metadata loading
+   - Created PhotoSortOption enum:
+     - Three options: Name, Date (Oldest First), Date (Newest First)
+     - Uses file system dates only (no EXIF extraction yet)
+     - Integrated with ThumbnailDisplaySettings
+   - Updated PhotoManager:
+     - Migrated cache directory from 'thumbnails' to 'cache'
+     - Added metadata extraction alongside thumbnail generation
+     - Stores metadata as .plist files in cache directory
+     - Added metadata() and loadPhotoData() public APIs
+   - Added sort picker to PhotoBrowserView toolbar:
+     - macOS: Menu-style picker showing sort options
+     - iOS: Dropdown menu with icons and checkmarks
+     - Updates collection view automatically when changed
+   - PhotoCollectionViewController changes:
+     - Applies sorting when loading photos
+     - Re-sorts when sort option changes
+     - Shows placeholders immediately while loading
+   - Note: Date sorting has issues but will be addressed later
 
 ### 🔧 Technical Decisions
 
