@@ -76,13 +76,36 @@ Photolala/
 - Single NavigationStack for all navigation
 - Touch-optimized interactions
 
+## Documentation Structure
+
+The `docs/` directory is organized as follows:
+
+```
+docs/
+├── README.md                    # Documentation overview and navigation
+├── PROJECT_STATUS.md           # Current implementation status
+│
+├── current/                    # Current architecture and implementation
+│   ├── architecture.md         # System architecture overview
+│   ├── navigation-flow.md      # Navigation patterns
+│   ├── thumbnail-system.md     # Thumbnail generation and caching
+│   └── selection-system.md     # Selection management
+│
+├── history/                    # Historical documents
+│   ├── design-decisions/       # Original design documents
+│   └── implementation-notes/   # Implementation journey
+│
+└── planning/                   # Future features and roadmap
+```
+
 ## Development Process
 
 Before implementing major features:
-1. Create documentation in the `docs/` directory describing what will be implemented
+1. Create documentation in `docs/planning/` describing what will be implemented
 2. Review and discuss the design
 3. Wait for approval before proceeding with coding
-4. Only start implementation after the documentation is approved
+4. After implementation, move docs to `history/` and update `current/`
+5. Update PROJECT_STATUS.md with implementation details
 
 ## Code Style
 

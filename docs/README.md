@@ -1,50 +1,56 @@
-# Documentation Directory
+# Photolala Documentation
 
-This directory contains planning and design documents for the Photolala project.
+## Quick Links
 
-## Current Status
+📊 **[PROJECT_STATUS.md](./PROJECT_STATUS.md)** - Current implementation status and recent changes
 
-📊 **See [`project-status.md`](./project-status.md) for the latest implementation status and recent changes.**
+## Documentation Structure
 
-## Purpose
+### Current State
+Documents describing the current architecture and implementation:
 
-Before implementing major features, we will:
-1. Document the requirements and design decisions here
-2. Review and discuss the plans
-3. Once approved, proceed with the actual implementation
+- **[current/architecture.md](./current/architecture.md)** - System architecture and component overview
+- **[current/navigation-flow.md](./current/navigation-flow.md)** - Platform-specific navigation patterns
+- **[current/thumbnail-system.md](./current/thumbnail-system.md)** - Thumbnail generation and caching
+- **[current/selection-system.md](./current/selection-system.md)** - Selection management and UI
 
-## Document Structure
+### History
+Historical design documents and implementation notes:
 
-### Status & Planning
-- [`project-status.md`](./project-status.md) - Current implementation status and recent changes
-- [`implementation-roadmap.md`](./implementation-roadmap.md) - Overall project roadmap
-- [`development-plan-2025-06.md`](./development-plan-2025-06.md) - Current development plan
+#### Design Decisions
+- **[history/design-decisions/](./history/design-decisions/)** - Original design documents
+  - `photo-browser-design.md` - Initial photo browser architecture
+  - `selection-and-preview-design.md` - Selection and preview feature design
+  - `thumbnail-*.md` - Various thumbnail system designs
+  - `swiftdata-thumbnail-metadata-design.md` - SwiftData integration plans
 
-### Architecture & Design
-- [`photo-browser-design.md`](./photo-browser-design.md) - Core photo browser architecture
-- [`window-per-folder-architecture.md`](./window-per-folder-architecture.md) - macOS window management
-- [`native-collection-view-design.md`](./native-collection-view-design.md) - Native collection view implementation
-- [`cross-platform-folder-selection-design.md`](./cross-platform-folder-selection-design.md) - Folder selection across platforms
+#### Implementation Notes  
+- **[history/implementation-notes/](./history/implementation-notes/)** - Development journey
+  - `implementation-phase1-details.md` - Phase 1 implementation
+  - `photo-preview-implementation.md` - Preview feature implementation
+  - `navigation-architecture.md` - Original navigation design
 
-### Implementation Notes
-- [`phase1-implementation-notes.md`](./phase1-implementation-notes.md) - Phase 1 implementation details
-- [`phase2-implementation-notes.md`](./phase2-implementation-notes.md) - Phase 2 implementation details
-- [`implementation-notes-phase3-4.md`](./implementation-notes-phase3-4.md) - Phase 3 & 4 implementation
+### Planning
+- *Currently empty - future roadmap documents will go here*
 
-### Technical Specifications
-- [`photolala-footprint-design.md`](./photolala-footprint-design.md) - .photolala file format
-- [`thumbnail-manager-design.md`](./thumbnail-manager-design.md) - **PhotoManager implementation** ✅
-- [`thumbnail-system-architecture.md`](./thumbnail-system-architecture.md) - Thumbnail generation system
-- [`loading-system-implementation-notes.md`](./loading-system-implementation-notes.md) - Loading and priority system
-- [`security-scoped-resources-implementation.md`](./security-scoped-resources-implementation.md) - Security and permissions
+## About This Structure
 
-## Recent Major Updates (June 13, 2025)
+This documentation is organized to separate:
+- **Current state** - What's actually implemented and how it works today
+- **History** - Design decisions, discussions, and implementation journey
+- **Planning** - Future features and roadmap (when needed)
 
-### PhotoManager Implementation Complete ✅
-- Dual caching system (memory + disk)
-- Proper thumbnail scaling (256px short side, 512px max)
-- EXIF orientation handling
-- Thread-safe with priority inversion fixes
-- Collection views now use thumbnails instead of full images
+This makes it easy for:
+- New developers to understand the current system
+- Team members to reference historical decisions
+- Everyone to track what's been implemented vs. planned
 
-See [`project-status.md`](./project-status.md) for full details.
+## Contributing
+
+When adding documentation:
+1. **Current features** → Add to `current/` or update existing docs
+2. **Design proposals** → Start in `planning/`, move to `history/` after implementation
+3. **Implementation notes** → Add to `history/implementation-notes/`
+4. **Status updates** → Update `PROJECT_STATUS.md`
+
+Last updated: June 14, 2025
