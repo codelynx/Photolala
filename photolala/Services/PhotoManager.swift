@@ -313,5 +313,7 @@ class PhotoManager {
 		do { try FileManager.default.createDirectory(atPath: thumbnailStoragePath, withIntermediateDirectories: true) }
 		catch { fatalError("\(error): cannot create thumbnail directory: \(thumbnailStoragePath)") }
 		self.thumbnailStoragePath = thumbnailStoragePath as NSString
+
+		self.imageCache.countLimit = 16
 	}
 }

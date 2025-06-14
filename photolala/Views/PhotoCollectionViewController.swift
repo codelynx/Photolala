@@ -24,6 +24,7 @@ class PhotoCollectionViewController: XViewController {
 	var photos: [PhotoReference] = []
 	var onSelectPhoto: ((PhotoReference, [PhotoReference]) -> Void)?
 	var onSelectFolder: ((PhotoReference) -> Void)?
+	var onPhotosLoadedWithReferences: (([PhotoReference]) -> Void)?
 	
 	var collectionView: XCollectionView!
 	
@@ -34,6 +35,7 @@ class PhotoCollectionViewController: XViewController {
 	var selectAllButton: UIBarButtonItem!
 	var actionToolbar: UIToolbar!
 	var onPhotosLoaded: ((Int) -> Void)?
+	var onPhotosLoadedWithReferences: (([PhotoReference]) -> Void)?
 	var onSelectionModeChanged: ((Bool) -> Void)?
 	#endif
 	
@@ -213,10 +215,11 @@ class PhotoCollectionViewController: XViewController {
 			self.photos = scannedPhotos
 			self.reloadData()
 			
-			#if os(iOS)
 			// Notify SwiftUI about photos loaded
+			#if os(iOS)
 			self.onPhotosLoaded?(self.photos.count)
 			#endif
+			self.onPhotosLoadedWithReferences?(self.photos)
 		}
 	}
 	
@@ -914,6 +917,7 @@ struct PhotoCollectionView: XViewControllerRepresentable {
 	let selectionManager: SelectionManager
 	var onSelectPhoto: ((PhotoReference, [PhotoReference]) -> Void)?
 	var onSelectFolder: ((PhotoReference) -> Void)?
+	var onPhotosLoaded: (([PhotoReference]) -> Void)?
 	#if os(iOS)
 	@Binding var isSelectionModeActive: Bool
 	@Binding var photosCount: Int
@@ -926,6 +930,7 @@ struct PhotoCollectionView: XViewControllerRepresentable {
 		controller.selectionManager = selectionManager
 		controller.onSelectPhoto = onSelectPhoto
 		controller.onSelectFolder = onSelectFolder
+		controller.onPhotosLoadedWithReferences = onPhotosLoaded
 		return controller
 	}
 	
@@ -951,6 +956,7 @@ struct PhotoCollectionView: XViewControllerRepresentable {
 				self.photosCount = count
 			}
 		}
+		controller.onPhotosLoadedWithReferences = onPhotosLoaded
 		controller.onSelectionModeChanged = { isActive in
 			DispatchQueue.main.async {
 				self.isSelectionModeActive = isActive
