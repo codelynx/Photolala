@@ -280,28 +280,37 @@ Last Updated: June 14, 2025
    - Escape to close (macOS), X button or swipe down (iOS)
    - Keyboard navigation with arrow keys
    - Auto-hiding overlay controls
+   - ~~Metadata HUD display~~ ✅ Added with 'i' key toggle
 
 4. **Add Selection Operations**:
-   - Selection count display
+   - ~~Selection count display~~ ✅ Completed
+   - ~~Deselect All functionality~~ ✅ Added with Cmd+D
    - Context menu for selected items
    - Basic operations (Copy, Move, Delete)
    - Prepare for Star/Flag/Label features
 
 5. **Enhance PhotoReference**:
-   - Add file size property
-   - Add creation date
-   - Add basic EXIF data
+   - ~~Add file size property~~ ✅ Available via PhotoMetadata
+   - ~~Add creation/modification date~~ ✅ Available via PhotoMetadata
+   - ~~Add basic EXIF data~~ ✅ PhotoMetadata extracts EXIF
    - ~~Consider renaming to PhotoReference~~ ✅ Already renamed throughout codebase
 
 6. **Performance Optimization**:
-   - Implement virtualized scrolling
-   - Add memory management
+   - ~~Implement virtualized scrolling~~ ✅ Using LazyHStack for thumbnail strip
+   - ~~Add memory management~~ ✅ Cache limits based on RAM
    - Background queue for scanning
+   - Replace thumbnail strip with collection view for very large sets (TODO added)
 
 7. **Error Handling**:
    - Handle corrupted images
    - Handle access permissions
    - User-friendly error messages
+
+8. **Sort and Filter**:
+   - ~~Sort by date~~ ✅ Implemented (using file dates)
+   - Sort by size
+   - Filter by file type
+   - Search functionality
 
 ### 💻 Build Status
 
@@ -395,6 +404,38 @@ Last Updated: June 14, 2025
      - Re-sorts when sort option changes
      - Shows placeholders immediately while loading
    - Note: Date sorting has issues but will be addressed later
+
+19. **Added Metadata HUD to Photo Preview (June 14 - Session 11)**:
+   - Created toggleable metadata overlay for photo preview:
+     - Shows filename, dimensions, file size, date, and camera info
+     - Semi-transparent black background with rounded corners
+     - Positioned to avoid toolbar overlap using shared constants
+   - Toggle methods:
+     - Keyboard shortcut 'i' for info
+     - Info button in control strip (filled icon when active)
+     - Smooth fade in/out animation
+   - Metadata loading:
+     - Loads asynchronously when image loads
+     - Shows file modification date immediately if available
+     - Displays full metadata when loaded from PhotoManager
+   - UI improvements:
+     - Removed file path display per user request
+     - Repositioned HUD closer to center to avoid toolbar overlap
+     - Added shared constants for toolbar height (44pt) and margin (8pt)
+   - Performance optimizations for thumbnail strip:
+     - Changed HStack to LazyHStack for lazy loading
+     - Added task cancellation when thumbnails scroll off-screen
+     - Added TODO for future collection view implementation
+   - Cross-platform support for both macOS and iOS
+
+20. **Added Deselect All Feature (June 14 - Session 11)**:
+   - Added "Deselect All" menu command in Edit menu with Cmd+D shortcut
+   - Implemented notification system for cross-window deselect functionality
+   - PhotoBrowserView listens for deselect notification
+   - PhotoCollectionViewController handles deselect for both platforms:
+     - macOS: Clears selection manager and native collection view
+     - iOS: Deselects items and updates UI in selection mode
+   - iOS maintains existing "Deselect All" button in selection mode
 
 ### 🔧 Technical Decisions
 
