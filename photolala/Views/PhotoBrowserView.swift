@@ -16,6 +16,7 @@ struct PhotoBrowserView: View {
 	@State private var photosCount = 0
 	@State private var navigationPath = NavigationPath()
 	@State private var selectedPhotoNavigation: PreviewNavigation?
+	@State private var allPhotos: [PhotoReference] = []
 	
 	init(directoryPath: NSString) {
 		self.directoryPath = directoryPath
@@ -32,6 +33,10 @@ struct PhotoBrowserView: View {
 					)
 					.navigationBarBackButtonHidden(true)
 				}
+		}
+		.onKeyPress(.space) {
+			handleSpaceKeyPress()
+			return .handled
 		}
 #else
 		collectionContent
@@ -54,6 +59,9 @@ struct PhotoBrowserView: View {
 				settings: settings,
 				selectionManager: selectionManager,
 				onSelectPhoto: handlePhotoSelection,
+				onPhotosLoaded: { photos in
+					self.allPhotos = photos
+				},
 				isSelectionModeActive: $isSelectionModeActive,
 				photosCount: $photosCount
 			)
@@ -62,7 +70,11 @@ struct PhotoBrowserView: View {
 				directoryPath: directoryPath,
 				settings: settings,
 				selectionManager: selectionManager,
-				onSelectPhoto: handlePhotoSelection
+				onSelectPhoto: handlePhotoSelection,
+				onPhotosLoaded: { photos in
+					self.allPhotos = photos
+					self.photosCount = photos.count
+				}
 			)
 #endif
 		}
@@ -130,8 +142,42 @@ struct PhotoBrowserView: View {
 		}
 	}
 	
+	private func handleSpaceKeyPress() {
+		// If we don't have photos yet, return
+		guard !allPhotos.isEmpty else { return }
+		
+		// Always show all photos, but start from selected if any
+		let photosToShow = allPhotos
+		let initialIndex: Int
+		
+		if !selectionManager.selectedItems.isEmpty {
+			// Find the first selected photo in the full list
+			if let firstSelected = selectionManager.selectedItems.first,
+			   let index = allPhotos.firstIndex(of: firstSelected) {
+				initialIndex = index
+			} else {
+				initialIndex = 0
+			}
+		} else {
+			initialIndex = 0
+		}
+		
+		print("[PhotoBrowserView] Space key: Showing all \(photosToShow.count) photos, starting at index \(initialIndex)")
+		
+		let navigation = PreviewNavigation(photos: photosToShow, initialIndex: initialIndex)
+		
+		#if os(macOS)
+		navigationPath.append(navigation)
+		#else
+		selectedPhotoNavigation = navigation
+		#endif
+	}
+	
 	private func handlePhotoSelection(_ photo: PhotoReference, _ allPhotos: [PhotoReference]) {
 		print("[PhotoBrowserView] handlePhotoSelection called for: \(photo.filename)")
+		
+		// Store all photos for space key navigation
+		self.allPhotos = allPhotos
 		
 		// If there's an active selection, show only selected photos
 		let photosToShow: [PhotoReference]
