@@ -28,10 +28,11 @@ Photolala is a cross-platform photo browser application built with SwiftUI, supp
 - Display modes: Scale to Fit / Scale to Fill
 - Size options: Small (64px), Medium (128px), Large (256px)
 
-#### SelectionManager
-- Per-window selection state
-- Tracks selected items, anchor, and focus
-- Syncs with native collection view selection
+#### Selection System
+- Uses native collection view selection
+- No custom SelectionManager
+- State maintained by UICollectionView/NSCollectionView
+- Selection changes communicated via callbacks
 
 ### Services
 

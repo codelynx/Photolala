@@ -11,9 +11,8 @@ import Observation
 struct PhotoBrowserView: View {
 	let directoryPath: NSString
 	@State private var settings = ThumbnailDisplaySettings()
-	@State private var selectionManager = SelectionManager()
-	@State private var isSelectionModeActive = false
 	@State private var photosCount = 0
+	@State private var selectedPhotos: [PhotoReference] = []
 	@State private var navigationPath = NavigationPath()
 	@State private var selectedPhotoNavigation: PreviewNavigation?
 	@State private var allPhotos: [PhotoReference] = []
@@ -67,23 +66,26 @@ struct PhotoBrowserView: View {
 			PhotoCollectionView(
 				directoryPath: directoryPath,
 				settings: settings,
-				selectionManager: selectionManager,
 				onSelectPhoto: handlePhotoSelection,
 				onPhotosLoaded: { photos in
 					self.allPhotos = photos
 				},
-				isSelectionModeActive: $isSelectionModeActive,
+				onSelectionChanged: { photos in
+					self.selectedPhotos = photos
+				},
 				photosCount: $photosCount
 			)
 #else
 			PhotoCollectionView(
 				directoryPath: directoryPath,
 				settings: settings,
-				selectionManager: selectionManager,
 				onSelectPhoto: handlePhotoSelection,
 				onPhotosLoaded: { photos in
 					self.allPhotos = photos
 					self.photosCount = photos.count
+				},
+				onSelectionChanged: { photos in
+					self.selectedPhotos = photos
 				}
 			)
 #endif
@@ -93,22 +95,12 @@ struct PhotoBrowserView: View {
 		.navigationSubtitle(directoryPath as String)
 #endif
 		.onReceive(NotificationCenter.default.publisher(for: .deselectAll)) { _ in
-			selectionManager.clearSelection()
+			selectedPhotos = []
 		}
 		.toolbar {
-#if os(iOS)
-			ToolbarItem(placement: .navigationBarTrailing) {
-				if photosCount > 0 && !isSelectionModeActive {
-					Button("Select") {
-						isSelectionModeActive = true
-					}
-				}
-			}
-#endif
-			
 			ToolbarItemGroup(placement: .automatic) {
 				// Preview selected photos button
-				if !selectionManager.selectedItems.isEmpty {
+				if !selectedPhotos.isEmpty {
 					Button(action: previewSelectedPhotos) {
 						Label("Preview", systemImage: "eye")
 					}
@@ -192,9 +184,9 @@ struct PhotoBrowserView: View {
 		let photosToShow = allPhotos
 		let initialIndex: Int
 		
-		if !selectionManager.selectedItems.isEmpty {
+		if !selectedPhotos.isEmpty {
 			// Find the first selected photo in the full list
-			if let firstSelected = selectionManager.selectedItems.first,
+			if let firstSelected = selectedPhotos.first,
 			   let index = allPhotos.firstIndex(of: firstSelected) {
 				initialIndex = index
 			} else {
@@ -225,9 +217,9 @@ struct PhotoBrowserView: View {
 		let photosToShow: [PhotoReference]
 		let initialIndex: Int
 		
-		if !selectionManager.selectedItems.isEmpty {
+		if !selectedPhotos.isEmpty {
 			// Convert selection to array maintaining order
-			photosToShow = allPhotos.filter { selectionManager.selectedItems.contains($0) }
+			photosToShow = allPhotos.filter { selectedPhotos.contains($0) }
 			initialIndex = photosToShow.firstIndex(of: photo) ?? 0
 			print("[PhotoBrowserView] Showing \(photosToShow.count) selected photos")
 		} else {
@@ -250,17 +242,17 @@ struct PhotoBrowserView: View {
 	
 	private func previewSelectedPhotos() {
 		// Get the selected photos in order
-		let selectedPhotos = selectionManager.selectedItems.sorted { photo1, photo2 in
+		let sortedPhotos = selectedPhotos.sorted { photo1, photo2 in
 			// Sort by filename to maintain consistent order
 			photo1.filename < photo2.filename
 		}
 		
-		guard !selectedPhotos.isEmpty else { return }
+		guard !sortedPhotos.isEmpty else { return }
 		
-		print("[PhotoBrowserView] Previewing \(selectedPhotos.count) selected photos")
+		print("[PhotoBrowserView] Previewing \(sortedPhotos.count) selected photos")
 		
 		// Start preview from the first selected photo
-		let navigation = PreviewNavigation(photos: selectedPhotos, initialIndex: 0)
+		let navigation = PreviewNavigation(photos: sortedPhotos, initialIndex: 0)
 		
 		#if os(macOS)
 		navigationPath.append(navigation)

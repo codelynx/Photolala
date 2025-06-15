@@ -18,7 +18,6 @@ import UIKit
 class PhotoCollectionViewController: XViewController {
 	let directoryPath: NSString
 	weak var settings: ThumbnailDisplaySettings?
-	weak var selectionManager: SelectionManager?
 	private var lastSortOption: PhotoSortOption?
 
 	@MainActor
@@ -26,17 +25,27 @@ class PhotoCollectionViewController: XViewController {
 	var onSelectPhoto: ((PhotoReference, [PhotoReference]) -> Void)?
 	var onSelectFolder: ((PhotoReference) -> Void)?
 	var onPhotosLoadedWithReferences: (([PhotoReference]) -> Void)?
+	var onSelectionChanged: (([PhotoReference]) -> Void)?
 	
 	var collectionView: XCollectionView!
 	
+	// Get currently selected photos
+	var selectedPhotos: [PhotoReference] {
+		#if os(macOS)
+		return collectionView.selectionIndexPaths.compactMap { indexPath in
+			guard indexPath.item < photos.count else { return nil }
+			return photos[indexPath.item]
+		}
+		#else
+		return collectionView.indexPathsForSelectedItems?.compactMap { indexPath in
+			guard indexPath.item < photos.count else { return nil }
+			return photos[indexPath.item]
+		} ?? []
+		#endif
+	}
+	
 	#if os(iOS)
-	var isSelectionMode = false
-	var selectButton: UIBarButtonItem!
-	var cancelButton: UIBarButtonItem!
-	var selectAllButton: UIBarButtonItem!
-	var actionToolbar: UIToolbar!
 	var onPhotosLoaded: ((Int) -> Void)?
-	var onSelectionModeChanged: ((Bool) -> Void)?
 	#endif
 	
 	init(directoryPath: NSString) {
@@ -140,7 +149,6 @@ class PhotoCollectionViewController: XViewController {
 	override func viewDidLoad() {
 		super.viewDidLoad()
 		setupCollectionView()
-		setupSelectionModeUI()
 		loadPhotos()
 		setupSettingsObserver()
 		setupToolbar()
@@ -175,57 +183,39 @@ class PhotoCollectionViewController: XViewController {
 		collectionView.dataSource = self
 		collectionView.delegate = self
 		collectionView.prefetchDataSource = self
-		collectionView.allowsMultipleSelectionDuringEditing = true
+		collectionView.allowsMultipleSelection = true
 		
 		collectionView.register(PhotoCollectionViewCell.self, forCellWithReuseIdentifier: "PhotoCell")
+		
+		// Add double-tap gesture recognizer for navigation
+		let doubleTapGesture = UITapGestureRecognizer(target: self, action: #selector(handleDoubleTap(_:)))
+		doubleTapGesture.numberOfTapsRequired = 2
+		collectionView.addGestureRecognizer(doubleTapGesture)
 		
 		view.addSubview(collectionView)
 	}
 	
-	private func setupSelectionModeUI() {
-		// Create bar button items
-		selectButton = UIBarButtonItem(title: "Select", style: .plain, target: self, action: #selector(enterSelectionMode))
-		cancelButton = UIBarButtonItem(barButtonSystemItem: .cancel, target: self, action: #selector(exitSelectionMode))
-		selectAllButton = UIBarButtonItem(title: "Select All", style: .plain, target: self, action: #selector(toggleSelectAll))
-		
-		// Initially show Select button
-		navigationItem.rightBarButtonItem = selectButton
-		
-		// Create action toolbar (hidden initially)
-		actionToolbar = UIToolbar()
-		actionToolbar.translatesAutoresizingMaskIntoConstraints = false
-		actionToolbar.isHidden = true
-		
-		// Set toolbar appearance for consistent background
-		let toolbarAppearance = UIToolbarAppearance()
-		toolbarAppearance.configureWithOpaqueBackground()
-		toolbarAppearance.backgroundColor = .systemBackground
-		actionToolbar.standardAppearance = toolbarAppearance
-		actionToolbar.scrollEdgeAppearance = toolbarAppearance
-		actionToolbar.compactAppearance = toolbarAppearance
-		actionToolbar.compactScrollEdgeAppearance = toolbarAppearance
-		
-		view.addSubview(actionToolbar)
-		
-		// Setup toolbar constraints
-		NSLayoutConstraint.activate([
-			actionToolbar.leadingAnchor.constraint(equalTo: view.leadingAnchor),
-			actionToolbar.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-			actionToolbar.bottomAnchor.constraint(equalTo: view.bottomAnchor)
-		])
-		
-		// Configure toolbar items
-		let shareButton = UIBarButtonItem(barButtonSystemItem: .action, target: self, action: #selector(shareSelectedItems))
-		let deleteButton = UIBarButtonItem(barButtonSystemItem: .trash, target: self, action: #selector(deleteSelectedItems))
-		let flexibleSpace = UIBarButtonItem(barButtonSystemItem: .flexibleSpace, target: nil, action: nil)
-		
-		actionToolbar.items = [shareButton, flexibleSpace, deleteButton]
-	}
 #endif
 	
 	@MainActor
 	func reloadData() {
+		// Preserve selection when reloading
+		#if os(iOS)
+		let selectedPaths = collectionView.indexPathsForSelectedItems ?? []
+		#else
+		let selectedPaths = collectionView.selectionIndexPaths
+		#endif
+		
 		collectionView.reloadData()
+		
+		// Restore selection
+		#if os(iOS)
+		for indexPath in selectedPaths {
+			collectionView.selectItem(at: indexPath, animated: false, scrollPosition: [])
+		}
+		#else
+		collectionView.selectionIndexPaths = selectedPaths
+		#endif
 	}
 	
 	// MARK: - Private Methods
@@ -351,7 +341,12 @@ class PhotoCollectionViewController: XViewController {
 		}
 		#endif
 		
-		collectionView.reloadData()
+		// Don't reload data as it clears selection - layout update is sufficient
+		#if os(macOS)
+		collectionView.collectionViewLayout?.invalidateLayout()
+		#else
+		collectionView.collectionViewLayout.invalidateLayout()
+		#endif
 	}
 	
 	private func setupToolbar() {
@@ -364,167 +359,27 @@ class PhotoCollectionViewController: XViewController {
 	}
 	
 	@objc private func handleDeselectAll() {
-		selectionManager?.clearSelection()
-		
 		#if os(macOS)
 		// Clear native collection view selection
 		collectionView.deselectAll(nil)
 		#else
-		// If in selection mode, update UI
-		if isSelectionMode {
-			// Deselect all items in collection view
-			for indexPath in collectionView.indexPathsForSelectedItems ?? [] {
-				collectionView.deselectItem(at: indexPath, animated: true)
-			}
-			updateSelectionTitle()
-			updateToolbarButtons()
+		// Deselect all items in collection view
+		for indexPath in collectionView.indexPathsForSelectedItems ?? [] {
+			collectionView.deselectItem(at: indexPath, animated: true)
 		}
 		#endif
 	}
 	
-	// MARK: - iOS Selection Mode
+	// MARK: - iOS Specific
 	
 	#if os(iOS)
-	@objc func enterSelectionMode() {
-		isSelectionMode = true
-		collectionView.allowsMultipleSelection = true
-		onSelectionModeChanged?(true)
-		
-		// Update navigation bar
-		navigationItem.leftBarButtonItem = cancelButton
-		navigationItem.rightBarButtonItem = selectAllButton
-		updateSelectionTitle()
-		
-		// Show action toolbar
-		actionToolbar.isHidden = false
-		updateToolbarButtons()
-		
-		// Adjust collection view bottom inset for toolbar
-		var contentInset = collectionView.contentInset
-		contentInset.bottom = 44 // toolbar height
-		collectionView.contentInset = contentInset
-		
-		// Update visible cells for selection mode
-		for cell in collectionView.visibleCells {
-			if let photoCell = cell as? PhotoCollectionViewCell {
-				photoCell.setSelectionMode(true)
-			}
-		}
-	}
 	
-	@objc func exitSelectionMode() {
-		isSelectionMode = false
-		collectionView.allowsMultipleSelection = false
-		onSelectionModeChanged?(false)
-		
-		// Clear selection
-		selectionManager?.clearSelection()
-		
-		// Reset navigation bar
-		navigationItem.leftBarButtonItem = nil
-		navigationItem.rightBarButtonItem = selectButton
-		navigationItem.title = directoryPath.lastPathComponent
-		
-		// Hide action toolbar
-		actionToolbar.isHidden = true
-		
-		// Reset collection view inset
-		var contentInset = collectionView.contentInset
-		contentInset.bottom = 0
-		collectionView.contentInset = contentInset
-		
-		// Update visible cells to hide checkboxes
-		for cell in collectionView.visibleCells {
-			if let photoCell = cell as? PhotoCollectionViewCell {
-				photoCell.setSelectionMode(false)
-			}
+	@objc private func handleDoubleTap(_ gesture: UITapGestureRecognizer) {
+		let location = gesture.location(in: collectionView)
+		if let indexPath = collectionView.indexPathForItem(at: location) {
+			// Navigate to photo preview on double-tap
+			handleNavigation(at: indexPath)
 		}
-	}
-	
-	@objc private func toggleSelectAll() {
-		guard let selectionManager = selectionManager else { return }
-		
-		if selectionManager.selectedItems.count == photos.count {
-			// Deselect all
-			for indexPath in collectionView.indexPathsForSelectedItems ?? [] {
-				collectionView.deselectItem(at: indexPath, animated: true)
-			}
-			selectionManager.clearSelection()
-		} else {
-			// Select all
-			for (index, photo) in photos.enumerated() {
-				let indexPath = IndexPath(item: index, section: 0)
-				collectionView.selectItem(at: indexPath, animated: true, scrollPosition: [])
-				selectionManager.addToSelection(photo)
-			}
-		}
-		
-		updateSelectionTitle()
-		updateToolbarButtons()
-	}
-	
-	private func updateSelectionTitle() {
-		guard let selectionManager = selectionManager else { return }
-		let count = selectionManager.selectionCount
-		
-		if count == 0 {
-			navigationItem.title = "Select Items"
-		} else {
-			navigationItem.title = "\(count) Selected"
-		}
-		
-		// Update Select All button title
-		if count == photos.count && count > 0 {
-			selectAllButton.title = "Deselect All"
-		} else {
-			selectAllButton.title = "Select All"
-		}
-	}
-	
-	private func updateToolbarButtons() {
-		guard let selectionManager = selectionManager else { return }
-		let hasSelection = selectionManager.selectionCount > 0
-		
-		// Enable/disable toolbar buttons based on selection
-		for item in actionToolbar.items ?? [] {
-			item.isEnabled = hasSelection
-		}
-	}
-	
-	@objc private func shareSelectedItems() {
-		guard let selectionManager = selectionManager else { return }
-		let selectedURLs = selectionManager.selectedItems.map { $0.fileURL }
-		
-		if !selectedURLs.isEmpty {
-			let activityController = UIActivityViewController(activityItems: selectedURLs, applicationActivities: nil)
-			
-			// For iPad
-			if let popover = activityController.popoverPresentationController {
-				popover.barButtonItem = actionToolbar.items?.first
-			}
-			
-			present(activityController, animated: true)
-		}
-	}
-	
-	@objc private func deleteSelectedItems() {
-		// Show confirmation alert
-		guard let selectionManager = selectionManager else { return }
-		let count = selectionManager.selectionCount
-		
-		let alert = UIAlertController(
-			title: "Delete \(count) Photo\(count == 1 ? "" : "s")?",
-			message: "This action cannot be undone.",
-			preferredStyle: .alert
-		)
-		
-		alert.addAction(UIAlertAction(title: "Cancel", style: .cancel))
-		alert.addAction(UIAlertAction(title: "Delete", style: .destructive) { _ in
-			// TODO: Implement actual deletion
-			print("Would delete \(count) items")
-		})
-		
-		present(alert, animated: true)
 	}
 	#endif
 	
@@ -564,7 +419,6 @@ extension PhotoCollectionViewController: XCollectionViewDataSource {
 		let item = collectionView.makeItem(withIdentifier: NSUserInterfaceItemIdentifier("PhotoItem"), for: indexPath) as! PhotoCollectionViewItem
 		let photo = photos[indexPath.item]
 		item.settings = settings
-		item.selectionManager = selectionManager
 		item.photoRepresentation = photo
 		item.updateCornerRadius()
 		return item
@@ -575,11 +429,18 @@ extension PhotoCollectionViewController: XCollectionViewDataSource {
 	func collectionView(_ collectionView: UICollectionView, cellForItemAt indexPath: IndexPath) -> UICollectionViewCell {
 		let cell = collectionView.dequeueReusableCell(withReuseIdentifier: "PhotoCell", for: indexPath) as! PhotoCollectionViewCell
 		let photo = photos[indexPath.item]
+		
 		cell.settings = settings
-		cell.selectionManager = selectionManager
 		cell.photoRepresentation = photo
 		cell.updateCornerRadius()
-		cell.setSelectionMode(isSelectionMode)
+		
+		// UICollectionView manages selection, but we need to sync when cells are reused
+		let selectedPaths = collectionView.indexPathsForSelectedItems ?? []
+		let shouldBeSelected = selectedPaths.contains(indexPath)
+		if shouldBeSelected != cell.isSelected {
+			cell.isSelected = shouldBeSelected
+		}
+		
 		return cell
 	}
 	#endif
@@ -597,21 +458,29 @@ extension PhotoCollectionViewController: XCollectionViewDelegate {
 	override func mouseDown(with event: NSEvent) {
 		print("[PhotoCollectionViewController] mouseDown called, clickCount: \(event.clickCount)")
 		
-		// Don't call super to prevent default selection behavior on double-click
-		if event.clickCount == 2 {
-			let locationInView = view.convert(event.locationInWindow, from: nil)
-			let locationInCollectionView = collectionView.convert(locationInView, from: view)
-			
-			print("[PhotoCollectionViewController] Double-click at location: \(locationInCollectionView)")
-			
-			if let indexPath = collectionView.indexPathForItem(at: locationInCollectionView) {
+		let locationInView = view.convert(event.locationInWindow, from: nil)
+		let locationInCollectionView = collectionView.convert(locationInView, from: view)
+		
+		if let indexPath = collectionView.indexPathForItem(at: locationInCollectionView) {
+			// Double-click: navigate
+			if event.clickCount == 2 {
 				print("[PhotoCollectionViewController] Double-click on item at indexPath: \(indexPath)")
 				handleNavigation(at: indexPath)
 				return
 			}
+			
+			// Single click: check for toggle behavior
+			if event.clickCount == 1 && !event.modifierFlags.contains(.command) && !event.modifierFlags.contains(.shift) {
+				// If item is already selected, deselect it (toggle behavior)
+				if collectionView.selectionIndexPaths.contains(indexPath) {
+					collectionView.deselectItems(at: Set([indexPath]))
+					// The delegate method will be called automatically
+					return
+				}
+			}
 		}
 		
-		// For single clicks, let the collection view handle it
+		// For other cases (Cmd+click, Shift+click, or selecting new item), let the collection view handle it
 		super.mouseDown(with: event)
 	}
 	
@@ -631,81 +500,39 @@ extension PhotoCollectionViewController: XCollectionViewDelegate {
 
 	#if os(macOS)
 	func collectionView(_ collectionView: NSCollectionView, didSelectItemsAt indexPaths: Set<IndexPath>) {
-		// Sync NSCollectionView selection with our SelectionManager
-		guard let selectionManager = selectionManager else { return }
-		
-		// Add newly selected items
-		for indexPath in indexPaths {
-			if indexPath.item < photos.count {
-				let photo = photos[indexPath.item]
-				if !selectionManager.isSelected(photo) {
-					selectionManager.addToSelection(photo)
-				}
-			}
-		}
-		
 		// Update visual state
 		for indexPath in indexPaths {
 			if let item = collectionView.item(at: indexPath) as? PhotoCollectionViewItem {
 				item.updateSelectionState()
 			}
 		}
+		
+		// Notify of selection change
+		onSelectionChanged?(selectedPhotos)
 	}
 	
 	func collectionView(_ collectionView: NSCollectionView, didDeselectItemsAt indexPaths: Set<IndexPath>) {
-		// Sync deselection
-		guard let selectionManager = selectionManager else { return }
-		
-		// Remove deselected items
-		for indexPath in indexPaths {
-			if indexPath.item < photos.count {
-				let photo = photos[indexPath.item]
-				selectionManager.removeFromSelection(photo)
-			}
-		}
-		
 		// Update visual state
 		for indexPath in indexPaths {
 			if let item = collectionView.item(at: indexPath) as? PhotoCollectionViewItem {
 				item.updateSelectionState()
 			}
 		}
+		
+		// Notify of selection change
+		onSelectionChanged?(selectedPhotos)
 	}
 	#else
 	func collectionView(_ collectionView: UICollectionView, didSelectItemAt indexPath: IndexPath) {
-		if isSelectionMode {
-			// In selection mode: sync with SelectionManager
-			guard let selectionManager = selectionManager else { return }
-			let photo = photos[indexPath.item]
-			selectionManager.addToSelection(photo)
-			
-			if let cell = collectionView.cellForItem(at: indexPath) as? PhotoCollectionViewCell {
-				cell.updateSelectionState()
-			}
-			
-			updateSelectionTitle()
-			updateToolbarButtons()
-		} else {
-			// Normal mode: navigate
-			collectionView.deselectItem(at: indexPath, animated: false)
-			handleNavigation(at: indexPath)
-		}
+		// System has already selected the item
+		// Notify of selection change
+		onSelectionChanged?(selectedPhotos)
 	}
 	
 	func collectionView(_ collectionView: UICollectionView, didDeselectItemAt indexPath: IndexPath) {
-		if isSelectionMode {
-			// Sync deselection
-			guard let selectionManager = selectionManager else { return }
-			let photo = photos[indexPath.item]
-			selectionManager.removeFromSelection(photo)
-			
-			if let cell = collectionView.cellForItem(at: indexPath) as? PhotoCollectionViewCell {
-				cell.updateSelectionState()
-			}
-			
-			updateSelectionTitle()
-			updateToolbarButtons()
-		}
+		// System has already deselected the item
+		// Notify of selection change
+		onSelectionChanged?(selectedPhotos)
 	}
 	#endif
 }
@@ -751,7 +578,6 @@ extension PhotoCollectionViewController: UICollectionViewDataSourcePrefetching {
 #if os(macOS)
 class PhotoCollectionViewItem: NSCollectionViewItem {
 	weak var settings: ThumbnailDisplaySettings?
-	weak var selectionManager: SelectionManager?
 	var photoRepresentation: PhotoReference? {
 		didSet {
 			loadThumbnail()
@@ -872,11 +698,14 @@ class PhotoCollectionViewItem: NSCollectionViewItem {
 	}
 	
 	func updateSelectionState() {
-		guard let photoRep = photoRepresentation,
-			  let selectionManager = selectionManager else { return }
+		guard let photoRep = photoRepresentation else { return }
 		
-		let isSelected = selectionManager.isSelected(photoRep)
-		let isFocused = selectionManager.focusedItem == photoRep
+		// Check collection view's selection state
+		var isSelected = false
+		if let collectionView = self.collectionView,
+		   let indexPath = collectionView.indexPath(for: self) {
+			isSelected = collectionView.selectionIndexPaths.contains(indexPath)
+		}
 		
 		// Update border to show selection
 		imageView?.layer?.borderWidth = isSelected ? 3 : 1
@@ -884,16 +713,6 @@ class PhotoCollectionViewItem: NSCollectionViewItem {
 		
 		// Update background for better visibility
 		view.layer?.backgroundColor = isSelected ? NSColor.controlAccentColor.withAlphaComponent(0.1).cgColor : NSColor.clear.cgColor
-		
-		// Add focus ring
-		if isFocused {
-			// Create focus ring effect
-			view.layer?.borderWidth = 2
-			view.layer?.borderColor = NSColor.keyboardFocusIndicatorColor.cgColor
-			view.layer?.cornerRadius = 4
-		} else {
-			view.layer?.borderWidth = 0
-		}
 	}
 	
 	override func viewDidAppear() {
@@ -905,7 +724,6 @@ class PhotoCollectionViewItem: NSCollectionViewItem {
 #else
 class PhotoCollectionViewCell: UICollectionViewCell {
 	weak var settings: ThumbnailDisplaySettings?
-	weak var selectionManager: SelectionManager?
 	var photoRepresentation: PhotoReference? {
 		didSet {
 			loadThumbnail()
@@ -914,8 +732,6 @@ class PhotoCollectionViewCell: UICollectionViewCell {
 	}
 	
 	private let imageView = UIImageView()
-	private let checkboxImageView = UIImageView()
-	private var isInSelectionMode = false
 	
 	override init(frame: CGRect) {
 		super.init(frame: frame)
@@ -926,32 +742,26 @@ class PhotoCollectionViewCell: UICollectionViewCell {
 		fatalError("init(coder:) has not been implemented")
 	}
 	
+	override var isSelected: Bool {
+		didSet {
+			updateSelectionState()
+		}
+	}
+	
 	private func setupViews() {
 		updateDisplayMode()
 		imageView.clipsToBounds = true
 		imageView.layer.borderWidth = 1
 		imageView.layer.borderColor = XColor.separator.cgColor
 		
-		// Setup checkbox
-		checkboxImageView.contentMode = .scaleAspectFit
-		checkboxImageView.isHidden = true
-		
 		contentView.addSubview(imageView)
-		contentView.addSubview(checkboxImageView)
 		imageView.translatesAutoresizingMaskIntoConstraints = false
-		checkboxImageView.translatesAutoresizingMaskIntoConstraints = false
 		
 		NSLayoutConstraint.activate([
 			imageView.topAnchor.constraint(equalTo: contentView.topAnchor),
 			imageView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor),
 			imageView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor),
-			imageView.bottomAnchor.constraint(equalTo: contentView.bottomAnchor),
-			
-			// Checkbox in top-right corner
-			checkboxImageView.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 8),
-			checkboxImageView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -8),
-			checkboxImageView.widthAnchor.constraint(equalToConstant: 24),
-			checkboxImageView.heightAnchor.constraint(equalToConstant: 24)
+			imageView.bottomAnchor.constraint(equalTo: contentView.bottomAnchor)
 		])
 	}
 	
@@ -1006,33 +816,20 @@ class PhotoCollectionViewCell: UICollectionViewCell {
 	}
 	
 	func updateSelectionState() {
-		guard let photoRep = photoRepresentation,
-			  let selectionManager = selectionManager else { return }
+		guard let photoRep = photoRepresentation else { return }
 		
-		let isSelected = selectionManager.isSelected(photoRep)
-		let isFocused = selectionManager.focusedItem == photoRep
+		// Use the cell's isSelected property
+		let isSelected = self.isSelected
 		
-		if isInSelectionMode {
-			// In selection mode, use tinted border for selection
-			if isSelected {
-				imageView.layer.borderWidth = 4
-				imageView.layer.borderColor = UIColor.systemBlue.cgColor
-				contentView.backgroundColor = UIColor.systemBlue.withAlphaComponent(0.15)
-			} else {
-				imageView.layer.borderWidth = 1
-				imageView.layer.borderColor = XColor.separator.cgColor
-				contentView.backgroundColor = UIColor.clear
-			}
-			
-			// Hide checkbox since we're using border selection
-			checkboxImageView.isHidden = true
+		// Always show selection state when selected
+		if isSelected {
+			imageView.layer.borderWidth = 4
+			imageView.layer.borderColor = UIColor.systemBlue.cgColor
+			contentView.backgroundColor = UIColor.systemBlue.withAlphaComponent(0.15)
 		} else {
-			// Normal mode - no selection visible on iOS
 			imageView.layer.borderWidth = 1
 			imageView.layer.borderColor = XColor.separator.cgColor
 			contentView.backgroundColor = UIColor.clear
-			contentView.layer.borderWidth = 0
-			checkboxImageView.isHidden = true
 		}
 	}
 	
@@ -1040,14 +837,7 @@ class PhotoCollectionViewCell: UICollectionViewCell {
 		super.prepareForReuse()
 		imageView.image = nil
 		photoRepresentation = nil
-		updateSelectionState()
-		checkboxImageView.isHidden = true
-		isInSelectionMode = false
-	}
-	
-	func setSelectionMode(_ enabled: Bool) {
-		isInSelectionMode = enabled
-		updateSelectionState()
+		// Don't update selection state here - isSelected will be set by collection view
 	}
 }
 #endif
@@ -1057,12 +847,11 @@ class PhotoCollectionViewCell: UICollectionViewCell {
 struct PhotoCollectionView: XViewControllerRepresentable {
 	let directoryPath: NSString
 	let settings: ThumbnailDisplaySettings
-	let selectionManager: SelectionManager
 	var onSelectPhoto: ((PhotoReference, [PhotoReference]) -> Void)?
 	var onSelectFolder: ((PhotoReference) -> Void)?
 	var onPhotosLoaded: (([PhotoReference]) -> Void)?
+	var onSelectionChanged: (([PhotoReference]) -> Void)?
 	#if os(iOS)
-	@Binding var isSelectionModeActive: Bool
 	@Binding var photosCount: Int
 	#endif
 	
@@ -1070,18 +859,18 @@ struct PhotoCollectionView: XViewControllerRepresentable {
 	func makeNSViewController(context: Context) -> PhotoCollectionViewController {
 		let controller = PhotoCollectionViewController(directoryPath: directoryPath)
 		controller.settings = settings
-		controller.selectionManager = selectionManager
 		controller.onSelectPhoto = onSelectPhoto
 		controller.onSelectFolder = onSelectFolder
 		controller.onPhotosLoadedWithReferences = onPhotosLoaded
+		controller.onSelectionChanged = onSelectionChanged
 		return controller
 	}
 	
 	func updateNSViewController(_ nsViewController: PhotoCollectionViewController, context: Context) {
 		nsViewController.settings = settings
-		nsViewController.selectionManager = selectionManager
 		nsViewController.onSelectPhoto = onSelectPhoto
 		nsViewController.onSelectFolder = onSelectFolder
+		nsViewController.onSelectionChanged = onSelectionChanged
 		// Trigger layout update when settings change
 		nsViewController.updateCollectionViewLayout()
 	}
@@ -1091,7 +880,6 @@ struct PhotoCollectionView: XViewControllerRepresentable {
 	func makeUIViewController(context: Context) -> PhotoCollectionViewController {
 		let controller = PhotoCollectionViewController(directoryPath: directoryPath)
 		controller.settings = settings
-		controller.selectionManager = selectionManager
 		controller.onSelectPhoto = onSelectPhoto
 		controller.onSelectFolder = onSelectFolder
 		controller.onPhotosLoaded = { count in
@@ -1100,28 +888,17 @@ struct PhotoCollectionView: XViewControllerRepresentable {
 			}
 		}
 		controller.onPhotosLoadedWithReferences = onPhotosLoaded
-		controller.onSelectionModeChanged = { isActive in
-			DispatchQueue.main.async {
-				self.isSelectionModeActive = isActive
-			}
-		}
+		controller.onSelectionChanged = onSelectionChanged
 		return controller
 	}
 	
 	func updateUIViewController(_ uiViewController: PhotoCollectionViewController, context: Context) {
 		uiViewController.settings = settings
-		uiViewController.selectionManager = selectionManager
 		uiViewController.onSelectPhoto = onSelectPhoto
 		uiViewController.onSelectFolder = onSelectFolder
+		uiViewController.onSelectionChanged = onSelectionChanged
 		// Trigger layout update when settings change
 		uiViewController.updateCollectionViewLayout()
-		
-		// Handle selection mode changes from SwiftUI
-		if isSelectionModeActive && !uiViewController.isSelectionMode {
-			uiViewController.enterSelectionMode()
-		} else if !isSelectionModeActive && uiViewController.isSelectionMode {
-			uiViewController.exitSelectionMode()
-		}
 	}
 	#endif
 	

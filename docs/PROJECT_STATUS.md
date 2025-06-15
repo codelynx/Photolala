@@ -469,9 +469,38 @@ Last Updated: June 15, 2025
 5. **Per-Window Settings**: Each window has independent display settings for flexibility
 6. **Enum-Based Configuration**: ThumbnailOption encapsulates all size-related layout properties
 7. **No Window Restoration**: App starts fresh each time for cleaner user experience
-8. **Native Collection View Selection**: Chose simplicity over custom behavior
-   - Use NSCollectionView's built-in selection mechanism
-   - Trade control for maintainability and platform consistency
-   - SelectionManager syncs with collection view state
+8. **Native Collection View Selection**: System-only approach
+   - Use platform-native selection APIs exclusively
+   - No custom SelectionManager - simpler architecture
+   - Selection state maintained by collection views
+   - Trade custom behavior for platform consistency
 9. **Memory-Aware Caching**: Dynamic cache sizing based on available RAM
 10. **Performance Monitoring**: Built-in statistics for optimization feedback
+22. **Removed SelectionManager - Switch to System-Native Selection (June 15 - Session 13)**:
+   - Completely removed custom SelectionManager class
+   - Switched to platform-native selection mechanisms:
+     - iOS: UICollectionView's `allowsMultipleSelection` and `indexPathsForSelectedItems`
+     - macOS: NSCollectionView's `allowsMultipleSelection` and `selectionIndexPaths`
+   - Simplified PhotoCollectionViewController:
+     - Removed all selection mode code (iOS now always allows selection)
+     - Removed `isSelectionMode`, `enterSelectionMode()`, `exitSelectionMode()`
+     - Selection state managed entirely by collection views
+     - Added `updateSelectionState()` call in cell's `isSelected` didSet
+   - Updated PhotoBrowserView:
+     - Replaced `selectionManager` with simple `selectedPhotos` array
+     - Selection changes communicated via `onSelectionChanged` callback
+   - Benefits:
+     - Significantly less code to maintain (593 lines removed)
+     - Consistent with platform behavior
+     - Free keyboard navigation and accessibility support
+     - Simpler state management
+   - iOS behavior changes:
+     - Single tap now selects/deselects (no selection mode needed)
+     - Double tap navigates to preview (avoiding conflict with selection)
+     - Selection always available, following system convention
+   - Fixed iOS selection issues:
+     - Selection now preserved during scrolling
+     - Collection view layout updates no longer clear selection
+     - Cell reuse properly syncs selection state
+     - `reloadData()` saves and restores selection
+     - `updateCollectionViewLayout()` uses `invalidateLayout()` instead of `reloadData()`
