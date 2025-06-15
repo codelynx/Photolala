@@ -222,25 +222,45 @@ let scaleFactor = max(viewSize.width / imageSize.width,
 
 Implement Solution 2 with `ScalableImageView` - a custom NSImageView subclass that provides both scale-to-fit and scale-to-fill modes with proper aspect ratio handling.
 
-## Implementation Plan
+## Implementation Status ✅
 
-### 1. Create ScalableImageView Class
+### 1. ScalableImageView Class Created
 - Location: `/photolala/Views/ScalableImageView.swift`
 - Platform: macOS only (iOS already has proper content modes)
 - Inherits from: NSImageView
+- Features:
+  - Custom `draw(_:)` method for proper scaling
+  - `ScaleMode` enum with `.scaleToFit` and `.scaleToFill`
+  - Helper methods for aspect calculations
+  - Proper clipping for scale-to-fill mode
 
-### 2. Integration Steps
-1. Create the new ScalableImageView class
-2. Update PhotoCollectionViewItem to use ScalableImageView instead of NSImageView
-3. Connect the scaleMode to ThumbnailDisplaySettings.displayMode
-4. Remove the current CALayer-based approach
-5. Test with various image aspect ratios
+### 2. Integration Completed
+1. ✅ Created ScalableImageView class with both scale modes
+2. ✅ Updated PhotoCollectionViewItem to use ScalableImageView
+3. ✅ Connected scaleMode to ThumbnailDisplaySettings.displayMode
+4. ✅ Removed the CALayer-based approach
+5. ✅ Added updateDisplayMode() call when configuring cells
 
-### 3. Benefits
+### 3. Implementation Details
+
+#### ScalableImageView
+- Uses custom drawing to achieve proper aspect fill/fit
+- Calculates draw rectangles based on image and view aspect ratios
+- Applies clipping for scale-to-fill to prevent overflow
+- Handles edge cases (zero sizes, nil images)
+
+#### PhotoCollectionViewController Changes
+- Replaced `NSImageView` with `ScalableImageView` in `loadView()`
+- Updated `updateDisplayMode()` to set `scaleMode` property
+- Added `updateDisplayMode()` call in `itemForRepresentedObjectAt`
+- Removed CALayer contentsGravity manipulation
+
+### 4. Benefits Achieved
 - **Predictable behavior**: Custom drawing ensures consistent results
+- **Fixes square image issue**: 1024x1024 images now scale correctly
 - **Reusable**: Can be used elsewhere in the app if needed
 - **Maintainable**: All scaling logic in one place
-- **Cross-compatible**: Matches iOS behavior closely
+- **Cross-compatible**: Matches iOS behavior
 
 ## Questions to Investigate
 

@@ -105,7 +105,7 @@ Tap photo → Push PhotoPreviewView
 
 1. **Directory Scanning**: DirectoryScanner → [PhotoReference]
 2. **Thumbnail Loading**: PhotoReference → PhotoManager → Cached Thumbnail
-3. **Selection**: User Interaction → SelectionManager → UI Updates
+3. **Selection**: User Interaction → Native Collection View → Callback → UI Updates
 4. **Navigation**: Selection/Tap → NavigationStack → New View
 
 ## Platform Differences
@@ -141,6 +141,13 @@ Tap photo → Push PhotoPreviewView
 
 ## Implementation Patterns
 
+### ScalableImageView (macOS)
+Custom NSImageView subclass that provides proper aspect fill/fit modes:
+- Implements custom `draw(_:)` method
+- Provides `.scaleToFit` and `.scaleToFill` modes
+- Matches iOS UIImageView content mode behavior
+- Handles aspect ratio calculations and clipping
+
 ### Cell Update Pattern
 Both iOS and macOS cells use a consistent update pattern:
 
@@ -167,3 +174,24 @@ Benefits:
 - Automatic batching of property changes
 - Consistent timing and state
 - Platform-appropriate implementation
+
+### Async Thumbnail Loading Pattern
+Proper threading to avoid UI blocking:
+
+```swift
+Task {
+    // Heavy work on background queue
+    let thumbnail = try await loadThumbnail()
+    
+    // UI updates on main thread
+    await MainActor.run {
+        imageView.image = thumbnail
+    }
+}
+```
+
+Benefits:
+- Thumbnail loading/decoding happens off main thread
+- UI remains responsive during loading
+- Smooth scrolling in collection views
+- Loading indicators shown immediately

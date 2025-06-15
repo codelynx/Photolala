@@ -420,6 +420,7 @@ extension PhotoCollectionViewController: XCollectionViewDataSource {
 		let photo = photos[indexPath.item]
 		item.settings = settings
 		item.photoRepresentation = photo
+		item.updateDisplayMode()
 		item.updateCornerRadius()
 		return item
 	}
@@ -587,10 +588,11 @@ class PhotoCollectionViewItem: NSCollectionViewItem {
 	
 	override func loadView() {
 		view = NSView()
+		view.wantsLayer = true
+		view.layer?.backgroundColor = NSColor.clear.cgColor
 		
-		let imageView = NSImageView()
+		let imageView = ScalableImageView()
 		imageView.translatesAutoresizingMaskIntoConstraints = false
-		imageView.imageScaling = .scaleProportionallyUpOrDown
 		imageView.wantsLayer = true
 		imageView.layer?.masksToBounds = true
 		imageView.layer?.borderWidth = 1
@@ -639,36 +641,52 @@ class PhotoCollectionViewItem: NSCollectionViewItem {
 		self.photoRepresentation = nil
 	}
 
+	private let loadingSymbol: String = "circle.dotted" // "photo"
+	private let loadingErrorSymbol = "exclamationmark.triangle"
+
 	private func loadThumbnail() {
 		guard let photoRep = photoRepresentation else { return }
 		
-		// Show placeholder immediately
-		imageView?.image = nil
-		imageView?.layer?.backgroundColor = XColor.quaternaryLabelColor.cgColor
+		// Show placeholder icon immediately
+		if let placeholderImage = NSImage(systemSymbolName: self.loadingSymbol, accessibilityDescription: "Loading photo") {
+			let config = NSImage.SymbolConfiguration(pointSize: 16, weight: .light)
+				.applying(NSImage.SymbolConfiguration(paletteColors: [XColor.tertiaryLabelColor]))
+			imageView?.image = placeholderImage.withSymbolConfiguration(config)
+		} else {
+			imageView?.image = nil
+		}
 		
 		// If thumbnail already exists, use it
 		if let thumbnail = photoRep.thumbnail {
 			imageView?.image = thumbnail
-			imageView?.layer?.backgroundColor = nil
 			return
 		}
 		
-		// Start loading thumbnail only
-		Task { @MainActor in
+		// Start loading thumbnail on background queue
+		Task {
 			do {
-				// Load thumbnail
+				// Load thumbnail (runs on background queue)
 				if let thumbnail = try await PhotoManager.shared.thumbnail(for: photoRep) {
-					// Update if we're still showing the same photo
-					guard self.photoRepresentation === photoRep else { return }
-					
-					photoRep.thumbnail = thumbnail
-					self.imageView?.image = thumbnail
-					self.imageView?.layer?.backgroundColor = nil
+					// Switch to main actor only for UI updates
+					await MainActor.run {
+						// Update if we're still showing the same photo
+						guard self.photoRepresentation === photoRep else { return }
+						
+						photoRep.thumbnail = thumbnail
+						self.imageView?.image = thumbnail
+					}
 				}
 			} catch {
-				// Show error state
-				guard self.photoRepresentation === photoRep else { return }
-				self.imageView?.layer?.backgroundColor = XColor.systemRed.withAlphaComponent(0.1).cgColor
+				// Switch to main actor for UI updates
+				await MainActor.run {
+					// Show error state with icon
+					guard self.photoRepresentation === photoRep else { return }
+					if let errorImage = NSImage(systemSymbolName: self.loadingErrorSymbol, accessibilityDescription: "Failed to load photo") {
+						let config = NSImage.SymbolConfiguration(pointSize: 32, weight: .light)
+							.applying(NSImage.SymbolConfiguration(paletteColors: [XColor.systemRed.withAlphaComponent(0.5)]))
+						self.imageView?.image = errorImage.withSymbolConfiguration(config)
+					}
+				}
 			}
 		}
 	}
@@ -682,16 +700,16 @@ class PhotoCollectionViewItem: NSCollectionViewItem {
 	
 	@MainActor
 	func updateDisplayMode() {
-		guard let imageView = imageView, let settings = settings else { return }
+		guard let settings = settings else { return }
 		
-		switch settings.displayMode {
-		case .scaleToFit:
-			imageView.imageScaling = .scaleProportionallyUpOrDown
-			imageView.layer?.contentsGravity = .center
-		case .scaleToFill:
-			// Use CALayer for aspect fill behavior
-			imageView.imageScaling = .scaleNone
-			imageView.layer?.contentsGravity = .resizeAspectFill
+		// Cast to ScalableImageView to access scaleMode
+		if let scalableImageView = imageView as? ScalableImageView {
+			switch settings.displayMode {
+			case .scaleToFit:
+				scalableImageView.scaleMode = .scaleToFit
+			case .scaleToFill:
+				scalableImageView.scaleMode = .scaleToFill
+			}
 		}
 	}
 	
@@ -768,36 +786,55 @@ class PhotoCollectionViewCell: UICollectionViewCell {
 		])
 	}
 	
+	private let loadingSymbol: String = "circle.dotted"
+	private let loadingErrorSymbol = "exclamationmark.triangle"
+	
 	private func loadThumbnail() {
 		guard let photoRep = photoRepresentation else { return }
 		
-		// Show placeholder immediately
-		imageView.image = nil
-		imageView.backgroundColor = XColor.quaternaryLabel
+		// Show placeholder icon immediately
+		if let placeholderImage = UIImage(systemName: self.loadingSymbol) {
+			let config = UIImage.SymbolConfiguration(pointSize: 16, weight: .light)
+			imageView.image = placeholderImage.withConfiguration(config)
+			imageView.tintColor = XColor.tertiaryLabel
+		} else {
+			imageView.image = nil
+		}
+		imageView.backgroundColor = nil
 		
 		// If thumbnail already exists, use it
 		if let thumbnail = photoRep.thumbnail {
 			imageView.image = thumbnail
-			imageView.backgroundColor = nil
+			imageView.tintColor = nil
 			return
 		}
 		
-		// Start loading thumbnail only
-		Task { @MainActor in
+		// Start loading thumbnail on background queue
+		Task {
 			do {
-				// Load thumbnail
+				// Load thumbnail (runs on background queue)
 				if let thumbnail = try await PhotoManager.shared.thumbnail(for: photoRep) {
-					// Update if we're still showing the same photo
-					guard self.photoRepresentation === photoRep else { return }
-					
-					photoRep.thumbnail = thumbnail
-					self.imageView.image = thumbnail
-					self.imageView.backgroundColor = nil
+					// Switch to main actor only for UI updates
+					await MainActor.run {
+						// Update if we're still showing the same photo
+						guard self.photoRepresentation === photoRep else { return }
+						
+						photoRep.thumbnail = thumbnail
+						self.imageView.image = thumbnail
+						self.imageView.tintColor = nil
+					}
 				}
 			} catch {
-				// Show error state
-				guard self.photoRepresentation === photoRep else { return }
-				self.imageView.backgroundColor = XColor.systemRed.withAlphaComponent(0.1)
+				// Switch to main actor for UI updates
+				await MainActor.run {
+					// Show error state with icon
+					guard self.photoRepresentation === photoRep else { return }
+					if let errorImage = UIImage(systemName: self.loadingErrorSymbol) {
+						let config = UIImage.SymbolConfiguration(pointSize: 32, weight: .light)
+						self.imageView.image = errorImage.withConfiguration(config)
+						self.imageView.tintColor = XColor.systemRed.withAlphaComponent(0.5)
+					}
+				}
 			}
 		}
 	}
