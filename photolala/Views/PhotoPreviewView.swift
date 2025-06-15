@@ -3,6 +3,7 @@ import SwiftUI
 struct PhotoPreviewView: View {
 	// Constants
 	private let controlStripHeight: CGFloat = 44
+	private let useNativeThumbnailStrip = true // Feature flag for testing
 	
 	let photos: [PhotoReference]
 	let initialIndex: Int
@@ -140,12 +141,24 @@ struct PhotoPreviewView: View {
 					VStack {
 						Spacer()
 						
-						ThumbnailStrip(
-							photos: photos,
-							currentIndex: $currentIndex,
-							thumbnailSize: CGSize(width: 60, height: 60),
-							onTimerExtend: extendControlsTimer
-						)
+						if useNativeThumbnailStrip {
+							// Native collection view implementation
+							ThumbnailStripView(
+								photos: photos,
+								currentIndex: $currentIndex,
+								thumbnailSize: CGSize(width: 60, height: 60),
+								onTimerExtend: extendControlsTimer
+							)
+							.frame(height: 84) // 60 + 24 for padding
+						} else {
+							// Original SwiftUI implementation
+							ThumbnailStrip(
+								photos: photos,
+								currentIndex: $currentIndex,
+								thumbnailSize: CGSize(width: 60, height: 60),
+								onTimerExtend: extendControlsTimer
+							)
+						}
 					}
 					.transition(.move(edge: .bottom).combined(with: .opacity))
 				}

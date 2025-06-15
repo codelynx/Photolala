@@ -13,6 +13,7 @@ Documents describing the current architecture and implementation:
 - **[current/navigation-flow.md](./current/navigation-flow.md)** - Platform-specific navigation patterns
 - **[current/thumbnail-system.md](./current/thumbnail-system.md)** - Thumbnail generation and caching
 - **[current/selection-system.md](./current/selection-system.md)** - Selection management and UI
+- **[current/native-thumbnail-strip.md](./current/native-thumbnail-strip.md)** - Native collection view thumbnail strip
 
 ### History
 Historical design documents and implementation notes:
