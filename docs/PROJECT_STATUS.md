@@ -326,6 +326,8 @@ Last Updated: June 15, 2025
 - `photolala/Views/PhotoPreviewView.swift` - Full image preview with zoom/pan
 - `photolala/Views/CacheStatisticsView.swift` - Cache performance monitoring UI
 - `photolala/Views/ScalableImageView.swift` - Custom NSImageView for aspect fill on macOS
+- `photolala/Views/PhotoContextMenuHeaderView.swift` - Context menu preview header view
+- `photolala/Views/ClickedCollectionView.swift` - NSCollectionView subclass for context menu support
 - `docs/project-status.md` (this file)
 - `docs/thumbnail-display-options-design.md` - Design for display options feature
 - `docs/thumbnail-display-implementation-plan.md` - Implementation plan
@@ -333,6 +335,7 @@ Last Updated: June 15, 2025
 - `docs/photo-preview-implementation.md` - Implementation plan for preview feature
 - `docs/planning/photo-loading-enhancements.md` - Performance optimization plan
 - `docs/planning/sort-by-date-feature.md` - Design for sort by date feature
+- `docs/planning/macos-context-menu-design.md` - Design and implementation for context menu
 - `docs/cache-statistics-guide.md` - Guide for using cache statistics
 
 **Removed:**
@@ -545,3 +548,32 @@ Last Updated: June 15, 2025
      - Made wrapper view transparent on macOS
      - Removed gray background placeholders
      - Icons provide clearer loading state feedback
+
+26. **Implemented macOS Context Menu (June 15 - Session 14)**:
+   - Created context menu for quick photo preview and actions:
+     - Right-click or Control+click to show menu
+     - Large 512x512px preview at top of menu
+     - Photo metadata display (filename, dimensions, date, camera)
+     - Non-destructive actions only (Open, Quick Look, Reveal, etc.)
+   - Implementation details:
+     - Custom `ClickedCollectionView` tracks right-clicked items
+     - `PhotoContextMenuHeaderView` with dynamic sizing
+     - Uses `intrinsicContentSize` for proper layout
+     - NSMenuDelegate for dynamic menu building
+   - Visual design:
+     - Transparent background with 1px border (matches thumbnails)
+     - ScalableImageView ensures proper aspect ratio
+     - 4px rounded corners for consistency
+     - Async metadata loading with "Loading..." placeholder
+   - Quick Look integration:
+     - Full QLPreviewPanel support
+     - Proper delegate/datasource implementation
+     - Animation from thumbnail position
+   - Actions implemented:
+     - Open: Navigate to PhotoPreviewView
+     - Quick Look: System preview with spacebar
+     - Open With: Dynamic app list submenu
+     - Reveal in Finder: Single or multiple files
+     - Get Info: System info panel via AppleScript
+   - Fixed constraint conflicts with custom NSMenuItem views
+   - Control+click properly handled as right-click equivalent
