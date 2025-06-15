@@ -105,6 +105,9 @@ class PhotoCollectionViewController: XViewController {
 		// Register item
 		collectionView.register(PhotoCollectionViewItem.self, forItemWithIdentifier: NSUserInterfaceItemIdentifier("PhotoItem"))
 		
+		// Register header
+		collectionView.register(PhotoGroupHeaderItem.self, forSupplementaryViewOfKind: NSCollectionView.elementKindSectionHeader, withIdentifier: NSUserInterfaceItemIdentifier("PhotoGroupHeader"))
+		
 		scrollView.documentView = collectionView
 		self.collectionView = collectionView
 		
@@ -161,6 +164,12 @@ class PhotoCollectionViewController: XViewController {
 		)
 		flowLayout.minimumInteritemSpacing = thumbnailOption.spacing
 		flowLayout.minimumLineSpacing = thumbnailOption.spacing
+		
+		// Configure headers if grouping is enabled
+		if settings?.groupingOption != .none {
+			flowLayout.headerReferenceSize = NSSize(width: 0, height: 40)
+		}
+		
 		return flowLayout
 	}
 #else
@@ -195,6 +204,11 @@ class PhotoCollectionViewController: XViewController {
 		layout.minimumInteritemSpacing = thumbnailOption.spacing
 		layout.minimumLineSpacing = thumbnailOption.spacing
 		
+		// Configure headers if grouping is enabled
+		if settings?.groupingOption != .none {
+			layout.headerReferenceSize = CGSize(width: 0, height: 40)
+		}
+		
 		collectionView = XCollectionView(frame: view.bounds, collectionViewLayout: layout)
 		collectionView.autoresizingMask = [.flexibleWidth, .flexibleHeight]
 		collectionView.backgroundColor = .systemBackground
@@ -204,6 +218,9 @@ class PhotoCollectionViewController: XViewController {
 		collectionView.allowsMultipleSelection = true
 		
 		collectionView.register(PhotoCollectionViewCell.self, forCellWithReuseIdentifier: "PhotoCell")
+		
+		// Register header
+		collectionView.register(PhotoGroupHeaderView.self, forSupplementaryViewOfKind: UICollectionView.elementKindSectionHeader, withReuseIdentifier: PhotoGroupHeaderView.reuseIdentifier)
 		
 		// Add double-tap gesture recognizer for navigation
 		let doubleTapGesture = UITapGestureRecognizer(target: self, action: #selector(handleDoubleTap(_:)))
@@ -333,6 +350,13 @@ class PhotoCollectionViewController: XViewController {
 			flowLayout.minimumInteritemSpacing = thumbnailOption.spacing
 			flowLayout.minimumLineSpacing = thumbnailOption.spacing
 			
+			// Configure headers if grouping is enabled
+			if settings.groupingOption != .none {
+				flowLayout.headerReferenceSize = NSSize(width: 0, height: 40)
+			} else {
+				flowLayout.headerReferenceSize = NSSize.zero
+			}
+			
 			// Update all visible items
 			for item in collectionView.visibleItems() {
 				if let photoItem = item as? PhotoCollectionViewItem {
@@ -353,6 +377,13 @@ class PhotoCollectionViewController: XViewController {
 			)
 			flowLayout.minimumInteritemSpacing = thumbnailOption.spacing
 			flowLayout.minimumLineSpacing = thumbnailOption.spacing
+			
+			// Configure headers if grouping is enabled
+			if settings.groupingOption != .none {
+				flowLayout.headerReferenceSize = CGSize(width: 0, height: 40)
+			} else {
+				flowLayout.headerReferenceSize = CGSize.zero
+			}
 			
 			// Update all visible cells
 			for cell in collectionView.visibleCells {
@@ -489,6 +520,35 @@ extension PhotoCollectionViewController: XCollectionViewDataSource {
 		}
 		
 		return cell
+	}
+	#endif
+	
+	// MARK: - Section Headers
+	
+	#if os(macOS)
+	func collectionView(_ collectionView: NSCollectionView, viewForSupplementaryElementOfKind kind: NSCollectionView.SupplementaryElementKind, at indexPath: IndexPath) -> NSView {
+		guard kind == NSCollectionView.elementKindSectionHeader,
+			  indexPath.section < photoGroups.count,
+			  settings?.groupingOption != .none else {
+			// Return empty view if not a header or grouping is disabled
+			return NSView()
+		}
+		
+		let header = collectionView.makeSupplementaryView(ofKind: kind, withIdentifier: NSUserInterfaceItemIdentifier("PhotoGroupHeader"), for: indexPath) as! PhotoGroupHeaderItem
+		header.headerView?.configure(with: photoGroups[indexPath.section].title)
+		return header.view
+	}
+	#else
+	func collectionView(_ collectionView: UICollectionView, viewForSupplementaryElementOfKind kind: String, at indexPath: IndexPath) -> UICollectionReusableView {
+		guard kind == UICollectionView.elementKindSectionHeader,
+			  indexPath.section < photoGroups.count else {
+			// Return empty view if not a header
+			return UICollectionReusableView()
+		}
+		
+		let header = collectionView.dequeueReusableSupplementaryView(ofKind: kind, withReuseIdentifier: PhotoGroupHeaderView.reuseIdentifier, for: indexPath) as! PhotoGroupHeaderView
+		header.configure(with: photoGroups[indexPath.section].title)
+		return header
 	}
 	#endif
 
