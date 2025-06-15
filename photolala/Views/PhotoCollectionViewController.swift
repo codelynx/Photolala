@@ -31,6 +31,12 @@ class PhotoCollectionViewController: XViewController {
 	var collectionView: XCollectionView!
 	
 	#if os(macOS)
+	var clickedCollectionView: ClickedCollectionView? {
+		return collectionView as? ClickedCollectionView
+	}
+	#endif
+	
+	#if os(macOS)
 	private var quickLookPhotos: [PhotoReference] = []
 	#endif
 	
@@ -83,7 +89,7 @@ class PhotoCollectionViewController: XViewController {
 		scrollView.hasHorizontalScroller = false
 		scrollView.autohidesScrollers = true
 		
-		let collectionView = XCollectionView()
+		let collectionView = ClickedCollectionView()
 		collectionView.collectionViewLayout = createLayout()
 		collectionView.delegate = self
 		collectionView.dataSource = self
@@ -97,6 +103,9 @@ class PhotoCollectionViewController: XViewController {
 		
 		scrollView.documentView = collectionView
 		self.collectionView = collectionView
+		
+		// Set up context menu
+		setupContextMenu()
 		
 		view.addSubview(scrollView)
 		
@@ -505,91 +514,13 @@ extension PhotoCollectionViewController: XCollectionViewDelegate {
 	
 	// MARK: - Context Menu
 	
-	override func rightMouseDown(with event: NSEvent) {
-		let locationInView = view.convert(event.locationInWindow, from: nil)
-		let locationInCollectionView = collectionView.convert(locationInView, from: view)
-		
-		// Check if we clicked on an item
-		if let indexPath = collectionView.indexPathForItem(at: locationInCollectionView) {
-			let clickedPhoto = photos[indexPath.item]
-			
-			// If clicked item isn't selected, select only it
-			if !collectionView.selectionIndexPaths.contains(indexPath) {
-				collectionView.deselectAll(nil)
-				collectionView.selectItems(at: Set([indexPath]), scrollPosition: [])
-			}
-			
-			// Create and show context menu
-			let menu = createContextMenu(for: selectedPhotos)
-			NSMenu.popUpContextMenu(menu, with: event, for: view)
-		} else {
-			// Clicked on empty space - could show different menu or ignore
-			super.rightMouseDown(with: event)
-		}
+	private func setupContextMenu() {
+		// Create a placeholder menu that will be dynamically updated
+		let menu = NSMenu()
+		menu.delegate = self
+		collectionView.menu = menu
 	}
 	
-	private func createContextMenu(for photos: [PhotoReference]) -> NSMenu {
-		let menu = NSMenu()
-		
-		if photos.count == 1 {
-			// Single photo selected - show preview
-			let photo = photos[0]
-			
-			// Create header view with preview and metadata
-			let headerItem = NSMenuItem()
-			let headerView = PhotoContextMenuHeaderView(frame: .zero)
-			headerView.configure(with: photo, displayMode: settings?.displayMode ?? .scaleToFit)
-			headerItem.view = headerView
-			menu.addItem(headerItem)
-			
-			menu.addItem(.separator())
-		} else if photos.count > 1 {
-			// Multiple photos selected - show count
-			let headerItem = NSMenuItem()
-			let multiView = PhotoContextMenuMultipleSelectionView(frame: .zero)
-			multiView.configure(with: photos.count)
-			headerItem.view = multiView
-			menu.addItem(headerItem)
-			
-			menu.addItem(.separator())
-		}
-		
-		// Open
-		let openItem = NSMenuItem(title: "Open", action: #selector(contextMenuOpen(_:)), keyEquivalent: "")
-		openItem.target = self
-		openItem.representedObject = photos
-		menu.addItem(openItem)
-		
-		// Quick Look
-		let quickLookItem = NSMenuItem(title: "Quick Look", action: #selector(contextMenuQuickLook(_:)), keyEquivalent: " ")
-		quickLookItem.target = self
-		quickLookItem.representedObject = photos
-		quickLookItem.keyEquivalentModifierMask = []
-		menu.addItem(quickLookItem)
-		
-		// Open With submenu
-		if photos.count == 1 {
-			let openWithItem = NSMenuItem(title: "Open With", action: nil, keyEquivalent: "")
-			openWithItem.submenu = createOpenWithMenu(for: photos[0])
-			menu.addItem(openWithItem)
-		}
-		
-		menu.addItem(.separator())
-		
-		// Reveal in Finder
-		let revealItem = NSMenuItem(title: "Reveal in Finder", action: #selector(contextMenuRevealInFinder(_:)), keyEquivalent: "R")
-		revealItem.target = self
-		revealItem.representedObject = photos
-		menu.addItem(revealItem)
-		
-		// Get Info
-		let infoItem = NSMenuItem(title: "Get Info", action: #selector(contextMenuGetInfo(_:)), keyEquivalent: "I")
-		infoItem.target = self
-		infoItem.representedObject = photos
-		menu.addItem(infoItem)
-		
-		return menu
-	}
 	
 	private func createOpenWithMenu(for photo: PhotoReference) -> NSMenu {
 		let menu = NSMenu()
@@ -880,7 +811,15 @@ class PhotoCollectionViewItem: NSCollectionViewItem {
 	}
 	
 	override func mouseDown(with event: NSEvent) {
-		print("[PhotoCollectionViewItem] mouseDown, clickCount: \(event.clickCount)")
+		print("[PhotoCollectionViewItem] mouseDown, clickCount: \(event.clickCount), modifiers: \(event.modifierFlags)")
+		
+		// Check for Control+click (right-click equivalent)
+		if event.modifierFlags.contains(.control) {
+			print("[PhotoCollectionViewItem] Control+click detected, triggering context menu")
+			// Trigger rightMouseDown to show context menu
+			self.rightMouseDown(with: event)
+			return
+		}
 		
 		if event.clickCount == 2 {
 			// Find the collection view controller and call its navigation handler
@@ -895,6 +834,23 @@ class PhotoCollectionViewItem: NSCollectionViewItem {
 		
 		super.mouseDown(with: event)
 	}
+	
+	override func rightMouseDown(with event: NSEvent) {
+		print("[PhotoCollectionViewItem] rightMouseDown called")
+		// Pass the event to the collection view to handle the menu
+		if let collectionView = self.collectionView {
+			// Get the menu and show it
+			if let menu = collectionView.menu(for: event) {
+				print("[PhotoCollectionViewItem] Showing menu")
+				NSMenu.popUpContextMenu(menu, with: event, for: self.view)
+			} else {
+				print("[PhotoCollectionViewItem] No menu returned from collection view")
+			}
+		} else {
+			super.rightMouseDown(with: event)
+		}
+	}
+	
 
 	override func viewWillLayout() {
 		super.viewWillLayout()
@@ -1209,3 +1165,87 @@ struct PhotoCollectionView: XViewControllerRepresentable {
 	#endif
 	
 }
+
+// MARK: - NSMenuDelegate
+
+#if os(macOS)
+extension PhotoCollectionViewController: NSMenuDelegate {
+	func menuNeedsUpdate(_ menu: NSMenu) {
+		print("[PhotoCollectionViewController] menuNeedsUpdate called")
+		
+		// Clear existing items
+		menu.removeAllItems()
+		
+		// Get the clicked index path from our custom collection view
+		guard let clickedCollectionView = clickedCollectionView,
+			  let clickedIndexPath = clickedCollectionView.clickedIndexPath else {
+			print("[PhotoCollectionViewController] No clicked collection view or index path")
+			return
+		}
+		
+		print("[PhotoCollectionViewController] Building menu for indexPath: \(clickedIndexPath)")
+		
+		// Get selected photos
+		let photos = selectedPhotos
+		print("[PhotoCollectionViewController] Selected photos count: \(photos.count)")
+		
+		if photos.count == 1 {
+			// Single photo selected - show preview
+			let photo = photos[0]
+			print("[PhotoCollectionViewController] Creating header for photo: \(photo.filename)")
+			
+			// Create header view with preview and metadata
+			let headerItem = NSMenuItem()
+			let headerView = PhotoContextMenuHeaderView(frame: .zero)
+			headerView.configure(with: photo, displayMode: settings?.displayMode ?? .scaleToFit)
+			headerItem.view = headerView
+			menu.addItem(headerItem)
+			
+			menu.addItem(.separator())
+		} else if photos.count > 1 {
+			// Multiple photos selected - show count
+			let headerItem = NSMenuItem()
+			let multiView = PhotoContextMenuMultipleSelectionView(frame: .zero)
+			multiView.configure(with: photos.count)
+			headerItem.view = multiView
+			menu.addItem(headerItem)
+			
+			menu.addItem(.separator())
+		}
+		
+		// Open
+		let openItem = NSMenuItem(title: "Open", action: #selector(contextMenuOpen(_:)), keyEquivalent: "")
+		openItem.target = self
+		openItem.representedObject = photos
+		menu.addItem(openItem)
+		
+		// Quick Look
+		let quickLookItem = NSMenuItem(title: "Quick Look", action: #selector(contextMenuQuickLook(_:)), keyEquivalent: " ")
+		quickLookItem.target = self
+		quickLookItem.representedObject = photos
+		quickLookItem.keyEquivalentModifierMask = []
+		menu.addItem(quickLookItem)
+		
+		// Open With submenu
+		if photos.count == 1 {
+			let openWithItem = NSMenuItem(title: "Open With", action: nil, keyEquivalent: "")
+			openWithItem.submenu = createOpenWithMenu(for: photos[0])
+			menu.addItem(openWithItem)
+		}
+		
+		menu.addItem(.separator())
+		
+		// Reveal in Finder
+		let revealItem = NSMenuItem(title: "Reveal in Finder", action: #selector(contextMenuRevealInFinder(_:)), keyEquivalent: "R")
+		revealItem.target = self
+		revealItem.representedObject = photos
+		menu.addItem(revealItem)
+		
+		// Get Info
+		let infoItem = NSMenuItem(title: "Get Info", action: #selector(contextMenuGetInfo(_:)), keyEquivalent: "I")
+		infoItem.target = self
+		infoItem.representedObject = photos
+		menu.addItem(infoItem)
+	}
+}
+#endif

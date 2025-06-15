@@ -24,10 +24,15 @@ class PhotoContextMenuHeaderView: NSView {
 	override init(frame frameRect: NSRect) {
 		// Initialize image view
 		imageView = ScalableImageView(frame: .zero)
-		imageView.scaleMode = .scaleToFit
+		imageView.scaleMode = .scaleToFit  // This ensures aspect ratio is maintained
 		imageView.wantsLayer = true
-		imageView.layer?.backgroundColor = NSColor.quaternaryLabelColor.cgColor
+		imageView.layer?.backgroundColor = NSColor.clear.cgColor
+		imageView.layer?.borderWidth = 1
+		imageView.layer?.borderColor = NSColor.separatorColor.cgColor
 		imageView.layer?.cornerRadius = 4
+		imageView.layer?.masksToBounds = true
+		imageView.translatesAutoresizingMaskIntoConstraints = false
+		// Don't set imageScaling - let ScalableImageView handle it
 		
 		// Initialize labels
 		filenameLabel = NSTextField(labelWithString: "")
@@ -62,6 +67,9 @@ class PhotoContextMenuHeaderView: NSView {
 		metadataStack.setHuggingPriority(.defaultHigh, for: .horizontal)
 		
 		super.init(frame: frameRect)
+		
+		// Disable autoresizing mask translation
+		self.translatesAutoresizingMaskIntoConstraints = false
 		
 		setupViews()
 	}
@@ -103,10 +111,7 @@ class PhotoContextMenuHeaderView: NSView {
 			
 			// Spinner centered on image view
 			loadingSpinner.centerXAnchor.constraint(equalTo: imageView.centerXAnchor),
-			loadingSpinner.centerYAnchor.constraint(equalTo: imageView.centerYAnchor),
-			
-			// Total width
-			widthAnchor.constraint(equalToConstant: 544) // 512 + 32 padding
+			loadingSpinner.centerYAnchor.constraint(equalTo: imageView.centerYAnchor)
 		])
 	}
 	
@@ -116,8 +121,8 @@ class PhotoContextMenuHeaderView: NSView {
 		// Cancel any existing loading task
 		loadingTask?.cancel()
 		
-		// Update scale mode
-		imageView.scaleMode = displayMode == .scaleToFit ? .scaleToFit : .scaleToFill
+		// Update scale mode - always use scaleToFit for context menu preview
+		imageView.scaleMode = .scaleToFit  // We want to see the whole image in the preview
 		
 		// Set filename
 		filenameLabel.stringValue = photo.filename
@@ -152,6 +157,9 @@ class PhotoContextMenuHeaderView: NSView {
 			dimensionsLabel.stringValue = "Loading..."
 			cameraLabel.stringValue = ""
 		}
+		
+		// Invalidate intrinsic content size when metadata changes
+		invalidateIntrinsicContentSize()
 	}
 	
 	private func loadContent() async {
@@ -187,7 +195,27 @@ class PhotoContextMenuHeaderView: NSView {
 	}
 	
 	override var intrinsicContentSize: NSSize {
-		return NSSize(width: 544, height: -1) // Width fixed, height flexible
+		// Width is fixed: 512 (image) + 32 (padding)
+		let width: CGFloat = 544
+		
+		// Calculate height based on content
+		var height: CGFloat = 16 // top padding
+		height += 512 // image height
+		height += 16 // spacing between image and metadata
+		
+		// Calculate metadata stack height
+		let metadataHeight = metadataStack.fittingSize.height
+		height += metadataHeight
+		
+		height += 16 // bottom padding
+		
+		return NSSize(width: width, height: height)
+	}
+	
+	override func layout() {
+		super.layout()
+		// Invalidate intrinsic content size when layout changes
+		invalidateIntrinsicContentSize()
 	}
 }
 
@@ -202,6 +230,8 @@ class PhotoContextMenuMultipleSelectionView: NSView {
 		label.alignment = .center
 		
 		super.init(frame: frameRect)
+		
+		self.translatesAutoresizingMaskIntoConstraints = false
 		
 		addSubview(label)
 		label.translatesAutoresizingMaskIntoConstraints = false
@@ -222,6 +252,10 @@ class PhotoContextMenuMultipleSelectionView: NSView {
 	
 	func configure(with count: Int) {
 		label.stringValue = "\(count) photos selected"
+	}
+	
+	override var intrinsicContentSize: NSSize {
+		return NSSize(width: 200, height: 60)
 	}
 }
 #endif

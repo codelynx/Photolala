@@ -59,8 +59,9 @@ Photolala is a **browsing tool**, not a file manager. The context menu should:
 - **Quality**: Uses existing thumbnail if available, generates if needed
 - **Display**: 
   - Centered in menu width
-  - Respects display mode (Scale to Fit/Fill)
-  - 8px padding around image
+  - Always uses Scale to Fit (shows entire image)
+  - Transparent background with 1px border
+  - 4px rounded corners
 - **Loading**: Show spinner if thumbnail not ready
 
 #### 2. Metadata Section
@@ -248,4 +249,93 @@ class PhotoContextMenuHeaderView: NSView {
 3. Should menu stay open after some actions?
 4. Custom preview size preference?
 5. Should we add "Copy Image" for copying to clipboard?
-6. How to indicate when metadata is still loading?
+6. ~~How to indicate when metadata is still loading?~~ → Shows "Loading..." text
+
+## Implementation Status ✅
+
+### Completed Features
+
+1. **Context Menu Infrastructure**
+   - Custom `ClickedCollectionView` to track right-clicked items
+   - NSMenuDelegate implementation for dynamic menu building
+   - Proper handling of Control+click as right-click
+
+2. **PhotoContextMenuHeaderView**
+   - 512x512px preview area with transparent background
+   - 1px separator color border (consistent with thumbnails)
+   - ScalableImageView with `.scaleToFit` for proper aspect ratio
+   - Dynamic height using `intrinsicContentSize`
+   - Async thumbnail loading with spinner feedback
+
+3. **Metadata Display**
+   - Filename (bold, 13pt)
+   - Dimensions & file size (11pt, secondary color)
+   - File modification date (formatted)
+   - Camera info when available
+   - "Loading..." placeholder for async data
+
+4. **Menu Actions**
+   - Open (navigates to PhotoPreviewView)
+   - Quick Look with full QLPreviewPanel integration
+   - Open With submenu (dynamic app list)
+   - Reveal in Finder (single/multiple files)
+   - Get Info (using AppleScript)
+
+5. **Visual Refinements**
+   - Transparent background instead of gray fill
+   - Thin border matching thumbnail style
+   - 4px rounded corners
+   - Proper constraint handling without conflicts
+
+### Implementation Details
+
+1. **Event Handling**
+   ```swift
+   // ClickedCollectionView tracks right-clicked item
+   override func menu(for event: NSEvent) -> NSMenu? {
+       clickedIndexPath = indexPathForItem(at: point)
+       // Auto-select if not already selected
+   }
+   ```
+
+2. **Dynamic Sizing**
+   ```swift
+   override var intrinsicContentSize: NSSize {
+       let width: CGFloat = 544
+       var height: CGFloat = 16 + 512 + 16 + metadataHeight + 16
+       return NSSize(width: width, height: height)
+   }
+   ```
+
+3. **Quick Look Integration**
+   - Implements QLPreviewPanelDataSource & Delegate
+   - Proper animation from thumbnail position
+   - Supports multiple photo selection
+
+### Lessons Learned
+
+1. **NSMenuItem with custom views needs careful setup**
+   - Must disable `translatesAutoresizingMaskIntoConstraints`
+   - Use `intrinsicContentSize` instead of fixed frames
+   - Call `invalidateIntrinsicContentSize()` when content changes
+
+2. **Control+click handling**
+   - PhotoCollectionViewItem passes Control+click to rightMouseDown
+   - Menu delegate approach cleaner than manual menu creation
+
+3. **Visual consistency**
+   - Transparent background with border looks better than solid fill
+   - Matches existing thumbnail design language
+
+### Known Issues / TODOs
+
+1. **Debug statements** - Remove print statements in production:
+   - ClickedCollectionView has debug prints
+   - PhotoCollectionViewController menuNeedsUpdate has debug prints
+   - PhotoCollectionViewItem mouseDown has debug prints
+
+2. **Future enhancements**:
+   - Consider caching 512px thumbnails separately
+   - Add keyboard navigation within menu
+   - Support for RAW file indicators
+   - Copy image to clipboard functionality
