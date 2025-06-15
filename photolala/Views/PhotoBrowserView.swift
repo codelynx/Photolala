@@ -128,13 +128,13 @@ struct PhotoBrowserView: View {
 #if os(iOS)
 				// Size menu for iOS
 				Menu {
-					Button("Small") {
+					Button("S") {
 						settings.thumbnailOption = .small
 					}
-					Button("Medium") {
+					Button("M") {
 						settings.thumbnailOption = .medium
 					}
-					Button("Large") {
+					Button("L") {
 						settings.thumbnailOption = .large
 					}
 				} label: {
@@ -143,9 +143,9 @@ struct PhotoBrowserView: View {
 #else
 				// Size picker for macOS
 				Picker("Size", selection: $settings.thumbnailOption) {
-					Text("Small").tag(ThumbnailOption.small)
-					Text("Medium").tag(ThumbnailOption.medium)
-					Text("Large").tag(ThumbnailOption.large)
+					Text("S").tag(ThumbnailOption.small)
+					Text("M").tag(ThumbnailOption.medium)
+					Text("L").tag(ThumbnailOption.large)
 				}
 				.pickerStyle(.segmented)
 				.help("Thumbnail size")
