@@ -618,3 +618,14 @@ Last Updated: June 15, 2025
      - Images are placeholders only
      - Help content to be updated near end of development
    - Documentation: `docs/planning/help-system-design.md`
+
+28. **Thumbnail Size Picker UI Refinement (June 15 - Session 16)**:
+   - Changed thumbnail size labels from full words to compact format:
+     - "Small", "Medium", "Large" → "S", "M", "L"
+     - Applied to both macOS segmented control and iOS menu
+   - Benefits:
+     - More compact toolbar UI
+     - Clearer visual hierarchy
+     - Consistent with modern UI patterns
+     - Still maintains clarity with help tooltips
+   - No functional changes, purely visual refinement
