@@ -18,7 +18,7 @@ class PhotoReference: Identifiable, Hashable {
 	var thumbnailLoadingState: LoadingState = .idle
 	var metadata: PhotoMetadata?
 	var metadataLoadingState: LoadingState = .idle
-	var fileModificationDate: Date?  // Quick access for initial sorting
+	var fileCreationDate: Date?  // Quick access for initial sorting - closer to photo taken date
 	
 	enum LoadingState: Equatable {
 		case idle
@@ -51,14 +51,15 @@ class PhotoReference: Identifiable, Hashable {
 	init(directoryPath: NSString, filename: String) {
 		self.directoryPath = directoryPath
 		self.filename = filename
-		// Load file modification date immediately (fast operation)
-		loadFileModificationDate()
+		// Load file creation date immediately (fast operation)
+		loadFileCreationDate()
 	}
 	
-	private func loadFileModificationDate() {
+	private func loadFileCreationDate() {
 		do {
 			let attributes = try FileManager.default.attributesOfItem(atPath: filePath)
-			self.fileModificationDate = attributes[.modificationDate] as? Date
+			// Use creation date as it's closer to when photo was taken
+			self.fileCreationDate = attributes[.creationDate] as? Date
 		} catch {
 			// Silently fail, will use current date as fallback
 			print("[PhotoReference] Failed to get file date for \(filename): \(error)")

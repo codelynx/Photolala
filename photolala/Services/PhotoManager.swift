@@ -858,13 +858,13 @@ class PhotoManager {
 		
 		let calendar = Calendar.current
 		let sortedPhotos = photos.sorted { (photo1: PhotoReference, photo2: PhotoReference) -> Bool in
-			return (photo1.fileModificationDate ?? Date()) > (photo2.fileModificationDate ?? Date())
+			return (photo1.fileCreationDate ?? Date()) > (photo2.fileCreationDate ?? Date())
 		}
 		
 		switch option {
 		case .year:
 			let grouped = Dictionary(grouping: sortedPhotos) { (photo: PhotoReference) -> Int in
-				calendar.component(.year, from: photo.fileModificationDate ?? Date())
+				calendar.component(.year, from: photo.fileCreationDate ?? Date())
 			}
 			
 			return grouped.map { year, photos in
@@ -882,7 +882,7 @@ class PhotoManager {
 			formatter.dateFormat = "MMMM yyyy"  // e.g., "April 2024"
 			
 			let grouped = Dictionary(grouping: sortedPhotos) { (photo: PhotoReference) -> Date in
-				let date = photo.fileModificationDate ?? Date()
+				let date = photo.fileCreationDate ?? Date()
 				let components = calendar.dateComponents([.year, .month], from: date)
 				return calendar.date(from: components) ?? date
 			}
@@ -902,7 +902,7 @@ class PhotoManager {
 			formatter.dateFormat = "MMMM d, yyyy"  // e.g., "April 15, 2024"
 			
 			let grouped = Dictionary(grouping: sortedPhotos) { (photo: PhotoReference) -> Date in
-				let date = photo.fileModificationDate ?? Date()
+				let date = photo.fileCreationDate ?? Date()
 				let components = calendar.dateComponents([.year, .month, .day], from: date)
 				return calendar.date(from: components) ?? date
 			}

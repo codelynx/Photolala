@@ -35,12 +35,12 @@ enum PhotoSortOption: String, CaseIterable {
 		case .filename:
 			return photo1.filename.localizedStandardCompare(photo2.filename) == .orderedAscending
 		case .dateAscending:
-			let date1 = photo1.fileModificationDate ?? Date.distantPast
-			let date2 = photo2.fileModificationDate ?? Date.distantPast
+			let date1 = photo1.fileCreationDate ?? Date.distantPast
+			let date2 = photo2.fileCreationDate ?? Date.distantPast
 			return date1 < date2
 		case .dateDescending:
-			let date1 = photo1.fileModificationDate ?? Date.distantPast
-			let date2 = photo2.fileModificationDate ?? Date.distantPast
+			let date1 = photo1.fileCreationDate ?? Date.distantPast
+			let date2 = photo2.fileCreationDate ?? Date.distantPast
 			return date1 > date2
 		}
 	}
