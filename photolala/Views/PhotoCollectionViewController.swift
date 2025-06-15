@@ -105,8 +105,8 @@ class PhotoCollectionViewController: XViewController {
 		// Register item
 		collectionView.register(PhotoCollectionViewItem.self, forItemWithIdentifier: NSUserInterfaceItemIdentifier("PhotoItem"))
 		
-		// Register header
-		collectionView.register(PhotoGroupHeaderItem.self, forSupplementaryViewOfKind: NSCollectionView.elementKindSectionHeader, withIdentifier: NSUserInterfaceItemIdentifier("PhotoGroupHeader"))
+		// Register header - register the view class directly, not the item
+		collectionView.register(PhotoGroupHeaderView.self, forSupplementaryViewOfKind: NSCollectionView.elementKindSectionHeader, withIdentifier: NSUserInterfaceItemIdentifier("PhotoGroupHeader"))
 		
 		scrollView.documentView = collectionView
 		self.collectionView = collectionView
@@ -206,7 +206,10 @@ class PhotoCollectionViewController: XViewController {
 		
 		// Configure headers if grouping is enabled
 		if settings?.groupingOption != .none {
-			layout.headerReferenceSize = CGSize(width: 0, height: 40)
+			// iOS needs a width for headers to display properly
+			layout.headerReferenceSize = CGSize(width: view.bounds.width, height: 40)
+		} else {
+			layout.headerReferenceSize = CGSize.zero
 		}
 		
 		collectionView = XCollectionView(frame: view.bounds, collectionViewLayout: layout)
@@ -380,7 +383,8 @@ class PhotoCollectionViewController: XViewController {
 			
 			// Configure headers if grouping is enabled
 			if settings.groupingOption != .none {
-				flowLayout.headerReferenceSize = CGSize(width: 0, height: 40)
+				// iOS needs a width for headers to display properly
+				flowLayout.headerReferenceSize = CGSize(width: collectionView.bounds.width, height: 40)
 			} else {
 				flowLayout.headerReferenceSize = CGSize.zero
 			}
@@ -534,9 +538,9 @@ extension PhotoCollectionViewController: XCollectionViewDataSource {
 			return NSView()
 		}
 		
-		let header = collectionView.makeSupplementaryView(ofKind: kind, withIdentifier: NSUserInterfaceItemIdentifier("PhotoGroupHeader"), for: indexPath) as! PhotoGroupHeaderItem
-		header.headerView?.configure(with: photoGroups[indexPath.section].title)
-		return header.view
+		let headerView = collectionView.makeSupplementaryView(ofKind: kind, withIdentifier: NSUserInterfaceItemIdentifier("PhotoGroupHeader"), for: indexPath) as! PhotoGroupHeaderView
+		headerView.configure(with: photoGroups[indexPath.section].title)
+		return headerView
 	}
 	#else
 	func collectionView(_ collectionView: UICollectionView, viewForSupplementaryElementOfKind kind: String, at indexPath: IndexPath) -> UICollectionReusableView {

@@ -51,15 +51,25 @@ class PhotoReference: Identifiable, Hashable {
 	init(directoryPath: NSString, filename: String) {
 		self.directoryPath = directoryPath
 		self.filename = filename
-		// Load file creation date immediately (fast operation)
-		loadFileCreationDate()
+		// Don't load file date in init - let it be loaded on demand
+		// This prevents blocking during directory scanning
 	}
 	
-	private func loadFileCreationDate() {
+	func loadFileCreationDateIfNeeded() {
+		guard fileCreationDate == nil else { return }
+		
+		let startTime = Date()
+		print("[PhotoReference] Loading file date for: \(filename)")
+		
 		do {
 			let attributes = try FileManager.default.attributesOfItem(atPath: filePath)
 			// Use creation date as it's closer to when photo was taken
 			self.fileCreationDate = attributes[.creationDate] as? Date
+			
+			let elapsed = Date().timeIntervalSince(startTime)
+			if elapsed > 0.1 {
+				print("[PhotoReference] Warning: Slow file attribute access for \(filename): \(String(format: "%.3f", elapsed))s")
+			}
 		} catch {
 			// Silently fail, will use current date as fallback
 			print("[PhotoReference] Failed to get file date for \(filename): \(error)")

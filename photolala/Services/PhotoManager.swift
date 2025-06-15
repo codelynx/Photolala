@@ -856,6 +856,13 @@ class PhotoManager {
 			return [PhotoGroup(title: "", photos: photos, dateRepresentative: Date())]
 		}
 		
+		print("[PhotoManager] Grouping \(photos.count) photos by \(option.rawValue)")
+		
+		// Load file dates for all photos that need it
+		for photo in photos {
+			photo.loadFileCreationDateIfNeeded()
+		}
+		
 		let calendar = Calendar.current
 		let sortedPhotos = photos.sorted { (photo1: PhotoReference, photo2: PhotoReference) -> Bool in
 			return (photo1.fileCreationDate ?? Date()) > (photo2.fileCreationDate ?? Date())

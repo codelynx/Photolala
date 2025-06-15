@@ -652,9 +652,9 @@ struct MetadataHUD: View {
 						if let cameraInfo = metadata.cameraInfo {
 							HudRow(label: "Camera", value: cameraInfo)
 						}
-					} else if let fileDate = photo.fileModificationDate {
+					} else if let fileDate = photo.fileCreationDate {
 						// Show file date if metadata not loaded yet
-						HudRow(label: "Modified", value: dateFormatter.string(from: fileDate))
+						HudRow(label: "Created", value: dateFormatter.string(from: fileDate))
 					}
 				}
 				.padding(20)

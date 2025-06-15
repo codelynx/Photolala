@@ -277,7 +277,13 @@ Last Updated: June 15, 2025
    - Auto-hiding overlay controls
    - ~~Metadata HUD display~~ ✅ Added with 'i' key toggle
 
-4. **Add Selection Operations**:
+4. **~~Add Photo Grouping~~** ✅ Completed Phase 1:
+   - Group by Year/Month/Day using file dates
+   - Section headers in collection view
+   - Instant performance (no EXIF parsing)
+   - Future: EXIF-based grouping, more group options
+
+5. **Add Selection Operations**:
    - ~~Selection count display~~ ✅ Completed
    - ~~Deselect All functionality~~ ✅ Added with Cmd+D
    - Context menu for selected items
@@ -321,6 +327,8 @@ Last Updated: June 15, 2025
 - ~~`photolala/Models/SelectionManager.swift` - Selection state management~~ → REMOVED (June 15)
 - `photolala/Models/PhotoMetadata.swift` - Metadata storage class
 - `photolala/Models/PhotoSortOption.swift` - Sort options enum
+- `photolala/Models/PhotoGroupingOption.swift` - Grouping options enum
+- `photolala/Models/PhotoGroup.swift` - Photo group model
 - `photolala/Services/DirectoryScanner.swift`
 - `photolala/Services/PhotoManager.swift` - Thumbnail generation and caching (enhanced with statistics)
 - `photolala/Views/PhotoPreviewView.swift` - Full image preview with zoom/pan
@@ -328,6 +336,7 @@ Last Updated: June 15, 2025
 - `photolala/Views/ScalableImageView.swift` - Custom NSImageView for aspect fill on macOS
 - `photolala/Views/PhotoContextMenuHeaderView.swift` - Context menu preview header view
 - `photolala/Views/ClickedCollectionView.swift` - NSCollectionView subclass for context menu support
+- `photolala/Views/PhotoGroupHeaderView.swift` - Section headers for photo groups
 - `docs/project-status.md` (this file)
 - `docs/thumbnail-display-options-design.md` - Design for display options feature
 - `docs/thumbnail-display-implementation-plan.md` - Implementation plan
@@ -337,21 +346,23 @@ Last Updated: June 15, 2025
 - `docs/planning/sort-by-date-feature.md` - Design for sort by date feature
 - `docs/planning/macos-context-menu-design.md` - Design and implementation for context menu
 - `docs/cache-statistics-guide.md` - Guide for using cache statistics
+- `docs/planning/photo-grouping-design.md` - Design for photo grouping feature
+- `scripts/create-test-photos.sh` - Script to create test photos with different dates
 
 **Removed:**
 - `photolala/Views/PhotoNavigationView.swift`
 - Various test/sample code
 
 **Modified:**
-- `photolala/Views/PhotoCollectionViewController.swift` - Added selection support, iOS selection mode, prefetching delegates, sort support
-- `photolala/Views/PhotoBrowserView.swift` - ~~Added SelectionManager~~ → Uses native selection, iOS selection mode, preview presentation, sort picker
+- `photolala/Views/PhotoCollectionViewController.swift` - Added selection support, iOS selection mode, prefetching delegates, sort support, section support
+- `photolala/Views/PhotoBrowserView.swift` - ~~Added SelectionManager~~ → Uses native selection, iOS selection mode, preview presentation, sort picker, grouping menu
 - `photolala/Views/WelcomeView.swift` - Removed test buttons, added iOS auto-navigation
 - `photolala/Views/PhotoPreviewView.swift` - Added image preloading for adjacent photos
 - `photolala/photolalaApp.swift` - Added NSApplicationDelegate for window restoration control
-- `photolala/Models/PhotoReference.swift` - Changed to @Observable class, renamed from PhotoRepresentation, added metadata support
-- `photolala/Models/ThumbnailDisplaySettings.swift` - Added sortOption property
+- `photolala/Models/PhotoReference.swift` - Changed to @Observable class, renamed from PhotoRepresentation, added metadata support, fileCreationDate
+- `photolala/Models/ThumbnailDisplaySettings.swift` - Added sortOption and groupingOption properties
 - `photolala/Utilities/XPlatform.swift` - Added collection view type aliases, jpegData extension
-- `photolala/Services/PhotoManager.swift` - Enhanced with statistics, prefetching, performance monitoring, metadata extraction
+- `photolala/Services/PhotoManager.swift` - Enhanced with statistics, prefetching, performance monitoring, metadata extraction, groupPhotos method
 - `photolala/Commands/PhotolalaCommands.swift` - Added View menu with Cache Statistics command
 - All files using PhotoRepresentation - Updated to use PhotoReference
 
@@ -629,3 +640,34 @@ Last Updated: June 15, 2025
      - Consistent with modern UI patterns
      - Still maintains clarity with help tooltips
    - No functional changes, purely visual refinement
+
+29. **Implemented Photo Grouping Feature (June 15 - Session 17)**:
+   - Phase 1 Complete: File-based grouping by Year/Month/Day
+   - Created new models:
+     - `PhotoGroupingOption`: Enum with none/year/month/day options
+     - `PhotoGroup`: Model representing grouped photos with title
+   - Enhanced PhotoManager:
+     - `groupPhotos()` method using Dictionary(grouping:) by date components
+     - Groups sorted by date (newest first within each group)
+   - Updated PhotoReference:
+     - Changed from `fileModificationDate` to `fileCreationDate`
+     - Creation date is closer to photo taken date
+   - UI Implementation:
+     - Added grouping menu to PhotoBrowserView toolbar
+     - Platform-specific: Menu on iOS, Picker on macOS
+     - Icons for each grouping option
+   - Collection View Sections:
+     - PhotoCollectionViewController supports multiple sections
+     - Added `PhotoGroupHeaderView` for section headers
+     - Headers show group titles (e.g., "2024", "March 2024")
+     - Dynamic header sizing based on grouping option
+   - Benefits:
+     - Instant performance - no EXIF parsing required
+     - Works well with network drives
+     - Progressive enhancement possible later
+   - Test implementation:
+     - Created test photos with various dates
+     - Verified grouping works correctly
+   - Future phases (documented but not implemented):
+     - Phase 2: EXIF-based grouping
+     - Phase 3: Hybrid approach with caching
