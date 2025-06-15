@@ -5,6 +5,7 @@
 //  Created by Claude on 2025/06/15.
 //
 
+#if os(macOS)
 import AppKit
 
 /// Custom NSCollectionView that tracks which item was clicked for context menu support
@@ -47,3 +48,4 @@ class ClickedCollectionView: NSCollectionView {
 		return menu
 	}
 }
+#endif

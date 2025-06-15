@@ -139,8 +139,8 @@ class PhotoContextMenuHeaderView: NSView {
 	private func updateMetadata() {
 		guard let photo = photo else { return }
 		
-		// File modification date (always available)
-		if let date = photo.fileModificationDate {
+		// File creation date (always available)
+		if let date = photo.fileCreationDate {
 			let formatter = DateFormatter()
 			formatter.dateStyle = .medium
 			formatter.timeStyle = .short

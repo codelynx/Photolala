@@ -74,6 +74,7 @@ class ThumbnailDisplaySettings {
 	var displayMode: ThumbnailDisplayMode = .scaleToFit
 	var thumbnailOption: ThumbnailOption = .default
 	var sortOption: PhotoSortOption = .filename
+	var groupingOption: PhotoGroupingOption = .none
 	
 	var thumbnailSize: CGFloat {
 		thumbnailOption.size

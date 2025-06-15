@@ -848,4 +848,85 @@ class PhotoManager {
 		return metadata
 	}
 	
+	// MARK: - Photo Grouping
+	
+	func groupPhotos(_ photos: [PhotoReference], by option: PhotoGroupingOption) -> [PhotoGroup] {
+		guard option != .none else {
+			// Single group with all photos
+			return [PhotoGroup(title: "", photos: photos, dateRepresentative: Date())]
+		}
+		
+		print("[PhotoManager] Grouping \(photos.count) photos by \(option.rawValue)")
+		
+		// Load file dates for all photos that need it
+		for photo in photos {
+			photo.loadFileCreationDateIfNeeded()
+		}
+		
+		let calendar = Calendar.current
+		let sortedPhotos = photos.sorted { (photo1: PhotoReference, photo2: PhotoReference) -> Bool in
+			return (photo1.fileCreationDate ?? Date()) > (photo2.fileCreationDate ?? Date())
+		}
+		
+		switch option {
+		case .year:
+			let grouped = Dictionary(grouping: sortedPhotos) { (photo: PhotoReference) -> Int in
+				calendar.component(.year, from: photo.fileCreationDate ?? Date())
+			}
+			
+			return grouped.map { year, photos in
+				PhotoGroup(
+					title: "\(year)",
+					photos: photos,
+					dateRepresentative: calendar.date(from: DateComponents(year: year)) ?? Date()
+				)
+			}.sorted { (group1: PhotoGroup, group2: PhotoGroup) -> Bool in
+				group1.dateRepresentative > group2.dateRepresentative
+			}
+			
+		case .month:
+			let formatter = DateFormatter()
+			formatter.dateFormat = "MMMM yyyy"  // e.g., "April 2024"
+			
+			let grouped = Dictionary(grouping: sortedPhotos) { (photo: PhotoReference) -> Date in
+				let date = photo.fileCreationDate ?? Date()
+				let components = calendar.dateComponents([.year, .month], from: date)
+				return calendar.date(from: components) ?? date
+			}
+			
+			return grouped.map { monthDate, photos in
+				PhotoGroup(
+					title: formatter.string(from: monthDate),
+					photos: photos,
+					dateRepresentative: monthDate
+				)
+			}.sorted { (group1: PhotoGroup, group2: PhotoGroup) -> Bool in
+				group1.dateRepresentative > group2.dateRepresentative
+			}
+			
+		case .day:
+			let formatter = DateFormatter()
+			formatter.dateFormat = "MMMM d, yyyy"  // e.g., "April 15, 2024"
+			
+			let grouped = Dictionary(grouping: sortedPhotos) { (photo: PhotoReference) -> Date in
+				let date = photo.fileCreationDate ?? Date()
+				let components = calendar.dateComponents([.year, .month, .day], from: date)
+				return calendar.date(from: components) ?? date
+			}
+			
+			return grouped.map { dayDate, photos in
+				PhotoGroup(
+					title: formatter.string(from: dayDate),
+					photos: photos,
+					dateRepresentative: dayDate
+				)
+			}.sorted { (group1: PhotoGroup, group2: PhotoGroup) -> Bool in
+				group1.dateRepresentative > group2.dateRepresentative
+			}
+			
+		default:
+			return [PhotoGroup(title: "", photos: photos, dateRepresentative: Date())]
+		}
+	}
+	
 }
