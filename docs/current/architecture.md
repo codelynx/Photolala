@@ -62,6 +62,10 @@ Photolala is a cross-platform photo browser application built with SwiftUI, supp
 - Handles platform-specific interactions:
   - macOS: Double-click navigation
   - iOS: Tap navigation, selection mode
+- Cell update pattern:
+  - Property changes trigger layout invalidation
+  - All visual updates batched in layout pass
+  - Ensures consistency and efficiency
 
 #### PhotoPreviewView
 - Pure SwiftUI implementation
@@ -134,3 +138,32 @@ Tap photo → Push PhotoPreviewView
 - Main actor for UI updates
 - Async/await for image operations
 - No priority inversions (fixed in implementation)
+
+## Implementation Patterns
+
+### Cell Update Pattern
+Both iOS and macOS cells use a consistent update pattern:
+
+```swift
+// iOS
+override func layoutSubviews() {
+    super.layoutSubviews()
+    updateDisplayMode()
+    updateCornerRadius()
+    updateSelectionState()
+}
+
+// macOS
+override func layout() {
+    super.layout()
+    updateDisplayMode()
+    updateCornerRadius()
+    updateSelectionState()
+}
+```
+
+Benefits:
+- Single update pass for all visual changes
+- Automatic batching of property changes
+- Consistent timing and state
+- Platform-appropriate implementation

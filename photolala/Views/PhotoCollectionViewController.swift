@@ -687,8 +687,11 @@ class PhotoCollectionViewItem: NSCollectionViewItem {
 		switch settings.displayMode {
 		case .scaleToFit:
 			imageView.imageScaling = .scaleProportionallyUpOrDown
+			imageView.layer?.contentsGravity = .center
 		case .scaleToFill:
-			imageView.imageScaling = .scaleAxesIndependently
+			// Use CALayer for aspect fill behavior
+			imageView.imageScaling = .scaleNone
+			imageView.layer?.contentsGravity = .resizeAspectFill
 		}
 	}
 	

@@ -504,3 +504,15 @@ Last Updated: June 15, 2025
      - Cell reuse properly syncs selection state
      - `reloadData()` saves and restores selection
      - `updateCollectionViewLayout()` uses `invalidateLayout()` instead of `reloadData()`
+
+23. **Improved Cell Update Pattern (June 15 - Session 13)**:
+   - Refactored both iOS and macOS cells to use proper layout invalidation pattern
+   - Property changes now trigger layout invalidation:
+     - iOS: `setNeedsLayout()` → `layoutSubviews()`
+     - macOS: `needsLayout = true` → `layout()`
+   - All visual updates (display mode, corner radius, selection) happen in one layout pass
+   - Benefits:
+     - Fixed display mode not being applied on first display
+     - More efficient batching of updates
+     - Consistent pattern across platforms
+     - Prevents timing issues and partial updates
