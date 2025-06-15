@@ -6,11 +6,6 @@
 	objectVersion = 77;
 	objects = {
 
-/* Begin PBXBuildFile section */
-		CC4541EF2DFED508005EB0D6 /* Resources in Resources */ = {isa = PBXBuildFile; fileRef = CC4541EE2DFED4FE005EB0D6 /* Resources */; };
-		CCFACC112DFACC3300798EB9 /* Photos in Resources */ = {isa = PBXBuildFile; fileRef = CCFACC102DFACC2B00798EB9 /* Photos */; };
-/* End PBXBuildFile section */
-
 /* Begin PBXContainerItemProxy section */
 		CC72EFE22DF6C68F00E1C25A /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
@@ -29,16 +24,22 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
-		CC4541EE2DFED4FE005EB0D6 /* Resources */ = {isa = PBXFileReference; lastKnownFileType = folder; path = Resources; sourceTree = "<group>"; };
 		CC72EFD12DF6C68D00E1C25A /* photolala.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = photolala.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		CC72EFE12DF6C68F00E1C25A /* photolalaTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = photolalaTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		CC72EFEB2DF6C68F00E1C25A /* photolalaUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = photolalaUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
-		CCFACC102DFACC2B00798EB9 /* Photos */ = {isa = PBXFileReference; lastKnownFileType = folder; path = Photos; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
+		CC4542872DFEEDAB005EB0D6 /* Artworks */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = Artworks;
+			sourceTree = "<group>";
+		};
 		CC72EFD32DF6C68D00E1C25A /* photolala */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			explicitFolders = (
+				Help,
+			);
 			path = photolala;
 			sourceTree = "<group>";
 		};
@@ -82,12 +83,11 @@
 		CC72EFC62DF6C4D600E1C25A = {
 			isa = PBXGroup;
 			children = (
-				CC4541EE2DFED4FE005EB0D6 /* Resources */,
+				CC4542872DFEEDAB005EB0D6 /* Artworks */,
 				CC72EFD32DF6C68D00E1C25A /* photolala */,
 				CC72EFE42DF6C68F00E1C25A /* photolalaTests */,
 				CC72EFEE2DF6C68F00E1C25A /* photolalaUITests */,
 				CC72EFD22DF6C68D00E1C25A /* Products */,
-				CCFACC102DFACC2B00798EB9 /* Photos */,
 			);
 			sourceTree = "<group>";
 		};
@@ -221,8 +221,6 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				CCFACC112DFACC3300798EB9 /* Photos in Resources */,
-				CC4541EF2DFED508005EB0D6 /* Resources in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -301,6 +299,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = YES;
 				CLANG_ANALYZER_NONNULL = YES;
 				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
 				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
@@ -355,7 +354,7 @@
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_CFBundleDisplayName = "";
+				INFOPLIST_KEY_CFBundleDisplayName = "🌻Photolala";
 				INFOPLIST_KEY_LSApplicationCategoryType = NSApplicationSupportsRestorableState;
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphonesimulator*]" = YES;
@@ -380,12 +379,13 @@
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				REGISTER_APP_GROUPS = YES;
 				SDKROOT = auto;
-				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx xros xrsimulator";
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx";
+				SUPPORTS_MACCATALYST = NO;
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
 				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = "1,2,7";
+				TARGETED_DEVICE_FAMILY = "1,2";
 				XROS_DEPLOYMENT_TARGET = 2.5;
 			};
 			name = Debug;
@@ -397,6 +397,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = YES;
 				CLANG_ANALYZER_NONNULL = YES;
 				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
 				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
@@ -445,7 +446,7 @@
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_CFBundleDisplayName = "";
+				INFOPLIST_KEY_CFBundleDisplayName = "🌻Photolala";
 				INFOPLIST_KEY_LSApplicationCategoryType = NSApplicationSupportsRestorableState;
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphonesimulator*]" = YES;
@@ -469,11 +470,12 @@
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				REGISTER_APP_GROUPS = YES;
 				SDKROOT = auto;
-				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx xros xrsimulator";
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx";
+				SUPPORTS_MACCATALYST = NO;
 				SWIFT_COMPILATION_MODE = wholemodule;
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = "1,2,7";
+				TARGETED_DEVICE_FAMILY = "1,2";
 				XROS_DEPLOYMENT_TARGET = 2.5;
 			};
 			name = Release;
