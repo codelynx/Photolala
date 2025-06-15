@@ -474,6 +474,34 @@ class PhotoManager {
 		}
 	}
 	
+	func prefetchThumbnails(for photos: [PhotoReference], priority: TaskPriority = .low) async {
+		// Limit concurrent thumbnail loads
+		let maxConcurrent = 4
+		
+		await withTaskGroup(of: Void.self) { group in
+			for (index, photo) in photos.enumerated() {
+				// Skip if already has thumbnail
+				if photo.thumbnail != nil {
+					continue
+				}
+				
+				// Limit concurrent operations
+				if index >= maxConcurrent {
+					await group.next()
+				}
+				
+				group.addTask(priority: priority) { [weak self] in
+					do {
+						_ = try await self?.thumbnail(for: photo)
+					} catch {
+						// Silently ignore prefetch errors
+						print("[PhotoManager] Prefetch thumbnail failed for \(photo.filename): \(error)")
+					}
+				}
+			}
+		}
+	}
+	
 	// Cancel all pending operations for cleanup
 	func cancelAllPrefetches() {
 		// This would require tracking tasks, implement later if needed
