@@ -16,6 +16,7 @@ struct PhotoBrowserView: View {
 	@State private var navigationPath = NavigationPath()
 	@State private var selectedPhotoNavigation: PreviewNavigation?
 	@State private var allPhotos: [PhotoReference] = []
+	@State private var showingHelp = false
 	
 	init(directoryPath: NSString) {
 		self.directoryPath = directoryPath
@@ -55,6 +56,12 @@ struct PhotoBrowserView: View {
 					initialIndex: navigation.initialIndex
 				)
 				.navigationBarBackButtonHidden(true)
+			}
+			.sheet(isPresented: $showingHelp) {
+				HelpView()
+			}
+			.onReceive(NotificationCenter.default.publisher(for: .showHelp)) { _ in
+				showingHelp = true
 			}
 #endif
 	}

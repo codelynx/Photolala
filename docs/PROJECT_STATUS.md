@@ -577,3 +577,44 @@ Last Updated: June 15, 2025
      - Get Info: System info panel via AppleScript
    - Fixed constraint conflicts with custom NSMenuItem views
    - Control+click properly handled as right-click equivalent
+
+27. **Implemented Help System POC (June 15 - Session 15)**:
+   - Created cross-platform help system using WKWebView:
+     - Wrapper components for both macOS and iOS
+     - Native presentation (window on macOS, sheet on iOS)
+     - HTML content with CSS styling
+   - Implementation details:
+     - `HelpWebView` cross-platform wrapper (NSViewRepresentable/UIViewRepresentable)
+     - `HelpView` container with navigation toolbar
+     - `HelpWindowController` for macOS window management
+     - Help menu command (⌘?) replaces standard Help menu
+   - Content structure:
+     - 7 HTML help pages covering all features
+     - Responsive CSS with dark mode support
+     - Platform-specific styling (iOS/macOS detection)
+     - Breadcrumb navigation and related topics
+   - HTML pages created:
+     - index.html: Main help page with topic categories
+     - getting-started.html: First steps and interface overview
+     - browsing-photos.html: Grid view and navigation
+     - organizing.html: Sorting, filtering, folder management
+     - searching.html: Search syntax and smart filters
+     - keyboard-shortcuts.html: Complete shortcut reference
+     - troubleshooting.html: Common issues and solutions
+   - Features implemented:
+     - External links open in default browser
+     - Dark mode automatically detected via CSS media queries
+     - Back/forward navigation gestures enabled
+     - Resource bundling (Resources/Help folder)
+     - Error handling with fallback content
+   - Technical approach:
+     - Static HelpWindowController to persist window
+     - Bundle.main.url for resource loading
+     - WKNavigationDelegate for URL handling
+     - CSS variables for theme support
+   - Known limitations:
+     - Navigation buttons UI created but not connected to WKWebView
+     - Search functionality not implemented
+     - Images are placeholders only
+     - Help content to be updated near end of development
+   - Documentation: `docs/planning/help-system-design.md`

@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<title>Searching Photos - Photolala Help</title>
+	<link rel="stylesheet" href="css/help.css">
+</head>
+<body>
+	<nav class="breadcrumb">
+		<a href="index.html">Help</a> &gt; Searching Photos
+	</nav>
+
+	<h1>Searching Photos</h1>
+
+	<p>Find specific photos quickly using Photolala's powerful search and filtering capabilities.</p>
+
+	<h2>Quick Search</h2>
+
+	<p>The fastest way to find photos is using the search bar:</p>
+	<ol>
+		<li>Press <strong>⌘F</strong> (Mac) or <strong>Ctrl+F</strong> to focus the search field</li>
+		<li>Type your search terms</li>
+		<li>Results appear instantly as you type</li>
+		<li>Press <strong>Escape</strong> to clear search and show all photos</li>
+	</ol>
+
+	<h3>What You Can Search</h3>
+	<ul>
+		<li><strong>Filename</strong> - Full or partial file names</li>
+		<li><strong>Extension</strong> - File types (jpg, raw, png)</li>
+		<li><strong>Date</strong> - Creation or modification dates</li>
+		<li><strong>Metadata</strong> - EXIF data, keywords, descriptions</li>
+		<li><strong>Camera Info</strong> - Camera model, lens, settings</li>
+	</ul>
+
+	<h2>Advanced Search Syntax</h2>
+
+	<p>Use special operators for more precise searches:</p>
+
+	<table>
+		<thead>
+			<tr>
+				<th>Operator</th>
+				<th>Example</th>
+				<th>Finds</th>
+			</tr>
+		</thead>
+		<tbody>
+			<tr>
+				<td><code>name:</code></td>
+				<td>name:sunset</td>
+				<td>Files with "sunset" in the name</td>
+			</tr>
+			<tr>
+				<td><code>ext:</code></td>
+				<td>ext:raw</td>
+				<td>All RAW format files</td>
+			</tr>
+			<tr>
+				<td><code>date:</code></td>
+				<td>date:2024</td>
+				<td>Photos from 2024</td>
+			</tr>
+			<tr>
+				<td><code>camera:</code></td>
+				<td>camera:nikon</td>
+				<td>Photos taken with Nikon cameras</td>
+			</tr>
+			<tr>
+				<td><code>size:</code></td>
+				<td>size:>10mb</td>
+				<td>Files larger than 10MB</td>
+			</tr>
+		</tbody>
+	</table>
+
+	<h3>Combining Search Terms</h3>
+	<ul>
+		<li><strong>AND</strong> - Space between terms (default)</li>
+		<li><strong>OR</strong> - Use | between terms</li>
+		<li><strong>NOT</strong> - Use - before term</li>
+		<li><strong>Exact phrase</strong> - Use quotes</li>
+	</ul>
+
+	<div class="code-example">
+		<p>Examples:</p>
+		<ul>
+			<li><code>sunset beach</code> - Contains both "sunset" AND "beach"</li>
+			<li><code>sunset | sunrise</code> - Contains "sunset" OR "sunrise"</li>
+			<li><code>vacation -work</code> - Contains "vacation" but NOT "work"</li>
+			<li><code>"golden hour"</code> - Exact phrase "golden hour"</li>
+		</ul>
+	</div>
+
+	<h2>Smart Filters</h2>
+
+	<p>Use pre-defined smart filters for common searches:</p>
+
+	<h3>Built-in Filters</h3>
+	<ul>
+		<li><strong>Recent</strong> - Photos from the last 7 days</li>
+		<li><strong>Favorites</strong> - Starred or rated photos</li>
+		<li><strong>Untagged</strong> - Photos without keywords</li>
+		<li><strong>Large Files</strong> - Photos over 20MB</li>
+		<li><strong>RAW Files</strong> - All RAW format images</li>
+		<li><strong>Videos</strong> - Video files only</li>
+	</ul>
+
+	<h3>Creating Custom Filters</h3>
+	<ol>
+		<li>Perform a search with your desired criteria</li>
+		<li>Click the <strong>Save Filter</strong> button</li>
+		<li>Name your filter</li>
+		<li>Access it from the Filters menu</li>
+	</ol>
+
+	<h2>Search by Metadata</h2>
+
+	<h3>EXIF Data Search</h3>
+	<p>Search using camera settings and technical data:</p>
+	<ul>
+		<li><code>iso:1600</code> - Specific ISO value</li>
+		<li><code>aperture:f/2.8</code> - Specific aperture</li>
+		<li><code>shutter:1/500</code> - Shutter speed</li>
+		<li><code>focal:50mm</code> - Focal length</li>
+		<li><code>lens:"24-70mm"</code> - Lens model</li>
+	</ul>
+
+	<h3>Location Search</h3>
+	<p>Find photos by GPS data (if available):</p>
+	<ul>
+		<li><code>location:paris</code> - City name</li>
+		<li><code>country:france</code> - Country</li>
+		<li><code>gps:yes</code> - Has GPS coordinates</li>
+		<li><code>near:"eiffel tower"</code> - Near landmark</li>
+	</ul>
+
+	<h2>Date Range Searches</h2>
+
+	<p>Find photos from specific time periods:</p>
+
+	<h3>Date Formats</h3>
+	<ul>
+		<li><code>date:2024</code> - Entire year</li>
+		<li><code>date:2024-06</code> - Specific month</li>
+		<li><code>date:2024-06-15</code> - Specific day</li>
+		<li><code>date:today</code> - Today's photos</li>
+		<li><code>date:yesterday</code> - Yesterday's photos</li>
+		<li><code>date:week</code> - Last 7 days</li>
+		<li><code>date:month</code> - Last 30 days</li>
+	</ul>
+
+	<h3>Date Ranges</h3>
+	<ul>
+		<li><code>date:2024-01..2024-06</code> - Range of months</li>
+		<li><code>date:>2024-01-01</code> - After specific date</li>
+		<li><code>date:<2024-01-01</code> - Before specific date</li>
+	</ul>
+
+	<h2>Search Tips</h2>
+
+	<div class="tip">
+		<strong>Pro Tips:</strong>
+		<ul>
+			<li>Use autocomplete suggestions for faster searches</li>
+			<li>Save frequently used searches as Smart Filters</li>
+			<li>Combine multiple criteria for precise results</li>
+			<li>Use the search history dropdown for recent searches</li>
+		</ul>
+	</div>
+
+	<h2>Search Results</h2>
+
+	<h3>Working with Results</h3>
+	<ul>
+		<li><strong>Result Count</strong> - Shows number of matching photos</li>
+		<li><strong>Highlight</strong> - Search terms highlighted in metadata</li>
+		<li><strong>Refine</strong> - Add more terms to narrow results</li>
+		<li><strong>Export Results</strong> - Save search results as collection</li>
+	</ul>
+
+	<h3>Search Performance</h3>
+	<p>Photolala indexes your photos for fast searching:</p>
+	<ul>
+		<li>Initial indexing happens on first folder open</li>
+		<li>Index updates automatically when files change</li>
+		<li>Large folders may take time to fully index</li>
+		<li>Search becomes faster after initial indexing</li>
+	</ul>
+
+	<div class="warning">
+		<strong>Note:</strong> Complex searches on very large collections may take a moment. The search progress indicator shows indexing status.
+	</div>
+
+	<h2>Related Topics</h2>
+	<ul>
+		<li><a href="organizing.html">Organizing with Search Results</a></li>
+		<li><a href="exporting.html">Exporting Search Results</a></li>
+		<li><a href="preferences.html">Search Preferences</a></li>
+	</ul>
+
+	<div class="navigation">
+		<a href="organizing.html" class="button">Previous: Organizing</a>
+		<a href="exporting.html" class="button primary">Next: Exporting</a>
+	</div>
+</body>
+</html>

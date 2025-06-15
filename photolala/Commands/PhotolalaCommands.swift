@@ -51,6 +51,16 @@ struct PhotolalaCommands: Commands {
 		CommandGroup(replacing: .windowSize) {
 			// Custom window commands if needed
 		}
+		
+		// Help menu - Add to existing help menu
+		CommandGroup(replacing: .help) {
+			Button("Photolala Help") {
+				showHelp()
+			}
+			.keyboardShortcut("?", modifiers: .command)
+			
+			Divider()
+		}
 	}
 	
 	private func openFolder() {
@@ -91,10 +101,28 @@ struct PhotolalaCommands: Commands {
 		window.isReleasedWhenClosed = false
 	}
 	#endif
+	
+	private func showHelp() {
+		#if os(macOS)
+		// Use a static variable to keep the help window controller alive
+		struct HelpWindow {
+			static var controller: HelpWindowController?
+		}
+		
+		if HelpWindow.controller == nil {
+			HelpWindow.controller = HelpWindowController()
+		}
+		HelpWindow.controller?.showHelp()
+		#else
+		// On iOS, we need to present it differently
+		NotificationCenter.default.post(name: .showHelp, object: nil)
+		#endif
+	}
 }
 
 // MARK: - Notification Names
 
 extension Notification.Name {
 	static let deselectAll = Notification.Name("com.electricwoods.photolala.deselectAll")
+	static let showHelp = Notification.Name("com.electricwoods.photolala.showHelp")
 }

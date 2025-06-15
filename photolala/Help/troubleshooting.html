@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<title>Troubleshooting - Photolala Help</title>
+	<link rel="stylesheet" href="css/help.css">
+</head>
+<body>
+	<nav class="breadcrumb">
+		<a href="index.html">Help</a> &gt; Troubleshooting
+	</nav>
+
+	<h1>Troubleshooting</h1>
+
+	<p>Solutions to common issues you might encounter while using Photolala.</p>
+
+	<h2>Performance Issues</h2>
+
+	<h3>Slow Thumbnail Loading</h3>
+	<p><strong>Problem:</strong> Thumbnails take a long time to appear or load slowly.</p>
+	<p><strong>Solutions:</strong></p>
+	<ul>
+		<li>Wait for initial thumbnail generation to complete</li>
+		<li>Check available disk space for cache storage</li>
+		<li>Clear thumbnail cache: <strong>Preferences &gt; Cache &gt; Clear Cache</strong></li>
+		<li>Reduce thumbnail size for faster loading</li>
+		<li>Ensure photos are on a fast storage device (SSD recommended)</li>
+	</ul>
+
+	<h3>Application Freezes or Hangs</h3>
+	<p><strong>Problem:</strong> Photolala becomes unresponsive.</p>
+	<p><strong>Solutions:</strong></p>
+	<ul>
+		<li>Check if a large folder is being scanned (see status bar)</li>
+		<li>Reduce number of photos displayed at once</li>
+		<li>Close unused windows to free memory</li>
+		<li>Restart the application</li>
+		<li>Update to the latest version</li>
+	</ul>
+
+	<h3>High Memory Usage</h3>
+	<p><strong>Problem:</strong> Photolala uses excessive memory.</p>
+	<p><strong>Solutions:</strong></p>
+	<ul>
+		<li>Close windows with large photo collections</li>
+		<li>Reduce thumbnail cache size in Preferences</li>
+		<li>Enable memory optimization: <strong>Preferences &gt; Performance</strong></li>
+		<li>Restart the app periodically when working with many photos</li>
+	</ul>
+
+	<h2>Display Issues</h2>
+
+	<h3>Thumbnails Not Showing</h3>
+	<p><strong>Problem:</strong> Blank or missing thumbnails.</p>
+	<p><strong>Solutions:</strong></p>
+	<ul>
+		<li>Check file permissions on photo folders</li>
+		<li>Verify photos are in supported formats</li>
+		<li>Regenerate thumbnails: Right-click &gt; <strong>Regenerate Thumbnail</strong></li>
+		<li>Clear and rebuild cache</li>
+		<li>Check for corrupted image files</li>
+	</ul>
+
+	<h3>Wrong Image Orientation</h3>
+	<p><strong>Problem:</strong> Photos appear rotated incorrectly.</p>
+	<p><strong>Solutions:</strong></p>
+	<ul>
+		<li>Photolala respects EXIF orientation data</li>
+		<li>Rotate images: Right-click &gt; <strong>Rotate</strong></li>
+		<li>Check camera orientation settings</li>
+		<li>Update image metadata if needed</li>
+	</ul>
+
+	<h3>Color Profile Issues</h3>
+	<p><strong>Problem:</strong> Colors look different than expected.</p>
+	<p><strong>Solutions:</strong></p>
+	<ul>
+		<li>Enable color management: <strong>Preferences &gt; Color</strong></li>
+		<li>Calibrate your display</li>
+		<li>Check embedded color profiles in images</li>
+		<li>Use consistent color space (sRGB recommended)</li>
+	</ul>
+
+	<h2>File Access Problems</h2>
+
+	<h3>Cannot Open Folder</h3>
+	<p><strong>Problem:</strong> Error when trying to open a photo folder.</p>
+	<p><strong>Solutions:</strong></p>
+	<ul>
+		<li>Check folder permissions</li>
+		<li>Ensure folder exists and is accessible</li>
+		<li>Verify network connection for network drives</li>
+		<li>Grant Photolala folder access in System Preferences</li>
+		<li>Try accessing parent folder first</li>
+	</ul>
+
+	<h3>Missing Photos</h3>
+	<p><strong>Problem:</strong> Some photos don't appear in folder view.</p>
+	<p><strong>Solutions:</strong></p>
+	<ul>
+		<li>Check file extensions are supported</li>
+		<li>Verify hidden files setting: <strong>View &gt; Show Hidden Files</strong></li>
+		<li>Refresh folder: <strong>⌘R</strong> (Mac) or <strong>F5</strong></li>
+		<li>Check filter settings aren't hiding photos</li>
+		<li>Ensure files aren't corrupted</li>
+	</ul>
+
+	<h2>Search Problems</h2>
+
+	<h3>Search Not Finding Photos</h3>
+	<p><strong>Problem:</strong> Search returns no or incorrect results.</p>
+	<p><strong>Solutions:</strong></p>
+	<ul>
+		<li>Wait for indexing to complete (see status bar)</li>
+		<li>Rebuild search index: <strong>Preferences &gt; Search &gt; Rebuild Index</strong></li>
+		<li>Check search syntax is correct</li>
+		<li>Clear search filters that may be limiting results</li>
+		<li>Verify metadata is present in photos</li>
+	</ul>
+
+	<h2>Platform-Specific Issues</h2>
+
+	<h3>macOS</h3>
+	<div class="platform-macos">
+		<h4>App Not Opening</h4>
+		<ul>
+			<li>Check Gatekeeper settings in System Preferences</li>
+			<li>Right-click app and choose <strong>Open</strong> first time</li>
+			<li>Verify macOS version compatibility</li>
+		</ul>
+
+		<h4>Permission Dialogs</h4>
+		<ul>
+			<li>Grant folder access when prompted</li>
+			<li>Check <strong>System Preferences &gt; Security &amp; Privacy &gt; Files and Folders</strong></li>
+			<li>Add Photolala to Full Disk Access if needed</li>
+		</ul>
+	</div>
+
+	<h3>iOS/iPadOS</h3>
+	<div class="platform-ios">
+		<h4>Cannot Access Photos</h4>
+		<ul>
+			<li>Grant photo library access in Settings</li>
+			<li>Check <strong>Settings &gt; Photolala &gt; Photos</strong></li>
+			<li>Select "All Photos" for full access</li>
+		</ul>
+
+		<h4>Storage Full</h4>
+		<ul>
+			<li>Clear thumbnail cache regularly</li>
+			<li>Offload unused data in Settings</li>
+			<li>Use iCloud Photos for storage</li>
+		</ul>
+	</div>
+
+	<h2>Error Messages</h2>
+
+	<h3>Common Errors and Solutions</h3>
+
+	<table>
+		<thead>
+			<tr>
+				<th>Error</th>
+				<th>Cause</th>
+				<th>Solution</th>
+			</tr>
+		</thead>
+		<tbody>
+			<tr>
+				<td>"Access Denied"</td>
+				<td>No permission to folder</td>
+				<td>Grant folder access or check permissions</td>
+			</tr>
+			<tr>
+				<td>"Invalid Image"</td>
+				<td>Corrupted or unsupported file</td>
+				<td>Verify file integrity or convert format</td>
+			</tr>
+			<tr>
+				<td>"Cache Full"</td>
+				<td>Thumbnail cache at limit</td>
+				<td>Clear cache or increase cache size</td>
+			</tr>
+			<tr>
+				<td>"Network Timeout"</td>
+				<td>Slow network drive</td>
+				<td>Check network connection or copy locally</td>
+			</tr>
+		</tbody>
+	</table>
+
+	<h2>Getting More Help</h2>
+
+	<h3>Diagnostic Information</h3>
+	<p>When reporting issues, include:</p>
+	<ul>
+		<li>Photolala version (<strong>About Photolala</strong>)</li>
+		<li>Operating system version</li>
+		<li>Steps to reproduce the problem</li>
+		<li>Error messages (exact text)</li>
+		<li>Sample files if applicable</li>
+	</ul>
+
+	<h3>Support Resources</h3>
+	<ul>
+		<li><strong>Online Help</strong> - Visit our website for latest guides</li>
+		<li><strong>Community Forum</strong> - Get help from other users</li>
+		<li><strong>Email Support</strong> - support@photolala.app</li>
+		<li><strong>Bug Reports</strong> - GitHub issues tracker</li>
+	</ul>
+
+	<h3>Debug Mode</h3>
+	<p>Enable debug logging for detailed diagnostics:</p>
+	<ol>
+		<li>Open <strong>Preferences &gt; Advanced</strong></li>
+		<li>Enable <strong>Debug Mode</strong></li>
+		<li>Reproduce the issue</li>
+		<li>Send logs with support request</li>
+	</ol>
+
+	<div class="tip">
+		<strong>Tip:</strong> Most issues can be resolved by updating to the latest version. Check for updates regularly via <strong>Photolala &gt; Check for Updates</strong>.
+	</div>
+
+	<h2>Preventive Measures</h2>
+
+	<ul>
+		<li>Keep Photolala updated</li>
+		<li>Maintain adequate free disk space</li>
+		<li>Organize photos in manageable folder sizes</li>
+		<li>Back up your photo collection regularly</li>
+		<li>Use supported image formats</li>
+		<li>Clear cache periodically</li>
+	</ul>
+
+	<div class="navigation">
+		<a href="keyboard-shortcuts.html" class="button">Previous: Keyboard Shortcuts</a>
+		<a href="index.html" class="button primary">Back to Help Home</a>
+	</div>
+</body>
+</html>
