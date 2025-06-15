@@ -1,0 +1,216 @@
+# S3 Backup Service Technical Requirements
+
+## Platform Requirements
+
+### macOS
+- **Minimum OS**: macOS 14.0 (Sonoma)
+- **Architecture**: Universal Binary (Apple Silicon + Intel)
+- **Frameworks**: 
+  - Foundation
+  - Network.framework (for connection monitoring)
+  - Security.framework (for keychain)
+  - BackgroundTasks.framework (for background uploads)
+
+### iOS/iPadOS
+- **Minimum OS**: iOS 17.0
+- **Background Modes**: Background fetch, Background processing
+- **Capabilities**: 
+  - Network access
+  - Background refresh
+  - Extended background execution
+
+## S3 API Requirements
+
+### Minimum S3 Operations
+- `ListBuckets` - List available buckets
+- `CreateBucket` - Create new bucket
+- `HeadBucket` - Check bucket exists/accessible
+- `PutObject` - Upload files
+- `HeadObject` - Check if file exists
+- `GetObject` - Download files (future)
+- `ListObjectsV2` - List bucket contents
+- `DeleteObject` - Remove files (optional)
+
+### S3 Features Used
+- **Multipart Upload** - For files > 5MB
+- **Storage Classes** - STANDARD, STANDARD_IA, GLACIER
+- **Server-Side Encryption** - SSE-S3, SSE-KMS
+- **Object Metadata** - Store photo metadata
+- **ETags** - For integrity verification
+
+## Performance Requirements
+
+### Upload Performance
+- **Chunk Size**: 5MB - 20MB (configurable)
+- **Concurrent Parts**: 3-5 for multipart upload
+- **Memory Usage**: < 100MB for upload buffers
+- **CPU Usage**: < 20% during uploads
+
+### Network Efficiency
+- **Retry Strategy**: Exponential backoff (1s, 2s, 4s, 8s, 16s)
+- **Timeout**: 30s per request
+- **Keep-Alive**: Connection pooling
+- **Compression**: Optional for metadata
+
+## Data Storage Requirements
+
+### Local Database
+- **Technology**: SQLite or Core Data
+- **Schema**:
+  ```sql
+  -- Backup Status
+  CREATE TABLE uploaded_files (
+    id INTEGER PRIMARY KEY,
+    local_path TEXT NOT NULL,
+    s3_key TEXT NOT NULL,
+    etag TEXT NOT NULL,
+    size INTEGER NOT NULL,
+    uploaded_at TIMESTAMP NOT NULL,
+    last_modified TIMESTAMP NOT NULL,
+    checksum TEXT,
+    metadata TEXT -- JSON
+  );
+  
+  -- Upload Queue
+  CREATE TABLE upload_queue (
+    id INTEGER PRIMARY KEY,
+    local_path TEXT NOT NULL,
+    priority INTEGER DEFAULT 0,
+    retry_count INTEGER DEFAULT 0,
+    last_error TEXT,
+    queued_at TIMESTAMP NOT NULL,
+    next_retry TIMESTAMP
+  );
+  
+  -- Provider Configuration
+  CREATE TABLE providers (
+    id INTEGER PRIMARY KEY,
+    name TEXT NOT NULL,
+    type TEXT NOT NULL,
+    endpoint TEXT NOT NULL,
+    bucket TEXT NOT NULL,
+    config TEXT -- JSON
+  );
+  ```
+
+### File System
+- **Cache Directory**: `~/Library/Caches/Photolala/S3Backup/`
+- **Temp Directory**: For multipart chunks
+- **Metadata Cache**: Extracted metadata files
+
+## Security Requirements
+
+### Credential Storage
+- **macOS**: Keychain Services API
+- **iOS**: Keychain with kSecAttrAccessibleAfterFirstUnlock
+- **Encryption**: All credentials encrypted at rest
+- **Access**: App-specific, not shared
+
+### Network Security
+- **TLS Version**: Minimum TLS 1.2
+- **Certificate Pinning**: Optional for known providers
+- **Request Signing**: AWS Signature Version 4
+
+### Data Protection
+- **At Rest**: Optional client-side encryption
+- **In Transit**: Always encrypted (HTTPS)
+- **Algorithms**: AES-256-GCM for client-side
+- **Key Derivation**: PBKDF2 or Argon2
+
+## Integration Requirements
+
+### Photo Library Integration
+- **File Watching**: FSEvents (macOS) / File Coordination (iOS)
+- **Metadata Access**: Read EXIF, IPTC, XMP
+- **Thumbnail Generation**: For quick previews
+- **Format Support**: All formats supported by Photolala
+
+### UI Integration
+- **SwiftUI Views**: For settings and status
+- **AppKit/UIKit**: For system integration
+- **Notifications**: Upload completion, errors
+- **Status Bar**: macOS menu bar item
+
+## Monitoring Requirements
+
+### Logging
+- **Levels**: Error, Warning, Info, Debug
+- **Rotation**: Keep last 7 days
+- **Privacy**: No credentials or personal data
+- **Location**: `~/Library/Logs/Photolala/`
+
+### Metrics
+- **Upload Statistics**:
+  - Total bytes uploaded
+  - Number of files uploaded
+  - Average upload speed
+  - Success/failure rates
+
+- **Performance Metrics**:
+  - Queue processing time
+  - Network latency
+  - Memory usage
+  - CPU usage
+
+### Health Checks
+- **Connection Test**: Periodic S3 connectivity check
+- **Queue Health**: Monitor for stuck uploads
+- **Storage Health**: Check available disk space
+
+## Error Handling Requirements
+
+### Recoverable Errors
+- **Network Timeouts**: Retry with backoff
+- **Rate Limiting**: Honor retry-after headers
+- **Temporary S3 Errors**: 503, 500 errors
+- **Partial Uploads**: Resume multipart
+
+### Non-Recoverable Errors
+- **Authentication Failures**: Notify user
+- **Permissions Errors**: Clear guidance
+- **Corrupt Files**: Skip and log
+- **Quota Exceeded**: Pause uploads
+
+## Testing Requirements
+
+### Unit Tests
+- **Coverage**: > 80% for core logic
+- **Mocking**: S3 client, network, file system
+- **Edge Cases**: Large files, interruptions
+
+### Integration Tests
+- **Real S3**: Test against MinIO locally
+- **Providers**: Test each supported provider
+- **Scenarios**: Upload, resume, conflict
+
+### Performance Tests
+- **Load Testing**: 10,000+ files
+- **Bandwidth**: Various network speeds
+- **Memory**: Monitor for leaks
+- **Battery**: iOS battery impact
+
+## Compliance Requirements
+
+### Privacy
+- **User Consent**: Explicit opt-in for backup
+- **Data Location**: User chooses region
+- **Deletion**: Complete removal option
+- **Export**: User can download all data
+
+### Provider Compliance
+- **AWS**: Understand service limits
+- **GDPR**: For EU users
+- **Data Residency**: Respect user choice
+- **Logging**: Audit trail for actions
+
+## Backward Compatibility
+
+### Migration
+- **Existing Photos**: Scan and queue for upload
+- **Settings**: Migrate from older versions
+- **Database**: Schema versioning
+
+### Versioning
+- **API Version**: Track S3 API changes
+- **File Format**: Version metadata format
+- **Protocol**: Handle protocol updates
