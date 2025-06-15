@@ -23,6 +23,8 @@ class PhotoCollectionViewController: XViewController {
 
 	@MainActor
 	var photos: [PhotoReference] = []
+	@MainActor
+	var photoGroups: [PhotoGroup] = []
 	var onSelectPhoto: ((PhotoReference, [PhotoReference]) -> Void)?
 	var onSelectFolder: ((PhotoReference) -> Void)?
 	var onPhotosLoadedWithReferences: (([PhotoReference]) -> Void)?
@@ -44,13 +46,15 @@ class PhotoCollectionViewController: XViewController {
 	var selectedPhotos: [PhotoReference] {
 		#if os(macOS)
 		return collectionView.selectionIndexPaths.compactMap { indexPath in
-			guard indexPath.item < photos.count else { return nil }
-			return photos[indexPath.item]
+			guard indexPath.section < photoGroups.count,
+				  indexPath.item < photoGroups[indexPath.section].photos.count else { return nil }
+			return photoGroups[indexPath.section].photos[indexPath.item]
 		}
 		#else
 		return collectionView.indexPathsForSelectedItems?.compactMap { indexPath in
-			guard indexPath.item < photos.count else { return nil }
-			return photos[indexPath.item]
+			guard indexPath.section < photoGroups.count,
+				  indexPath.item < photoGroups[indexPath.section].photos.count else { return nil }
+			return photoGroups[indexPath.section].photos[indexPath.item]
 		} ?? []
 		#endif
 	}
@@ -242,6 +246,11 @@ class PhotoCollectionViewController: XViewController {
 			// Apply sorting based on current settings
 			let sortedPhotos = settings?.sortOption.sort(scannedPhotos) ?? scannedPhotos
 			self.photos = sortedPhotos
+			
+			// Apply grouping based on current settings
+			let groupingOption = settings?.groupingOption ?? .none
+			self.photoGroups = PhotoManager.shared.groupPhotos(sortedPhotos, by: groupingOption)
+			
 			self.reloadData()
 			
 			// Notify SwiftUI about photos loaded
@@ -287,15 +296,16 @@ class PhotoCollectionViewController: XViewController {
 			_ = settings.displayMode
 			_ = settings.thumbnailSize
 			_ = settings.sortOption
+			_ = settings.groupingOption
 		} onChange: { [weak self] in
 			Task { @MainActor in
 				let oldSortOption = self?.lastSortOption
 				let newSortOption = settings.sortOption
 				
-				// If sort option changed, re-sort photos
-				if oldSortOption != newSortOption {
+				// If sort option or grouping changed, reload photos
+				if oldSortOption != newSortOption || self?.photoGroups.isEmpty == true {
 					self?.lastSortOption = newSortOption
-					self?.applySorting()
+					self?.loadPhotos()
 				} else {
 					// Otherwise just update layout
 					self?.updateCollectionViewLayout()
@@ -400,7 +410,10 @@ class PhotoCollectionViewController: XViewController {
 	// MARK: - Navigation
 	
 	func handleNavigation(at indexPath: IndexPath) {
-		let photo = photos[indexPath.item]
+		guard indexPath.section < photoGroups.count,
+			  indexPath.item < photoGroups[indexPath.section].photos.count else { return }
+			  
+		let photo = photoGroups[indexPath.section].photos[indexPath.item]
 		let photoURL = photo.fileURL
 		
 		print("[PhotoCollectionViewController] handleNavigation called for: \(photo.filename)")
@@ -423,15 +436,30 @@ class PhotoCollectionViewController: XViewController {
 // MARK: - Data Source
 
 extension PhotoCollectionViewController: XCollectionViewDataSource {
+	
+	#if os(macOS)
+	func numberOfSections(in collectionView: NSCollectionView) -> Int {
+		return photoGroups.isEmpty ? 0 : photoGroups.count
+	}
+	#else
+	func numberOfSections(in collectionView: UICollectionView) -> Int {
+		return photoGroups.isEmpty ? 0 : photoGroups.count
+	}
+	#endif
 
 	func collectionView(_ collectionView: XCollectionView, numberOfItemsInSection section: Int) -> Int {
-		return photos.count
+		guard section < photoGroups.count else { return 0 }
+		return photoGroups[section].photos.count
 	}
 	
 	#if os(macOS)
 	func collectionView(_ collectionView: NSCollectionView, itemForRepresentedObjectAt indexPath: IndexPath) -> NSCollectionViewItem {
 		let item = collectionView.makeItem(withIdentifier: NSUserInterfaceItemIdentifier("PhotoItem"), for: indexPath) as! PhotoCollectionViewItem
-		let photo = photos[indexPath.item]
+		guard indexPath.section < photoGroups.count,
+			  indexPath.item < photoGroups[indexPath.section].photos.count else {
+			return item
+		}
+		let photo = photoGroups[indexPath.section].photos[indexPath.item]
 		item.settings = settings
 		item.photoRepresentation = photo
 		item.updateDisplayMode()
@@ -443,7 +471,11 @@ extension PhotoCollectionViewController: XCollectionViewDataSource {
 	#if os(iOS)
 	func collectionView(_ collectionView: UICollectionView, cellForItemAt indexPath: IndexPath) -> UICollectionViewCell {
 		let cell = collectionView.dequeueReusableCell(withReuseIdentifier: "PhotoCell", for: indexPath) as! PhotoCollectionViewCell
-		let photo = photos[indexPath.item]
+		guard indexPath.section < photoGroups.count,
+			  indexPath.item < photoGroups[indexPath.section].photos.count else {
+			return cell
+		}
+		let photo = photoGroups[indexPath.section].photos[indexPath.item]
 		
 		cell.settings = settings
 		cell.photoRepresentation = photo
@@ -566,11 +598,16 @@ extension PhotoCollectionViewController: XCollectionViewDelegate {
 	
 	@objc private func contextMenuOpen(_ sender: NSMenuItem) {
 		guard let photos = sender.representedObject as? [PhotoReference],
-			  let firstPhoto = photos.first,
-			  let index = self.photos.firstIndex(of: firstPhoto) else { return }
+			  let firstPhoto = photos.first else { return }
 		
-		let indexPath = IndexPath(item: index, section: 0)
-		handleNavigation(at: indexPath)
+		// Find the photo in our groups
+		for (sectionIndex, group) in photoGroups.enumerated() {
+			if let itemIndex = group.photos.firstIndex(of: firstPhoto) {
+				let indexPath = IndexPath(item: itemIndex, section: sectionIndex)
+				handleNavigation(at: indexPath)
+				return
+			}
+		}
 	}
 	
 	@objc private func contextMenuQuickLook(_ sender: NSMenuItem) {
@@ -677,8 +714,10 @@ extension PhotoCollectionViewController: XCollectionViewDelegate {
 #if os(macOS)
 extension PhotoCollectionViewController: NSCollectionViewPrefetching {
 	func collectionView(_ collectionView: NSCollectionView, prefetchItemsAt indexPaths: [IndexPath]) {
-		let photos = indexPaths.compactMap { indexPath in
-			indexPath.item < self.photos.count ? self.photos[indexPath.item] : nil
+		let photos: [PhotoReference] = indexPaths.compactMap { indexPath in
+			guard indexPath.section < self.photoGroups.count,
+				  indexPath.item < self.photoGroups[indexPath.section].photos.count else { return nil }
+			return self.photoGroups[indexPath.section].photos[indexPath.item]
 		}
 		
 		Task {
@@ -693,8 +732,10 @@ extension PhotoCollectionViewController: NSCollectionViewPrefetching {
 #else
 extension PhotoCollectionViewController: UICollectionViewDataSourcePrefetching {
 	func collectionView(_ collectionView: UICollectionView, prefetchItemsAt indexPaths: [IndexPath]) {
-		let photos = indexPaths.compactMap { indexPath in
-			indexPath.item < self.photos.count ? self.photos[indexPath.item] : nil
+		let photos: [PhotoReference] = indexPaths.compactMap { indexPath in
+			guard indexPath.section < self.photoGroups.count,
+				  indexPath.item < self.photoGroups[indexPath.section].photos.count else { return nil }
+			return self.photoGroups[indexPath.section].photos[indexPath.item]
 		}
 		
 		Task {

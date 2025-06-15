@@ -179,6 +179,65 @@ struct PhotoBrowserView: View {
 				.frame(width: 150)
 				.help("Sort photos by")
 #endif
+				
+				// Grouping picker
+#if os(iOS)
+				Menu {
+					Button(action: {
+						settings.groupingOption = .year
+					}) {
+						Label("Year", systemImage: "calendar")
+						if settings.groupingOption == .year {
+							Image(systemName: "checkmark")
+						}
+					}
+					Button(action: {
+						settings.groupingOption = .month
+					}) {
+						Label("Month", systemImage: "calendar.badge.clock")
+						if settings.groupingOption == .month {
+							Image(systemName: "checkmark")
+						}
+					}
+					Button(action: {
+						settings.groupingOption = .day
+					}) {
+						Label("Day", systemImage: "calendar.circle")
+						if settings.groupingOption == .day {
+							Image(systemName: "checkmark")
+						}
+					}
+					
+					Divider()
+					
+					Button(action: {
+						settings.groupingOption = .none
+					}) {
+						Label("None", systemImage: "square.grid.3x3")
+						if settings.groupingOption == .none {
+							Image(systemName: "checkmark")
+						}
+					}
+				} label: {
+					if settings.groupingOption != .none {
+						Label(settings.groupingOption.rawValue, systemImage: settings.groupingOption.systemImage)
+					} else {
+						Image(systemName: "calendar")
+					}
+				}
+#else
+				// macOS: Use a picker with menu style
+				Picker("Group by", selection: $settings.groupingOption) {
+					Text("Year").tag(PhotoGroupingOption.year)
+					Text("Month").tag(PhotoGroupingOption.month)
+					Text("Day").tag(PhotoGroupingOption.day)
+					Divider()
+					Text("None").tag(PhotoGroupingOption.none)
+				}
+				.pickerStyle(.menu)
+				.frame(width: 120)
+				.help("Group photos by date")
+#endif
 			}
 		}
 	}
