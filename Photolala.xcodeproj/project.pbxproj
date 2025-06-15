@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		CC4541EF2DFED508005EB0D6 /* Resources in Resources */ = {isa = PBXBuildFile; fileRef = CC4541EE2DFED4FE005EB0D6 /* Resources */; };
 		CCFACC112DFACC3300798EB9 /* Photos in Resources */ = {isa = PBXBuildFile; fileRef = CCFACC102DFACC2B00798EB9 /* Photos */; };
 /* End PBXBuildFile section */
 
@@ -28,6 +29,7 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		CC4541EE2DFED4FE005EB0D6 /* Resources */ = {isa = PBXFileReference; lastKnownFileType = folder; path = Resources; sourceTree = "<group>"; };
 		CC72EFD12DF6C68D00E1C25A /* photolala.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = photolala.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		CC72EFE12DF6C68F00E1C25A /* photolalaTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = photolalaTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		CC72EFEB2DF6C68F00E1C25A /* photolalaUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = photolalaUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -80,6 +82,7 @@
 		CC72EFC62DF6C4D600E1C25A = {
 			isa = PBXGroup;
 			children = (
+				CC4541EE2DFED4FE005EB0D6 /* Resources */,
 				CC72EFD32DF6C68D00E1C25A /* photolala */,
 				CC72EFE42DF6C68F00E1C25A /* photolalaTests */,
 				CC72EFEE2DF6C68F00E1C25A /* photolalaUITests */,
@@ -219,6 +222,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				CCFACC112DFACC3300798EB9 /* Photos in Resources */,
+				CC4541EF2DFED508005EB0D6 /* Resources in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

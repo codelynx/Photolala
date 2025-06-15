@@ -9,6 +9,7 @@ import SwiftUI
 import Observation
 #if os(macOS)
 import AppKit
+import Quartz
 #else
 import UIKit
 #endif
@@ -28,6 +29,10 @@ class PhotoCollectionViewController: XViewController {
 	var onSelectionChanged: (([PhotoReference]) -> Void)?
 	
 	var collectionView: XCollectionView!
+	
+	#if os(macOS)
+	private var quickLookPhotos: [PhotoReference] = []
+	#endif
 	
 	// Get currently selected photos
 	var selectedPhotos: [PhotoReference] {
@@ -497,6 +502,204 @@ extension PhotoCollectionViewController: XCollectionViewDelegate {
 		// Let NSCollectionView handle other keys (arrows, etc.)
 		super.keyDown(with: event)
 	}
+	
+	// MARK: - Context Menu
+	
+	override func rightMouseDown(with event: NSEvent) {
+		let locationInView = view.convert(event.locationInWindow, from: nil)
+		let locationInCollectionView = collectionView.convert(locationInView, from: view)
+		
+		// Check if we clicked on an item
+		if let indexPath = collectionView.indexPathForItem(at: locationInCollectionView) {
+			let clickedPhoto = photos[indexPath.item]
+			
+			// If clicked item isn't selected, select only it
+			if !collectionView.selectionIndexPaths.contains(indexPath) {
+				collectionView.deselectAll(nil)
+				collectionView.selectItems(at: Set([indexPath]), scrollPosition: [])
+			}
+			
+			// Create and show context menu
+			let menu = createContextMenu(for: selectedPhotos)
+			NSMenu.popUpContextMenu(menu, with: event, for: view)
+		} else {
+			// Clicked on empty space - could show different menu or ignore
+			super.rightMouseDown(with: event)
+		}
+	}
+	
+	private func createContextMenu(for photos: [PhotoReference]) -> NSMenu {
+		let menu = NSMenu()
+		
+		if photos.count == 1 {
+			// Single photo selected - show preview
+			let photo = photos[0]
+			
+			// Create header view with preview and metadata
+			let headerItem = NSMenuItem()
+			let headerView = PhotoContextMenuHeaderView(frame: .zero)
+			headerView.configure(with: photo, displayMode: settings?.displayMode ?? .scaleToFit)
+			headerItem.view = headerView
+			menu.addItem(headerItem)
+			
+			menu.addItem(.separator())
+		} else if photos.count > 1 {
+			// Multiple photos selected - show count
+			let headerItem = NSMenuItem()
+			let multiView = PhotoContextMenuMultipleSelectionView(frame: .zero)
+			multiView.configure(with: photos.count)
+			headerItem.view = multiView
+			menu.addItem(headerItem)
+			
+			menu.addItem(.separator())
+		}
+		
+		// Open
+		let openItem = NSMenuItem(title: "Open", action: #selector(contextMenuOpen(_:)), keyEquivalent: "")
+		openItem.target = self
+		openItem.representedObject = photos
+		menu.addItem(openItem)
+		
+		// Quick Look
+		let quickLookItem = NSMenuItem(title: "Quick Look", action: #selector(contextMenuQuickLook(_:)), keyEquivalent: " ")
+		quickLookItem.target = self
+		quickLookItem.representedObject = photos
+		quickLookItem.keyEquivalentModifierMask = []
+		menu.addItem(quickLookItem)
+		
+		// Open With submenu
+		if photos.count == 1 {
+			let openWithItem = NSMenuItem(title: "Open With", action: nil, keyEquivalent: "")
+			openWithItem.submenu = createOpenWithMenu(for: photos[0])
+			menu.addItem(openWithItem)
+		}
+		
+		menu.addItem(.separator())
+		
+		// Reveal in Finder
+		let revealItem = NSMenuItem(title: "Reveal in Finder", action: #selector(contextMenuRevealInFinder(_:)), keyEquivalent: "R")
+		revealItem.target = self
+		revealItem.representedObject = photos
+		menu.addItem(revealItem)
+		
+		// Get Info
+		let infoItem = NSMenuItem(title: "Get Info", action: #selector(contextMenuGetInfo(_:)), keyEquivalent: "I")
+		infoItem.target = self
+		infoItem.representedObject = photos
+		menu.addItem(infoItem)
+		
+		return menu
+	}
+	
+	private func createOpenWithMenu(for photo: PhotoReference) -> NSMenu {
+		let menu = NSMenu()
+		
+		// Get applications that can open this file
+		let fileURL = photo.fileURL
+		let apps = LSCopyApplicationURLsForURL(fileURL as CFURL, .all)?.takeRetainedValue() as? [URL] ?? []
+		
+		// Get default app
+		let defaultApp = NSWorkspace.shared.urlForApplication(toOpen: fileURL)
+		
+		// Add default app first if available
+		if let defaultApp = defaultApp {
+			let appName = FileManager.default.displayName(atPath: defaultApp.path)
+			let defaultItem = NSMenuItem(title: "\(appName) (default)", action: #selector(contextMenuOpenWith(_:)), keyEquivalent: "")
+			defaultItem.target = self
+			defaultItem.representedObject = (photo, defaultApp)
+			menu.addItem(defaultItem)
+			menu.addItem(.separator())
+		}
+		
+		// Add other apps
+		for appURL in apps {
+			if appURL != defaultApp {
+				let appName = FileManager.default.displayName(atPath: appURL.path)
+				let item = NSMenuItem(title: appName, action: #selector(contextMenuOpenWith(_:)), keyEquivalent: "")
+				item.target = self
+				item.representedObject = (photo, appURL)
+				menu.addItem(item)
+			}
+		}
+		
+		if menu.items.isEmpty {
+			let noAppsItem = NSMenuItem(title: "No Applications", action: nil, keyEquivalent: "")
+			noAppsItem.isEnabled = false
+			menu.addItem(noAppsItem)
+		}
+		
+		return menu
+	}
+	
+	// MARK: - Context Menu Actions
+	
+	@objc private func contextMenuOpen(_ sender: NSMenuItem) {
+		guard let photos = sender.representedObject as? [PhotoReference],
+			  let firstPhoto = photos.first,
+			  let index = self.photos.firstIndex(of: firstPhoto) else { return }
+		
+		let indexPath = IndexPath(item: index, section: 0)
+		handleNavigation(at: indexPath)
+	}
+	
+	@objc private func contextMenuQuickLook(_ sender: NSMenuItem) {
+		guard let photos = sender.representedObject as? [PhotoReference] else { return }
+		
+		// Import QuickLook
+		if #available(macOS 10.15, *) {
+			let panel = QLPreviewPanel.shared()
+			panel?.dataSource = self
+			panel?.delegate = self
+			
+			// Store photos for Quick Look
+			self.quickLookPhotos = photos
+			
+			if panel?.isVisible == true {
+				panel?.reloadData()
+			} else {
+				panel?.makeKeyAndOrderFront(nil)
+			}
+		}
+	}
+	
+	@objc private func contextMenuOpenWith(_ sender: NSMenuItem) {
+		guard let (photo, appURL) = sender.representedObject as? (PhotoReference, URL) else { return }
+		
+		NSWorkspace.shared.open([photo.fileURL], withApplicationAt: appURL, configuration: NSWorkspace.OpenConfiguration())
+	}
+	
+	@objc private func contextMenuRevealInFinder(_ sender: NSMenuItem) {
+		guard let photos = sender.representedObject as? [PhotoReference] else { return }
+		
+		if photos.count == 1 {
+			NSWorkspace.shared.selectFile(photos[0].filePath, inFileViewerRootedAtPath: "")
+		} else {
+			// Reveal multiple files
+			NSWorkspace.shared.activateFileViewerSelecting(photos.map { URL(fileURLWithPath: $0.filePath) })
+		}
+	}
+	
+	@objc private func contextMenuGetInfo(_ sender: NSMenuItem) {
+		guard let photos = sender.representedObject as? [PhotoReference] else { return }
+		
+		// Open info panel for each photo
+		for photo in photos {
+			NSWorkspace.shared.activateFileViewerSelecting([photo.fileURL])
+			
+			// Use AppleScript to open Get Info
+			let script = """
+			tell application "Finder"
+				activate
+				open information window of (POSIX file "\(photo.filePath)" as alias)
+			end tell
+			"""
+			
+			if let appleScript = NSAppleScript(source: script) {
+				var error: NSDictionary?
+				appleScript.executeAndReturnError(&error)
+			}
+		}
+	}
 	#endif
 
 	#if os(macOS)
@@ -570,6 +773,69 @@ extension PhotoCollectionViewController: UICollectionViewDataSourcePrefetching {
 	
 	func collectionView(_ collectionView: UICollectionView, cancelPrefetchingForItemsAt indexPaths: [IndexPath]) {
 		// Could implement cancellation if we track tasks
+	}
+}
+#endif
+
+// MARK: - Quick Look Support
+
+#if os(macOS)
+extension PhotoCollectionViewController: QLPreviewPanelDataSource, QLPreviewPanelDelegate {
+	
+	// MARK: QLPreviewPanelDataSource
+	
+	func numberOfPreviewItems(in panel: QLPreviewPanel!) -> Int {
+		return quickLookPhotos.count
+	}
+	
+	func previewPanel(_ panel: QLPreviewPanel!, previewItemAt index: Int) -> QLPreviewItem! {
+		guard index < quickLookPhotos.count else { return nil }
+		return quickLookPhotos[index].fileURL as QLPreviewItem
+	}
+	
+	// MARK: QLPreviewPanelDelegate
+	
+	func previewPanel(_ panel: QLPreviewPanel!, handle event: NSEvent!) -> Bool {
+		// Handle keyboard events if needed
+		if event.type == .keyDown {
+			// Could handle custom keyboard shortcuts here
+		}
+		return false
+	}
+	
+	func previewPanel(_ panel: QLPreviewPanel!, sourceFrameOnScreenFor item: QLPreviewItem!) -> NSRect {
+		// Return the frame of the thumbnail for animation
+		guard let fileURL = item as? URL,
+			  let photoIndex = quickLookPhotos.firstIndex(where: { $0.fileURL == fileURL }) else {
+			return NSRect.zero
+		}
+		
+		let indexPath = IndexPath(item: photoIndex, section: 0)
+		guard let item = collectionView.item(at: indexPath),
+			  let window = view.window else {
+			return NSRect.zero
+		}
+		
+		// Convert item frame to screen coordinates
+		let itemFrameInCollection = item.view.frame
+		let itemFrameInWindow = collectionView.convert(itemFrameInCollection, to: nil)
+		let itemFrameInScreen = window.convertToScreen(itemFrameInWindow)
+		
+		return itemFrameInScreen
+	}
+	
+	override func acceptsPreviewPanelControl(_ panel: QLPreviewPanel!) -> Bool {
+		return true
+	}
+	
+	override func beginPreviewPanelControl(_ panel: QLPreviewPanel!) {
+		panel.dataSource = self
+		panel.delegate = self
+	}
+	
+	override func endPreviewPanelControl(_ panel: QLPreviewPanel!) {
+		panel.dataSource = nil
+		panel.delegate = nil
 	}
 }
 #endif
