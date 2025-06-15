@@ -1,39 +1,53 @@
-# S3 Photo Backup Service
+# S3 Photo Backup Service (Simplified)
 
-## Overview
+## Philosophy
 
-This directory contains the design documentation for integrating S3-compatible online photo backup services with Photolala. The goal is to provide seamless backup and sync capabilities for photo collections.
+Start simple. Add complexity only when needed.
+
+## What This Is
+
+A basic way to backup photos from Photolala to AWS S3. Manual uploads only. No fancy features.
 
 ## Documentation Structure
 
-- `design/` - Design documents and architecture
-- `api/` - API specifications and interfaces
-- `requirements/` - Feature requirements and user stories
-- `security/` - Security considerations and best practices
+- `design/` - Simple design document
+- `requirements/` - What we're building (and what we're NOT)
+- `api/` - API design (for later)
+- `security/` - Security notes
 
-## Status
+## Current Status
 
-🚧 **Design Phase** - Currently documenting requirements and architecture
+🚧 **Design Phase** - Simplified approach defined
 
-## Goals
+## Phase 1 Goals (MVP)
 
-1. Provide automatic backup of local photos to S3-compatible storage
-2. Support multiple S3 providers (AWS S3, Backblaze B2, Wasabi, MinIO, etc.)
-3. Enable selective sync and smart caching
-4. Maintain photo metadata and folder structure
-5. Ensure secure and efficient transfers
+1. Connect to AWS S3
+2. Upload a folder of photos
+3. Track what's been uploaded
+4. Show progress
+5. That's it!
 
-## Non-Goals (Phase 1)
+## What We're NOT Doing (Yet)
 
-- Full two-way sync (initial focus on backup)
-- Photo editing in cloud
-- Sharing features
-- Mobile app integration
+- ❌ Multiple providers (just AWS)
+- ❌ Automatic backup
+- ❌ Two-way sync
+- ❌ Encryption
+- ❌ iOS support
+- ❌ Intel Macs
+- ❌ Background uploads
 
-## Key Considerations
+## Technical Choices
 
-- **Performance**: Efficient upload/download with resume capability
-- **Security**: Encrypted transfers and storage options
-- **Cost**: Optimize for storage and bandwidth costs
-- **Reliability**: Handle network interruptions gracefully
-- **Privacy**: User control over what gets backed up
+- **Storage**: Simple JSON file (no database)
+- **Platform**: macOS 14+ on Apple Silicon only
+- **UI**: Basic SwiftUI view
+- **Security**: macOS Keychain for credentials
+
+## Next Steps
+
+1. Review simplified design
+2. Pick AWS SDK version
+3. Build basic prototype
+4. Test with real photos
+5. Get user feedback

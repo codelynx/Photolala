@@ -1,102 +1,66 @@
-# S3 Backup Service Technical Requirements
+# S3 Backup Service Technical Requirements (Simplified)
 
 ## Platform Requirements
 
-### macOS
+### macOS Only (Phase 1)
 - **Minimum OS**: macOS 14.0 (Sonoma)
-- **Architecture**: Universal Binary (Apple Silicon + Intel)
-- **Frameworks**: 
+- **Architecture**: Apple Silicon only
+- **Frameworks**:
   - Foundation
-  - Network.framework (for connection monitoring)
   - Security.framework (for keychain)
-  - BackgroundTasks.framework (for background uploads)
+  - AWS SDK for Swift
 
-### iOS/iPadOS
-- **Minimum OS**: iOS 17.0
-- **Background Modes**: Background fetch, Background processing
-- **Capabilities**: 
-  - Network access
-  - Background refresh
-  - Extended background execution
+### No iOS Support (Phase 1)
+- Focus on macOS first
+- iOS can be added later if needed
 
 ## S3 API Requirements
 
-### Minimum S3 Operations
-- `ListBuckets` - List available buckets
-- `CreateBucket` - Create new bucket
-- `HeadBucket` - Check bucket exists/accessible
-- `PutObject` - Upload files
-- `HeadObject` - Check if file exists
-- `GetObject` - Download files (future)
-- `ListObjectsV2` - List bucket contents
-- `DeleteObject` - Remove files (optional)
+### Phase 1: Basic Operations Only
+- `ListBuckets` - Show user their buckets
+- `PutObject` - Upload photos
+- `HeadObject` - Check if photo already uploaded
 
-### S3 Features Used
-- **Multipart Upload** - For files > 5MB
-- **Storage Classes** - STANDARD, STANDARD_IA, GLACIER
-- **Server-Side Encryption** - SSE-S3, SSE-KMS
-- **Object Metadata** - Store photo metadata
-- **ETags** - For integrity verification
+### That's it!
 
-## Performance Requirements
+Later phases might add:
+- Multipart upload for large files
+- Different storage classes
+- Download capability
 
-### Upload Performance
-- **Chunk Size**: 5MB - 20MB (configurable)
-- **Concurrent Parts**: 3-5 for multipart upload
-- **Memory Usage**: < 100MB for upload buffers
-- **CPU Usage**: < 20% during uploads
+## Simple Requirements
 
-### Network Efficiency
-- **Retry Strategy**: Exponential backoff (1s, 2s, 4s, 8s, 16s)
-- **Timeout**: 30s per request
-- **Keep-Alive**: Connection pooling
-- **Compression**: Optional for metadata
+### Performance
+- Upload one file at a time (no concurrency yet)
+- Use whatever the AWS SDK defaults to
+- Don't worry about optimization in Phase 1
 
-## Data Storage Requirements
+### Data Storage
 
-### Local Database
-- **Technology**: SQLite or Core Data
-- **Schema**:
-  ```sql
-  -- Backup Status
-  CREATE TABLE uploaded_files (
-    id INTEGER PRIMARY KEY,
-    local_path TEXT NOT NULL,
-    s3_key TEXT NOT NULL,
-    etag TEXT NOT NULL,
-    size INTEGER NOT NULL,
-    uploaded_at TIMESTAMP NOT NULL,
-    last_modified TIMESTAMP NOT NULL,
-    checksum TEXT,
-    metadata TEXT -- JSON
-  );
-  
-  -- Upload Queue
-  CREATE TABLE upload_queue (
-    id INTEGER PRIMARY KEY,
-    local_path TEXT NOT NULL,
-    priority INTEGER DEFAULT 0,
-    retry_count INTEGER DEFAULT 0,
-    last_error TEXT,
-    queued_at TIMESTAMP NOT NULL,
-    next_retry TIMESTAMP
-  );
-  
-  -- Provider Configuration
-  CREATE TABLE providers (
-    id INTEGER PRIMARY KEY,
-    name TEXT NOT NULL,
-    type TEXT NOT NULL,
-    endpoint TEXT NOT NULL,
-    bucket TEXT NOT NULL,
-    config TEXT -- JSON
-  );
-  ```
+#### No Database!
+Use a simple JSON file instead:
+- Location: `~/Library/Application Support/Photolala/backup-state.json`
+- Human readable
+- Easy to debug
+- No dependencies
 
-### File System
-- **Cache Directory**: `~/Library/Caches/Photolala/S3Backup/`
-- **Temp Directory**: For multipart chunks
-- **Metadata Cache**: Extracted metadata files
+#### JSON Structure
+```json
+{
+  "version": 1,
+  "lastBackup": "2025-06-15T10:30:00Z",
+  "files": {
+    "/path/to/photo.jpg": {
+      "uploadedAt": "2025-06-15T10:30:00Z",
+      "size": 2048576,
+      "s3Key": "photos/photo.jpg"
+    }
+  }
+}
+```
+
+[KY] I am not confident' we can discuss later
+
 
 ## Security Requirements
 
