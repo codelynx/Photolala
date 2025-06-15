@@ -235,30 +235,25 @@ Last Updated: June 15, 2025
    - Users start with a clean state each time
    - Added Photos library entitlement for future features
 
-13. **Implemented Selection System (June 13 - Session 5)**:
-   - Created SelectionManager class (per-window):
-     - Tracks selectedItems, anchorItem, and focusedItem
-     - Methods for single/multi/range selection
-     - Designed for keyboard and mouse interactions
+13. **~~Implemented Selection System (June 13 - Session 5)~~** → **Replaced with System-Native Selection (June 15)**:
+   - ~~Created SelectionManager class (per-window)~~ - REMOVED
+   - Now uses platform-native selection:
+     - iOS: UICollectionView's built-in selection
+     - macOS: NSCollectionView's built-in selection
    - Visual feedback implementation:
      - Selected: 3px blue border + light blue background
      - Focus: 2px system focus color border (for keyboard navigation)
-   - Integration approach simplified:
-     - Initially tried custom keyboard/mouse handling
-     - Discovered conflict with NSCollectionView's built-in selection
-     - Pivoted to using native collection view selection
-     - SelectionManager now syncs with collection view state
-   - What works (via NSCollectionView):
+   - What works (via native collection views):
      - Single click selection
      - Cmd+click toggle selection
      - Shift+click range selection
      - Arrow key navigation
      - Shift+arrow extending selection
-   - Trade-offs accepted:
-     - Less control over exact selection behavior
-     - Some edge cases don't work as originally designed
-     - Simpler, more maintainable code
+   - Benefits of native approach:
+     - No custom state management needed
      - Platform-consistent behavior
+     - Built-in keyboard/accessibility support
+     - Significantly less code to maintain
 
 ### 🐛 Known Issues
 
@@ -323,13 +318,14 @@ Last Updated: June 15, 2025
 **Added:**
 - `photolala/Models/PhotoReference.swift`
 - `photolala/Models/ThumbnailDisplaySettings.swift` - Display mode and size settings
-- `photolala/Models/SelectionManager.swift` - Selection state management
+- ~~`photolala/Models/SelectionManager.swift` - Selection state management~~ → REMOVED (June 15)
 - `photolala/Models/PhotoMetadata.swift` - Metadata storage class
 - `photolala/Models/PhotoSortOption.swift` - Sort options enum
 - `photolala/Services/DirectoryScanner.swift`
 - `photolala/Services/PhotoManager.swift` - Thumbnail generation and caching (enhanced with statistics)
 - `photolala/Views/PhotoPreviewView.swift` - Full image preview with zoom/pan
 - `photolala/Views/CacheStatisticsView.swift` - Cache performance monitoring UI
+- `photolala/Views/ScalableImageView.swift` - Custom NSImageView for aspect fill on macOS
 - `docs/project-status.md` (this file)
 - `docs/thumbnail-display-options-design.md` - Design for display options feature
 - `docs/thumbnail-display-implementation-plan.md` - Implementation plan
@@ -345,7 +341,7 @@ Last Updated: June 15, 2025
 
 **Modified:**
 - `photolala/Views/PhotoCollectionViewController.swift` - Added selection support, iOS selection mode, prefetching delegates, sort support
-- `photolala/Views/PhotoBrowserView.swift` - Added SelectionManager, iOS selection mode, preview presentation, sort picker
+- `photolala/Views/PhotoBrowserView.swift` - ~~Added SelectionManager~~ → Uses native selection, iOS selection mode, preview presentation, sort picker
 - `photolala/Views/WelcomeView.swift` - Removed test buttons, added iOS auto-navigation
 - `photolala/Views/PhotoPreviewView.swift` - Added image preloading for adjacent photos
 - `photolala/photolalaApp.swift` - Added NSApplicationDelegate for window restoration control
@@ -433,9 +429,9 @@ Last Updated: June 15, 2025
    - Implemented notification system for cross-window deselect functionality
    - PhotoBrowserView listens for deselect notification
    - PhotoCollectionViewController handles deselect for both platforms:
-     - macOS: Clears selection manager and native collection view
-     - iOS: Deselects items and updates UI in selection mode
-   - iOS maintains existing "Deselect All" button in selection mode
+     - macOS: Clears native collection view selection
+     - iOS: Deselects items via collection view API
+   - ~~iOS maintains existing "Deselect All" button in selection mode~~ → Removed with selection mode
 
 21. **Implemented Native Thumbnail Strip (June 15 - Session 12)**:
    - Replaced SwiftUI LazyHStack with native collection views for performance:
@@ -469,9 +465,83 @@ Last Updated: June 15, 2025
 5. **Per-Window Settings**: Each window has independent display settings for flexibility
 6. **Enum-Based Configuration**: ThumbnailOption encapsulates all size-related layout properties
 7. **No Window Restoration**: App starts fresh each time for cleaner user experience
-8. **Native Collection View Selection**: Chose simplicity over custom behavior
-   - Use NSCollectionView's built-in selection mechanism
-   - Trade control for maintainability and platform consistency
-   - SelectionManager syncs with collection view state
+8. **Native Collection View Selection**: System-only approach
+   - Use platform-native selection APIs exclusively
+   - No custom SelectionManager - simpler architecture
+   - Selection state maintained by collection views
+   - Trade custom behavior for platform consistency
 9. **Memory-Aware Caching**: Dynamic cache sizing based on available RAM
 10. **Performance Monitoring**: Built-in statistics for optimization feedback
+22. **Removed SelectionManager - Switch to System-Native Selection (June 15 - Session 13)**:
+   - Completely removed custom SelectionManager class
+   - Switched to platform-native selection mechanisms:
+     - iOS: UICollectionView's `allowsMultipleSelection` and `indexPathsForSelectedItems`
+     - macOS: NSCollectionView's `allowsMultipleSelection` and `selectionIndexPaths`
+   - Simplified PhotoCollectionViewController:
+     - Removed all selection mode code (iOS now always allows selection)
+     - Removed `isSelectionMode`, `enterSelectionMode()`, `exitSelectionMode()`
+     - Selection state managed entirely by collection views
+     - Added `updateSelectionState()` call in cell's `isSelected` didSet
+   - Updated PhotoBrowserView:
+     - Replaced `selectionManager` with simple `selectedPhotos` array
+     - Selection changes communicated via `onSelectionChanged` callback
+   - Benefits:
+     - Significantly less code to maintain (593 lines removed)
+     - Consistent with platform behavior
+     - Free keyboard navigation and accessibility support
+     - Simpler state management
+   - iOS behavior changes:
+     - Single tap now selects/deselects (no selection mode needed)
+     - Double tap navigates to preview (avoiding conflict with selection)
+     - Selection always available, following system convention
+   - Fixed iOS selection issues:
+     - Selection now preserved during scrolling
+     - Collection view layout updates no longer clear selection
+     - Cell reuse properly syncs selection state
+     - `reloadData()` saves and restores selection
+     - `updateCollectionViewLayout()` uses `invalidateLayout()` instead of `reloadData()`
+
+23. **Improved Cell Update Pattern (June 15 - Session 13)**:
+   - Refactored both iOS and macOS cells to use proper layout invalidation pattern
+   - Property changes now trigger layout invalidation:
+     - iOS: `setNeedsLayout()` → `layoutSubviews()`
+     - macOS: `needsLayout = true` → `layout()`
+   - All visual updates (display mode, corner radius, selection) happen in one layout pass
+   - Benefits:
+     - Fixed display mode not being applied on first display
+     - More efficient batching of updates
+     - Consistent pattern across platforms
+     - Prevents timing issues and partial updates
+
+24. **Implemented ScalableImageView for macOS Aspect Fill (June 15 - Session 13)**:
+   - Created custom NSImageView subclass to properly handle scale modes
+   - Fixed issue where NSImageView lacks proper aspect fill support
+   - Implementation details:
+     - ScalableImageView with `.scaleToFit` and `.scaleToFill` modes
+     - Custom draw method calculates proper aspect ratios
+     - Clipping applied for scale-to-fill to prevent overflow
+     - Matches iOS UIImageView behavior
+   - Fixed issues:
+     - Square images (1024x1024) now scale correctly without unwanted zoom
+     - Consistent behavior across all image aspect ratios
+     - Proper aspect fill that maintains ratio while filling cell
+   - Integration:
+     - Replaced NSImageView with ScalableImageView in PhotoCollectionViewItem
+     - Connected to existing ThumbnailDisplaySettings.displayMode
+
+25. **Improved Thumbnail Loading UI/UX (June 15 - Session 13)**:
+   - Added SF Symbol placeholders while thumbnails load:
+     - Loading state: "circle.dotted" icon with light gray tint
+     - Error state: "exclamationmark.triangle" icon with red tint
+   - Fixed potential UI blocking in thumbnail loading:
+     - Removed `Task { @MainActor in ... }` pattern
+     - Thumbnail loading now runs on background queue
+     - Only UI updates use `MainActor.run { }`
+   - Improvements applied to both iOS and macOS:
+     - Consistent loading indicators across platforms
+     - Smooth scrolling performance maintained
+     - Better error feedback with visual indicators
+   - UI refinements:
+     - Made wrapper view transparent on macOS
+     - Removed gray background placeholders
+     - Icons provide clearer loading state feedback

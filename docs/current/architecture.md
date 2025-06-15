@@ -28,10 +28,11 @@ Photolala is a cross-platform photo browser application built with SwiftUI, supp
 - Display modes: Scale to Fit / Scale to Fill
 - Size options: Small (64px), Medium (128px), Large (256px)
 
-#### SelectionManager
-- Per-window selection state
-- Tracks selected items, anchor, and focus
-- Syncs with native collection view selection
+#### Selection System
+- Uses native collection view selection
+- No custom SelectionManager
+- State maintained by UICollectionView/NSCollectionView
+- Selection changes communicated via callbacks
 
 ### Services
 
@@ -61,6 +62,10 @@ Photolala is a cross-platform photo browser application built with SwiftUI, supp
 - Handles platform-specific interactions:
   - macOS: Double-click navigation
   - iOS: Tap navigation, selection mode
+- Cell update pattern:
+  - Property changes trigger layout invalidation
+  - All visual updates batched in layout pass
+  - Ensures consistency and efficiency
 
 #### PhotoPreviewView
 - Pure SwiftUI implementation
@@ -100,7 +105,7 @@ Tap photo → Push PhotoPreviewView
 
 1. **Directory Scanning**: DirectoryScanner → [PhotoReference]
 2. **Thumbnail Loading**: PhotoReference → PhotoManager → Cached Thumbnail
-3. **Selection**: User Interaction → SelectionManager → UI Updates
+3. **Selection**: User Interaction → Native Collection View → Callback → UI Updates
 4. **Navigation**: Selection/Tap → NavigationStack → New View
 
 ## Platform Differences
@@ -133,3 +138,60 @@ Tap photo → Push PhotoPreviewView
 - Main actor for UI updates
 - Async/await for image operations
 - No priority inversions (fixed in implementation)
+
+## Implementation Patterns
+
+### ScalableImageView (macOS)
+Custom NSImageView subclass that provides proper aspect fill/fit modes:
+- Implements custom `draw(_:)` method
+- Provides `.scaleToFit` and `.scaleToFill` modes
+- Matches iOS UIImageView content mode behavior
+- Handles aspect ratio calculations and clipping
+
+### Cell Update Pattern
+Both iOS and macOS cells use a consistent update pattern:
+
+```swift
+// iOS
+override func layoutSubviews() {
+    super.layoutSubviews()
+    updateDisplayMode()
+    updateCornerRadius()
+    updateSelectionState()
+}
+
+// macOS
+override func layout() {
+    super.layout()
+    updateDisplayMode()
+    updateCornerRadius()
+    updateSelectionState()
+}
+```
+
+Benefits:
+- Single update pass for all visual changes
+- Automatic batching of property changes
+- Consistent timing and state
+- Platform-appropriate implementation
+
+### Async Thumbnail Loading Pattern
+Proper threading to avoid UI blocking:
+
+```swift
+Task {
+    // Heavy work on background queue
+    let thumbnail = try await loadThumbnail()
+    
+    // UI updates on main thread
+    await MainActor.run {
+        imageView.image = thumbnail
+    }
+}
+```
+
+Benefits:
+- Thumbnail loading/decoding happens off main thread
+- UI remains responsive during loading
+- Smooth scrolling in collection views
+- Loading indicators shown immediately
