@@ -359,6 +359,99 @@ class S3BackupService: ObservableObject {
 
 		return photos
 	}
+	
+	// MARK: - Restore Operations
+	
+	/// Initiate restore for an archived photo
+	func restorePhoto(md5: String, userId: String, rushDelivery: Bool = false) async throws {
+		let key = "users/\(userId)/photos/\(md5).dat"
+		
+		// Create restore request
+		let input = RestoreObjectInput(
+			bucket: bucketName,
+			key: key,
+			restoreRequest: S3ClientTypes.RestoreRequest(
+				days: 30, // Keep restored for 30 days
+				glacierJobParameters: S3ClientTypes.GlacierJobParameters(
+					tier: rushDelivery ? .expedited : .standard
+				)
+			)
+		)
+		
+		do {
+			_ = try await client.restoreObject(input: input)
+			print("[S3BackupService] Restore initiated for \(key)")
+		} catch {
+			// Check if already restored/restoring
+			if error.localizedDescription.contains("RestoreAlreadyInProgress") {
+				print("[S3BackupService] Restore already in progress for \(key)")
+				return
+			}
+			throw error
+		}
+	}
+	
+	/// Check restore status for a photo
+	func checkRestoreStatus(md5: String, userId: String) async throws -> RestoreStatus {
+		let key = "users/\(userId)/photos/\(md5).dat"
+		
+		let input = HeadObjectInput(
+			bucket: bucketName,
+			key: key
+		)
+		
+		let response = try await client.headObject(input: input)
+		
+		// Parse restore header
+		if let restore = response.restore {
+			if restore.contains("ongoing-request=\"true\"") {
+				// Extract expiry time if available
+				if let expiryRange = restore.range(of: "expiry-date=\"([^\"]+)\"", options: .regularExpression),
+				   let dateString = restore[expiryRange].split(separator: "\"").last {
+					let formatter = ISO8601DateFormatter()
+					if let expiryDate = formatter.date(from: String(dateString)) {
+						return .inProgress(estimatedCompletion: expiryDate)
+					}
+				}
+				return .inProgress(estimatedCompletion: nil)
+			} else if restore.contains("ongoing-request=\"false\"") {
+				// Extract expiry date
+				if let expiryRange = restore.range(of: "expiry-date=\"([^\"]+)\"", options: .regularExpression),
+				   let dateString = restore[expiryRange].split(separator: "\"").last {
+					let formatter = ISO8601DateFormatter()
+					if let expiryDate = formatter.date(from: String(dateString)) {
+						return .completed(expiresAt: expiryDate)
+					}
+				}
+				return .completed(expiresAt: nil)
+			}
+		}
+		
+		// Check storage class
+		if let storageClass = response.storageClass,
+		   (storageClass == .deepArchive || storageClass == .glacier) {
+			return .notStarted
+		}
+		
+		return .available
+	}
+	
+	/// Batch restore multiple photos
+	func restorePhotos(md5s: [String], userId: String, rushDelivery: Bool = false) async throws {
+		var errors: [Error] = []
+		
+		for md5 in md5s {
+			do {
+				try await restorePhoto(md5: md5, userId: userId, rushDelivery: rushDelivery)
+			} catch {
+				errors.append(error)
+			}
+		}
+		
+		if !errors.isEmpty {
+			throw S3BackupError.batchRestoreFailed(errors: errors)
+		}
+	}
 }
 
 // MARK: - Supporting Types
@@ -370,10 +463,18 @@ struct PhotoEntry {
 	let storageClass: String
 }
 
+enum RestoreStatus {
+	case notStarted
+	case inProgress(estimatedCompletion: Date?)
+	case completed(expiresAt: Date?)
+	case available // Not archived, immediately available
+}
+
 enum S3BackupError: Error, LocalizedError {
 	case credentialsNotFound
 	case uploadFailed
 	case photoNotFound
+	case batchRestoreFailed(errors: [Error])
 
 	var errorDescription: String? {
 		switch self {
@@ -383,6 +484,8 @@ enum S3BackupError: Error, LocalizedError {
 			"Failed to upload file to S3"
 		case .photoNotFound:
 			"Photo not found in S3"
+		case .batchRestoreFailed(let errors):
+			"Failed to restore \(errors.count) photos"
 		}
 	}
 }

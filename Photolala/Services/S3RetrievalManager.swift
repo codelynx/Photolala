@@ -20,12 +20,12 @@ class S3RetrievalManager: ObservableObject {
 	func requestRetrieval(for photo: PhotoReference, rushDelivery: Bool = false) async throws {
 		guard let md5 = photo.md5Hash,
 		      let userId = identityManager.currentUser?.appleUserID else {
-			throw RetrievalError.missingUserInfo
+			throw PhotoRetrievalError.missingUserInfo
 		}
 		
 		// Check if already retrieving
 		if activeRetrievals[md5] != nil {
-			throw RetrievalError.alreadyRetrieving
+			throw PhotoRetrievalError.alreadyRetrieving
 		}
 		
 		isRetrieving = true
@@ -42,13 +42,8 @@ class S3RetrievalManager: ObservableObject {
 		activeRetrievals[md5] = retrieval
 		
 		// Initiate S3 restore request
-		let key = "users/\(userId)/photos/\(md5).dat"
-		
-		// For now, just update status - actual S3 restore API requires more setup
-		// TODO: Implement actual S3 restore when API is available
 		do {
-			// Simulate restore request for now
-			print("[S3RetrievalManager] Would initiate restore for key: \(key)")
+			try await s3Service.restorePhoto(md5: md5, userId: userId, rushDelivery: rushDelivery)
 			
 			// Update status to in progress
 			activeRetrievals[md5] = PhotoRetrieval(
@@ -60,7 +55,7 @@ class S3RetrievalManager: ObservableObject {
 			
 			// Start monitoring restore status
 			Task {
-				await monitorRestoreStatus(for: md5, key: key)
+				await monitorRestoreStatus(for: md5, userId: userId)
 			}
 			
 		} catch {
@@ -88,48 +83,81 @@ class S3RetrievalManager: ObservableObject {
 		}
 		
 		if !errors.isEmpty {
-			throw RetrievalError.batchErrors(errors)
+			throw PhotoRetrievalError.batchErrors(errors)
 		}
 	}
 	
 	/// Monitor restore status for a photo
-	private func monitorRestoreStatus(for md5: String, key: String) async {
+	private func monitorRestoreStatus(for md5: String, userId: String) async {
 		var checkCount = 0
 		let maxChecks = 48 // Check for up to 48 hours
-		let checkInterval: TimeInterval = 3600 // Check every hour
+		let checkInterval: TimeInterval = 900 // Check every 15 minutes initially
 		
 		while checkCount < maxChecks {
-			try? await Task.sleep(nanoseconds: UInt64(checkInterval * 1_000_000_000))
+			// Wait before checking (shorter initially, longer as time goes on)
+			let waitTime = checkCount < 4 ? checkInterval : checkInterval * 4 // Every hour after first hour
+			try? await Task.sleep(nanoseconds: UInt64(waitTime * 1_000_000_000))
 			
 			// Check if still monitoring this retrieval
-			guard activeRetrievals[md5] != nil else { break }
+			guard let retrieval = activeRetrievals[md5] else { break }
 			
-			// Check restore status
-			// TODO: Implement actual head object call when S3 service exposes client
-			// For now, simulate completion after some checks
-			if checkCount > 2 {
-				// Simulate restore complete after 2 checks
-				activeRetrievals[md5] = PhotoRetrieval(
-					photoMD5: md5,
-					requestedAt: activeRetrievals[md5]!.requestedAt,
-					estimatedReadyAt: Date(),
-					status: .completed
-				)
+			do {
+				// Check restore status
+				let status = try await s3Service.checkRestoreStatus(md5: md5, userId: userId)
 				
-				// Send notification
-				await sendRestoreCompleteNotification(for: md5)
-				break
-			} else {
-				// Still in progress
-				let progress = Double(checkCount) / Double(maxChecks)
-				if let retrieval = activeRetrievals[md5] {
+				switch status {
+				case .completed(let expiresAt):
+					// Restore complete!
+					activeRetrievals[md5] = PhotoRetrieval(
+						photoMD5: md5,
+						requestedAt: retrieval.requestedAt,
+						estimatedReadyAt: Date(),
+						status: .completed
+					)
+					
+					// Update archive info if we have the photo reference
+					if let expiresAt = expiresAt {
+						// TODO: Update photo's archive info with expiry date
+						print("[S3RetrievalManager] Photo restored, expires at: \(expiresAt)")
+					}
+					
+					// Send notification
+					await sendRestoreCompleteNotification(for: md5)
+					return
+					
+				case .inProgress(let estimatedCompletion):
+					// Update progress estimate
+					let progress = Double(checkCount) / Double(maxChecks)
+					activeRetrievals[md5] = PhotoRetrieval(
+						photoMD5: md5,
+						requestedAt: retrieval.requestedAt,
+						estimatedReadyAt: estimatedCompletion ?? retrieval.estimatedReadyAt,
+						status: .inProgress(percentComplete: progress)
+					)
+					
+				case .notStarted:
+					// Shouldn't happen, but handle it
+					print("[S3RetrievalManager] Warning: Restore not started for \(md5)")
 					activeRetrievals[md5] = PhotoRetrieval(
 						photoMD5: md5,
 						requestedAt: retrieval.requestedAt,
 						estimatedReadyAt: retrieval.estimatedReadyAt,
-						status: .inProgress(percentComplete: progress)
+						status: .failed(error: "Restore not started")
 					)
+					return
+					
+				case .available:
+					// Photo is already available (not archived)
+					activeRetrievals[md5] = PhotoRetrieval(
+						photoMD5: md5,
+						requestedAt: retrieval.requestedAt,
+						estimatedReadyAt: Date(),
+						status: .completed
+					)
+					return
 				}
+			} catch {
+				print("[S3RetrievalManager] Error checking restore status: \(error)")
 			}
 			
 			checkCount += 1
@@ -176,24 +204,5 @@ class S3RetrievalManager: ObservableObject {
 	func cancelRetrieval(for photo: PhotoReference) {
 		guard let md5 = photo.md5Hash else { return }
 		activeRetrievals.removeValue(forKey: md5)
-	}
-}
-
-// MARK: - Errors
-
-enum RetrievalError: LocalizedError {
-	case missingUserInfo
-	case alreadyRetrieving
-	case batchErrors([Error])
-	
-	var errorDescription: String? {
-		switch self {
-		case .missingUserInfo:
-			return "User information not available"
-		case .alreadyRetrieving:
-			return "This photo is already being retrieved"
-		case .batchErrors(let errors):
-			return "Failed to retrieve \(errors.count) photos"
-		}
 	}
 }

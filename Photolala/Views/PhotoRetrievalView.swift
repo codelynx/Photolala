@@ -1,4 +1,5 @@
 import SwiftUI
+import CryptoKit
 
 struct PhotoRetrievalView: View {
 	let photoReference: PhotoReference
@@ -7,8 +8,10 @@ struct PhotoRetrievalView: View {
 	@State private var rushDelivery = false
 	@Binding var isPresented: Bool
 	
-	@EnvironmentObject var s3BackupService: S3BackupService
+	@EnvironmentObject var s3BackupManager: S3BackupManager
 	@EnvironmentObject var identityManager: IdentityManager
+	@State private var isRetrieving = false
+	@State private var retrievalError: String?
 	
 	enum RetrievalOption: String, CaseIterable {
 		case singlePhoto = "single"
@@ -101,15 +104,25 @@ struct PhotoRetrievalView: View {
 					isPresented = false
 				}
 				.secondaryButtonStyle()
+				.disabled(isRetrieving)
 				
 				Button(action: startRetrieval) {
-					HStack {
-						Image(systemName: "flame.fill")
-						Text("Thaw Photo\(selectedOption == .singlePhoto ? "" : "s")")
+					if isRetrieving {
+						HStack {
+							ProgressView()
+								.progressViewStyle(CircularProgressViewStyle())
+								.scaleEffect(0.8)
+							Text("Processing...")
+						}
+					} else {
+						HStack {
+							Image(systemName: "flame.fill")
+							Text("Thaw Photo\(selectedOption == .singlePhoto ? "" : "s")")
+						}
 					}
 				}
 				.primaryButtonStyle()
-				.disabled(!canStartRetrieval)
+				.disabled(!canStartRetrieval || isRetrieving)
 			}
 			.padding()
 			
@@ -135,6 +148,19 @@ struct PhotoRetrievalView: View {
 			}
 			.padding(.horizontal)
 			.padding(.bottom)
+			
+			// Error display
+			if let error = retrievalError {
+				HStack {
+					Image(systemName: "exclamationmark.triangle.fill")
+						.foregroundColor(.red)
+					Text(error)
+						.font(.caption)
+						.foregroundColor(.red)
+				}
+				.padding(.horizontal)
+				.padding(.bottom, 8)
+			}
 		}
 		.frame(width: 400)
 		.background(Color(XPlatform.secondaryBackgroundColor))
@@ -204,9 +230,80 @@ struct PhotoRetrievalView: View {
 	// MARK: - Actions
 	
 	private func startRetrieval() {
-		// TODO: Implement retrieval request
-		print("Starting retrieval for \(photoCount(for: selectedOption)) photos")
-		isPresented = false
+		guard let s3Service = s3BackupManager.s3Service,
+		      let userId = identityManager.currentUser?.appleUserID else {
+			retrievalError = "Service not configured"
+			return
+		}
+		
+		isRetrieving = true
+		
+		Task {
+			do {
+				switch selectedOption {
+				case .singlePhoto:
+					// Restore single photo
+					let md5: String
+					if let existingMD5 = photoReference.md5Hash {
+						md5 = existingMD5
+					} else {
+						guard let computedMD5 = await computeMD5() else {
+							throw PhotoRetrievalError.missingMD5
+						}
+						md5 = computedMD5
+					}
+					try await s3Service.restorePhoto(md5: md5, userId: userId, rushDelivery: rushDelivery)
+					
+				case .selectedPhotos:
+					// TODO: Get selected photos from selection manager
+					// For now, just restore the single photo
+					let md5: String
+					if let existingMD5 = photoReference.md5Hash {
+						md5 = existingMD5
+					} else {
+						guard let computedMD5 = await computeMD5() else {
+							throw PhotoRetrievalError.missingMD5
+						}
+						md5 = computedMD5
+					}
+					try await s3Service.restorePhoto(md5: md5, userId: userId, rushDelivery: rushDelivery)
+					
+				case .entireAlbum:
+					// TODO: Get all photos in album
+					// For now, just restore the single photo
+					let md5: String
+					if let existingMD5 = photoReference.md5Hash {
+						md5 = existingMD5
+					} else {
+						guard let computedMD5 = await computeMD5() else {
+							throw PhotoRetrievalError.missingMD5
+						}
+						md5 = computedMD5
+					}
+					try await s3Service.restorePhoto(md5: md5, userId: userId, rushDelivery: rushDelivery)
+				}
+				
+				await MainActor.run {
+					isRetrieving = false
+					isPresented = false
+				}
+			} catch {
+				await MainActor.run {
+					isRetrieving = false
+					retrievalError = error.localizedDescription
+				}
+			}
+		}
+	}
+	
+	private func computeMD5() async -> String? {
+		do {
+			let data = try Data(contentsOf: photoReference.fileURL)
+			let digest = Insecure.MD5.hash(data: data)
+			return digest.map { String(format: "%02hhx", $0) }.joined()
+		} catch {
+			return nil
+		}
 	}
 }
 
@@ -269,6 +366,28 @@ struct RetrievalOptionRow: View {
 		}
 		.buttonStyle(.plain)
 		.padding(.horizontal)
+	}
+}
+
+// MARK: - Errors
+
+enum PhotoRetrievalError: LocalizedError {
+	case missingMD5
+	case missingUserInfo
+	case alreadyRetrieving
+	case batchErrors([Error])
+	
+	var errorDescription: String? {
+		switch self {
+		case .missingMD5:
+			return "Unable to compute photo identifier"
+		case .missingUserInfo:
+			return "User information not available"
+		case .alreadyRetrieving:
+			return "This photo is already being retrieved"
+		case .batchErrors(let errors):
+			return "Failed to retrieve \(errors.count) photos"
+		}
 	}
 }
 

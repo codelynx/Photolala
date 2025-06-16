@@ -1,6 +1,6 @@
 # Photolala Project Status
 
-Last Updated: June 16, 2025
+Last Updated: June 16, 2025 (Session 4)
 
 ## Current Implementation Status
 
@@ -344,6 +344,14 @@ Last Updated: June 16, 2025
 - `photolala/Views/SignInPromptView.swift` - Sign in with Apple onboarding
 - `photolala/Views/UserAccountView.swift` - User account status display
 - `photolala/Views/AWSCredentialsView.swift` - AWS credential configuration (dev only)
+- `photolala/Views/SubscriptionView.swift` - IAP subscription selection UI
+- `photolala/Views/IAPTestView.swift` - IAP testing interface
+- `photolala/Views/PhotoRetrievalView.swift` - Archive photo retrieval dialog
+- `photolala/Views/PhotoArchiveBadge.swift` - Visual indicators for archived photos
+- `photolala/Models/ArchiveStatus.swift` - S3 storage class and archive lifecycle models
+- `photolala/Services/S3RetrievalManager.swift` - Manages photo restoration requests
+- `photolala/Services/IAPManager.swift` - StoreKit 2 subscription management
+- `photolala/PhotolalaProducts.storekit` - IAP product configuration
 - `docs/project-status.md` (this file)
 - `docs/thumbnail-display-options-design.md` - Design for display options feature
 - `docs/thumbnail-display-implementation-plan.md` - Implementation plan
@@ -354,11 +362,18 @@ Last Updated: June 16, 2025
 - `docs/planning/macos-context-menu-design.md` - Design and implementation for context menu
 - `docs/cache-statistics-guide.md` - Guide for using cache statistics
 - `docs/planning/photo-grouping-design.md` - Design for photo grouping feature
+- `docs/planning/iap-testing-guide.md` - Complete IAP testing guide
+- `docs/current/archive-retrieval-system.md` - Archive retrieval architecture and implementation
 - `scripts/create-test-photos.sh` - Script to create test photos with different dates
 - `services/s3-backup/` - Complete S3 backup service design documentation
   - `/design/identity-management-design.md` - Identity and authentication architecture
   - `/design/payment-evolution-strategy.md` - IAP to web payment evolution
   - `/design/cross-platform-identity-strategy.md` - Multi-platform expansion plan
+  - `/design/CURRENT-pricing-strategy.md` - Current pricing model and strategy
+  - `/design/deep-archive-analysis.md` - Deep Archive cost analysis and UX
+  - `/design/user-communication-strategy.md` - User messaging for archive features
+  - `/design/implementation-checklist.md` - Complete feature implementation checklist
+  - `/design/implementation-plan-v2.md` - Updated implementation roadmap
   - `/implementation/aws-sdk-swift-credentials.md` - AWS credential handling
   - `/research/game-industry-identity-patterns.md` - Industry best practices
 
@@ -367,15 +382,16 @@ Last Updated: June 16, 2025
 - Various test/sample code
 
 **Modified:**
-- `photolala/Views/PhotoCollectionViewController.swift` - Added selection support, iOS selection mode, prefetching delegates, sort support, section support
-- `photolala/Views/PhotoBrowserView.swift` - ~~Added SelectionManager~~ → Uses native selection, iOS selection mode, preview presentation, sort picker, grouping menu
+- `photolala/Views/PhotoCollectionViewController.swift` - Added selection support, iOS selection mode, prefetching delegates, sort support, section support, archive badge display, click handlers
+- `photolala/Views/PhotoBrowserView.swift` - ~~Added SelectionManager~~ → Uses native selection, iOS selection mode, preview presentation, sort picker, grouping menu, archive retrieval dialog
 - `photolala/Views/WelcomeView.swift` - Removed test buttons, added iOS auto-navigation
 - `photolala/Views/PhotoPreviewView.swift` - Added image preloading for adjacent photos
 - `photolala/photolalaApp.swift` - Added NSApplicationDelegate for window restoration control
-- `photolala/Models/PhotoReference.swift` - Changed to @Observable class, renamed from PhotoRepresentation, added metadata support, fileCreationDate
+- `photolala/Models/PhotoReference.swift` - Changed to @Observable class, renamed from PhotoRepresentation, added metadata support, fileCreationDate, archiveInfo property
 - `photolala/Models/ThumbnailDisplaySettings.swift` - Added sortOption and groupingOption properties
-- `photolala/Utilities/XPlatform.swift` - Added collection view type aliases, jpegData extension
+- `photolala/Utilities/XPlatform.swift` - Added collection view type aliases, jpegData extension, button styles and colors
 - `photolala/Services/PhotoManager.swift` - Enhanced with statistics, prefetching, performance monitoring, metadata extraction, groupPhotos method
+- `photolala/Services/S3BackupService.swift` - Added restorePhoto, checkRestoreStatus, and batch restore methods
 - `photolala/Commands/PhotolalaCommands.swift` - Added View menu with Cache Statistics command
 - All files using PhotoRepresentation - Updated to use PhotoReference
 
@@ -752,3 +768,62 @@ Last Updated: June 16, 2025
      - Replace test AWS credentials with Photolala-managed service
      - Add subscription management UI
      - Implement usage tracking backend
+
+32. **Implemented In-App Purchase Support (June 16 - Session 3)**:
+   - **StoreKit 2 Integration**:
+     - Created IAPManager for subscription management
+     - Added PhotolalaProducts.storekit configuration file
+     - Supports auto-renewable subscriptions for all tiers
+     - Family sharing enabled for Family tier
+   - **UI Components**:
+     - SubscriptionView with pricing cards for each tier
+     - IAPTestView for development testing
+     - Receipt validation check support
+   - **Subscription Products**:
+     - com.electricwoods.photolala.basic (100GB - $2.99/mo)
+     - com.electricwoods.photolala.standard (1TB - $9.99/mo)  
+     - com.electricwoods.photolala.pro (5TB - $39.99/mo)
+     - com.electricwoods.photolala.family (10TB - $69.99/mo)
+   - **Testing Guide**:
+     - Created iap-testing-guide.md with complete instructions
+     - StoreKit testing in Xcode simulator
+     - Sandbox testing with test accounts
+     - TestFlight beta testing workflow
+
+33. **Implemented Archive Retrieval System (June 16 - Session 4)**:
+   - **Archive Status Models**:
+     - Created ArchiveStatus enum for S3 storage classes
+     - Added PhotoArchiveInfo to track archive lifecycle
+     - Integrated with PhotoReference model
+   - **Visual Indicators**:
+     - PhotoArchiveBadge shows archive state:
+       - ❄️ Archived (Deep Archive/Glacier)
+       - ⏳ Retrieving (restore in progress)
+       - ✨ Recently restored (temporarily available)
+       - ⭐ Premium feature indicator
+       - ⚠️ Error state
+   - **Retrieval UI**:
+     - PhotoRetrievalView modal dialog
+     - Options: single photo, selected photos, entire album
+     - Rush delivery toggle (5-12 hours vs 12-48 hours)
+     - Cost estimation based on file size
+   - **S3 Integration**:
+     - RestoreObject API implementation in S3BackupService
+     - Support for expedited and standard retrieval tiers
+     - Status checking via HeadObject with restore header parsing
+     - Batch restore support for multiple photos
+   - **Retrieval Manager**:
+     - S3RetrievalManager tracks active retrievals
+     - Background monitoring of restore progress
+     - Planned: Push notifications on completion
+   - **Platform Integration**:
+     - Click handlers in PhotoCollectionViewController
+     - Sheet presentation in PhotoBrowserView
+     - Cross-platform support (macOS/iOS)
+   - **Error Handling**:
+     - PhotoRetrievalError for various failure cases
+     - Graceful handling of RestoreAlreadyInProgress
+     - Batch operation error aggregation
+   - **Documentation**:
+     - Created archive-retrieval-system.md in docs/current/
+     - Detailed implementation and architecture notes
