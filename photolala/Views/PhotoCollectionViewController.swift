@@ -29,6 +29,7 @@ class PhotoCollectionViewController: XViewController {
 	var onSelectFolder: ((PhotoReference) -> Void)?
 	var onPhotosLoadedWithReferences: (([PhotoReference]) -> Void)?
 	var onSelectionChanged: (([PhotoReference]) -> Void)?
+	var onArchivedPhotoClick: ((PhotoReference) -> Void)?
 
 	var collectionView: XCollectionView!
 
@@ -489,9 +490,8 @@ class PhotoCollectionViewController: XViewController {
 		
 		print("[PhotoCollectionViewController] Showing retrieval dialog for archived photo: \(photo.filename)")
 		
-		// TODO: Present PhotoRetrievalView
-		// For now, just log
-		print("Would show retrieval dialog for photo with archive status: \(archiveInfo.storageClass.displayName)")
+		// Call the handler to show retrieval dialog
+		onArchivedPhotoClick?(photo)
 	}
 
 }
@@ -1484,6 +1484,7 @@ struct PhotoCollectionView: XViewControllerRepresentable {
 	var onSelectFolder: ((PhotoReference) -> Void)?
 	var onPhotosLoaded: (([PhotoReference]) -> Void)?
 	var onSelectionChanged: (([PhotoReference]) -> Void)?
+	var onArchivedPhotoClick: ((PhotoReference) -> Void)?
 	#if os(iOS)
 		@Binding var photosCount: Int
 	#endif
@@ -1496,6 +1497,7 @@ struct PhotoCollectionView: XViewControllerRepresentable {
 			controller.onSelectFolder = self.onSelectFolder
 			controller.onPhotosLoadedWithReferences = self.onPhotosLoaded
 			controller.onSelectionChanged = self.onSelectionChanged
+			controller.onArchivedPhotoClick = self.onArchivedPhotoClick
 			return controller
 		}
 
@@ -1504,6 +1506,7 @@ struct PhotoCollectionView: XViewControllerRepresentable {
 			nsViewController.onSelectPhoto = self.onSelectPhoto
 			nsViewController.onSelectFolder = self.onSelectFolder
 			nsViewController.onSelectionChanged = self.onSelectionChanged
+			nsViewController.onArchivedPhotoClick = self.onArchivedPhotoClick
 			// Trigger layout update when settings change
 			nsViewController.updateCollectionViewLayout()
 		}
@@ -1522,6 +1525,7 @@ struct PhotoCollectionView: XViewControllerRepresentable {
 			}
 			controller.onPhotosLoadedWithReferences = self.onPhotosLoaded
 			controller.onSelectionChanged = self.onSelectionChanged
+			controller.onArchivedPhotoClick = self.onArchivedPhotoClick
 			return controller
 		}
 
@@ -1530,6 +1534,7 @@ struct PhotoCollectionView: XViewControllerRepresentable {
 			uiViewController.onSelectPhoto = self.onSelectPhoto
 			uiViewController.onSelectFolder = self.onSelectFolder
 			uiViewController.onSelectionChanged = self.onSelectionChanged
+			uiViewController.onArchivedPhotoClick = self.onArchivedPhotoClick
 			// Trigger layout update when settings change
 			uiViewController.updateCollectionViewLayout()
 		}

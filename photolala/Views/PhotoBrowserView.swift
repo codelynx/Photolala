@@ -20,6 +20,8 @@ struct PhotoBrowserView: View {
 	@State private var showingS3UploadProgress = false
 	@State private var showingSignInPrompt = false
 	@State private var showingUpgradePrompt = false
+	@State private var archivedPhotoForRetrieval: PhotoReference?
+	@State private var showingRetrievalDialog = false
 	@StateObject private var s3BackupManager = S3BackupManager.shared
 	@StateObject private var identityManager = IdentityManager.shared
 
@@ -59,6 +61,18 @@ struct PhotoBrowserView: View {
 			.sheet(isPresented: self.$showingUpgradePrompt) {
 				SubscriptionView()
 			}
+			.sheet(isPresented: self.$showingRetrievalDialog) {
+				if let photo = archivedPhotoForRetrieval,
+				   let archiveInfo = photo.archiveInfo {
+					PhotoRetrievalView(
+						photoReference: photo,
+						archiveInfo: archiveInfo,
+						isPresented: self.$showingRetrievalDialog
+					)
+					.environmentObject(s3BackupManager)
+					.environmentObject(identityManager)
+				}
+			}
 		#else
 			self.collectionContent
 				.navigationDestination(item: self.$selectedPhotoNavigation) { navigation in
@@ -70,6 +84,18 @@ struct PhotoBrowserView: View {
 				}
 				.sheet(isPresented: self.$showingHelp) {
 					HelpView()
+				}
+				.sheet(isPresented: self.$showingRetrievalDialog) {
+					if let photo = archivedPhotoForRetrieval,
+					   let archiveInfo = photo.archiveInfo {
+						PhotoRetrievalView(
+							photoReference: photo,
+							archiveInfo: archiveInfo,
+							isPresented: self.$showingRetrievalDialog
+						)
+						.environmentObject(s3BackupManager)
+						.environmentObject(identityManager)
+					}
 				}
 				.onReceive(NotificationCenter.default.publisher(for: .showHelp)) { _ in
 					self.showingHelp = true
@@ -95,6 +121,10 @@ struct PhotoBrowserView: View {
 					onSelectionChanged: { photos in
 						self.selectedPhotos = photos
 					},
+					onArchivedPhotoClick: { photo in
+						self.archivedPhotoForRetrieval = photo
+						self.showingRetrievalDialog = true
+					},
 					photosCount: self.$photosCount
 				)
 			#else
@@ -112,6 +142,10 @@ struct PhotoBrowserView: View {
 					},
 					onSelectionChanged: { photos in
 						self.selectedPhotos = photos
+					},
+					onArchivedPhotoClick: { photo in
+						self.archivedPhotoForRetrieval = photo
+						self.showingRetrievalDialog = true
 					}
 				)
 			#endif
