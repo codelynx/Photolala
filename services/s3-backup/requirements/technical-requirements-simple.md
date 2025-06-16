@@ -9,13 +9,17 @@
 
 ### Dependencies
 - AWS SDK for Swift
-- macOS Keychain (for credentials)
+- SwiftData for local state
 - Foundation framework
+- CoreImage (thumbnail generation)
+- ImageIO (EXIF extraction)
 
 ### S3 Operations Needed
-1. `ListBuckets` - Show available buckets
-2. `PutObject` - Upload photos
-3. `HeadObject` - Check if already uploaded
+1. `PutObject` - Upload photos, thumbnails, metadata
+2. `GetObject` - Download thumbnails and catalogs
+3. `ListObjectsV2` - List user's photos (backup use)
+4. `RestoreObject` - Restore from Deep Archive
+5. Lambda triggers for catalog updates
 
 ### Data Storage
 - **Use SwiftData** (not JSON files)
@@ -24,11 +28,13 @@
 - Remember user preferences
 
 ### Security
-- **Option 1**: Photolala Service (Apple ID → S3 credentials)
-- **Option 2**: User's own AWS credentials (power users)
-- Store credentials in macOS Keychain
-- Use HTTPS for all transfers
+- **Photolala-Managed Service Only**
+- Apple ID authentication
+- Backend API exchanges for STS tokens
+- No local credential storage
+- HTTPS/TLS 1.3 for all transfers
 - Server-side encryption (SSE-S3)
+- Per-user S3 prefix isolation
 
 ### UI Requirements
 - Integration with photo selection
@@ -39,7 +45,8 @@
 - Cost estimation display
 
 ### What We're NOT Doing (Phase 1)
-- ❌ Multiple S3 providers
+- ❌ User's own AWS credentials
+- ❌ Multiple regions (us-east-1 only)
 - ❌ Automatic backup
 - ❌ Client-side encryption
 - ❌ Intel support
@@ -57,7 +64,8 @@
 
 Build a cost-effective cloud backup that:
 1. Uses MD5 for deduplication
-2. Leverages storage classes for cost optimization
-3. Enables browsing via thumbnails
-4. Integrates with photo selection
-5. Keeps it simple!
+2. Leverages storage classes (STANDARD_IA → DEEP_ARCHIVE)
+3. Enables browsing via thumbnails without downloading originals
+4. Integrates with existing photo selection UI
+5. Photolala-managed service tied to Apple ID
+6. Simple subscription tiers aligned with Apple standards
