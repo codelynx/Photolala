@@ -12,26 +12,26 @@ Build commands for different platforms:
 
 ```bash
 # Build for macOS
-xcodebuild -scheme photolala -destination 'platform=macOS' build
+xcodebuild -scheme Photolala -destination 'platform=macOS' build
 
 # Build for iOS Simulator
-xcodebuild -scheme photolala -destination 'platform=iOS Simulator,name=iPhone 16 Pro' build
+xcodebuild -scheme Photolala -destination 'platform=iOS Simulator,name=iPhone 16 Pro' build
 
 # Build for tvOS Simulator  
-xcodebuild -scheme photolala -destination 'platform=tvOS Simulator,name=Apple TV' build
+xcodebuild -scheme Photolala -destination 'platform=tvOS Simulator,name=Apple TV' build
 
 # Clean build
-xcodebuild -scheme photolala clean
+xcodebuild -scheme Photolala clean
 
 # Run tests
-xcodebuild -scheme photolala test
+xcodebuild -scheme Photolala test
 ```
 
 ## Project Structure
 
 ```
 Photolala/
-├── photolala/              # Main app target
+├── Photolala/              # Main app target
 │   ├── Models/            # Data models (PhotoReference, Directory)
 │   ├── Views/             # SwiftUI views
 │   ├── ViewModels/        # Observable view models
@@ -39,8 +39,8 @@ Photolala/
 │   ├── Utilities/         # Helper utilities (XPlatform, BundlePhotosHelper)
 │   ├── Commands/          # Menu commands (PhotolalaCommands)
 │   └── PhotolalaApp.swift # App entry point
-├── photolalaTests/        # Unit tests
-├── photolalaUITests/      # UI tests
+├── PhotolalaTests/        # Unit tests
+├── PhotolalaUITests/      # UI tests
 ├── Photos/                # Sample photos (folder reference)
 ├── docs/                  # Design documents and implementation notes
 ├── scripts/               # Utility scripts
@@ -50,7 +50,7 @@ Photolala/
 ## Development Notes
 
 - Development Team ID: 2P97EM4L4N
-- Bundle ID: com.electricwoods.photolala
+- Bundle ID: com.electricwoods.Photolala
 - Supported platforms: macOS 14.0+, iOS 18.5+, tvOS 18.0+
 - Architecture: SwiftUI (no SwiftData for core functionality)
 - Key features implemented:
