@@ -331,12 +331,14 @@ Last Updated: June 15, 2025
 - `photolala/Models/PhotoGroup.swift` - Photo group model
 - `photolala/Services/DirectoryScanner.swift`
 - `photolala/Services/PhotoManager.swift` - Thumbnail generation and caching (enhanced with statistics)
+- `photolala/Services/S3BackupService.swift` - AWS S3 backup service (POC)
 - `photolala/Views/PhotoPreviewView.swift` - Full image preview with zoom/pan
 - `photolala/Views/CacheStatisticsView.swift` - Cache performance monitoring UI
 - `photolala/Views/ScalableImageView.swift` - Custom NSImageView for aspect fill on macOS
 - `photolala/Views/PhotoContextMenuHeaderView.swift` - Context menu preview header view
 - `photolala/Views/ClickedCollectionView.swift` - NSCollectionView subclass for context menu support
 - `photolala/Views/PhotoGroupHeaderView.swift` - Section headers for photo groups
+- `photolala/Views/S3BackupTestView.swift` - S3 backup POC test interface
 - `docs/project-status.md` (this file)
 - `docs/thumbnail-display-options-design.md` - Design for display options feature
 - `docs/thumbnail-display-implementation-plan.md` - Implementation plan
@@ -347,7 +349,9 @@ Last Updated: June 15, 2025
 - `docs/planning/macos-context-menu-design.md` - Design and implementation for context menu
 - `docs/cache-statistics-guide.md` - Guide for using cache statistics
 - `docs/planning/photo-grouping-design.md` - Design for photo grouping feature
+- `docs/planning/aws-sdk-swift-credentials.md` - AWS credentials handling for macOS apps
 - `scripts/create-test-photos.sh` - Script to create test photos with different dates
+- `services/s3-backup/` - Complete S3 backup service design documentation
 
 **Removed:**
 - `photolala/Views/PhotoNavigationView.swift`
@@ -671,3 +675,34 @@ Last Updated: June 15, 2025
    - Future phases (documented but not implemented):
      - Phase 2: EXIF-based grouping
      - Phase 3: Hybrid approach with caching
+
+30. **S3 Backup Service POC (June 16)**:
+   - Created S3BackupService for revolutionary $1.99/TB backup pricing:
+     - Uses AWS SDK for Swift with S3 client
+     - MD5-based deduplication across all users
+     - Stores photos in `users/{userId}/photos/{md5}.dat`
+     - Separate thumbnail storage for faster browsing
+   - AWS Credentials handling:
+     - Primary: Environment variables (AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY)
+     - Fallback: AWS credentials file in app container
+     - Documented macOS app sandboxing limitations
+   - Test Implementation:
+     - S3BackupTestView with photo picker integration
+     - Upload photos with automatic MD5 calculation
+     - List uploaded photos with metadata
+     - Real-time credentials check and diagnostics
+   - Technical details:
+     - StaticAWSCredentialIdentityResolver for authentication
+     - CryptoKit for MD5 hashing
+     - Async/await throughout for modern Swift concurrency
+   - Documentation:
+     - `docs/planning/aws-sdk-swift-credentials.md`: Solutions for macOS credential handling
+     - `services/s3-backup/`: Complete service design documentation
+   - Security:
+     - Added `xcshareddata/xcschemes/**` to .gitignore to protect credentials
+     - Environment variables set in Xcode scheme (not committed)
+   - Current Status:
+     - ✅ Successfully uploading photos to S3
+     - ✅ MD5 deduplication working
+     - ✅ Photo listing functionality
+     - POC phase - credentials management to be improved for production

@@ -6,6 +6,11 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		CC8E83C22E0001E200FE4558 /* AWSS3 in Frameworks */ = {isa = PBXBuildFile; productRef = CC8E83C12E0001E200FE4558 /* AWSS3 */; };
+		CC8E83C42E0001F800FE4558 /* AWSClientRuntime in Frameworks */ = {isa = PBXBuildFile; productRef = CC8E83C32E0001F800FE4558 /* AWSClientRuntime */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXContainerItemProxy section */
 		CC72EFE22DF6C68F00E1C25A /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
@@ -60,6 +65,8 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				CC8E83C42E0001F800FE4558 /* AWSClientRuntime in Frameworks */,
+				CC8E83C22E0001E200FE4558 /* AWSS3 in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -87,6 +94,7 @@
 				CC72EFD32DF6C68D00E1C25A /* photolala */,
 				CC72EFE42DF6C68F00E1C25A /* photolalaTests */,
 				CC72EFEE2DF6C68F00E1C25A /* photolalaUITests */,
+				CC8E83C02E0001E200FE4558 /* Frameworks */,
 				CC72EFD22DF6C68D00E1C25A /* Products */,
 			);
 			sourceTree = "<group>";
@@ -99,6 +107,13 @@
 				CC72EFEB2DF6C68F00E1C25A /* photolalaUITests.xctest */,
 			);
 			name = Products;
+			sourceTree = "<group>";
+		};
+		CC8E83C02E0001E200FE4558 /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			name = Frameworks;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -121,6 +136,8 @@
 			);
 			name = photolala;
 			packageProductDependencies = (
+				CC8E83C12E0001E200FE4558 /* AWSS3 */,
+				CC8E83C32E0001F800FE4558 /* AWSClientRuntime */,
 			);
 			productName = photolala;
 			productReference = CC72EFD12DF6C68D00E1C25A /* photolala.app */;
@@ -204,6 +221,9 @@
 			);
 			mainGroup = CC72EFC62DF6C4D600E1C25A;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				CC8E83BF2E00018100FE4558 /* XCRemoteSwiftPackageReference "aws-sdk-swift" */,
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = CC72EFD22DF6C68D00E1C25A /* Products */;
 			projectDirPath = "";
@@ -814,6 +834,30 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		CC8E83BF2E00018100FE4558 /* XCRemoteSwiftPackageReference "aws-sdk-swift" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/awslabs/aws-sdk-swift";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 1.3.36;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		CC8E83C12E0001E200FE4558 /* AWSS3 */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = CC8E83BF2E00018100FE4558 /* XCRemoteSwiftPackageReference "aws-sdk-swift" */;
+			productName = AWSS3;
+		};
+		CC8E83C32E0001F800FE4558 /* AWSClientRuntime */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = CC8E83BF2E00018100FE4558 /* XCRemoteSwiftPackageReference "aws-sdk-swift" */;
+			productName = AWSClientRuntime;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = CC72EFC72DF6C4D600E1C25A /* Project object */;
 }

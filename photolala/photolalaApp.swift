@@ -26,6 +26,8 @@ struct photolalaApp: App {
 	
 	init() {
 		print("[photolalaApp] App initialized")
+		print("AWS_ACCESS_KEY_ID=", ProcessInfo.processInfo.environment["AWS_ACCESS_KEY_ID"] ?? "nil")
+		print("AWS_SECRET_ACCESS_KEY=", ProcessInfo.processInfo.environment["AWS_SECRET_ACCESS_KEY"] ?? "nil")
 	}
 	
 	var body: some Scene {

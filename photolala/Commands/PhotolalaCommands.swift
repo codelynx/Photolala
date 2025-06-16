@@ -45,6 +45,14 @@ struct PhotolalaCommands: Commands {
 				#endif
 			}
 			.keyboardShortcut("I", modifiers: [.command, .shift])
+			
+			Divider()
+			
+			Button("S3 Backup Test...") {
+				#if os(macOS)
+				showS3BackupTest()
+				#endif
+			}
 		}
 		
 		// Window menu customization
@@ -94,6 +102,24 @@ struct PhotolalaCommands: Commands {
 		window.title = "Cache Statistics"
 		window.center()
 		window.contentView = NSHostingView(rootView: CacheStatisticsView())
+		window.makeKeyAndOrderFront(nil)
+		
+		// Keep window in front but not floating
+		window.level = .normal
+		window.isReleasedWhenClosed = false
+	}
+	
+	private func showS3BackupTest() {
+		let window = NSWindow(
+			contentRect: NSRect(x: 0, y: 0, width: 600, height: 600),
+			styleMask: [.titled, .closable, .resizable],
+			backing: .buffered,
+			defer: false
+		)
+		
+		window.title = "S3 Backup Test"
+		window.center()
+		window.contentView = NSHostingView(rootView: S3BackupTestView())
 		window.makeKeyAndOrderFront(nil)
 		
 		// Keep window in front but not floating
