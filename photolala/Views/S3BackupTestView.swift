@@ -75,12 +75,7 @@ struct S3BackupTestView: View {
 						await self.identityManager.signOut()
 					}
 				}
-				#if os(macOS)
-				.buttonStyle(.link)
-				#else
-				.buttonStyle(.plain)
-				.foregroundColor(.blue)
-				#endif
+				.linkButtonStyle()
 			}
 			.padding()
 			.background(Color.gray.opacity(0.1))

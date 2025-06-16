@@ -967,5 +967,58 @@ class PhotoManager {
 			return [PhotoGroup(title: "", photos: photos, dateRepresentative: Date())]
 		}
 	}
+	
+	// MARK: - Archive Status
+	
+	/// Load archive status from S3 for a photo
+	func loadArchiveStatus(for photo: PhotoReference, s3Service: S3BackupService, userId: String) async throws {
+		// First ensure we have MD5 hash
+		if photo.md5Hash == nil {
+			let data = try Data(contentsOf: photo.fileURL)
+			let digest = self.md5Digest(of: data)
+			photo.md5Hash = digest.data.hexadecimalString
+		}
+		
+		guard let md5 = photo.md5Hash else {
+			throw error(message: "Unable to compute MD5 hash")
+		}
+		
+		// Get photo info from S3
+		do {
+			let (size, storageClass) = try await s3Service.getPhotoInfo(md5: md5, userId: userId)
+			
+			// Convert storage class string to enum
+			let archiveStatus = ArchiveStatus(rawValue: storageClass) ?? .standard
+			
+			// Create archive info
+			photo.archiveInfo = ArchivedPhotoInfo(
+				md5: md5,
+				archivedDate: Date(), // TODO: Get actual archive date from S3 metadata
+				storageClass: archiveStatus,
+				lastAccessedDate: nil, // TODO: Track access dates
+				isPinned: false, // TODO: Implement pinning
+				retrieval: nil // TODO: Track active retrievals
+			)
+		} catch {
+			// Photo not in S3 or error - no archive info
+			print("[PhotoManager] No archive info for \(photo.filename): \(error)")
+		}
+	}
+	
+	/// Load archive status for multiple photos
+	func loadArchiveStatus(for photos: [PhotoReference], s3Service: S3BackupService, userId: String) async {
+		// Load in parallel with limited concurrency
+		await withTaskGroup(of: Void.self) { group in
+			for photo in photos {
+				group.addTask { [weak self] in
+					do {
+						try await self?.loadArchiveStatus(for: photo, s3Service: s3Service, userId: userId)
+					} catch {
+						print("[PhotoManager] Failed to load archive status for \(photo.filename): \(error)")
+					}
+				}
+			}
+		}
+	}
 
 }

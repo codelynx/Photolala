@@ -943,8 +943,10 @@ extension PhotoCollectionViewController: XCollectionViewDelegate {
 			didSet {
 				self.loadThumbnail()
 				self.updateSelectionState()
+				self.updateArchiveBadge()
 			}
 		}
+		private var archiveBadgeView: NSView?
 
 		override func loadView() {
 			view = NSView()
@@ -1026,6 +1028,8 @@ extension PhotoCollectionViewController: XCollectionViewDelegate {
 			super.prepareForReuse()
 			self.imageView?.image = nil
 			self.photoRepresentation = nil
+			self.archiveBadgeView?.removeFromSuperview()
+			self.archiveBadgeView = nil
 		}
 
 		private let loadingSymbol: String = "circle.dotted" // "photo"
@@ -1139,6 +1143,74 @@ extension PhotoCollectionViewController: XCollectionViewDelegate {
 			super.viewDidAppear()
 			self.updateSelectionState()
 		}
+		
+		private func updateArchiveBadge() {
+			// Remove existing badge
+			self.archiveBadgeView?.removeFromSuperview()
+			self.archiveBadgeView = nil
+			
+			// Check if we have archive info to display
+			guard let archiveInfo = photoRepresentation?.archiveInfo else { return }
+			
+			// Create appropriate badge based on status
+			var badgeText: String?
+			var badgeColor: NSColor?
+			
+			if let retrieval = archiveInfo.retrieval {
+				switch retrieval.status {
+				case .pending, .inProgress:
+					badgeText = "⏳"
+					badgeColor = .orange
+				case .completed:
+					badgeText = "✨"
+					badgeColor = .systemYellow
+				case .failed:
+					badgeText = "⚠️"
+					badgeColor = .systemRed
+				}
+			} else if archiveInfo.isPinned {
+				badgeText = "⭐"
+				badgeColor = .systemYellow
+			} else if !archiveInfo.storageClass.isImmediatelyAccessible {
+				badgeText = "❄️"
+				badgeColor = .systemBlue
+			} else if archiveInfo.isExpiringSoon {
+				badgeText = "⚠️"
+				badgeColor = .systemOrange
+			} else if archiveInfo.daysUntilReArchive != nil {
+				badgeText = "✨"
+				badgeColor = .systemYellow
+			}
+			
+			// Create badge if needed
+			guard let text = badgeText else { return }
+			
+			let badge = NSTextField(labelWithString: text)
+			badge.font = .systemFont(ofSize: 14)
+			badge.backgroundColor = badgeColor?.withAlphaComponent(0.9)
+			badge.wantsLayer = true
+			badge.layer?.cornerRadius = 10
+			badge.layer?.masksToBounds = true
+			badge.alignment = .center
+			badge.translatesAutoresizingMaskIntoConstraints = false
+			
+			view.addSubview(badge)
+			self.archiveBadgeView = badge
+			
+			NSLayoutConstraint.activate([
+				badge.topAnchor.constraint(equalTo: view.topAnchor, constant: 4),
+				badge.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -4),
+				badge.widthAnchor.constraint(equalToConstant: 24),
+				badge.heightAnchor.constraint(equalToConstant: 24)
+			])
+			
+			// Add dimming effect for archived photos
+			if !archiveInfo.storageClass.isImmediatelyAccessible {
+				imageView?.alphaValue = 0.7
+			} else {
+				imageView?.alphaValue = 1.0
+			}
+		}
 
 	}
 #else
@@ -1148,10 +1220,12 @@ extension PhotoCollectionViewController: XCollectionViewDelegate {
 			didSet {
 				self.loadThumbnail()
 				self.updateSelectionState()
+				self.updateArchiveBadge()
 			}
 		}
 
 		private let imageView = UIImageView()
+		private var archiveBadgeView: UIView?
 
 		override init(frame: CGRect) {
 			super.init(frame: frame)
@@ -1277,7 +1351,77 @@ extension PhotoCollectionViewController: XCollectionViewDelegate {
 			super.prepareForReuse()
 			self.imageView.image = nil
 			self.photoRepresentation = nil
+			self.archiveBadgeView?.removeFromSuperview()
+			self.archiveBadgeView = nil
 			// Don't update selection state here - isSelected will be set by collection view
+		}
+		
+		private func updateArchiveBadge() {
+			// Remove existing badge
+			self.archiveBadgeView?.removeFromSuperview()
+			self.archiveBadgeView = nil
+			
+			// Check if we have archive info to display
+			guard let archiveInfo = photoRepresentation?.archiveInfo else { return }
+			
+			// Create appropriate badge based on status
+			var badgeText: String?
+			var badgeColor: UIColor?
+			
+			if let retrieval = archiveInfo.retrieval {
+				switch retrieval.status {
+				case .pending, .inProgress:
+					badgeText = "⏳"
+					badgeColor = .orange
+				case .completed:
+					badgeText = "✨"
+					badgeColor = .systemYellow
+				case .failed:
+					badgeText = "⚠️"
+					badgeColor = .systemRed
+				}
+			} else if archiveInfo.isPinned {
+				badgeText = "⭐"
+				badgeColor = .systemYellow
+			} else if !archiveInfo.storageClass.isImmediatelyAccessible {
+				badgeText = "❄️"
+				badgeColor = .systemBlue
+			} else if archiveInfo.isExpiringSoon {
+				badgeText = "⚠️"
+				badgeColor = .systemOrange
+			} else if archiveInfo.daysUntilReArchive != nil {
+				badgeText = "✨"
+				badgeColor = .systemYellow
+			}
+			
+			// Create badge if needed
+			guard let text = badgeText else { return }
+			
+			let badge = UILabel()
+			badge.text = text
+			badge.font = .systemFont(ofSize: 14)
+			badge.backgroundColor = badgeColor?.withAlphaComponent(0.9)
+			badge.layer.cornerRadius = 12
+			badge.layer.masksToBounds = true
+			badge.textAlignment = .center
+			badge.translatesAutoresizingMaskIntoConstraints = false
+			
+			contentView.addSubview(badge)
+			self.archiveBadgeView = badge
+			
+			NSLayoutConstraint.activate([
+				badge.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 4),
+				badge.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -4),
+				badge.widthAnchor.constraint(equalToConstant: 24),
+				badge.heightAnchor.constraint(equalToConstant: 24)
+			])
+			
+			// Add dimming effect for archived photos
+			if !archiveInfo.storageClass.isImmediatelyAccessible {
+				imageView.alpha = 0.7
+			} else {
+				imageView.alpha = 1.0
+			}
 		}
 	}
 #endif

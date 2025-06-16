@@ -65,11 +65,7 @@ struct SignInPromptView: View {
 			.padding(.bottom, 40)
 		}
 		.frame(width: 500, height: 600)
-		#if os(macOS)
-			.background(Color(NSColor.windowBackgroundColor))
-		#else
-			.background(Color(UIColor.systemBackground))
-		#endif
+		.background(Color(XPlatform.secondaryBackgroundColor))
 			.onChange(of: self.identityManager.isSignedIn) { _, isSignedIn in
 				if isSignedIn {
 					self.dismiss()
@@ -169,16 +165,12 @@ struct SubscriptionUpgradeView: View {
 				Button("View All Plans") {
 					// Show full subscription view
 				}
-				.buttonStyle(.borderedProminent)
+				.primaryButtonStyle()
 			}
 			.padding(.bottom, 40)
 		}
 		.frame(width: 500, height: 600)
-		#if os(macOS)
-			.background(Color(NSColor.windowBackgroundColor))
-		#else
-			.background(Color(UIColor.systemBackground))
-		#endif
+		.background(Color(XPlatform.secondaryBackgroundColor))
 	}
 
 	private func formatBytes(_ bytes: Int64) -> String {

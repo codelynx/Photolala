@@ -47,3 +47,47 @@ extension XImage {
 		}
 	#endif
 }
+
+// MARK: - Cross-platform Button Styles
+
+extension View {
+	/// Applies a link-style button appearance across platforms
+	func linkButtonStyle() -> some View {
+		#if os(macOS)
+		self.buttonStyle(.link)
+		#else
+		self.buttonStyle(.plain)
+			.foregroundColor(.blue)
+		#endif
+	}
+	
+	/// Applies a primary button style across platforms
+	func primaryButtonStyle() -> some View {
+		#if os(macOS)
+		self.buttonStyle(.borderedProminent)
+		#else
+		self.buttonStyle(.borderedProminent)
+		#endif
+	}
+	
+	/// Applies a secondary button style across platforms
+	func secondaryButtonStyle() -> some View {
+		#if os(macOS)
+		self.buttonStyle(.bordered)
+		#else
+		self.buttonStyle(.bordered)
+		#endif
+	}
+}
+
+// MARK: - Cross-platform Colors
+
+struct XPlatform {
+	#if os(macOS)
+	static let secondaryBackgroundColor = NSColor.windowBackgroundColor
+	static let tertiaryBackgroundColor = NSColor.controlBackgroundColor
+	#else
+	static let secondaryBackgroundColor = UIColor.systemBackground
+	static let tertiaryBackgroundColor = UIColor.secondarySystemBackground
+	#endif
+}
