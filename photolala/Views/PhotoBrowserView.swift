@@ -87,6 +87,10 @@ struct PhotoBrowserView: View {
 					onSelectPhoto: self.handlePhotoSelection,
 					onPhotosLoaded: { photos in
 						self.allPhotos = photos
+						// Load archive status for all photos
+						Task {
+							await self.loadArchiveStatus(for: photos)
+						}
 					},
 					onSelectionChanged: { photos in
 						self.selectedPhotos = photos
@@ -101,6 +105,10 @@ struct PhotoBrowserView: View {
 					onPhotosLoaded: { photos in
 						self.allPhotos = photos
 						self.photosCount = photos.count
+						// Load archive status for all photos
+						Task {
+							await self.loadArchiveStatus(for: photos)
+						}
 					},
 					onSelectionChanged: { photos in
 						self.selectedPhotos = photos
@@ -420,6 +428,35 @@ struct PhotoBrowserView: View {
 					// Show error
 				}
 			}
+		}
+	}
+	
+	private func loadArchiveStatus(for photos: [PhotoReference]) async {
+		// Only load if S3 backup is configured and user is signed in
+		guard s3BackupManager.isConfigured,
+		      let userId = identityManager.currentUser?.appleUserID else { return }
+		
+		print("[PhotoBrowserView] Loading archive status for \(photos.count) photos")
+		
+		// Load archive status in batches to avoid overwhelming the API
+		let batchSize = 50
+		guard let s3Service = s3BackupManager.s3Service else { return }
+		
+		for batch in photos.chunked(into: batchSize) {
+			await PhotoManager.shared.loadArchiveStatus(
+				for: batch,
+				s3Service: s3Service,
+				userId: userId
+			)
+		}
+	}
+}
+
+// Helper extension for array chunking
+extension Array {
+	func chunked(into size: Int) -> [[Element]] {
+		return stride(from: 0, to: count, by: size).map {
+			Array(self[$0..<Swift.min($0 + size, count)])
 		}
 	}
 }

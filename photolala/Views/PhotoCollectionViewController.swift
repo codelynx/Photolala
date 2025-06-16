@@ -476,6 +476,23 @@ class PhotoCollectionViewController: XViewController {
 			}
 		}
 	}
+	
+	func handleArchivedPhotoClick(at indexPath: IndexPath) {
+		guard indexPath.section < self.photoGroups.count,
+		      indexPath.item < self.photoGroups[indexPath.section].photos.count else { return }
+		
+		let photo = self.photoGroups[indexPath.section].photos[indexPath.item]
+		
+		// Verify this is an archived photo
+		guard let archiveInfo = photo.archiveInfo,
+		      !archiveInfo.storageClass.isImmediatelyAccessible else { return }
+		
+		print("[PhotoCollectionViewController] Showing retrieval dialog for archived photo: \(photo.filename)")
+		
+		// TODO: Present PhotoRetrievalView
+		// For now, just log
+		print("Would show retrieval dialog for photo with archive status: \(archiveInfo.storageClass.displayName)")
+	}
 
 }
 
@@ -987,6 +1004,20 @@ extension PhotoCollectionViewController: XCollectionViewDelegate {
 				self.rightMouseDown(with: event)
 				return
 			}
+			
+			// Check if this is an archived photo that needs retrieval
+			if event.clickCount == 1,
+			   let archiveInfo = photoRepresentation?.archiveInfo,
+			   !archiveInfo.storageClass.isImmediatelyAccessible {
+				// Find the collection view controller and call archive handler
+				if let collectionView = self.collectionView,
+				   let viewController = collectionView.delegate as? PhotoCollectionViewController,
+				   let indexPath = collectionView.indexPath(for: self) {
+					print("[PhotoCollectionViewItem] Click on archived photo, showing retrieval dialog")
+					viewController.handleArchivedPhotoClick(at: indexPath)
+					return
+				}
+			}
 
 			if event.clickCount == 2 {
 				// Find the collection view controller and call its navigation handler
@@ -1258,6 +1289,10 @@ extension PhotoCollectionViewController: XCollectionViewDelegate {
 				self.imageView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor),
 				self.imageView.bottomAnchor.constraint(equalTo: contentView.bottomAnchor),
 			])
+			
+			// Add tap gesture for archived photos
+			let tapGesture = UITapGestureRecognizer(target: self, action: #selector(handleTap))
+			contentView.addGestureRecognizer(tapGesture)
 		}
 
 		private let loadingSymbol: String = "circle.dotted"
@@ -1421,6 +1456,20 @@ extension PhotoCollectionViewController: XCollectionViewDelegate {
 				imageView.alpha = 0.7
 			} else {
 				imageView.alpha = 1.0
+			}
+		}
+		
+		@objc private func handleTap() {
+			// Check if this is an archived photo that needs retrieval
+			if let archiveInfo = photoRepresentation?.archiveInfo,
+			   !archiveInfo.storageClass.isImmediatelyAccessible {
+				// Find the collection view controller
+				if let collectionView = self.superview?.superview as? UICollectionView,
+				   let viewController = collectionView.delegate as? PhotoCollectionViewController,
+				   let indexPath = collectionView.indexPath(for: self) {
+					print("[PhotoCollectionViewCell] Tap on archived photo, showing retrieval dialog")
+					viewController.handleArchivedPhotoClick(at: indexPath)
+				}
 			}
 		}
 	}
