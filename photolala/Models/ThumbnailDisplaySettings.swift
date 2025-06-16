@@ -10,13 +10,13 @@ import SwiftUI
 enum ThumbnailDisplayMode: String, CaseIterable {
 	case scaleToFit = "fit"
 	case scaleToFill = "fill"
-	
+
 	var localizedName: String {
 		switch self {
 		case .scaleToFit:
-			return "Scale to Fit"
+			"Scale to Fit"
 		case .scaleToFill:
-			return "Scale to Fill"
+			"Scale to Fill"
 		}
 	}
 }
@@ -25,46 +25,46 @@ enum ThumbnailOption: CaseIterable {
 	case small
 	case medium
 	case large
-	
+
 	static var `default`: ThumbnailOption { .medium }
-	
+
 	var size: CGFloat {
 		switch self {
-		case .small: return 64
-		case .medium: return 128
-		case .large: return 256
+		case .small: 64
+		case .medium: 128
+		case .large: 256
 		}
 	}
-	
+
 	var name: String {
 		switch self {
-		case .small: return "Small"
-		case .medium: return "Medium"
-		case .large: return "Large"
+		case .small: "Small"
+		case .medium: "Medium"
+		case .large: "Large"
 		}
 	}
-	
+
 	var spacing: CGFloat {
 		switch self {
-		case .small: return 2
-		case .medium: return 4
-		case .large: return 8
+		case .small: 2
+		case .medium: 4
+		case .large: 8
 		}
 	}
-	
+
 	var cornerRadius: CGFloat {
 		switch self {
-		case .small: return 0
-		case .medium: return 6
-		case .large: return 12
+		case .small: 0
+		case .medium: 6
+		case .large: 12
 		}
 	}
-	
+
 	var sectionInset: CGFloat {
 		switch self {
-		case .small: return 4
-		case .medium: return 8
-		case .large: return 12
+		case .small: 4
+		case .medium: 8
+		case .large: 12
 		}
 	}
 }
@@ -75,11 +75,11 @@ class ThumbnailDisplaySettings {
 	var thumbnailOption: ThumbnailOption = .default
 	var sortOption: PhotoSortOption = .filename
 	var groupingOption: PhotoGroupingOption = .none
-	
+
 	var thumbnailSize: CGFloat {
-		thumbnailOption.size
+		self.thumbnailOption.size
 	}
-	
+
 	init() {
 		// No UserDefaults - each window gets its own settings
 	}

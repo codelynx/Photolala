@@ -1,138 +1,224 @@
-import SwiftUI
 import PhotosUI
+import SwiftUI
 
 struct S3BackupTestView: View {
+	@StateObject private var backupManager = S3BackupManager.shared
+	@StateObject private var identityManager = IdentityManager.shared
+	@StateObject private var iapManager = IAPManager.shared
 	@State private var selectedPhoto: PhotosPickerItem?
 	@State private var uploadStatus = ""
 	@State private var isUploading = false
 	@State private var uploadedPhotos: [PhotoEntry] = []
-	@State private var s3Service: S3BackupService?
-	@State private var initError: String?
-	@State private var credentialsInfo: String = ""
-	
-	private let testUserId = "test-user-123"
-	
+	@State private var showSignInPrompt = false
+	@State private var showSubscriptionView = false
+	@State private var currentStats: S3BackupManager.BackupStats?
+
 	var body: some View {
 		VStack(spacing: 20) {
-			Text("S3 Backup POC")
+			self.headerSection
+
+			if self.identityManager.isSignedIn {
+				self.userInfoSection
+				self.uploadSection
+				Divider()
+				self.uploadedPhotosSection
+			} else {
+				self.signInPromptSection
+			}
+
+			Spacer()
+		}
+		.padding()
+		.frame(width: 700, height: 800)
+		.sheet(isPresented: self.$showSignInPrompt) {
+			SignInPromptView()
+		}
+		.sheet(isPresented: self.$showSubscriptionView) {
+			SubscriptionView()
+		}
+		.task {
+			await self.loadUserData()
+		}
+	}
+
+	private var headerSection: some View {
+		VStack(spacing: 8) {
+			Text("S3 Backup Service")
 				.font(.largeTitle)
-			
-			// Credentials info section
-			if !credentialsInfo.isEmpty {
-				VStack(alignment: .leading, spacing: 8) {
-					Text("AWS Credentials Check:")
+				.fontWeight(.bold)
+
+			Text("Secure cloud backup for your photos")
+				.font(.headline)
+				.foregroundColor(.secondary)
+		}
+	}
+
+	private var userInfoSection: some View {
+		VStack(alignment: .leading, spacing: 12) {
+			HStack {
+				Image(systemName: "person.circle.fill")
+					.font(.title)
+					.foregroundColor(.accentColor)
+
+				VStack(alignment: .leading) {
+					Text(self.identityManager.currentUser?.fullName ?? "Photolala User")
 						.font(.headline)
-					
-					#if os(macOS)
-					Text(credentialsInfo)
-						.textSelection(.enabled)
-						.font(.system(.body, design: .monospaced))
-						.padding(8)
-						.background(Color.blue.opacity(0.1))
-						.cornerRadius(4)
-						.frame(maxWidth: .infinity, alignment: .leading)
-					#else
-					TextEditor(text: .constant(credentialsInfo))
-						.font(.system(.body, design: .monospaced))
-						.foregroundColor(.primary)
-						.scrollDisabled(true)
-						.padding(4)
-						.background(Color.blue.opacity(0.1))
-						.cornerRadius(4)
-						.frame(minHeight: 60, maxHeight: 120)
-					#endif
+					Text(self.identityManager.currentUser?.email ?? "No email")
+						.font(.caption)
+						.foregroundColor(.secondary)
+				}
+
+				Spacer()
+
+				Button("Sign Out") {
+					Task {
+						await self.identityManager.signOut()
+					}
+				}
+				#if os(macOS)
+				.buttonStyle(.link)
+				#else
+				.buttonStyle(.plain)
+				.foregroundColor(.blue)
+				#endif
+			}
+			.padding()
+			.background(Color.gray.opacity(0.1))
+			.cornerRadius(12)
+
+			// Storage usage
+			if let stats = currentStats {
+				HStack {
+					VStack(alignment: .leading) {
+						Text("Storage Used")
+							.font(.caption)
+							.foregroundColor(.secondary)
+						Text(self.formatBytes(stats.totalSize))
+							.font(.title3)
+							.fontWeight(.semibold)
+					}
+
+					Spacer()
+
+					VStack(alignment: .trailing) {
+						Text("Photos Backed Up")
+							.font(.caption)
+							.foregroundColor(.secondary)
+						Text("\(stats.totalFiles)")
+							.font(.title3)
+							.fontWeight(.semibold)
+					}
 				}
 				.padding()
+				.background(Color.accentColor.opacity(0.1))
+				.cornerRadius(12)
 			}
-			
-			if let error = initError {
-				VStack(alignment: .leading, spacing: 8) {
-					Text("Error:")
+
+			// Subscription status
+			HStack {
+				VStack(alignment: .leading) {
+					Text("Current Plan")
+						.font(.caption)
+						.foregroundColor(.secondary)
+					Text(self.identityManager.currentUser?.subscription?.displayName ?? "Free (5GB)")
 						.font(.headline)
-						.foregroundColor(.red)
-					
-					// Selectable error text
-					#if os(macOS)
-					Text(error)
-						.textSelection(.enabled)
-						.font(.system(.body, design: .monospaced))
-						.padding(8)
-						.background(Color.gray.opacity(0.1))
-						.cornerRadius(4)
-						.frame(maxWidth: .infinity, alignment: .leading)
-					#else
-					TextEditor(text: .constant(error))
-						.font(.system(.body, design: .monospaced))
-						.foregroundColor(.primary)
-						.scrollDisabled(true)
-						.padding(4)
-						.background(Color.gray.opacity(0.1))
-						.cornerRadius(4)
-						.frame(minHeight: 60, maxHeight: 120)
-					#endif
 				}
-				.padding()
+
+				Spacer()
+
+				Button("Upgrade") {
+					self.showSubscriptionView = true
+				}
+				.buttonStyle(.borderedProminent)
+				.disabled(self.identityManager.currentUser?.subscription?.tier == .family)
 			}
-			
-			// Upload Section
-			VStack {
-				HStack(spacing: 20) {
-					Button("Check AWS Credentials") {
-						checkCredentials()
-					}
-					.buttonStyle(.bordered)
-					
-					PhotosPicker(selection: $selectedPhoto,
-								matching: .images) {
-						Label("Select Photo", systemImage: "photo")
-							.frame(width: 200, height: 50)
-							.background(Color.blue)
-							.foregroundColor(.white)
-							.cornerRadius(10)
-					}
-					.disabled(isUploading || s3Service == nil)
-					.onChange(of: selectedPhoto) { oldValue, newValue in
-						Task {
-							await uploadPhoto()
-						}
-					}
+			.padding()
+			.background(Color.blue.opacity(0.1))
+			.cornerRadius(12)
+		}
+	}
+
+	private var signInPromptSection: some View {
+		VStack(spacing: 20) {
+			Image(systemName: "icloud.slash")
+				.font(.system(size: 60))
+				.foregroundColor(.secondary)
+
+			Text("Sign in to use backup service")
+				.font(.title2)
+
+			Button("Sign in with Apple") {
+				self.showSignInPrompt = true
+			}
+			.buttonStyle(.borderedProminent)
+			.controlSize(.large)
+		}
+		.padding(40)
+	}
+
+	private var uploadSection: some View {
+		VStack(spacing: 16) {
+			PhotosPicker(
+				selection: self.$selectedPhoto,
+				matching: .images
+			) {
+				Label("Select Photo to Backup", systemImage: "photo.badge.plus")
+					.frame(maxWidth: .infinity)
+					.frame(height: 50)
+					.background(Color.blue)
+					.foregroundColor(.white)
+					.cornerRadius(10)
+			}
+			.disabled(self.isUploading)
+			.onChange(of: self.selectedPhoto) { _, _ in
+				Task {
+					await self.uploadPhoto()
 				}
-				
-				if isUploading {
+			}
+
+			if self.isUploading {
+				HStack {
 					ProgressView()
 						.progressViewStyle(CircularProgressViewStyle())
+					Text("Uploading...")
+						.foregroundColor(.secondary)
 				}
-				
-				Text(uploadStatus)
-					.font(.caption)
-					.foregroundColor(uploadStatus.contains("❌") ? .red : .secondary)
-					#if os(macOS)
-					.textSelection(.enabled)
-					#endif
 			}
-			
-			Divider()
-			
-			// List Uploaded Photos
-			VStack(alignment: .leading) {
-				HStack {
-					Text("Uploaded Photos")
-						.font(.headline)
-					Spacer()
-					Button("Refresh") {
-						Task {
-							await loadPhotos()
-						}
+
+			if !self.uploadStatus.isEmpty {
+				Text(self.uploadStatus)
+					.font(.caption)
+					.foregroundColor(self.uploadStatus.contains("❌") ? .red : .green)
+					.multilineTextAlignment(.center)
+			}
+		}
+	}
+
+	private var uploadedPhotosSection: some View {
+		VStack(alignment: .leading) {
+			HStack {
+				Text("Your Backed Up Photos")
+					.font(.headline)
+				Spacer()
+				Button("Refresh") {
+					Task {
+						await self.loadPhotos()
 					}
-					.disabled(s3Service == nil)
 				}
-				
-				List(uploadedPhotos, id: \.md5) { photo in
+				.buttonStyle(.bordered)
+			}
+
+			if self.uploadedPhotos.isEmpty {
+				Text("No photos backed up yet")
+					.foregroundColor(.secondary)
+					.frame(maxWidth: .infinity, maxHeight: 200)
+			} else {
+				List(self.uploadedPhotos, id: \.md5) { photo in
 					VStack(alignment: .leading, spacing: 4) {
 						Text("MD5: \(photo.md5)")
 							.font(.caption.monospaced())
 						HStack {
-							Text("Size: \(formatBytes(photo.size))")
+							Text("Size: \(self.formatBytes(photo.size))")
 							Text("•")
 							Text("Storage: \(photo.storageClass)")
 							Text("•")
@@ -145,139 +231,94 @@ struct S3BackupTestView: View {
 				}
 				.frame(maxHeight: 300)
 			}
-			.padding()
-			
-			Spacer()
 		}
 		.padding()
-		.frame(width: 600, height: 700)
-		.task {
-			await initializeService()
-		}
 	}
-	
+
 	private func uploadPhoto() async {
-		guard let selectedPhoto,
-			  let s3Service else { return }
-		
-		isUploading = true
-		uploadStatus = "Loading photo..."
-		
+		guard let selectedPhoto else { return }
+
+		self.isUploading = true
+		self.uploadStatus = "Loading photo..."
+
 		do {
 			// Load photo data
 			guard let data = try await selectedPhoto.loadTransferable(type: Data.self) else {
-				uploadStatus = "Failed to load photo"
-				isUploading = false
+				self.uploadStatus = "Failed to load photo"
+				self.isUploading = false
 				return
 			}
-			
-			uploadStatus = "Uploading to S3..."
-			
-			// Upload photo
-			let md5 = try await s3Service.uploadPhoto(data: data, userId: testUserId)
-			
-			// Create thumbnail (simplified for POC)
-			let thumbnailData = data // In real app, would resize
-			try await s3Service.uploadThumbnail(data: thumbnailData, md5: md5, userId: testUserId)
-			
-			uploadStatus = "✅ Uploaded: \(md5)"
-			
-			// Refresh list
-			await loadPhotos()
-			
+
+			self.uploadStatus = "Creating backup..."
+
+			// Create a temporary photo reference
+			let tempDir = FileManager.default.temporaryDirectory
+			let tempURL = tempDir.appendingPathComponent("temp_photo.jpg")
+			try data.write(to: tempURL)
+
+			let photoRef = PhotoReference(
+				directoryPath: tempDir.path as NSString,
+				filename: "temp_photo.jpg"
+			)
+
+			// Upload using backup manager
+			try await self.backupManager.uploadPhoto(photoRef)
+
+			self.uploadStatus = "✅ Successfully backed up!"
+
+			// Clean up temp file
+			try? FileManager.default.removeItem(at: tempURL)
+
+			// Refresh list and stats
+			await self.loadPhotos()
+			await self.loadUserData()
+
 		} catch {
-			uploadStatus = "❌ Error: \(error.localizedDescription)"
+			if case S3BackupError.uploadFailed = error {
+				self.uploadStatus = "❌ Storage quota exceeded. Please upgrade your plan."
+				self.showSubscriptionView = true
+			} else if case S3BackupError.credentialsNotFound = error {
+				self.uploadStatus = "❌ Please sign in first"
+				self.showSignInPrompt = true
+			} else {
+				self.uploadStatus = "❌ Error: \(error.localizedDescription)"
+			}
 		}
-		
-		isUploading = false
+
+		self.isUploading = false
 	}
-	
+
 	private func loadPhotos() async {
-		guard let s3Service else { return }
-		
+		guard self.identityManager.isSignedIn else { return }
+
 		do {
-			uploadedPhotos = try await s3Service.listUserPhotos(userId: testUserId)
+			if let service = backupManager.s3Service {
+				self.uploadedPhotos = try await service.listUserPhotos(
+					userId: self.identityManager.currentUser?.serviceUserID ?? ""
+				)
+			}
 		} catch {
 			print("Failed to load photos: \(error)")
-			uploadStatus = "Failed to load photos: \(error.localizedDescription)"
 		}
 	}
-	
+
+	private func loadUserData() async {
+		guard self.identityManager.isSignedIn else { return }
+
+		// Load backup stats
+		self.currentStats = await self.backupManager.getBackupStats()
+
+		// Load photos
+		await self.loadPhotos()
+
+		// Ensure IAP products are loaded
+		await self.iapManager.loadProducts()
+	}
+
 	private func formatBytes(_ bytes: Int64) -> String {
 		let formatter = ByteCountFormatter()
-		formatter.countStyle = .file
+		formatter.countStyle = .binary
 		return formatter.string(fromByteCount: bytes)
-	}
-	
-	private func initializeService() async {
-		do {
-			s3Service = try await S3BackupService()
-			uploadStatus = "Ready to upload"
-			await loadPhotos()
-		} catch {
-			initError = "Failed to initialize: \(error.localizedDescription)\n\nMake sure your AWS credentials are configured in ~/.aws/credentials"
-		}
-	}
-	
-	private func checkCredentials() {
-		let fileManager = FileManager.default
-		let homeDirectory = fileManager.homeDirectoryForCurrentUser
-		let containerCredentialsPath = homeDirectory.appendingPathComponent(".aws/credentials").path
-		let systemCredentialsPath = NSString(string: "~/.aws/credentials").expandingTildeInPath
-		
-		var info = "Checking AWS credentials...\n\n"
-		
-		// Check environment variables first
-		if let accessKey = ProcessInfo.processInfo.environment["AWS_ACCESS_KEY_ID"],
-		   let secretKey = ProcessInfo.processInfo.environment["AWS_SECRET_ACCESS_KEY"] {
-			info += "✅ Found AWS_ACCESS_KEY_ID in environment\n"
-			info += "✅ Found AWS_SECRET_ACCESS_KEY in environment\n\n"
-			info += "Environment variables are set correctly!\n"
-		} else {
-			info += "❌ No AWS environment variables found\n\n"
-		}
-		
-		// Check container directory (sandboxed location)
-		info += "📱 App Container Path:\n\(containerCredentialsPath)\n\n"
-		
-		if fileManager.fileExists(atPath: containerCredentialsPath) {
-			info += "✅ Credentials file exists in app container\n"
-			// Try to parse it
-			if let credentialsData = try? String(contentsOfFile: containerCredentialsPath) {
-				let lines = credentialsData.components(separatedBy: .newlines)
-				info += "📄 File contains \(lines.count) lines\n"
-			}
-		} else {
-			info += "❌ No credentials file in app container\n"
-		}
-		
-		info += "\n"
-		
-		// Check system location
-		info += "💻 System Path:\n\(systemCredentialsPath)\n\n"
-		
-		if fileManager.fileExists(atPath: systemCredentialsPath) {
-			info += "✅ Credentials file exists at system location\n"
-			info += "⚠️ Note: Sandboxed app cannot access this location\n"
-		} else {
-			info += "❌ No credentials file at system location\n"
-		}
-		
-		info += "\n📝 Solutions for Sandboxed Apps:\n\n"
-		info += "Option 1: Set environment variables in Xcode\n"
-		info += "1. Edit scheme → Run → Arguments\n"
-		info += "2. Add environment variables:\n"
-		info += "   AWS_ACCESS_KEY_ID = your_key\n"
-		info += "   AWS_SECRET_ACCESS_KEY = your_secret\n\n"
-		
-		info += "Option 2: Copy credentials to app container\n"
-		info += "mkdir -p \"\(homeDirectory.path)/.aws\"\n"
-		info += "cp ~/.aws/credentials \"\(homeDirectory.path)/.aws/\"\n\n"
-		
-		info += "Option 3: Disable App Sandbox (development only)\n"
-		info += "Remove App Sandbox capability in project settings"
-		
-		credentialsInfo = info
 	}
 }
 

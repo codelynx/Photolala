@@ -3,7 +3,7 @@ import SwiftUI
 struct SignInPromptView: View {
 	@Environment(\.dismiss) private var dismiss
 	@StateObject private var identityManager = IdentityManager.shared
-	
+
 	var body: some View {
 		VStack(spacing: 32) {
 			// Header
@@ -11,11 +11,11 @@ struct SignInPromptView: View {
 				Image(systemName: "icloud.and.arrow.up")
 					.font(.system(size: 60))
 					.foregroundColor(.accentColor)
-				
+
 				Text("Sign In to Back Up Photos")
 					.font(.largeTitle)
 					.fontWeight(.bold)
-				
+
 				Text("Create a free account to back up your photos to the cloud and access them from any device.")
 					.font(.body)
 					.foregroundColor(.secondary)
@@ -23,28 +23,28 @@ struct SignInPromptView: View {
 					.frame(maxWidth: 400)
 			}
 			.padding(.top, 40)
-			
+
 			// Benefits
 			VStack(alignment: .leading, spacing: 16) {
-				FeatureRow(
+				SignInFeatureRow(
 					icon: "icloud",
-					title: "5 GB Free Storage",
-					description: "Start with 5 GB of free cloud storage"
+					title: "Free Trial - 200MB",
+					description: "Try our service with 200MB free"
 				)
-				
-				FeatureRow(
+
+				SignInFeatureRow(
 					icon: "devices.phone.and.tablet",
 					title: "Access Anywhere",
 					description: "View your photos on all your devices"
 				)
-				
-				FeatureRow(
+
+				SignInFeatureRow(
 					icon: "lock.shield",
 					title: "Secure & Private",
 					description: "Your photos are encrypted and private"
 				)
-				
-				FeatureRow(
+
+				SignInFeatureRow(
 					icon: "arrow.up.circle",
 					title: "Automatic Backup",
 					description: "Never lose your precious memories"
@@ -52,44 +52,48 @@ struct SignInPromptView: View {
 			}
 			.frame(maxWidth: 400)
 			.padding(.vertical)
-			
+
 			// Sign In Button
 			SignInWithAppleButton()
 				.padding(.bottom, 20)
-			
+
 			// Skip for now
 			Button("Browse Locally Only") {
-				dismiss()
+				self.dismiss()
 			}
 			.foregroundColor(.secondary)
 			.padding(.bottom, 40)
 		}
 		.frame(width: 500, height: 600)
-		.background(Color(NSColor.windowBackgroundColor))
-		.onChange(of: identityManager.isSignedIn) { _, isSignedIn in
-			if isSignedIn {
-				dismiss()
+		#if os(macOS)
+			.background(Color(NSColor.windowBackgroundColor))
+		#else
+			.background(Color(UIColor.systemBackground))
+		#endif
+			.onChange(of: self.identityManager.isSignedIn) { _, isSignedIn in
+				if isSignedIn {
+					self.dismiss()
+				}
 			}
-		}
 	}
 }
 
-struct FeatureRow: View {
+struct SignInFeatureRow: View {
 	let icon: String
 	let title: String
 	let description: String
-	
+
 	var body: some View {
 		HStack(alignment: .top, spacing: 16) {
-			Image(systemName: icon)
+			Image(systemName: self.icon)
 				.font(.title2)
 				.foregroundColor(.accentColor)
 				.frame(width: 30)
-			
+
 			VStack(alignment: .leading, spacing: 4) {
-				Text(title)
+				Text(self.title)
 					.font(.headline)
-				Text(description)
+				Text(self.description)
 					.font(.caption)
 					.foregroundColor(.secondary)
 			}
@@ -102,14 +106,14 @@ struct FeatureRow: View {
 struct SubscriptionUpgradeView: View {
 	@Environment(\.dismiss) private var dismiss
 	@StateObject private var identityManager = IdentityManager.shared
-	
+
 	let currentUsage: Int64
 	let storageLimit: Int64
-	
+
 	var usagePercentage: Double {
-		Double(currentUsage) / Double(storageLimit)
+		Double(self.currentUsage) / Double(self.storageLimit)
 	}
-	
+
 	var body: some View {
 		VStack(spacing: 24) {
 			// Header
@@ -117,49 +121,51 @@ struct SubscriptionUpgradeView: View {
 				Image(systemName: "exclamationmark.icloud")
 					.font(.system(size: 50))
 					.foregroundColor(.orange)
-				
+
 				Text("Storage Limit Reached")
 					.font(.largeTitle)
 					.fontWeight(.bold)
-				
-				Text("You've used \(formatBytes(currentUsage)) of your \(formatBytes(storageLimit)) free storage.")
-					.font(.body)
-					.foregroundColor(.secondary)
+
+				Text(
+					"You've used \(self.formatBytes(self.currentUsage)) of your \(self.formatBytes(self.storageLimit)) free storage."
+				)
+				.font(.body)
+				.foregroundColor(.secondary)
 			}
 			.padding(.top, 40)
-			
+
 			// Usage indicator
 			VStack(alignment: .leading, spacing: 8) {
-				ProgressView(value: usagePercentage)
+				ProgressView(value: self.usagePercentage)
 					.tint(.orange)
-				
+
 				HStack {
-					Text(formatBytes(currentUsage))
+					Text(self.formatBytes(self.currentUsage))
 						.font(.caption)
 					Spacer()
-					Text(formatBytes(storageLimit))
+					Text(self.formatBytes(self.storageLimit))
 						.font(.caption)
 				}
 				.foregroundColor(.secondary)
 			}
 			.frame(maxWidth: 300)
 			.padding()
-			
+
 			// Subscription tiers
 			VStack(spacing: 12) {
-				SubscriptionTierRow(tier: .basic, isRecommended: true)
-				SubscriptionTierRow(tier: .standard, isRecommended: false)
-				SubscriptionTierRow(tier: .pro, isRecommended: false)
+				SubscriptionTierRow(tier: .starter, isRecommended: true)
+				SubscriptionTierRow(tier: .essential, isRecommended: false)
+				SubscriptionTierRow(tier: .plus, isRecommended: false)
 			}
 			.padding(.horizontal)
-			
+
 			// Actions
 			HStack(spacing: 16) {
 				Button("Maybe Later") {
-					dismiss()
+					self.dismiss()
 				}
 				.buttonStyle(.plain)
-				
+
 				Button("View All Plans") {
 					// Show full subscription view
 				}
@@ -168,9 +174,13 @@ struct SubscriptionUpgradeView: View {
 			.padding(.bottom, 40)
 		}
 		.frame(width: 500, height: 600)
-		.background(Color(NSColor.windowBackgroundColor))
+		#if os(macOS)
+			.background(Color(NSColor.windowBackgroundColor))
+		#else
+			.background(Color(UIColor.systemBackground))
+		#endif
 	}
-	
+
 	private func formatBytes(_ bytes: Int64) -> String {
 		let formatter = ByteCountFormatter()
 		formatter.countStyle = .file
@@ -181,14 +191,14 @@ struct SubscriptionUpgradeView: View {
 struct SubscriptionTierRow: View {
 	let tier: SubscriptionTier
 	let isRecommended: Bool
-	
+
 	var body: some View {
 		HStack {
 			VStack(alignment: .leading, spacing: 4) {
 				HStack {
-					Text(tier.displayName)
+					Text(self.tier.displayName)
 						.font(.headline)
-					if isRecommended {
+					if self.isRecommended {
 						Text("RECOMMENDED")
 							.font(.caption2)
 							.fontWeight(.bold)
@@ -199,24 +209,24 @@ struct SubscriptionTierRow: View {
 							.cornerRadius(4)
 					}
 				}
-				
-				Text("\(formatBytes(tier.storageLimit)) storage")
+
+				Text("\(self.formatBytes(self.tier.storageLimit)) storage")
 					.font(.caption)
 					.foregroundColor(.secondary)
 			}
-			
+
 			Spacer()
-			
-			Text(tier.monthlyPrice)
+
+			Text(self.tier.monthlyPrice)
 				.font(.title3)
 				.fontWeight(.semibold)
 		}
 		.padding()
-		.background(isRecommended ? Color.accentColor.opacity(0.1) : Color.gray.opacity(0.1))
+		.background(self.isRecommended ? Color.accentColor.opacity(0.1) : Color.gray.opacity(0.1))
 		.cornerRadius(8)
-		
+
 	}
-	
+
 	private func formatBytes(_ bytes: Int64) -> String {
 		let formatter = ByteCountFormatter()
 		formatter.countStyle = .file
@@ -230,7 +240,7 @@ struct SubscriptionTierRow: View {
 
 #Preview("Upgrade") {
 	SubscriptionUpgradeView(
-		currentUsage: 5 * 1024 * 1024 * 1024,
-		storageLimit: 5 * 1024 * 1024 * 1024
+		currentUsage: 5 * 1_024 * 1_024 * 1_024,
+		storageLimit: 5 * 1_024 * 1_024 * 1_024
 	)
 }

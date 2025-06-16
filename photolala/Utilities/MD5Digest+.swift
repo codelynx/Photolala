@@ -9,14 +9,21 @@ import Foundation
 
 extension Insecure.MD5Digest {
 	public var data: Data {
-		return self.withUnsafeBytes { buffer in
+		self.withUnsafeBytes { buffer in
 			Data(buffer)
 		}
 	}
+
 	init?(rawBytes: Data) {
 		guard Insecure.MD5Digest.byteCount == rawBytes.count else { return nil }
 		self = rawBytes.withUnsafeBytes { buffer in
 			buffer.load(as: Insecure.MD5Digest.self)
 		}
+	}
+}
+
+extension Data {
+	var md5Digest: Data {
+		Insecure.MD5.hash(data: self).data
 	}
 }

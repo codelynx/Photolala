@@ -5,8 +5,8 @@
 //  Created by Kaz Yoshikawa on 2025/06/12.
 //
 
-import SwiftUI
 import Observation
+import SwiftUI
 
 struct PhotoBrowserView: View {
 	let directoryPath: NSString
@@ -22,312 +22,326 @@ struct PhotoBrowserView: View {
 	@State private var showingUpgradePrompt = false
 	@StateObject private var s3BackupManager = S3BackupManager.shared
 	@StateObject private var identityManager = IdentityManager.shared
-	
+
 	init(directoryPath: NSString) {
 		self.directoryPath = directoryPath
 	}
-	
+
 	var body: some View {
-#if os(macOS)
-		NavigationStack(path: $navigationPath) {
-			collectionContent
-				.navigationDestination(for: PreviewNavigation.self) { navigation in
+		#if os(macOS)
+			NavigationStack(path: self.$navigationPath) {
+				self.collectionContent
+					.navigationDestination(for: PreviewNavigation.self) { navigation in
+						PhotoPreviewView(
+							photos: navigation.photos,
+							initialIndex: navigation.initialIndex
+						)
+						.navigationBarBackButtonHidden(true)
+					}
+			}
+			.onKeyPress(.space) {
+				self.handleSpaceKeyPress()
+				return .handled
+			}
+			.onKeyPress(keys: ["s"]) { _ in
+				// Print cache statistics
+				PhotoManager.shared.printCacheStatistics()
+				return .handled
+			}
+			.onKeyPress(keys: ["r"]) { _ in
+				// Reset cache statistics
+				PhotoManager.shared.resetStatistics()
+				return .handled
+			}
+			.sheet(isPresented: self.$showingSignInPrompt) {
+				SignInPromptView()
+			}
+			.sheet(isPresented: self.$showingUpgradePrompt) {
+				SubscriptionView()
+			}
+		#else
+			self.collectionContent
+				.navigationDestination(item: self.$selectedPhotoNavigation) { navigation in
 					PhotoPreviewView(
 						photos: navigation.photos,
 						initialIndex: navigation.initialIndex
 					)
 					.navigationBarBackButtonHidden(true)
 				}
-		}
-		.onKeyPress(.space) {
-			handleSpaceKeyPress()
-			return .handled
-		}
-		.onKeyPress(keys: ["s"]) { _ in
-			// Print cache statistics
-			PhotoManager.shared.printCacheStatistics()
-			return .handled
-		}
-		.onKeyPress(keys: ["r"]) { _ in
-			// Reset cache statistics
-			PhotoManager.shared.resetStatistics()
-			return .handled
-		}
-#else
-		collectionContent
-			.navigationDestination(item: $selectedPhotoNavigation) { navigation in
-				PhotoPreviewView(
-					photos: navigation.photos,
-					initialIndex: navigation.initialIndex
-				)
-				.navigationBarBackButtonHidden(true)
-			}
-			.sheet(isPresented: $showingHelp) {
-				HelpView()
-			}
-			.onReceive(NotificationCenter.default.publisher(for: .showHelp)) { _ in
-				showingHelp = true
-			}
-#endif
+				.sheet(isPresented: self.$showingHelp) {
+					HelpView()
+				}
+				.onReceive(NotificationCenter.default.publisher(for: .showHelp)) { _ in
+					self.showingHelp = true
+				}
+		#endif
 	}
-	
+
 	@ViewBuilder
 	private var collectionContent: some View {
 		Group {
-#if os(iOS)
-			PhotoCollectionView(
-				directoryPath: directoryPath,
-				settings: settings,
-				onSelectPhoto: handlePhotoSelection,
-				onPhotosLoaded: { photos in
-					self.allPhotos = photos
-				},
-				onSelectionChanged: { photos in
-					self.selectedPhotos = photos
-				},
-				photosCount: $photosCount
-			)
-#else
-			PhotoCollectionView(
-				directoryPath: directoryPath,
-				settings: settings,
-				onSelectPhoto: handlePhotoSelection,
-				onPhotosLoaded: { photos in
-					self.allPhotos = photos
-					self.photosCount = photos.count
-				},
-				onSelectionChanged: { photos in
-					self.selectedPhotos = photos
-				}
-			)
-#endif
-		}
-		.navigationTitle(directoryPath.lastPathComponent)
-#if os(macOS)
-		.navigationSubtitle(directoryPath as String)
-#endif
-		.onReceive(NotificationCenter.default.publisher(for: .deselectAll)) { _ in
-			selectedPhotos = []
-		}
-		.overlay {
-			if showingS3UploadProgress {
-				ZStack {
-					Color.black.opacity(0.4)
-						.ignoresSafeArea()
-					
-					VStack(spacing: 16) {
-						ProgressView()
-							.progressViewStyle(CircularProgressViewStyle())
-							.scaleEffect(1.5)
-						
-						Text(s3BackupManager.uploadStatus)
-							.font(.headline)
-							.foregroundColor(.white)
-						
-						if s3BackupManager.uploadProgress > 0 {
-							ProgressView(value: s3BackupManager.uploadProgress)
-								.frame(width: 200)
-						}
+			#if os(iOS)
+				PhotoCollectionView(
+					directoryPath: self.directoryPath,
+					settings: self.settings,
+					onSelectPhoto: self.handlePhotoSelection,
+					onPhotosLoaded: { photos in
+						self.allPhotos = photos
+					},
+					onSelectionChanged: { photos in
+						self.selectedPhotos = photos
+					},
+					photosCount: self.$photosCount
+				)
+			#else
+				PhotoCollectionView(
+					directoryPath: self.directoryPath,
+					settings: self.settings,
+					onSelectPhoto: self.handlePhotoSelection,
+					onPhotosLoaded: { photos in
+						self.allPhotos = photos
+						self.photosCount = photos.count
+					},
+					onSelectionChanged: { photos in
+						self.selectedPhotos = photos
 					}
-					.padding(32)
-					.background(Color.secondary.opacity(0.9))
-					.cornerRadius(16)
-				}
+				)
+			#endif
+		}
+		.navigationTitle(self.directoryPath.lastPathComponent)
+		#if os(macOS)
+			.navigationSubtitle(self.directoryPath as String)
+		#endif
+			.onReceive(NotificationCenter.default.publisher(for: .deselectAll)) { _ in
+				self.selectedPhotos = []
 			}
-		}
-		.toolbar {
-			ToolbarItemGroup(placement: .automatic) {
-				// Preview selected photos button
-				if !selectedPhotos.isEmpty {
-					Button(action: previewSelectedPhotos) {
-						Label("Preview", systemImage: "eye")
-					}
-#if os(macOS)
-					.help("Preview selected photos")
-#endif
-				}
-				// Display mode toggle
-				Button(action: {
-					settings.displayMode = settings.displayMode == .scaleToFit ? .scaleToFill : .scaleToFit
-				}) {
-					Image(systemName: settings.displayMode == .scaleToFit ? "aspectratio" : "aspectratio.fill")
-				}
-#if os(macOS)
-				.help(settings.displayMode == .scaleToFit ? "Switch to Fill" : "Switch to Fit")
-#endif
-				
-#if os(iOS)
-				// Size menu for iOS
-				Menu {
-					Button("S") {
-						settings.thumbnailOption = .small
-					}
-					Button("M") {
-						settings.thumbnailOption = .medium
-					}
-					Button("L") {
-						settings.thumbnailOption = .large
-					}
-				} label: {
-					Image(systemName: "slider.horizontal.3")
-				}
-#else
-				// Size picker for macOS
-				Picker("Size", selection: $settings.thumbnailOption) {
-					Text("S").tag(ThumbnailOption.small)
-					Text("M").tag(ThumbnailOption.medium)
-					Text("L").tag(ThumbnailOption.large)
-				}
-				.pickerStyle(.segmented)
-				.help("Thumbnail size")
-#endif
-				
-				// Sort picker
-#if os(iOS)
-				Menu {
-					ForEach(PhotoSortOption.allCases, id: \.self) { option in
-						Button(action: {
-							settings.sortOption = option
-						}) {
-							Label(option.rawValue, systemImage: option.systemImage)
-							if option == settings.sortOption {
-								Image(systemName: "checkmark")
+			.overlay {
+				if self.showingS3UploadProgress {
+					ZStack {
+						Color.black.opacity(0.4)
+							.ignoresSafeArea()
+
+						VStack(spacing: 16) {
+							ProgressView()
+								.progressViewStyle(CircularProgressViewStyle())
+								.scaleEffect(1.5)
+
+							Text(self.s3BackupManager.uploadStatus)
+								.font(.headline)
+								.foregroundColor(.white)
+
+							if self.s3BackupManager.uploadProgress > 0 {
+								ProgressView(value: self.s3BackupManager.uploadProgress)
+									.frame(width: 200)
 							}
 						}
+						.padding(32)
+						.background(Color.secondary.opacity(0.9))
+						.cornerRadius(16)
 					}
-				} label: {
-					Label("Sort", systemImage: settings.sortOption.systemImage)
-				}
-#else
-				// macOS: Use a picker with menu style
-				Picker("Sort", selection: $settings.sortOption) {
-					ForEach(PhotoSortOption.allCases, id: \.self) { option in
-						Text(option.rawValue)
-							.tag(option)
-					}
-				}
-				.pickerStyle(.menu)
-				.frame(width: 150)
-				.help("Sort photos by")
-#endif
-				
-				// Grouping picker
-#if os(iOS)
-				Menu {
-					Button(action: {
-						settings.groupingOption = .year
-					}) {
-						Label("Year", systemImage: "calendar")
-						if settings.groupingOption == .year {
-							Image(systemName: "checkmark")
-						}
-					}
-					Button(action: {
-						settings.groupingOption = .month
-					}) {
-						Label("Month", systemImage: "calendar.badge.clock")
-						if settings.groupingOption == .month {
-							Image(systemName: "checkmark")
-						}
-					}
-					Button(action: {
-						settings.groupingOption = .day
-					}) {
-						Label("Day", systemImage: "calendar.circle")
-						if settings.groupingOption == .day {
-							Image(systemName: "checkmark")
-						}
-					}
-					
-					Divider()
-					
-					Button(action: {
-						settings.groupingOption = .none
-					}) {
-						Label("None", systemImage: "square.grid.3x3")
-						if settings.groupingOption == .none {
-							Image(systemName: "checkmark")
-						}
-					}
-				} label: {
-					if settings.groupingOption != .none {
-						Label(settings.groupingOption.rawValue, systemImage: settings.groupingOption.systemImage)
-					} else {
-						Image(systemName: "calendar")
-					}
-				}
-#else
-				// macOS: Use a picker with menu style
-				Picker("Group by", selection: $settings.groupingOption) {
-					Text("Year").tag(PhotoGroupingOption.year)
-					Text("Month").tag(PhotoGroupingOption.month)
-					Text("Day").tag(PhotoGroupingOption.day)
-					Divider()
-					Text("None").tag(PhotoGroupingOption.none)
-				}
-				.pickerStyle(.menu)
-				.frame(width: 120)
-				.help("Group photos by date")
-#endif
-				
-				// S3 Backup button
-				if !selectedPhotos.isEmpty {
-					Button(action: backupSelectedPhotos) {
-						Label("Backup", systemImage: "icloud.and.arrow.up")
-					}
-					.disabled(s3BackupManager.isUploading)
-					#if os(macOS)
-					.help(identityManager.isSignedIn ? "Backup selected photos to cloud" : "Sign in to backup photos")
-					#endif
 				}
 			}
-		}
+			.toolbar {
+				ToolbarItemGroup(placement: .automatic) {
+					// Preview selected photos button
+					if !self.selectedPhotos.isEmpty {
+						Button(action: self.previewSelectedPhotos) {
+							Label("Preview", systemImage: "eye")
+						}
+						#if os(macOS)
+						.help("Preview selected photos")
+						#endif
+					}
+					// Display mode toggle
+					Button(action: {
+						self.settings.displayMode = self.settings
+							.displayMode == .scaleToFit ? .scaleToFill : .scaleToFit
+					}) {
+						Image(systemName: self.settings.displayMode == .scaleToFit ? "aspectratio" : "aspectratio.fill")
+					}
+					#if os(macOS)
+					.help(self.settings.displayMode == .scaleToFit ? "Switch to Fill" : "Switch to Fit")
+					#endif
+
+					#if os(iOS)
+						// Size menu for iOS
+						Menu {
+							Button("S") {
+								self.settings.thumbnailOption = .small
+							}
+							Button("M") {
+								self.settings.thumbnailOption = .medium
+							}
+							Button("L") {
+								self.settings.thumbnailOption = .large
+							}
+						} label: {
+							Image(systemName: "slider.horizontal.3")
+						}
+					#else
+						// Size picker for macOS
+						Picker("Size", selection: self.$settings.thumbnailOption) {
+							Text("S").tag(ThumbnailOption.small)
+							Text("M").tag(ThumbnailOption.medium)
+							Text("L").tag(ThumbnailOption.large)
+						}
+						.pickerStyle(.segmented)
+						.help("Thumbnail size")
+					#endif
+
+					// Sort picker
+					#if os(iOS)
+						Menu {
+							ForEach(PhotoSortOption.allCases, id: \.self) { option in
+								Button(action: {
+									self.settings.sortOption = option
+								}) {
+									Label(option.rawValue, systemImage: option.systemImage)
+									if option == self.settings.sortOption {
+										Image(systemName: "checkmark")
+									}
+								}
+							}
+						} label: {
+							Label("Sort", systemImage: self.settings.sortOption.systemImage)
+						}
+					#else
+						// macOS: Use a picker with menu style
+						Picker("Sort", selection: self.$settings.sortOption) {
+							ForEach(PhotoSortOption.allCases, id: \.self) { option in
+								Text(option.rawValue)
+									.tag(option)
+							}
+						}
+						.pickerStyle(.menu)
+						.frame(width: 150)
+						.help("Sort photos by")
+					#endif
+
+					// Grouping picker
+					#if os(iOS)
+						Menu {
+							Button(action: {
+								self.settings.groupingOption = .year
+							}) {
+								Label("Year", systemImage: "calendar")
+								if self.settings.groupingOption == .year {
+									Image(systemName: "checkmark")
+								}
+							}
+							Button(action: {
+								self.settings.groupingOption = .month
+							}) {
+								Label("Month", systemImage: "calendar.badge.clock")
+								if self.settings.groupingOption == .month {
+									Image(systemName: "checkmark")
+								}
+							}
+							Button(action: {
+								self.settings.groupingOption = .day
+							}) {
+								Label("Day", systemImage: "calendar.circle")
+								if self.settings.groupingOption == .day {
+									Image(systemName: "checkmark")
+								}
+							}
+
+							Divider()
+
+							Button(action: {
+								self.settings.groupingOption = .none
+							}) {
+								Label("None", systemImage: "square.grid.3x3")
+								if self.settings.groupingOption == .none {
+									Image(systemName: "checkmark")
+								}
+							}
+						} label: {
+							if self.settings.groupingOption != .none {
+								Label(
+									self.settings.groupingOption.rawValue,
+									systemImage: self.settings.groupingOption.systemImage
+								)
+							} else {
+								Image(systemName: "calendar")
+							}
+						}
+					#else
+						// macOS: Use a picker with menu style
+						Picker("Group by", selection: self.$settings.groupingOption) {
+							Text("Year").tag(PhotoGroupingOption.year)
+							Text("Month").tag(PhotoGroupingOption.month)
+							Text("Day").tag(PhotoGroupingOption.day)
+							Divider()
+							Text("None").tag(PhotoGroupingOption.none)
+						}
+						.pickerStyle(.menu)
+						.frame(width: 120)
+						.help("Group photos by date")
+					#endif
+
+					// S3 Backup button
+					if !self.selectedPhotos.isEmpty {
+						Button(action: self.backupSelectedPhotos) {
+							Label("Backup", systemImage: "icloud.and.arrow.up")
+						}
+						.disabled(self.s3BackupManager.isUploading)
+						#if os(macOS)
+							.help(
+								self.identityManager
+									.isSignedIn ? "Backup selected photos to cloud" : "Sign in to backup photos"
+							)
+						#endif
+					}
+				}
+			}
 	}
-	
+
 	private func handleSpaceKeyPress() {
 		// If we don't have photos yet, return
-		guard !allPhotos.isEmpty else { return }
-		
+		guard !self.allPhotos.isEmpty else { return }
+
 		// Always show all photos, but start from selected if any
-		let photosToShow = allPhotos
-		let initialIndex: Int
-		
-		if !selectedPhotos.isEmpty {
+		let photosToShow = self.allPhotos
+		let initialIndex: Int = if !self.selectedPhotos.isEmpty {
 			// Find the first selected photo in the full list
 			if let firstSelected = selectedPhotos.first,
-			   let index = allPhotos.firstIndex(of: firstSelected) {
-				initialIndex = index
+			   let index = allPhotos.firstIndex(of: firstSelected)
+			{
+				index
 			} else {
-				initialIndex = 0
+				0
 			}
 		} else {
-			initialIndex = 0
+			0
 		}
-		
-		print("[PhotoBrowserView] Space key: Showing all \(photosToShow.count) photos, starting at index \(initialIndex)")
-		
+
+		print(
+			"[PhotoBrowserView] Space key: Showing all \(photosToShow.count) photos, starting at index \(initialIndex)"
+		)
+
 		let navigation = PreviewNavigation(photos: photosToShow, initialIndex: initialIndex)
-		
+
 		#if os(macOS)
-		navigationPath.append(navigation)
+			self.navigationPath.append(navigation)
 		#else
-		selectedPhotoNavigation = navigation
+			self.selectedPhotoNavigation = navigation
 		#endif
 	}
-	
+
 	private func handlePhotoSelection(_ photo: PhotoReference, _ allPhotos: [PhotoReference]) {
 		print("[PhotoBrowserView] handlePhotoSelection called for: \(photo.filename)")
-		
+
 		// Store all photos for space key navigation
 		self.allPhotos = allPhotos
-		
+
 		// If there's an active selection, show only selected photos
 		let photosToShow: [PhotoReference]
 		let initialIndex: Int
-		
-		if !selectedPhotos.isEmpty {
+
+		if !self.selectedPhotos.isEmpty {
 			// Convert selection to array maintaining order
-			photosToShow = allPhotos.filter { selectedPhotos.contains($0) }
+			photosToShow = allPhotos.filter { self.selectedPhotos.contains($0) }
 			initialIndex = photosToShow.firstIndex(of: photo) ?? 0
 			print("[PhotoBrowserView] Showing \(photosToShow.count) selected photos")
 		} else {
@@ -336,73 +350,73 @@ struct PhotoBrowserView: View {
 			initialIndex = allPhotos.firstIndex(of: photo) ?? 0
 			print("[PhotoBrowserView] Showing all \(photosToShow.count) photos")
 		}
-		
+
 		// Navigate to preview
 		print("[PhotoBrowserView] Navigating to preview with index: \(initialIndex)")
 		let navigation = PreviewNavigation(photos: photosToShow, initialIndex: initialIndex)
-		
+
 		#if os(macOS)
-		navigationPath.append(navigation)
+			self.navigationPath.append(navigation)
 		#else
-		selectedPhotoNavigation = navigation
+			self.selectedPhotoNavigation = navigation
 		#endif
 	}
-	
+
 	private func previewSelectedPhotos() {
 		// Get the selected photos in order
-		let sortedPhotos = selectedPhotos.sorted { photo1, photo2 in
+		let sortedPhotos = self.selectedPhotos.sorted { photo1, photo2 in
 			// Sort by filename to maintain consistent order
 			photo1.filename < photo2.filename
 		}
-		
+
 		guard !sortedPhotos.isEmpty else { return }
-		
+
 		print("[PhotoBrowserView] Previewing \(sortedPhotos.count) selected photos")
-		
+
 		// Start preview from the first selected photo
 		let navigation = PreviewNavigation(photos: sortedPhotos, initialIndex: 0)
-		
+
 		#if os(macOS)
-		navigationPath.append(navigation)
+			self.navigationPath.append(navigation)
 		#else
-		selectedPhotoNavigation = navigation
+			self.selectedPhotoNavigation = navigation
 		#endif
 	}
-	
+
 	private func backupSelectedPhotos() {
 		// Check if signed in
-		guard identityManager.isSignedIn else {
-			showingSignInPrompt = true
+		guard self.identityManager.isSignedIn else {
+			self.showingSignInPrompt = true
 			return
 		}
-		
+
 		// Check if service is configured
-		guard s3BackupManager.isConfigured else {
+		guard self.s3BackupManager.isConfigured else {
 			// In production, this would be automatic
 			// For now, show error
 			return
 		}
-		
-		showingS3UploadProgress = true
-		
+
+		self.showingS3UploadProgress = true
+
 		Task {
 			do {
-				try await s3BackupManager.uploadPhotos(selectedPhotos)
+				try await self.s3BackupManager.uploadPhotos(self.selectedPhotos)
 				await MainActor.run {
-					showingS3UploadProgress = false
-					selectedPhotos = [] // Clear selection after upload
+					self.showingS3UploadProgress = false
+					self.selectedPhotos = [] // Clear selection after upload
 				}
 			} catch S3BackupError.uploadFailed {
 				// Might be quota exceeded
 				await MainActor.run {
-					showingS3UploadProgress = false
-					if s3BackupManager.currentUsage >= s3BackupManager.storageLimit {
-						showingUpgradePrompt = true
+					self.showingS3UploadProgress = false
+					if self.s3BackupManager.currentUsage >= self.s3BackupManager.storageLimit {
+						self.showingUpgradePrompt = true
 					}
 				}
 			} catch {
 				await MainActor.run {
-					showingS3UploadProgress = false
+					self.showingS3UploadProgress = false
 					// Show error
 				}
 			}
@@ -414,19 +428,6 @@ struct PhotoBrowserView: View {
 struct PreviewNavigation: Hashable {
 	let photos: [PhotoReference]
 	let initialIndex: Int
-}
-
-		#if os(macOS)
-		.sheet(isPresented: $showingSignInPrompt) {
-			SignInPromptView()
-		}
-		.sheet(isPresented: $showingUpgradePrompt) {
-			SubscriptionUpgradeView(
-				currentUsage: s3BackupManager.currentUsage,
-				storageLimit: s3BackupManager.storageLimit
-			)
-		}
-		#endif
 }
 
 #Preview {

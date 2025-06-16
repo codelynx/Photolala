@@ -11,24 +11,24 @@ enum PhotoSortOption: String, CaseIterable {
 	case filename = "Name"
 	case dateAscending = "Date (Oldest First)"
 	case dateDescending = "Date (Newest First)"
-	
+
 	var systemImage: String {
 		switch self {
-		case .filename: return "textformat"
-		case .dateAscending: return "calendar"
-		case .dateDescending: return "calendar"
+		case .filename: "textformat"
+		case .dateAscending: "calendar"
+		case .dateDescending: "calendar"
 		}
 	}
-	
+
 	// Helper to get sort direction arrow
 	var directionIndicator: String {
 		switch self {
-		case .filename: return ""
-		case .dateAscending: return "↑"
-		case .dateDescending: return "↓"
+		case .filename: ""
+		case .dateAscending: "↑"
+		case .dateDescending: "↓"
 		}
 	}
-	
+
 	// Sort comparator for PhotoReference - using file dates only
 	func comparator(for photo1: PhotoReference, photo2: PhotoReference) -> Bool {
 		switch self {
@@ -44,9 +44,9 @@ enum PhotoSortOption: String, CaseIterable {
 			return date1 > date2
 		}
 	}
-	
+
 	// Sort an array of photos
 	func sort(_ photos: [PhotoReference]) -> [PhotoReference] {
-		return photos.sorted { comparator(for: $0, photo2: $1) }
+		photos.sorted { self.comparator(for: $0, photo2: $1) }
 	}
 }

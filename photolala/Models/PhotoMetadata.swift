@@ -18,19 +18,19 @@ class PhotoMetadata: NSObject, Codable {
 	let orientation: Int?
 	let gpsLatitude: Double?
 	let gpsLongitude: Double?
-	
+
 	// Computed properties
 	var displayDate: Date {
-		dateTaken ?? fileModificationDate
+		self.dateTaken ?? self.fileModificationDate
 	}
-	
+
 	var dimensions: String? {
 		guard let width = pixelWidth, let height = pixelHeight else { return nil }
 		return "\(width) × \(height)"
 	}
-	
+
 	var cameraInfo: String? {
-		switch (cameraMake, cameraModel) {
+		switch (self.cameraMake, self.cameraModel) {
 		case let (make?, model?):
 			// Remove manufacturer name from model if it's duplicated
 			if model.hasPrefix(make) {
@@ -45,23 +45,25 @@ class PhotoMetadata: NSObject, Codable {
 			return nil
 		}
 	}
-	
+
 	var formattedFileSize: String {
 		let formatter = ByteCountFormatter()
 		formatter.countStyle = .file
-		return formatter.string(fromByteCount: fileSize)
+		return formatter.string(fromByteCount: self.fileSize)
 	}
-	
-	init(dateTaken: Date? = nil,
-		 fileModificationDate: Date,
-		 fileSize: Int64,
-		 pixelWidth: Int? = nil,
-		 pixelHeight: Int? = nil,
-		 cameraMake: String? = nil,
-		 cameraModel: String? = nil,
-		 orientation: Int? = nil,
-		 gpsLatitude: Double? = nil,
-		 gpsLongitude: Double? = nil) {
+
+	init(
+		dateTaken: Date? = nil,
+		fileModificationDate: Date,
+		fileSize: Int64,
+		pixelWidth: Int? = nil,
+		pixelHeight: Int? = nil,
+		cameraMake: String? = nil,
+		cameraModel: String? = nil,
+		orientation: Int? = nil,
+		gpsLatitude: Double? = nil,
+		gpsLongitude: Double? = nil
+	) {
 		self.dateTaken = dateTaken
 		self.fileModificationDate = fileModificationDate
 		self.fileSize = fileSize
@@ -74,7 +76,7 @@ class PhotoMetadata: NSObject, Codable {
 		self.gpsLongitude = gpsLongitude
 		super.init()
 	}
-	
+
 	// Codable requirements
 	enum CodingKeys: String, CodingKey {
 		case dateTaken, fileModificationDate, fileSize

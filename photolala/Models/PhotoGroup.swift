@@ -12,8 +12,8 @@ struct PhotoGroup: Identifiable {
 	let title: String
 	let photos: [PhotoReference]
 	let dateRepresentative: Date
-	
+
 	var photoCount: Int {
-		photos.count
+		self.photos.count
 	}
 }

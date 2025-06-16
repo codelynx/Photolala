@@ -4,11 +4,11 @@ struct PhotoPreviewView: View {
 	// Constants
 	private let controlStripHeight: CGFloat = 44
 	private let useNativeThumbnailStrip = true // Feature flag for testing
-	
+
 	let photos: [PhotoReference]
 	let initialIndex: Int
 	@Binding var isPresented: Bool
-	
+
 	@State private var currentIndex: Int
 	@State private var zoomScale: CGFloat = 1.0
 	@State private var offset: CGSize = .zero
@@ -21,29 +21,29 @@ struct PhotoPreviewView: View {
 	@State private var showMetadataHUD = false
 	@State private var currentMetadata: PhotoMetadata?
 	@FocusState private var isFocused: Bool
-	
+
 	@Environment(\.dismiss) private var dismiss
-	
+
 	@ViewBuilder
 	private func imageView(for image: XImage) -> some View {
-#if os(macOS)
-		Image(nsImage: image)
-			.resizable()
-			.aspectRatio(contentMode: .fit)
-#else
-		Image(uiImage: image)
-			.resizable()
-			.aspectRatio(contentMode: .fit)
-#endif
+		#if os(macOS)
+			Image(nsImage: image)
+				.resizable()
+				.aspectRatio(contentMode: .fit)
+		#else
+			Image(uiImage: image)
+				.resizable()
+				.aspectRatio(contentMode: .fit)
+		#endif
 	}
-	
+
 	init(photos: [PhotoReference], initialIndex: Int, isPresented: Binding<Bool> = .constant(false)) {
 		self.photos = photos
 		self.initialIndex = initialIndex
 		self._isPresented = isPresented
 		self._currentIndex = State(initialValue: initialIndex)
 	}
-	
+
 	var body: some View {
 		GeometryReader { geometry in
 			ZStack {
@@ -52,34 +52,34 @@ struct PhotoPreviewView: View {
 					.ignoresSafeArea()
 					.contentShape(Rectangle())
 					.focusable()
-					.focused($isFocused)
+					.focused(self.$isFocused)
 					.onTapGesture {
-						isFocused = true
+						self.isFocused = true
 					}
-				
+
 				// Image display
 				if let image = currentImage {
-					imageView(for: image)
-						.scaleEffect(zoomScale)
-						.offset(offset)
+					self.imageView(for: image)
+						.scaleEffect(self.zoomScale)
+						.offset(self.offset)
 						.gesture(
 							MagnificationGesture()
 								.onChanged { value in
-									zoomScale = value
+									self.zoomScale = value
 								}
 								.onEnded { value in
 									withAnimation(.spring()) {
-										zoomScale = min(max(value, 0.5), 5.0)
+										self.zoomScale = min(max(value, 0.5), 5.0)
 									}
 								}
 						)
 						.simultaneousGesture(
 							DragGesture()
 								.onChanged { value in
-									if zoomScale > 1 {
-										offset = CGSize(
-											width: offset.width + value.translation.width,
-											height: offset.height + value.translation.height
+									if self.zoomScale > 1 {
+										self.offset = CGSize(
+											width: self.offset.width + value.translation.width,
+											height: self.offset.height + value.translation.height
 										)
 									}
 								}
@@ -88,16 +88,16 @@ struct PhotoPreviewView: View {
 							TapGesture(count: 2)
 								.onEnded { _ in
 									withAnimation(.spring()) {
-										if zoomScale > 1 {
-											zoomScale = 1
-											offset = .zero
+										if self.zoomScale > 1 {
+											self.zoomScale = 1
+											self.offset = .zero
 										} else {
-											zoomScale = 2
+											self.zoomScale = 2
 										}
 									}
 								}
 						)
-				} else if isLoadingImage {
+				} else if self.isLoadingImage {
 					ProgressView()
 						.progressViewStyle(CircularProgressViewStyle(tint: .white))
 						.scaleEffect(1.5)
@@ -113,61 +113,62 @@ struct PhotoPreviewView: View {
 							.foregroundColor(.gray)
 					}
 				}
-				
+
 				// Control strip at top
-				if showThumbnailStrip {
+				if self.showThumbnailStrip {
 					VStack(spacing: 0) {
 						ControlStrip(
-							currentIndex: currentIndex,
-							totalCount: photos.count,
-							filename: photos[currentIndex].filename, controlStripHeight: self.controlStripHeight,
-							onClose: { dismiss() },
-							onToggleFullscreen: toggleFullscreen,
+							currentIndex: self.currentIndex,
+							totalCount: self.photos.count,
+							filename: self.photos[self.currentIndex].filename,
+							controlStripHeight: self.controlStripHeight,
+							onClose: { self.dismiss() },
+							onToggleFullscreen: self.toggleFullscreen,
 							onToggleMetadata: {
 								withAnimation(.easeInOut(duration: 0.2)) {
-									showMetadataHUD.toggle()
+									self.showMetadataHUD.toggle()
 								}
 							},
-							showMetadata: $showMetadataHUD
+							showMetadata: self.$showMetadataHUD
 						)
-						
+
 						Spacer()
 					}
 					.transition(.move(edge: .top).combined(with: .opacity))
 				}
-				
+
 				// Thumbnail strip at bottom
-				if showThumbnailStrip {
+				if self.showThumbnailStrip {
 					VStack {
 						Spacer()
-						
-						if useNativeThumbnailStrip {
+
+						if self.useNativeThumbnailStrip {
 							// Native collection view implementation
 							ThumbnailStripView(
-								photos: photos,
-								currentIndex: $currentIndex,
+								photos: self.photos,
+								currentIndex: self.$currentIndex,
 								thumbnailSize: CGSize(width: 60, height: 60),
-								onTimerExtend: extendControlsTimer
+								onTimerExtend: self.extendControlsTimer
 							)
 							.frame(height: 84) // 60 + 24 for padding
 						} else {
 							// Original SwiftUI implementation
 							ThumbnailStrip(
-								photos: photos,
-								currentIndex: $currentIndex,
+								photos: self.photos,
+								currentIndex: self.$currentIndex,
 								thumbnailSize: CGSize(width: 60, height: 60),
-								onTimerExtend: extendControlsTimer
+								onTimerExtend: self.extendControlsTimer
 							)
 						}
 					}
 					.transition(.move(edge: .bottom).combined(with: .opacity))
 				}
-				
+
 				// Metadata HUD
-				if showMetadataHUD {
+				if self.showMetadataHUD {
 					MetadataHUD(
-						photo: photos[currentIndex],
-						metadata: currentMetadata,
+						photo: self.photos[self.currentIndex],
+						metadata: self.currentMetadata,
 						geometry: geometry, topMargin: self.controlStripHeight
 					)
 					.transition(.opacity)
@@ -175,54 +176,56 @@ struct PhotoPreviewView: View {
 			}
 			.contentShape(Rectangle())
 			.onTapGesture { location in
-				handleTapGesture(at: location, in: geometry)
+				self.handleTapGesture(at: location, in: geometry)
 			}
 		}
 		.onAppear {
-			loadCurrentImage()
+			self.loadCurrentImage()
 			// Add a small delay to ensure the view is fully loaded
 			DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-				isFocused = true
+				self.isFocused = true
 			}
 		}
 		.onDisappear {
-			controlsTimer?.invalidate()
+			self.controlsTimer?.invalidate()
 		}
-		.onChange(of: currentIndex) { _, _ in
-			loadCurrentImage()
+		.onChange(of: self.currentIndex) { _, _ in
+			self.loadCurrentImage()
 		}
-#if os(macOS)
+		#if os(macOS)
 		.onExitCommand {
-			dismiss()
+			self.dismiss()
 		}
-#endif
+		#endif
 		.onKeyPress(.leftArrow) {
-			navigateToPrevious()
+			self.navigateToPrevious()
 			return .handled
 		}
 		.onKeyPress(.rightArrow) {
-			navigateToNext()
+			self.navigateToNext()
 			return .handled
 		}
 		.onKeyPress(keys: ["f"]) { _ in
-			toggleFullscreen()
+			self.toggleFullscreen()
 			return .handled
 		}
 		.onKeyPress(keys: ["t"]) { _ in
-			print("[PhotoPreviewView] Toggle thumbnail strip: \(!showThumbnailStrip), photos count: \(photos.count)")
+			print(
+				"[PhotoPreviewView] Toggle thumbnail strip: \(!self.showThumbnailStrip), photos count: \(self.photos.count)"
+			)
 			withAnimation(.easeInOut(duration: 0.3)) {
-				showThumbnailStrip.toggle()
+				self.showThumbnailStrip.toggle()
 			}
 			// Reset timer when toggling
-			if showThumbnailStrip {
-				controlsTimer?.invalidate()
-				controlsTimer = Timer.scheduledTimer(withTimeInterval: 30.0, repeats: false) { _ in
+			if self.showThumbnailStrip {
+				self.controlsTimer?.invalidate()
+				self.controlsTimer = Timer.scheduledTimer(withTimeInterval: 30.0, repeats: false) { _ in
 					withAnimation(.easeInOut(duration: 0.3)) {
-						showThumbnailStrip = false
+						self.showThumbnailStrip = false
 					}
 				}
 			} else {
-				controlsTimer?.invalidate()
+				self.controlsTimer?.invalidate()
 			}
 			return .handled
 		}
@@ -233,7 +236,7 @@ struct PhotoPreviewView: View {
 		}
 		.onKeyPress(keys: ["i"]) { _ in
 			withAnimation(.easeInOut(duration: 0.2)) {
-				showMetadataHUD.toggle()
+				self.showMetadataHUD.toggle()
 			}
 			return .handled
 		}
@@ -242,35 +245,35 @@ struct PhotoPreviewView: View {
 			print("Help overlay - not yet implemented")
 			return .handled
 		}
-#if os(iOS)
+		#if os(iOS)
 		.gesture(
 			DragGesture()
 				.onEnded { value in
 					let threshold: CGFloat = 50
-					if value.translation.width > threshold && currentIndex > 0 {
-						navigateToPrevious()
-					} else if value.translation.width < -threshold && currentIndex < photos.count - 1 {
-						navigateToNext()
+					if value.translation.width > threshold, self.currentIndex > 0 {
+						self.navigateToPrevious()
+					} else if value.translation.width < -threshold, self.currentIndex < self.photos.count - 1 {
+						self.navigateToNext()
 					}
 				}
 		)
 		.statusBarHidden(true)
-#endif
+		#endif
 	}
-	
+
 	private func loadCurrentImage() {
-		guard currentIndex >= 0 && currentIndex < photos.count else { 
-			print("[PhotoPreviewView] Index out of bounds: \(currentIndex) for \(photos.count) photos")
-			return 
+		guard self.currentIndex >= 0, self.currentIndex < self.photos.count else {
+			print("[PhotoPreviewView] Index out of bounds: \(self.currentIndex) for \(self.photos.count) photos")
+			return
 		}
-		
-		let photo = photos[currentIndex]
-		print("[PhotoPreviewView] Loading image for: \(photo.filename) at index \(currentIndex)")
-		isLoadingImage = true
-		imageLoadError = nil
-		currentImage = nil
-		currentMetadata = nil
-		
+
+		let photo = self.photos[self.currentIndex]
+		print("[PhotoPreviewView] Loading image for: \(photo.filename) at index \(self.currentIndex)")
+		self.isLoadingImage = true
+		self.imageLoadError = nil
+		self.currentImage = nil
+		self.currentMetadata = nil
+
 		Task {
 			do {
 				// Load image
@@ -289,7 +292,7 @@ struct PhotoPreviewView: View {
 						self.isLoadingImage = false
 					}
 				}
-				
+
 				// Load metadata (don't block on this)
 				Task {
 					if let metadata = try? await PhotoManager.shared.metadata(for: photo) {
@@ -307,98 +310,98 @@ struct PhotoPreviewView: View {
 			}
 		}
 	}
-	
+
 	private func navigateToPrevious() {
-		if currentIndex > 0 {
-			currentIndex -= 1
-			resetZoom()
+		if self.currentIndex > 0 {
+			self.currentIndex -= 1
+			self.resetZoom()
 		}
 	}
-	
+
 	private func navigateToNext() {
-		if currentIndex < photos.count - 1 {
-			currentIndex += 1
-			resetZoom()
+		if self.currentIndex < self.photos.count - 1 {
+			self.currentIndex += 1
+			self.resetZoom()
 		}
 	}
-	
+
 	private func resetZoom() {
 		withAnimation(.spring()) {
-			zoomScale = 1.0
-			offset = .zero
+			self.zoomScale = 1.0
+			self.offset = .zero
 		}
 	}
-	
+
 	private func toggleFullscreen() {
 		#if os(macOS)
-		if let window = NSApplication.shared.keyWindow {
-			window.toggleFullScreen(nil)
-			isFullscreen.toggle()
-		}
+			if let window = NSApplication.shared.keyWindow {
+				window.toggleFullScreen(nil)
+				self.isFullscreen.toggle()
+			}
 		#endif
 	}
-	
+
 	private func handleTapGesture(at location: CGPoint, in geometry: GeometryProxy) {
 		let width = geometry.size.width
 		let quarterWidth = width * 0.25
-		
+
 		// Define tap zones
 		if location.x < quarterWidth {
 			// Left quarter - navigate to previous
-			if currentIndex > 0 {
-				navigateToPrevious()
+			if self.currentIndex > 0 {
+				self.navigateToPrevious()
 			}
 		} else if location.x > width - quarterWidth {
 			// Right quarter - navigate to next
-			if currentIndex < photos.count - 1 {
-				navigateToNext()
+			if self.currentIndex < self.photos.count - 1 {
+				self.navigateToNext()
 			}
 		} else {
 			// Center area (middle 50%) - toggle controls
 			withAnimation(.easeInOut(duration: 0.3)) {
-				showThumbnailStrip.toggle()
+				self.showThumbnailStrip.toggle()
 			}
-			
+
 			// Reset timer if showing controls
-			if showThumbnailStrip {
-				controlsTimer?.invalidate()
-				controlsTimer = Timer.scheduledTimer(withTimeInterval: 30.0, repeats: false) { _ in
+			if self.showThumbnailStrip {
+				self.controlsTimer?.invalidate()
+				self.controlsTimer = Timer.scheduledTimer(withTimeInterval: 30.0, repeats: false) { _ in
 					withAnimation(.easeInOut(duration: 0.3)) {
-						showThumbnailStrip = false
+						self.showThumbnailStrip = false
 					}
 				}
 			} else {
-				controlsTimer?.invalidate()
+				self.controlsTimer?.invalidate()
 			}
 		}
 	}
-	
+
 	private func extendControlsTimer() {
 		// Reset the timer when user interacts with thumbnails
-		if showThumbnailStrip {
-			controlsTimer?.invalidate()
-			controlsTimer = Timer.scheduledTimer(withTimeInterval: 30.0, repeats: false) { _ in
+		if self.showThumbnailStrip {
+			self.controlsTimer?.invalidate()
+			self.controlsTimer = Timer.scheduledTimer(withTimeInterval: 30.0, repeats: false) { _ in
 				withAnimation(.easeInOut(duration: 0.3)) {
-					showThumbnailStrip = false
+					self.showThumbnailStrip = false
 				}
 			}
 		}
 	}
-	
+
 	private func preloadAdjacentImages() {
 		// Preload ±2 images from current
 		var indicesToPreload: [Int] = []
-		
+
 		// Add previous images
-		if currentIndex - 2 >= 0 { indicesToPreload.append(currentIndex - 2) }
-		if currentIndex - 1 >= 0 { indicesToPreload.append(currentIndex - 1) }
-		
+		if self.currentIndex - 2 >= 0 { indicesToPreload.append(self.currentIndex - 2) }
+		if self.currentIndex - 1 >= 0 { indicesToPreload.append(self.currentIndex - 1) }
+
 		// Add next images
-		if currentIndex + 1 < photos.count { indicesToPreload.append(currentIndex + 1) }
-		if currentIndex + 2 < photos.count { indicesToPreload.append(currentIndex + 2) }
-		
-		let photosToPreload = indicesToPreload.map { photos[$0] }
-		
+		if self.currentIndex + 1 < self.photos.count { indicesToPreload.append(self.currentIndex + 1) }
+		if self.currentIndex + 2 < self.photos.count { indicesToPreload.append(self.currentIndex + 2) }
+
+		let photosToPreload = indicesToPreload.map { self.photos[$0] }
+
 		Task {
 			await PhotoManager.shared.prefetchImages(for: photosToPreload, priority: .low)
 		}
@@ -416,51 +419,51 @@ struct ControlStrip: View {
 	let onToggleFullscreen: () -> Void
 	let onToggleMetadata: () -> Void
 	@Binding var showMetadata: Bool
-	
+
 	var body: some View {
 		HStack(spacing: 16) {
 			// Back/Close button
-			Button(action: onClose) {
+			Button(action: self.onClose) {
 				Image(systemName: "chevron.left")
 					.font(.system(size: 16, weight: .medium))
 					.foregroundColor(.white)
-					.frame(width: controlStripHeight, height: controlStripHeight)
+					.frame(width: self.controlStripHeight, height: self.controlStripHeight)
 			}
 			.buttonStyle(.plain)
-			
+
 			// Progress indicator
-			Text("\(currentIndex + 1) / \(totalCount)")
+			Text("\(self.currentIndex + 1) / \(self.totalCount)")
 				.font(.system(size: 14, weight: .medium))
 				.foregroundColor(.white.opacity(0.8))
 				.frame(minWidth: 60)
-			
+
 			// Filename
-			Text(filename)
+			Text(self.filename)
 				.font(.system(size: 14, weight: .regular))
 				.foregroundColor(.white)
 				.lineLimit(1)
 				.frame(maxWidth: .infinity)
-			
+
 			// Metadata toggle
-			Button(action: onToggleMetadata) {
-				Image(systemName: showMetadata ? "info.circle.fill" : "info.circle")
+			Button(action: self.onToggleMetadata) {
+				Image(systemName: self.showMetadata ? "info.circle.fill" : "info.circle")
 					.font(.system(size: 16, weight: .medium))
 					.foregroundColor(.white)
-					.frame(width: controlStripHeight, height: controlStripHeight)
+					.frame(width: self.controlStripHeight, height: self.controlStripHeight)
 			}
 			.buttonStyle(.plain)
-			
+
 			// Fullscreen toggle
-			Button(action: onToggleFullscreen) {
+			Button(action: self.onToggleFullscreen) {
 				Image(systemName: "arrow.up.left.and.arrow.down.right")
 					.font(.system(size: 16, weight: .medium))
 					.foregroundColor(.white)
-					.frame(width: controlStripHeight, height: controlStripHeight)
+					.frame(width: self.controlStripHeight, height: self.controlStripHeight)
 			}
 			.buttonStyle(.plain)
 		}
 		.padding(.horizontal, 16)
-		.frame(height: controlStripHeight)
+		.frame(height: self.controlStripHeight)
 		.background(Color.black.opacity(0.8))
 	}
 }
@@ -483,44 +486,44 @@ struct ThumbnailStrip: View {
 	@Binding var currentIndex: Int
 	let thumbnailSize: CGSize
 	let onTimerExtend: (() -> Void)?
-	
+
 	@State private var thumbnails: [Int: XImage] = [:]
 	@Namespace private var namespace
-	
+
 	var body: some View {
 		ScrollViewReader { proxy in
 			ScrollView(.horizontal, showsIndicators: false) {
-				LazyHStack(spacing: 8) {  // Changed from HStack to LazyHStack
-					ForEach(photos.indices, id: \.self) { index in
+				LazyHStack(spacing: 8) { // Changed from HStack to LazyHStack
+					ForEach(self.photos.indices, id: \.self) { index in
 						ThumbnailView(
-							photo: photos[index],
-							isSelected: index == currentIndex,
-							size: thumbnailSize
+							photo: self.photos[index],
+							isSelected: index == self.currentIndex,
+							size: self.thumbnailSize
 						)
 						.id(index)
 						.onTapGesture {
 							withAnimation(.easeInOut(duration: 0.3)) {
-								currentIndex = index
+								self.currentIndex = index
 							}
-							onTimerExtend?()
+							self.onTimerExtend?()
 						}
 					}
 				}
 				.padding(.horizontal, 16)
 				.padding(.vertical, 12)
 			}
-			.frame(height: thumbnailSize.height + 24)
+			.frame(height: self.thumbnailSize.height + 24)
 			.background(Color.black.opacity(0.8))
-			.onChange(of: currentIndex) { _ in
+			.onChange(of: self.currentIndex) { _ in
 				withAnimation {
-					proxy.scrollTo(currentIndex, anchor: .center)
+					proxy.scrollTo(self.currentIndex, anchor: .center)
 				}
 			}
 			.onAppear {
-				print("[ThumbnailStrip] onAppear with \(photos.count) photos")
+				print("[ThumbnailStrip] onAppear with \(self.photos.count) photos")
 				// Scroll to current photo on appear
 				DispatchQueue.main.async {
-					proxy.scrollTo(currentIndex, anchor: .center)
+					proxy.scrollTo(self.currentIndex, anchor: .center)
 				}
 			}
 		}
@@ -531,69 +534,71 @@ struct ThumbnailView: View {
 	let photo: PhotoReference
 	let isSelected: Bool
 	let size: CGSize
-	
+
 	@State private var thumbnail: XImage?
 	@State private var loadTask: Task<Void, Never>?
-	
+
 	var body: some View {
 		ZStack {
-			if let thumbnail = thumbnail {
-#if os(macOS)
-				Image(nsImage: thumbnail)
-					.resizable()
-					.aspectRatio(contentMode: .fill)
-#else
-				Image(uiImage: thumbnail)
-					.resizable()
-					.aspectRatio(contentMode: .fill)
-#endif
+			if let thumbnail {
+				#if os(macOS)
+					Image(nsImage: thumbnail)
+						.resizable()
+						.aspectRatio(contentMode: .fill)
+				#else
+					Image(uiImage: thumbnail)
+						.resizable()
+						.aspectRatio(contentMode: .fill)
+				#endif
 			} else {
 				// Placeholder
 				Rectangle()
 					.fill(Color.gray.opacity(0.3))
-				
+
 				ProgressView()
 					.scaleEffect(0.5)
 			}
 		}
-		.frame(width: size.width, height: size.height)
+		.frame(width: self.size.width, height: self.size.height)
 		.clipShape(RoundedRectangle(cornerRadius: 4))
 		.overlay(
 			RoundedRectangle(cornerRadius: 4)
-				.stroke(isSelected ? Color.white : Color.gray.opacity(0.5), 
-						lineWidth: isSelected ? 3 : 1)
+				.stroke(
+					self.isSelected ? Color.white : Color.gray.opacity(0.5),
+					lineWidth: self.isSelected ? 3 : 1
+				)
 		)
-		.scaleEffect(isSelected ? 1.1 : 1.0)
-		.animation(.easeInOut(duration: 0.2), value: isSelected)
+		.scaleEffect(self.isSelected ? 1.1 : 1.0)
+		.animation(.easeInOut(duration: 0.2), value: self.isSelected)
 		.onAppear {
 			// Check if thumbnail is already cached in the photo object
 			if let cached = photo.thumbnail {
 				self.thumbnail = cached
 			} else {
 				// Load thumbnail
-				loadTask = Task {
-					await loadThumbnail()
+				self.loadTask = Task {
+					await self.loadThumbnail()
 				}
 			}
 		}
 		.onDisappear {
 			// Cancel loading task when view disappears
-			loadTask?.cancel()
-			loadTask = nil
+			self.loadTask?.cancel()
+			self.loadTask = nil
 		}
 	}
-	
+
 	private func loadThumbnail() async {
-		print("[ThumbnailView] Loading thumbnail for: \(photo.filename)")
+		print("[ThumbnailView] Loading thumbnail for: \(self.photo.filename)")
 		do {
 			// Check for cancellation
 			if Task.isCancelled { return }
-			
+
 			if let thumb = try await PhotoManager.shared.thumbnail(for: photo) {
 				// Check for cancellation again after async operation
 				if Task.isCancelled { return }
-				
-				print("[ThumbnailView] Loaded thumbnail for: \(photo.filename)")
+
+				print("[ThumbnailView] Loaded thumbnail for: \(self.photo.filename)")
 				await MainActor.run {
 					if !Task.isCancelled {
 						self.thumbnail = thumb
@@ -602,12 +607,11 @@ struct ThumbnailView: View {
 			}
 		} catch {
 			if !Task.isCancelled {
-				print("[ThumbnailView] Failed to load thumbnail for: \(photo.filename)")
+				print("[ThumbnailView] Failed to load thumbnail for: \(self.photo.filename)")
 			}
 		}
 	}
 }
-
 
 // MARK: - Metadata HUD
 
@@ -616,45 +620,45 @@ struct MetadataHUD: View {
 	let metadata: PhotoMetadata?
 	let geometry: GeometryProxy
 	let topMargin: CGFloat
-	
+
 	private var dateFormatter: DateFormatter {
 		let formatter = DateFormatter()
 		formatter.dateStyle = .medium
 		formatter.timeStyle = .medium
 		return formatter
 	}
-	
+
 	var body: some View {
 		HStack {
 			Spacer()
-			
+
 			VStack {
 				Spacer()
-					.frame(height: topMargin + 8) // Space from top to avoid toolbar
-				
+					.frame(height: self.topMargin + 8) // Space from top to avoid toolbar
+
 				VStack(alignment: .leading, spacing: 12) {
 					// Filename
-					HudRow(label: "Filename", value: photo.filename)
-					
+					HudRow(label: "Filename", value: self.photo.filename)
+
 					Divider()
 						.background(Color.white.opacity(0.3))
-					
+
 					// File info group
-					if let metadata = metadata {
+					if let metadata {
 						if let dimensions = metadata.dimensions {
 							HudRow(label: "Dimensions", value: dimensions)
 						}
-						
+
 						HudRow(label: "File Size", value: metadata.formattedFileSize)
-						
-						HudRow(label: "Date", value: dateFormatter.string(from: metadata.displayDate))
-						
+
+						HudRow(label: "Date", value: self.dateFormatter.string(from: metadata.displayDate))
+
 						if let cameraInfo = metadata.cameraInfo {
 							HudRow(label: "Camera", value: cameraInfo)
 						}
 					} else if let fileDate = photo.fileCreationDate {
 						// Show file date if metadata not loaded yet
-						HudRow(label: "Created", value: dateFormatter.string(from: fileDate))
+						HudRow(label: "Created", value: self.dateFormatter.string(from: fileDate))
 					}
 				}
 				.padding(20)
@@ -666,10 +670,10 @@ struct MetadataHUD: View {
 								.stroke(Color.white.opacity(0.2), lineWidth: 1)
 						)
 				)
-				
+
 				Spacer() // Push to center vertically
 			}
-			
+
 			Spacer()
 		}
 		.padding(20)
@@ -679,15 +683,15 @@ struct MetadataHUD: View {
 struct HudRow: View {
 	let label: String
 	let value: String
-	
+
 	var body: some View {
 		HStack(alignment: .top, spacing: 12) {
-			Text(label + ":")
+			Text(self.label + ":")
 				.font(.system(size: 14, weight: .medium))
 				.foregroundColor(.white.opacity(0.7))
 				.frame(width: 100, alignment: .trailing)
-			
-			Text(value)
+
+			Text(self.value)
 				.font(.system(size: 14))
 				.foregroundColor(.white)
 				.frame(maxWidth: .infinity, alignment: .leading)
