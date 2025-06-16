@@ -29,6 +29,11 @@ This directory contains summaries of development sessions, documenting what was 
 - Added automatic EXIF preservation to S3
 - Created comprehensive documentation
 
+### Session 6
+- [Implemented batch photo selection for retrieval](./2025-06-16-session6.md)
+- Enhanced PhotoRetrievalView to support multiple photo selection
+- Added accurate cost calculations based on file sizes
+
 ## Previous Sessions
 
 See git history for sessions before June 16, 2025.

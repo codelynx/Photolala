@@ -91,6 +91,7 @@ struct PhotoBrowserView: View {
 						PhotoRetrievalView(
 							photoReference: photo,
 							archiveInfo: archiveInfo,
+							selectedPhotos: self.selectedPhotos,
 							isPresented: self.$showingRetrievalDialog
 						)
 						.environmentObject(s3BackupManager)

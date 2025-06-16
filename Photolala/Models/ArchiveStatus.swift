@@ -78,6 +78,7 @@ struct ArchivedPhotoInfo {
 	let lastAccessedDate: Date?
 	let isPinned: Bool // User wants to keep this photo always available
 	let retrieval: PhotoRetrieval?
+	let originalSize: Int64 // Size in bytes for cost calculations
 	
 	/// Time remaining before photo re-archives (if retrieved)
 	var daysUntilReArchive: Int? {

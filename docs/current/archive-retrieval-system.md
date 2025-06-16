@@ -10,7 +10,8 @@ The archive retrieval system allows users to restore photos that have been autom
 
 1. **Archive Status Models** (`Models/ArchiveStatus.swift`)
    - Defines storage classes (STANDARD, DEEP_ARCHIVE, GLACIER, INTELLIGENT_TIERING)
-   - Tracks archive lifecycle information
+   - Tracks archive lifecycle information with ArchivedPhotoInfo
+   - Stores original file size for cost calculations
    - Determines immediate accessibility
 
 2. **Visual Indicators** (`Views/PhotoArchiveBadge.swift`)
@@ -25,7 +26,12 @@ The archive retrieval system allows users to restore photos that have been autom
    - Modal interface for initiating photo restoration
    - Options for single photo, selected photos, or entire album
    - Rush delivery toggle (12-48 hours vs 5-12 hours)
-   - Cost estimation display
+   - Cost estimation display based on actual file sizes
+   - Batch selection support:
+     - Accepts array of selected photos
+     - Automatically filters archived photos
+     - Defaults to "Selected photos" option when multiple archived photos selected
+     - Calculates total size and cost for batch operations
 
 4. **Retrieval Manager** (`Services/S3RetrievalManager.swift`)
    - Manages active retrieval requests
@@ -128,7 +134,7 @@ Based on S3 Deep Archive pricing:
 
 ## Future Enhancements
 
-1. **Batch Selection UI**: Allow users to select multiple photos for retrieval
+1. ~~**Batch Selection UI**: Allow users to select multiple photos for retrieval~~ ✅ Implemented
 2. **Progress Notifications**: Push notifications when retrieval completes
 3. **Retrieval History**: Track and display past retrieval requests
 4. **Smart Pre-warming**: Predictively restore photos based on usage patterns

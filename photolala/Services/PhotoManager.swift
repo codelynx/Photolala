@@ -997,7 +997,8 @@ class PhotoManager {
 				storageClass: archiveStatus,
 				lastAccessedDate: nil, // TODO: Track access dates
 				isPinned: false, // TODO: Implement pinning
-				retrieval: nil // TODO: Track active retrievals
+				retrieval: nil, // TODO: Track active retrievals
+				originalSize: size
 			)
 		} catch {
 			// Photo not in S3 or error - no archive info

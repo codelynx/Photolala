@@ -75,6 +75,7 @@ Last Updated: June 16, 2025 (Session 5)
 - Session 3: Added In-App Purchase support with StoreKit 2
 - Session 4: Completed archive retrieval system with S3 restore APIs
 - Session 5: Implemented metadata backup system with binary plist format
+- Session 6: Added batch photo selection for archive retrieval
 
 See sections 30-34 below for detailed implementation notes.
 
@@ -816,7 +817,8 @@ See sections 30-34 below for detailed implementation notes.
 33. **Implemented Archive Retrieval System (June 16 - Session 4)**:
    - **Archive Status Models**:
      - Created ArchiveStatus enum for S3 storage classes
-     - Added PhotoArchiveInfo to track archive lifecycle
+     - Added ArchivedPhotoInfo to track archive lifecycle
+     - Added originalSize property for cost calculations
      - Integrated with PhotoReference model
    - **Visual Indicators**:
      - PhotoArchiveBadge shows archive state:
@@ -829,7 +831,13 @@ See sections 30-34 below for detailed implementation notes.
      - PhotoRetrievalView modal dialog
      - Options: single photo, selected photos, entire album
      - Rush delivery toggle (5-12 hours vs 12-48 hours)
-     - Cost estimation based on file size
+     - Cost estimation based on actual file sizes
+   - **Batch Photo Selection (Session 6)**:
+     - PhotoRetrievalView accepts array of selected photos
+     - Intelligently defaults to "Selected photos" option when multiple archived photos selected
+     - Calculates total size and cost for all archived photos in selection
+     - Filters out non-archived photos automatically
+     - Supports batch restore operations
    - **S3 Integration**:
      - RestoreObject API implementation in S3BackupService
      - Support for expedited and standard retrieval tiers
@@ -841,7 +849,7 @@ See sections 30-34 below for detailed implementation notes.
      - Planned: Push notifications on completion
    - **Platform Integration**:
      - Click handlers in PhotoCollectionViewController
-     - Sheet presentation in PhotoBrowserView
+     - Sheet presentation in PhotoBrowserView with selected photos
      - Cross-platform support (macOS/iOS)
    - **Error Handling**:
      - PhotoRetrievalError for various failure cases

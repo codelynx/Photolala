@@ -137,7 +137,8 @@ struct PhotoArchiveBadge_Previews: PreviewProvider {
 					storageClass: .deepArchive,
 					lastAccessedDate: nil,
 					isPinned: false,
-					retrieval: nil
+					retrieval: nil,
+					originalSize: 1_000_000
 				),
 				retrieval: nil
 			)
@@ -155,7 +156,8 @@ struct PhotoArchiveBadge_Previews: PreviewProvider {
 						requestedAt: Date(),
 						estimatedReadyAt: Date().addingTimeInterval(86400),
 						status: .inProgress(percentComplete: 0.5)
-					)
+					),
+					originalSize: 1_000_000
 				),
 				retrieval: nil
 			)
@@ -168,7 +170,8 @@ struct PhotoArchiveBadge_Previews: PreviewProvider {
 					storageClass: .standard,
 					lastAccessedDate: Date().addingTimeInterval(-23 * 86400), // 23 days ago
 					isPinned: false,
-					retrieval: nil
+					retrieval: nil,
+					originalSize: 1_000_000
 				),
 				retrieval: nil
 			)
