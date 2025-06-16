@@ -17,6 +17,11 @@ struct PhotoBrowserView: View {
 	@State private var selectedPhotoNavigation: PreviewNavigation?
 	@State private var allPhotos: [PhotoReference] = []
 	@State private var showingHelp = false
+	@State private var showingS3UploadProgress = false
+	@State private var showingSignInPrompt = false
+	@State private var showingUpgradePrompt = false
+	@StateObject private var s3BackupManager = S3BackupManager.shared
+	@StateObject private var identityManager = IdentityManager.shared
 	
 	init(directoryPath: NSString) {
 		self.directoryPath = directoryPath
@@ -103,6 +108,32 @@ struct PhotoBrowserView: View {
 #endif
 		.onReceive(NotificationCenter.default.publisher(for: .deselectAll)) { _ in
 			selectedPhotos = []
+		}
+		.overlay {
+			if showingS3UploadProgress {
+				ZStack {
+					Color.black.opacity(0.4)
+						.ignoresSafeArea()
+					
+					VStack(spacing: 16) {
+						ProgressView()
+							.progressViewStyle(CircularProgressViewStyle())
+							.scaleEffect(1.5)
+						
+						Text(s3BackupManager.uploadStatus)
+							.font(.headline)
+							.foregroundColor(.white)
+						
+						if s3BackupManager.uploadProgress > 0 {
+							ProgressView(value: s3BackupManager.uploadProgress)
+								.frame(width: 200)
+						}
+					}
+					.padding(32)
+					.background(Color.secondary.opacity(0.9))
+					.cornerRadius(16)
+				}
+			}
 		}
 		.toolbar {
 			ToolbarItemGroup(placement: .automatic) {
@@ -238,6 +269,17 @@ struct PhotoBrowserView: View {
 				.frame(width: 120)
 				.help("Group photos by date")
 #endif
+				
+				// S3 Backup button
+				if !selectedPhotos.isEmpty {
+					Button(action: backupSelectedPhotos) {
+						Label("Backup", systemImage: "icloud.and.arrow.up")
+					}
+					.disabled(s3BackupManager.isUploading)
+					#if os(macOS)
+					.help(identityManager.isSignedIn ? "Backup selected photos to cloud" : "Sign in to backup photos")
+					#endif
+				}
 			}
 		}
 	}
@@ -326,12 +368,65 @@ struct PhotoBrowserView: View {
 		selectedPhotoNavigation = navigation
 		#endif
 	}
+	
+	private func backupSelectedPhotos() {
+		// Check if signed in
+		guard identityManager.isSignedIn else {
+			showingSignInPrompt = true
+			return
+		}
+		
+		// Check if service is configured
+		guard s3BackupManager.isConfigured else {
+			// In production, this would be automatic
+			// For now, show error
+			return
+		}
+		
+		showingS3UploadProgress = true
+		
+		Task {
+			do {
+				try await s3BackupManager.uploadPhotos(selectedPhotos)
+				await MainActor.run {
+					showingS3UploadProgress = false
+					selectedPhotos = [] // Clear selection after upload
+				}
+			} catch S3BackupError.uploadFailed {
+				// Might be quota exceeded
+				await MainActor.run {
+					showingS3UploadProgress = false
+					if s3BackupManager.currentUsage >= s3BackupManager.storageLimit {
+						showingUpgradePrompt = true
+					}
+				}
+			} catch {
+				await MainActor.run {
+					showingS3UploadProgress = false
+					// Show error
+				}
+			}
+		}
+	}
 }
 
 // Navigation data model
 struct PreviewNavigation: Hashable {
 	let photos: [PhotoReference]
 	let initialIndex: Int
+}
+
+		#if os(macOS)
+		.sheet(isPresented: $showingSignInPrompt) {
+			SignInPromptView()
+		}
+		.sheet(isPresented: $showingUpgradePrompt) {
+			SubscriptionUpgradeView(
+				currentUsage: s3BackupManager.currentUsage,
+				storageLimit: s3BackupManager.storageLimit
+			)
+		}
+		#endif
 }
 
 #Preview {

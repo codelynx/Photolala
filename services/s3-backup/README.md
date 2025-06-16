@@ -14,14 +14,41 @@ A Photolala-managed cloud backup service using AWS S3 with:
 
 ## Documentation Structure
 
-- `design/` - Simple design document
+- `design/` - Architecture and design documents
+  - Core S3 backup service design
+  - Identity management design
+  - Cross-platform identity strategy
+  - Pricing and storage optimization
+- `implementation/` - Technical implementation details
+  - AWS SDK Swift credentials handling
+- `research/` - Background research
+  - Game industry identity patterns
 - `requirements/` - What we're building (and what we're NOT)
 - `api/` - API design (for later)
 - `security/` - Security notes
 
 ## Current Status
 
-🚧 **Design Phase** - Simplified approach defined
+🚧 **POC Implementation** - Core features working, production infrastructure needed
+
+### ✅ Completed
+- Sign in with Apple authentication
+- Identity management with Keychain storage
+- S3 upload/download functionality
+- Subscription tier definitions
+- Storage quota enforcement
+- User interface for auth flow
+
+### 🚧 In Progress
+- StoreKit 2 integration for IAP
+- Backend services for user management
+- Production AWS credential handling
+
+### ❌ Not Started
+- Subscription purchase flow
+- Usage tracking persistence
+- Deep Archive lifecycle
+- Family sharing
 
 ## Phase 1 Goals (MVP)
 
@@ -71,8 +98,11 @@ s3://photolala/users/{user-id}/metadata/{md5}.plist
 
 ### Next Steps
 
-1. Implement AWS SDK integration
-2. Build MD5 calculation pipeline
-3. Create thumbnail generation
-4. Design Deep Archive UX
-5. Integrate subscription billing
+1. ~~Implement AWS SDK integration~~ ✅
+2. ~~Build MD5 calculation pipeline~~ ✅
+3. ~~Create thumbnail generation~~ ✅
+4. ~~Implement Sign in with Apple~~ ✅
+5. Add StoreKit 2 for subscriptions
+6. Build backend services
+7. Design Deep Archive UX
+8. Production deployment

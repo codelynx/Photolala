@@ -24,9 +24,16 @@ class S3BackupService {
 		self.client = S3Client(config: configuration)
 	}
 	
-	// Convenience init that reads from environment variables or credentials file
+	// Convenience init that reads from Keychain, environment, or credentials file
 	convenience init() async throws {
-		// First, try environment variables (works better with sandboxed apps)
+		// First, try Keychain (production)
+		if let credentials = try? KeychainManager.shared.loadAWSCredentials() {
+			print("Using AWS credentials from Keychain")
+			try await self.init(accessKey: credentials.accessKey, secretKey: credentials.secretKey)
+			return
+		}
+		
+		// Second, try environment variables (development)
 		if let accessKey = ProcessInfo.processInfo.environment["AWS_ACCESS_KEY_ID"],
 		   let secretKey = ProcessInfo.processInfo.environment["AWS_SECRET_ACCESS_KEY"],
 		   !accessKey.isEmpty, !secretKey.isEmpty {
@@ -35,7 +42,7 @@ class S3BackupService {
 			return
 		}
 		
-		// If no environment variables, try the credentials file
+		// Third, try the credentials file (fallback)
 		// For sandboxed apps, this will be in the container directory
 		let homeDirectory = FileManager.default.homeDirectoryForCurrentUser
 		let credentialsPath = homeDirectory.appendingPathComponent(".aws/credentials").path
@@ -229,7 +236,7 @@ enum S3BackupError: Error, LocalizedError {
 	var errorDescription: String? {
 		switch self {
 		case .credentialsNotFound:
-			return "AWS credentials not found. For sandboxed apps:\n1. Set environment variables AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY in Xcode scheme\n2. Or copy ~/.aws/credentials to the app's container directory"
+			return "AWS credentials not found. Please configure your AWS credentials in Settings."
 		case .uploadFailed:
 			return "Failed to upload file to S3"
 		case .photoNotFound:

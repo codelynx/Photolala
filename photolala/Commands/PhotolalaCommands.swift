@@ -48,6 +48,12 @@ struct PhotolalaCommands: Commands {
 			
 			Divider()
 			
+			Button("AWS S3 Configuration...") {
+				#if os(macOS)
+				showAWSConfiguration()
+				#endif
+			}
+			
 			Button("S3 Backup Test...") {
 				#if os(macOS)
 				showS3BackupTest()
@@ -102,6 +108,26 @@ struct PhotolalaCommands: Commands {
 		window.title = "Cache Statistics"
 		window.center()
 		window.contentView = NSHostingView(rootView: CacheStatisticsView())
+		window.makeKeyAndOrderFront(nil)
+		
+		// Keep window in front but not floating
+		window.level = .normal
+		window.isReleasedWhenClosed = false
+	}
+	
+	private func showAWSConfiguration() {
+		let window = NSWindow(
+			contentRect: NSRect(x: 0, y: 0, width: 500, height: 400),
+			styleMask: [.titled, .closable, .resizable],
+			backing: .buffered,
+			defer: false
+		)
+		
+		window.title = "AWS S3 Configuration"
+		window.center()
+		window.contentView = NSHostingView(rootView: NavigationStack {
+			AWSCredentialsView()
+		})
 		window.makeKeyAndOrderFront(nil)
 		
 		// Keep window in front but not floating

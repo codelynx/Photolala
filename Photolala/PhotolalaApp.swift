@@ -26,6 +26,10 @@ struct PhotolalaApp: App {
 	
 	init() {
 		print("[photolalaApp] App initialized")
+		
+		// Initialize managers
+		_ = IdentityManager.shared
+		_ = S3BackupManager.shared
 	}
 	
 	var body: some Scene {

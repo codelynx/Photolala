@@ -1,6 +1,6 @@
 # Photolala Project Status
 
-Last Updated: June 15, 2025
+Last Updated: June 16, 2025
 
 ## Current Implementation Status
 
@@ -332,6 +332,8 @@ Last Updated: June 15, 2025
 - `photolala/Services/DirectoryScanner.swift`
 - `photolala/Services/PhotoManager.swift` - Thumbnail generation and caching (enhanced with statistics)
 - `photolala/Services/S3BackupService.swift` - AWS S3 backup service (POC)
+- `photolala/Services/IdentityManager.swift` - Sign in with Apple and user management
+- `photolala/Services/KeychainManager.swift` - Secure credential storage
 - `photolala/Views/PhotoPreviewView.swift` - Full image preview with zoom/pan
 - `photolala/Views/CacheStatisticsView.swift` - Cache performance monitoring UI
 - `photolala/Views/ScalableImageView.swift` - Custom NSImageView for aspect fill on macOS
@@ -339,6 +341,9 @@ Last Updated: June 15, 2025
 - `photolala/Views/ClickedCollectionView.swift` - NSCollectionView subclass for context menu support
 - `photolala/Views/PhotoGroupHeaderView.swift` - Section headers for photo groups
 - `photolala/Views/S3BackupTestView.swift` - S3 backup POC test interface
+- `photolala/Views/SignInPromptView.swift` - Sign in with Apple onboarding
+- `photolala/Views/UserAccountView.swift` - User account status display
+- `photolala/Views/AWSCredentialsView.swift` - AWS credential configuration (dev only)
 - `docs/project-status.md` (this file)
 - `docs/thumbnail-display-options-design.md` - Design for display options feature
 - `docs/thumbnail-display-implementation-plan.md` - Implementation plan
@@ -349,9 +354,13 @@ Last Updated: June 15, 2025
 - `docs/planning/macos-context-menu-design.md` - Design and implementation for context menu
 - `docs/cache-statistics-guide.md` - Guide for using cache statistics
 - `docs/planning/photo-grouping-design.md` - Design for photo grouping feature
-- `docs/planning/aws-sdk-swift-credentials.md` - AWS credentials handling for macOS apps
 - `scripts/create-test-photos.sh` - Script to create test photos with different dates
 - `services/s3-backup/` - Complete S3 backup service design documentation
+  - `/design/identity-management-design.md` - Identity and authentication architecture
+  - `/design/payment-evolution-strategy.md` - IAP to web payment evolution
+  - `/design/cross-platform-identity-strategy.md` - Multi-platform expansion plan
+  - `/implementation/aws-sdk-swift-credentials.md` - AWS credential handling
+  - `/research/game-industry-identity-patterns.md` - Industry best practices
 
 **Removed:**
 - `photolala/Views/PhotoNavigationView.swift`
@@ -696,7 +705,7 @@ Last Updated: June 15, 2025
      - CryptoKit for MD5 hashing
      - Async/await throughout for modern Swift concurrency
    - Documentation:
-     - `docs/planning/aws-sdk-swift-credentials.md`: Solutions for macOS credential handling
+     - `services/s3-backup/implementation/aws-sdk-swift-credentials.md`: AWS credential handling
      - `services/s3-backup/`: Complete service design documentation
    - Security:
      - Added `xcshareddata/xcschemes/**` to .gitignore to protect credentials
@@ -706,3 +715,40 @@ Last Updated: June 15, 2025
      - ✅ MD5 deduplication working
      - ✅ Photo listing functionality
      - POC phase - credentials management to be improved for production
+
+31. **Implemented Sign in with Apple and Identity Management (June 16 - Session 2)**:
+   - **Identity Management System**:
+     - Created IdentityManager with complete Sign in with Apple flow
+     - PhotolalaUser model with service ID, Apple ID, and subscription info
+     - Secure storage in Keychain for persistent authentication
+     - Cross-platform support (iOS/macOS) with platform-specific UI
+   - **Authentication Flow**:
+     - Users must sign in before accessing cloud backup features
+     - Beautiful SignInPromptView shows benefits of creating account
+     - Automatic 5GB free tier upon sign-in
+     - Graceful upgrade prompts when quota exceeded
+   - **Updated S3 Integration**:
+     - S3BackupManager now requires authentication
+     - Enforces storage quotas based on subscription tier
+     - Tracks usage and prevents uploads beyond limits
+     - Shows upgrade prompt when storage full
+   - **UI Components Added**:
+     - SignInPromptView: Onboarding for cloud backup
+     - SubscriptionUpgradeView: Quota exceeded handling
+     - UserAccountView: Account info in toolbar
+     - BackupStatusView: Compact status indicator
+   - **Subscription Tiers Defined**:
+     - Free: 5 GB
+     - Basic: 100 GB ($2.99/mo)
+     - Standard: 1 TB ($9.99/mo)
+     - Pro: 5 TB ($39.99/mo)
+     - Family: 10 TB ($69.99/mo)
+   - **Documentation**:
+     - Identity management design in services/s3-backup/design/
+     - Payment evolution strategy documented
+     - Cross-platform identity strategy for future expansion
+   - **Next Steps**:
+     - Implement StoreKit 2 for IAP subscriptions
+     - Replace test AWS credentials with Photolala-managed service
+     - Add subscription management UI
+     - Implement usage tracking backend
