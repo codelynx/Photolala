@@ -308,6 +308,55 @@ class S3BackupService: ObservableObject {
 		// Update stats (thumbnails don't count against quota)
 		self.backupStats.thumbnailSize += Int64(data.count)
 	}
+	
+	// MARK: - Upload Metadata
+	
+	func uploadMetadata(_ metadata: PhotoMetadata, md5: String, userId: String) async throws {
+		let key = "users/\(userId)/metadata/\(md5).plist"
+		
+		// Encode metadata to plist
+		let encoder = PropertyListEncoder()
+		encoder.outputFormat = .binary
+		let plistData = try encoder.encode(metadata)
+		
+		let putObjectInput = PutObjectInput(
+			body: .data(plistData),
+			bucket: bucketName,
+			contentType: "application/x-plist",
+			key: key,
+			storageClass: .standard // Metadata stays in Standard for quick access
+		)
+		
+		_ = try await self.client.putObject(input: putObjectInput)
+		print("Uploaded metadata: \(md5)")
+		
+		// Update stats
+		self.backupStats.metadataSize += Int64(plistData.count)
+	}
+	
+	// MARK: - Download Metadata
+	
+	func downloadMetadata(md5: String, userId: String) async throws -> PhotoMetadata? {
+		let key = "users/\(userId)/metadata/\(md5).plist"
+		
+		do {
+			let response = try await client.getObject(input: GetObjectInput(
+				bucket: bucketName,
+				key: key
+			))
+			
+			guard let data = try await response.body?.readData() else {
+				return nil
+			}
+			
+			let decoder = PropertyListDecoder()
+			return try decoder.decode(PhotoMetadata.self, from: data)
+		} catch {
+			// Metadata might not exist for older uploads
+			print("Failed to download metadata for \(md5): \(error)")
+			return nil
+		}
+	}
 
 	// MARK: - Get Photo Info
 
@@ -358,6 +407,72 @@ class S3BackupService: ObservableObject {
 		}
 
 		return photos
+	}
+	
+	// MARK: - List Photos with Metadata
+	
+	func listUserPhotosWithMetadata(userId: String) async throws -> [PhotoEntry] {
+		// Get photos and metadata in parallel
+		async let photosTask = listUserPhotos(userId: userId)
+		async let metadataTask = listUserMetadata(userId: userId)
+		
+		var photos = try await photosTask
+		let metadataDict = try await metadataTask
+		
+		// Attach metadata to photos
+		for i in photos.indices {
+			if let metadata = metadataDict[photos[i].md5] {
+				photos[i].metadata = metadata
+			}
+		}
+		
+		return photos
+	}
+	
+	// MARK: - List User Metadata
+	
+	func listUserMetadata(userId: String) async throws -> [String: PhotoMetadata] {
+		let prefix = "users/\(userId)/metadata/"
+		var metadataDict: [String: PhotoMetadata] = [:]
+		var continuationToken: String? = nil
+		
+		repeat {
+			let listObjectsInput = ListObjectsV2Input(
+				bucket: bucketName,
+				continuationToken: continuationToken,
+				prefix: prefix
+			)
+			
+			let response = try await client.listObjectsV2(input: listObjectsInput)
+			
+			// Process metadata files in parallel
+			await withTaskGroup(of: (String, PhotoMetadata?).self) { group in
+				for object in response.contents ?? [] {
+					guard let key = object.key else { continue }
+					
+					// Extract MD5 from key
+					let md5 = key
+						.replacingOccurrences(of: prefix, with: "")
+						.replacingOccurrences(of: ".plist", with: "")
+					
+					group.addTask {
+						let metadata = try? await self.downloadMetadata(md5: md5, userId: userId)
+						return (md5, metadata)
+					}
+				}
+				
+				// Collect results
+				for await (md5, metadata) in group {
+					if let metadata = metadata {
+						metadataDict[md5] = metadata
+					}
+				}
+			}
+			
+			continuationToken = response.nextContinuationToken
+		} while continuationToken != nil
+		
+		return metadataDict
 	}
 	
 	// MARK: - Restore Operations
@@ -461,6 +576,7 @@ struct PhotoEntry {
 	let size: Int64
 	let lastModified: Date
 	let storageClass: String
+	var metadata: PhotoMetadata?
 }
 
 enum RestoreStatus {

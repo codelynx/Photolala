@@ -38,17 +38,20 @@ A Photolala-managed cloud backup service using AWS S3 with:
 - Subscription tier definitions
 - Storage quota enforcement
 - User interface for auth flow
+- StoreKit 2 integration for IAP
+- Archive retrieval UI with restore dialog
+- S3 RestoreObject API integration
+- Metadata backup system (binary plist)
 
 ### 🚧 In Progress
-- StoreKit 2 integration for IAP
 - Backend services for user management
 - Production AWS credential handling
+- Receipt validation endpoint
 
 ### ❌ Not Started
-- Subscription purchase flow
 - Usage tracking persistence
-- Deep Archive lifecycle
-- Family sharing
+- S3 lifecycle rules configuration
+- Family sharing implementation
 
 ## Phase 1 Goals (MVP)
 
@@ -102,7 +105,8 @@ s3://photolala/users/{user-id}/metadata/{md5}.plist
 2. ~~Build MD5 calculation pipeline~~ ✅
 3. ~~Create thumbnail generation~~ ✅
 4. ~~Implement Sign in with Apple~~ ✅
-5. Add StoreKit 2 for subscriptions
-6. Build backend services
-7. Design Deep Archive UX
-8. Production deployment
+5. ~~Add StoreKit 2 for subscriptions~~ ✅
+6. ~~Design Deep Archive UX~~ ✅
+7. ~~Implement metadata backup~~ ✅
+8. Build backend services
+9. Production deployment

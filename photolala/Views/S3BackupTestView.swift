@@ -221,6 +221,20 @@ struct S3BackupTestView: View {
 						}
 						.font(.caption2)
 						.foregroundColor(.secondary)
+						
+						// Show metadata if available
+						if let metadata = photo.metadata {
+							HStack {
+								if let dimensions = metadata.dimensions {
+									Label(dimensions, systemImage: "aspectratio")
+								}
+								if let camera = metadata.cameraInfo {
+									Label(camera, systemImage: "camera")
+								}
+							}
+							.font(.caption2)
+							.foregroundColor(.blue)
+						}
 					}
 					.padding(.vertical, 4)
 				}
@@ -288,7 +302,7 @@ struct S3BackupTestView: View {
 
 		do {
 			if let service = backupManager.s3Service {
-				self.uploadedPhotos = try await service.listUserPhotos(
+				self.uploadedPhotos = try await service.listUserPhotosWithMetadata(
 					userId: self.identityManager.currentUser?.serviceUserID ?? ""
 				)
 			}

@@ -1,8 +1,8 @@
 # S3 Backup Service Design (Simplified)
 
-Version: 0.2.0
-Date: June 15, 2025
-Status: Draft
+Version: 0.3.0
+Date: June 16, 2025
+Status: Implemented (POC)
 Philosophy: Start simple, evolve as needed
 
 ## Table of Contents
@@ -233,7 +233,7 @@ See [Deep Archive UX Stories](./deep-archive-ux-stories.md) for detailed user jo
 2. For each photo:
    - Calculate MD5 hash
    - Check if already uploaded (via catalog)
-   - Extract EXIF metadata
+   - Extract EXIF metadata (using PhotoManager)
    - Generate thumbnail (using existing app standards: 256px min, 512px max)
    - Upload: photo → thumbnail → metadata
    - Trigger Lambda to update catalog

@@ -1,6 +1,6 @@
 # Photolala Project Status
 
-Last Updated: June 16, 2025 (Session 4)
+Last Updated: June 16, 2025 (Session 5)
 
 ## Current Implementation Status
 
@@ -52,12 +52,31 @@ Last Updated: June 16, 2025 (Session 4)
   - Automatic navigation to photo browser
   - NavigationStack-based architecture
 
+#### S3 Backup Service (POC)
+- **Authentication**: Sign in with Apple integration
+- **Storage**: MD5-based deduplication to S3
+- **Subscriptions**: StoreKit 2 with 5 tiers (Free to Family)
+- **Archive Retrieval**: Deep Archive restore with cost estimates
+- **Metadata Backup**: Binary plist format for EXIF preservation
+- **UI**: Test interface in S3BackupTestView
+
 ### 🚧 In Progress / Placeholder Implementations
 
 1. ~~**Thumbnail Loading**: Currently loads full images (needs optimization)~~ ✅ Fixed
 2. **Photo Detail View**: Not yet implemented
 3. **Metadata Extraction**: PhotoReference prepared for expansion
 4. ~~**Performance Optimization**: No caching or lazy loading yet~~ ✅ Implemented dual caching
+
+### 📝 Recent Changes (June 16, 2025)
+
+**S3 Backup Service Implementation Sessions**:
+- Session 1: Implemented cross-platform UI helpers and started archive retrieval UX
+- Session 2: Implemented Sign in with Apple and identity management
+- Session 3: Added In-App Purchase support with StoreKit 2
+- Session 4: Completed archive retrieval system with S3 restore APIs
+- Session 5: Implemented metadata backup system with binary plist format
+
+See sections 30-34 below for detailed implementation notes.
 
 ### 📝 Recent Changes (June 15, 2025)
 
@@ -259,7 +278,7 @@ Last Updated: June 16, 2025 (Session 4)
 
 1. ~~Thumbnail loading is inefficient (loads full images)~~ ✅ Fixed with PhotoManager
 2. ~~No image caching mechanism~~ ✅ Fixed with dual NSCache system
-3. No metadata display
+3. ~~No metadata display~~ ✅ Fixed with PhotoMetadata and HUD in preview
 4. ~~No photo detail view implementation~~ ✅ Fixed with PhotoPreviewView
 5. No error handling for invalid image files
 6. Swift 6 Sendable warnings for NSImage/UIImage
@@ -364,6 +383,10 @@ Last Updated: June 16, 2025 (Session 4)
 - `docs/planning/photo-grouping-design.md` - Design for photo grouping feature
 - `docs/planning/iap-testing-guide.md` - Complete IAP testing guide
 - `docs/current/archive-retrieval-system.md` - Archive retrieval architecture and implementation
+- `docs/current/metadata-backup-system.md` - Metadata backup implementation and API reference
+- `docs/session-summaries/` - Development session summaries
+  - `/README.md` - Session index
+  - `/2025-06-16-session5.md` - Metadata backup implementation session
 - `scripts/create-test-photos.sh` - Script to create test photos with different dates
 - `services/s3-backup/` - Complete S3 backup service design documentation
   - `/design/identity-management-design.md` - Identity and authentication architecture
@@ -827,3 +850,32 @@ Last Updated: June 16, 2025 (Session 4)
    - **Documentation**:
      - Created archive-retrieval-system.md in docs/current/
      - Detailed implementation and architecture notes
+
+34. **Implemented Metadata Backup System (June 16 - Session 5)**:
+   - **Backup Components**:
+     - Automatic metadata extraction during photo upload
+     - Property List (plist) serialization with binary encoding
+     - Stored in S3 Standard storage class for quick access
+   - **S3BackupService Methods**:
+     - `uploadMetadata()`: Uploads metadata as plist files
+     - `downloadMetadata()`: Retrieves individual metadata
+     - `listUserMetadata()`: Bulk retrieves all user metadata
+     - `listUserPhotosWithMetadata()`: Combined photos + metadata
+   - **Storage Structure**:
+     - Metadata stored at `users/{userId}/metadata/{md5}.plist`
+     - Free bonus storage (doesn't count against quota)
+     - Typical size: 200-400 bytes per photo (binary format)
+   - **UI Integration**:
+     - S3BackupTestView displays photo dimensions and camera info
+     - Updated to use `listUserPhotosWithMetadata()` API
+   - **Performance**:
+     - Parallel metadata downloads using TaskGroup
+     - Efficient bulk operations for large photo collections
+   - **Benefits**:
+     - Enables future search capabilities
+     - Preserves EXIF data permanently
+     - Quick photo info without downloading full images
+     - Negligible cost (~$0.00007/month for 10,000 photos)
+   - **Documentation**:
+     - Created metadata-backup-system.md in docs/current/
+     - Comprehensive API reference and cost analysis
