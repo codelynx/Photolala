@@ -33,7 +33,7 @@ struct SignInPromptView: View {
 				)
 
 				SignInFeatureRow(
-					icon: "devices.phone.and.tablet",
+					icon: "iphone",
 					title: "Access Anywhere",
 					description: "View your photos on all your devices"
 				)

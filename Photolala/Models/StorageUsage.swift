@@ -30,20 +30,20 @@ struct StorageUsage: Codable {
 		Double(deepArchiveBytes) / 1_000_000_000
 	}
 	
-	/// Percentage of storage limit used
-	var percentageUsed: Double {
-		guard let limit = IAPManager.shared.currentStorageLimit else { return 0 }
+	/// Calculate percentage with given limit
+	func percentageUsed(with limit: Int64?) -> Double {
+		guard let limit = limit, limit > 0 else { return 0 }
 		return Double(totalBytes) / Double(limit) * 100
 	}
 	
 	/// Whether the user is approaching their limit (>80%)
-	var isApproachingLimit: Bool {
-		percentageUsed >= 80
+	func isApproachingLimit(with limit: Int64?) -> Bool {
+		percentageUsed(with: limit) >= 80
 	}
 	
 	/// Whether the user has exceeded their limit
-	var isOverLimit: Bool {
-		percentageUsed > 100
+	func isOverLimit(with limit: Int64?) -> Bool {
+		percentageUsed(with: limit) > 100
 	}
 }
 

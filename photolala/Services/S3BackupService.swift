@@ -588,6 +588,8 @@ enum S3BackupError: Error, LocalizedError {
 	case uploadFailed
 	case photoNotFound
 	case batchRestoreFailed(errors: [Error])
+	case notConfigured
+	case notAuthenticated
 
 	var errorDescription: String? {
 		switch self {
@@ -599,6 +601,10 @@ enum S3BackupError: Error, LocalizedError {
 			"Photo not found in S3"
 		case .batchRestoreFailed(let errors):
 			"Failed to restore \(errors.count) photos"
+		case .notConfigured:
+			"S3 backup service is not configured"
+		case .notAuthenticated:
+			"User is not authenticated"
 		}
 	}
 }

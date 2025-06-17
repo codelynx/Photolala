@@ -222,6 +222,8 @@ class IdentityManager: NSObject, ObservableObject {
 			}
 
 			print("Sign in successful: \(user.displayName)")
+			print("Photolala Service User ID: \(user.serviceUserID)")
+			print("Apple User ID: \(user.appleUserID)")
 		} catch {
 			await MainActor.run {
 				self.errorMessage = "Failed to save user: \(error.localizedDescription)"

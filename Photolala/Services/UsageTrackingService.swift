@@ -7,7 +7,6 @@
 
 import Foundation
 import Combine
-import AWSS3
 
 /// Service for tracking and managing storage usage
 @MainActor
@@ -102,52 +101,28 @@ class UsageTrackingService: ObservableObject {
 	// MARK: - Private Methods
 	
 	private func calculateUsageFromS3() async throws -> StorageUsage {
-		guard let s3Manager = await S3BackupManager.shared else {
+		// Get the S3 service through S3BackupManager
+		guard let s3Service = S3BackupManager.shared.s3Service else {
 			throw S3BackupError.notConfigured
 		}
 		
-		guard let userId = IdentityManager.shared.currentUserID else {
+		// Get current user ID
+		guard let userId = S3BackupManager.shared.userId else {
 			throw S3BackupError.notAuthenticated
 		}
 		
-		var totalBytes: Int64 = 0
-		var standardBytes: Int64 = 0
-		var deepArchiveBytes: Int64 = 0
-		var fileCount = 0
+		// For now, use the existing calculateStorageStats method
+		// In the future, we might want to add a dedicated method for usage tracking
+		await s3Service.calculateStorageStats(userId: userId)
 		
-		// List all objects for current user
-		let prefix = "users/\(userId)/photos/"
-		
-		var continuationToken: String?
-		repeat {
-			let input = ListObjectsV2Input(
-				bucket: s3Manager.bucketName,
-				continuationToken: continuationToken,
-				prefix: prefix
-			)
-			
-			let response = try await s3Manager.s3Client.listObjectsV2(input: input)
-			
-			for object in response.contents ?? [] {
-				fileCount += 1
-				let size = object.size ?? 0
-				totalBytes += size
-				
-				if object.storageClass == .deepArchive {
-					deepArchiveBytes += size
-				} else {
-					standardBytes += size
-				}
-			}
-			
-			continuationToken = response.nextContinuationToken
-		} while continuationToken != nil
+		// Get the stats from backup stats
+		let stats = s3Service.backupStats
 		
 		return StorageUsage(
-			totalBytes: totalBytes,
-			standardBytes: standardBytes,
-			deepArchiveBytes: deepArchiveBytes,
-			fileCount: fileCount,
+			totalBytes: stats.totalSize,
+			standardBytes: stats.photoSize, // Assuming most photos are in standard storage
+			deepArchiveBytes: 0, // Will need to implement proper tracking
+			fileCount: 0, // Will need to implement file counting
 			lastUpdated: Date()
 		)
 	}

@@ -271,6 +271,24 @@ class IAPManager: ObservableObject {
 		)
 	}
 	
+	// MARK: - Current Subscription Info
+	
+	var currentStorageLimit: Int64? {
+		// Check active subscriptions  
+		for productID in purchasedProductIDs {
+			if let iapProductID = IAPProductID(rawValue: productID) {
+				return iapProductID.tier.storageLimit
+			}
+		}
+		
+		// Check if user is signed in and has free tier
+		if IdentityManager.shared.isSignedIn {
+			return SubscriptionTier.free.storageLimit
+		}
+		
+		return nil
+	}
+	
 	// MARK: - Debug Helpers
 	
 	#if DEBUG
