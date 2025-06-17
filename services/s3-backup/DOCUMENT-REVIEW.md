@@ -1,175 +1,144 @@
-# S3 Backup Service - Document Review
+# Documentation Review and Updates
+
+Last Updated: January 17, 2025
 
 ## Overview
-This review covers all documentation for the Photolala S3 Backup Service, a revolutionary photo backup solution that offers 10X more storage than competitors at 70% lower cost through intelligent archiving.
 
-## Core Design Documents
+This session focused on three main areas:
+1. IAP Developer Tools consolidation and bug fixes
+2. Local receipt validation implementation 
+3. Usage tracking and CloudWatch monitoring design
 
-### 1. Main Design Document
-**File**: `design/s3-backup-service-design.md`
-**Status**: ✅ Complete and Updated
+## Changes Made
+
+### 1. IAP Developer Tools Consolidation
+
+**Problem**: Duplicate IAP testing views and window sizing issues
+
+**Solution**: Created consolidated `IAPDeveloperView.swift` with proper window management
+
+**Files Created/Modified**:
+- `Photolala/Views/IAPDeveloperView.swift` - New consolidated developer view
+- `Photolala/Commands/PhotolalaCommands.swift` - Reorganized menu structure
+
+**Key Improvements**:
+- Fixed TabView bug causing title bar issues by using Picker + switch
+- Proper window sizing (1000x700) with title configuration
+- Consolidated IAP Testing and Debug Panel into single interface
+- Created new "Photolala" menu to avoid duplicate View menus
+
+### 2. Local Receipt Validation
+
+**Implementation**: StoreKit 2 based local validation for development
+
+**Files Created**:
+- `Photolala/Services/LocalReceiptValidator.swift` - Receipt validation service
+- `Photolala/Views/ReceiptValidationTestView.swift` - Testing interface
+- `docs/planning/local-receipt-validation-implementation.md` - Implementation guide
+
+**Features**:
+- Uses `Transaction.currentEntitlements` for validation
+- Supports both StoreKit 2 and sandbox validation
+- Development-only implementation (#if DEBUG)
+- No server-side validation needed for MVP
+
+### 3. Usage Tracking Design
+
+**Approach**: Client-side usage calculation using AWS SDK for Swift
+
+**Documentation Created**:
+- `docs/planning/usage-tracking-feature.md` - Feature design document
+- `services/s3-backup/design/usage-tracking-design.md` - Technical design
+- `services/s3-backup/implementation/usage-tracking-mvp.md` - MVP implementation plan
+
+**Files Created** (partial implementation):
+- `Photolala/Models/StorageUsage.swift` - Usage data model
+- `Photolala/Services/UsageTrackingService.swift` - Usage tracking service
+
+**Key Decisions**:
+- No Lambda/backend required for MVP
+- Use S3 ListObjectsV2 API directly from iOS
+- 24-hour local caching
+- Soft limits with 10% grace period
+
+### 4. CloudWatch Monitoring
+
+**Documentation Created**:
+- `services/s3-backup/implementation/cloudwatch-monitoring.md` - Monitoring design
+- `services/s3-backup/implementation/monitoring-setup-checklist.md` - Setup guide
+
 **Key Points**:
-- MD5-based storage structure for deduplication
-- Storage class strategy (STANDARD → STANDARD_IA → DEEP_ARCHIVE)
-- Final pricing: $1.99 for 1TB with 14-day hot window
-- Photo credits system (1 credit = 100MB)
-- Family sharing architecture
-- Cancellation policy with 30-day grace period
+- No scripts required - all setup via AWS Console
+- Basic alarms: cost, storage size, request rate
+- ~35 minutes manual setup time
+- Cost: ~$10-50/month for monitoring
 
-### 2. Key Decisions
-**File**: `design/key-decisions.md`
-**Status**: ✅ Complete
-**Key Points**:
-- MD5 addressing: `s3://photolala/users/{user-id}/photos/{md5}.dat`
-- Storage costs: STANDARD_IA ($4/TB/mo) vs DEEP_ARCHIVE ($0.99/TB/mo)
-- Owner-only starring (simplified from multi-user)
-- Photolala-managed service only (no BYO credentials)
-- Fixed us-east-1 region
+## Architecture Decisions
 
-### 3. Final Pricing Strategy
-**File**: `design/FINAL-pricing-strategy.md`
-**Status**: ✅ Complete
-**Revolutionary Pricing**:
-- Starter: $0.99 - 200GB (7-day window)
-- Essential: $1.99 - 1TB (14-day window) ⭐
-- Plus: $2.99 - 1.5TB (21-day window)
-- Family: $5.99 - 5TB (30-day window)
+### 1. Client-Side Usage Tracking
+- **Rationale**: Simpler than backend services, uses existing S3 credentials
+- **Trade-offs**: Slower for large libraries, but acceptable with caching
+- **Future**: Can add server-side tracking later if needed
 
-## Technical Architecture
+### 2. Local Receipt Validation
+- **Rationale**: Sufficient for development and TestFlight testing
+- **Security**: StoreKit 2 provides cryptographic verification
+- **Production**: Will need server-side validation for App Store release
 
-### 4. Access Control
-**Files**: 
-- `design/access-control-architecture.md` (detailed)
-- `design/access-control-simple.md` (simplified)
-**Status**: ✅ Complete
-**Approach**: Presigned URLs for security
-- API validates every access
-- Time-limited URLs for specific files
-- No direct S3 access from app
-- STS option for power users (future)
+### 3. Manual CloudWatch Setup
+- **Rationale**: Avoid complexity of Infrastructure as Code for MVP
+- **Benefits**: Quick to implement, easy to modify
+- **Future**: Can automate with CloudFormation/Terraform later
 
-### 5. Authentication & Security
-**Files**:
-- `design/apple-id-integration-flow.md`
-- `design/apple-id-to-sts-flow.md`
-- `design/security-privacy-architecture.md`
-**Status**: ✅ Complete
-**Key Points**:
-- Sign in with Apple → Photolala UUID
-- STS tokens scoped to user prefix
-- Server-side encryption (S3 SSE-S3)
-- Admin access with audit logging
+## Technical Discoveries
 
-### 6. Storage Classes
-**File**: `design/storage-class-comparison.md`
-**Status**: ✅ Complete
-**Strategy**:
-- STANDARD: Thumbnails & last X days
-- STANDARD_IA: Not used (retrieval fees)
-- DEEP_ARCHIVE: Everything older
+### TabView Bug on macOS
+- TabView with `.tabViewStyle(.automatic)` pushes content into title bar
+- Solution: Use Picker with switch statement instead
+- Filed as potential SwiftUI bug
 
-## User Experience
-
-### 7. Deep Archive UX
-**Files**:
-- `design/deep-archive-ux-stories.md`
-- `design/archive-lifecycle-ux.md`
-- `design/family-deep-archive-ux.md`
-**Status**: ✅ Complete
-**Key Features**:
-- Visual badges: ❄️ (archived) → ⏳ (thawing) → ✨ (ready)
-- Credit-based retrieval system
-- Family coordination features
-- 30-day availability after retrieval
-
-### 8. Cancellation Policy
-**File**: `design/cancellation-policy.md`
-**Status**: ✅ Complete
-**User-Friendly Approach**:
-- 30-day grace period (full access)
-- 90-day browse-only period
-- Recovery Pass option ($9.99)
-- Thumbnails preserved indefinitely
-
-## Implementation
-
-### 9. API Design
-**File**: `api/service-api-design.md`
-**Status**: ✅ Complete
-**Endpoints**:
-- Authentication (Apple ID)
-- Upload/download with presigned URLs
-- Credit management
-- Family sharing
-
-### 10. Technical Requirements
-**Files**:
-- `requirements/technical-requirements-simple.md`
-- `requirements/user-stories.md`
-**Status**: ✅ Complete
-**Stack**:
-- AWS SDK for Swift
-- SwiftData for local state
-- Photolala-managed S3 only
-- macOS 14+ (Apple Silicon)
-
-## Operations
-
-### 11. Admin Interface
-**File**: `design/minimal-admin-interface.md`
-**Status**: ✅ Complete
-**Approach**: Keep it minimal
-- Slack bot for alerts
-- Simple web dashboard
-- CloudWatch monitoring
-- Emergency kill switches
-
-### 12. Market Research
-**File**: `design/market-research-photo-backup.md`
-**Status**: ✅ Complete
-**Key Findings**:
-- Nobody offers archive tiers
-- Competitors: $7-10/TB/month
-- Photolala: $1.99/TB/month
-- 70-90% cost savings
-
-## Document Quality Assessment
-
-### Strengths ✅
-1. **Comprehensive Coverage**: All aspects documented
-2. **Clear Pricing**: Revolutionary $1.99/TB model
-3. **Technical Depth**: Implementation details included
-4. **User-Centric**: UX flows well thought out
-5. **Security**: Multiple layers documented
-
-### Areas Complete ✅
-1. ✅ Pricing strategy finalized
-2. ✅ Technical architecture decided
-3. ✅ Security model defined
-4. ✅ UX flows designed
-5. ✅ Market positioning clear
-
-### Ready for Implementation? YES ✅
+### StoreKit 2 Advantages
+- Built-in receipt validation with `Transaction.currentEntitlements`
+- No need for ASN.1 parsing or certificate validation
+- Async/await support throughout
 
 ## Next Steps
-1. **Development Phase 1**: Authentication + basic upload
-2. **Development Phase 2**: Archive lifecycle + retrieval
-3. **Development Phase 3**: Family features + credits
-4. **Launch**: Soft launch → aggressive pricing → scale
 
-## Key Innovations
-1. **14-day hot window**: Perfect balance of cost/convenience
-2. **1TB for $1.99**: Market-breaking price
-3. **Credit system**: Predictable retrieval costs
-4. **Family coordination**: Unique in market
-5. **Transparent archiving**: Honest about trade-offs
+### Immediate (Before Launch)
+1. Complete usage tracking UI implementation
+2. Integrate usage checks with upload flow
+3. Set up CloudWatch monitoring in AWS Console
+4. Test with large photo libraries
 
-## Risk Mitigation
-- Clear user education about retrieval times
-- Generous cancellation policy
-- Multiple retrieval speed options
-- Family credit pooling
-- Continuous cost monitoring
+### Post-Launch
+1. Monitor usage patterns and costs
+2. Implement server-side receipt validation
+3. Add usage history and trends
+4. Consider automated enforcement
 
-## Conclusion
-The S3 Backup Service documentation is comprehensive and ready for implementation. The revolutionary pricing model ($1.99/TB) combined with intelligent archiving creates a unique market position that competitors cannot easily match.
+## Lessons Learned
+
+1. **Start Simple**: Client-side solutions can be sufficient for MVP
+2. **SwiftUI Quirks**: Some macOS-specific bugs require workarounds
+3. **AWS Services**: Many features available without custom backend
+4. **Documentation First**: Planning before coding saves time
+
+## Files to Add to Xcode Project
+
+The following files were created but need to be added to the Xcode project:
+- `Photolala/Views/IAPDeveloperView.swift` - Consolidated IAP developer tools
+- `Photolala/Services/LocalReceiptValidator.swift` - Local receipt validation
+- `Photolala/Views/ReceiptValidationTestView.swift` - Receipt validation UI
+- `Photolala/Models/StorageUsage.swift` - Storage usage data model
+- `Photolala/Services/UsageTrackingService.swift` - Usage tracking service
+
+Note: These files should be added to the appropriate groups in Xcode and included in the app target.
+
+## Repository Status
+
+Current branch: `feature/s3-backup-service`
+
+Ready for:
+- Usage tracking UI implementation
+- CloudWatch monitoring setup
+- Testing with TestFlight

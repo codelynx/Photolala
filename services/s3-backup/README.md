@@ -19,13 +19,19 @@ A Photolala-managed cloud backup service using AWS S3 with:
   - Identity management design
   - Cross-platform identity strategy
   - Pricing and storage optimization
+  - Usage tracking design
 - `implementation/` - Technical implementation details
   - AWS SDK Swift credentials handling
+  - Usage tracking MVP approach
+  - CloudWatch monitoring setup
+  - Monitoring setup checklist
+  - Next steps and priorities
 - `research/` - Background research
   - Game industry identity patterns
 - `requirements/` - What we're building (and what we're NOT)
 - `api/` - API design (for later)
 - `security/` - Security notes
+- Session summaries and reviews
 
 ## Current Status
 
@@ -42,14 +48,18 @@ A Photolala-managed cloud backup service using AWS S3 with:
 - Archive retrieval UI with restore dialog
 - S3 RestoreObject API integration
 - Metadata backup system (binary plist)
+- IAP Developer Tools (consolidated UI)
+- Local receipt validation (StoreKit 2)
+- Usage tracking design (client-side approach)
+- CloudWatch monitoring design
 
 ### 🚧 In Progress
-- Backend services for user management
+- Usage tracking UI implementation
+- CloudWatch monitoring setup
 - Production AWS credential handling
-- Receipt validation endpoint
 
 ### ❌ Not Started
-- Usage tracking persistence
+- Backend services (deferred - not needed for MVP)
 - S3 lifecycle rules configuration
 - Family sharing implementation
 
