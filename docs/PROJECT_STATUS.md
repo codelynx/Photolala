@@ -1,6 +1,6 @@
 # Photolala Project Status
 
-Last Updated: June 16, 2025 (Session 5)
+Last Updated: June 17, 2025 (Session 6)
 
 ## Current Implementation Status
 
@@ -908,3 +908,32 @@ See sections 30-34 below for detailed implementation notes.
      - configure-s3-lifecycle-final.sh already uses new paths
      - Documentation reflects V5 pricing strategy
      - Universal 180-day archive policy for all users
+
+35. **IAP Developer Tools Consolidation (June 17, 2025 - Session 6)**:
+   - **Menu Reorganization**:
+     - Created new "Photolala" top-level menu for app-specific features
+     - Eliminated confusing duplicate "View" menus
+     - Added "Manage Subscription..." to Photolala menu
+     - Added "Developer Tools" submenu (DEBUG only) with IAP tools
+   - **Created IAPDeveloperView.swift**:
+     - Consolidated IAP testing and debugging into single tabbed interface
+     - Three tabs: Status, Products, and Actions
+     - Status Tab: Shows user status, IAP status, and debug info
+     - Products Tab: Lists available products and purchase status
+     - Actions Tab: Quick actions and debug tools
+   - **Window Management Improvements**:
+     - Fixed blank window titles by setting titleVisibility
+     - Added miniaturizable to window style mask
+     - Proper window sizing (600x700 for developer tools)
+   - **Receipt Viewing Enhancement**:
+     - Now shows informative content instead of blank window
+     - Explains why receipts are missing in development builds
+     - Shows receipt URL and size when available
+   - **UI Polish**:
+     - Removed unnecessary "View" label from segmented picker
+     - Improved subscription view window sizing (1000x700)
+     - Better integration between IAPManager and IdentityManager
+   - **TabView Title Bar Bug Fix**:
+     - Discovered TabView with .tabViewStyle(.automatic) pushes content into title bar on macOS
+     - Replaced TabView with switch statement inside Group to avoid the issue
+     - Maintains same functionality with proper window layout

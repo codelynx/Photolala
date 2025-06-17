@@ -37,37 +37,45 @@ struct PhotolalaCommands: Commands {
 			.keyboardShortcut("D", modifiers: .command)
 		}
 
-		// View menu
-		CommandMenu("View") {
-			Button("Cache Statistics...") {
+		// Add to existing View menu instead of creating a new one
+		CommandGroup(after: .toolbar) {
+			Divider()
+			
+			Button("Show Cache Statistics...") {
 				#if os(macOS)
 					self.showCacheStatistics()
 				#endif
 			}
 			.keyboardShortcut("I", modifiers: [.command, .shift])
-
-			Divider()
-
-			Button("S3 Backup...") {
-				#if os(macOS)
-					self.showS3BackupTest()
-				#endif
-			}
-
+		}
+		
+		// Create a new Photolala menu for app-specific features
+		CommandMenu("Photolala") {
 			Button("Manage Subscription...") {
 				#if os(macOS)
 					self.showSubscriptionView()
 				#endif
 			}
-
+			
+			Divider()
+			
+			Button("Cloud Backup Settings...") {
+				#if os(macOS)
+					self.showS3BackupTest()
+				#endif
+			}
+			// .disabled(!FeatureFlags.isS3BackupEnabled) // Coming soon
+			
 			#if DEBUG
-				Divider()
-
-				Button("IAP Test...") {
+			Divider()
+			
+			Menu("Developer Tools") {
+				Button("IAP Developer Tools...") {
 					#if os(macOS)
-						self.showIAPTest()
+						self.showIAPDeveloper()
 					#endif
 				}
+			}
 			#endif
 		}
 
@@ -85,6 +93,7 @@ struct PhotolalaCommands: Commands {
 
 			Divider()
 		}
+		
 	}
 
 	private func openFolder() {
@@ -161,22 +170,26 @@ struct PhotolalaCommands: Commands {
 			window.isReleasedWhenClosed = false
 		}
 
-		private func showIAPTest() {
+		private func showIAPDeveloper() {
 			let window = NSWindow(
-				contentRect: NSRect(x: 0, y: 0, width: 500, height: 600),
-				styleMask: [.titled, .closable, .resizable],
+				contentRect: NSRect(x: 0, y: 0, width: 600, height: 700),
+				styleMask: [.titled, .closable, .resizable, .miniaturizable],
 				backing: .buffered,
 				defer: false
 			)
 
-			window.title = "IAP Testing"
+			window.title = "IAP Developer Tools"
 			window.center()
-			window.contentView = NSHostingView(rootView: IAPTestView())
+			window.contentView = NSHostingView(rootView: IAPDeveloperView())
 			window.makeKeyAndOrderFront(nil)
 
 			// Keep window in front but not floating
 			window.level = .normal
 			window.isReleasedWhenClosed = false
+			
+			// Force title to be shown
+			window.titleVisibility = .visible
+			window.titlebarAppearsTransparent = false
 		}
 	#endif
 
@@ -196,6 +209,7 @@ struct PhotolalaCommands: Commands {
 			NotificationCenter.default.post(name: .showHelp, object: nil)
 		#endif
 	}
+	
 }
 
 // MARK: - Notification Names

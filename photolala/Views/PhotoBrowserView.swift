@@ -324,7 +324,7 @@ struct PhotoBrowserView: View {
 					#endif
 
 					// S3 Backup button
-					if !self.selectedPhotos.isEmpty {
+					if !self.selectedPhotos.isEmpty && FeatureFlags.isS3BackupEnabled {
 						Button(action: self.backupSelectedPhotos) {
 							Label("Backup", systemImage: "icloud.and.arrow.up")
 						}

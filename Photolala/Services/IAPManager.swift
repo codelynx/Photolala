@@ -270,6 +270,23 @@ class IAPManager: ObservableObject {
 			isActive: true
 		)
 	}
+	
+	// MARK: - Debug Helpers
+	
+	#if DEBUG
+	var activeSubscriptions: [String] {
+		Array(purchasedProductIDs)
+	}
+	
+	var currentSubscriptionTier: SubscriptionTier? {
+		for productID in purchasedProductIDs {
+			if let iapProductID = IAPProductID(rawValue: productID) {
+				return iapProductID.tier
+			}
+		}
+		return nil
+	}
+	#endif
 }
 
 // MARK: - Supporting Types

@@ -484,6 +484,9 @@ class PhotoCollectionViewController: XViewController {
 		
 		let photo = self.photoGroups[indexPath.section].photos[indexPath.item]
 		
+		// Check if archive retrieval is enabled
+		guard FeatureFlags.isArchiveRetrievalEnabled else { return }
+		
 		// Verify this is an archived photo
 		guard let archiveInfo = photo.archiveInfo,
 		      !archiveInfo.storageClass.isImmediatelyAccessible else { return }
