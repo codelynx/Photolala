@@ -1,11 +1,13 @@
-# Implementation Checklist - New Pricing Strategy
+# Implementation Checklist - V5 Pricing Strategy
+
+Last Updated: June 16, 2025
 
 ## 1. Update Storage Limits ✅ DONE
-- Free: 200MB ✓
+- Free: 5GB ✓ (Updated from 200MB)
 - Starter: 500GB ✓
 - Essential: 1TB ✓
-- Plus: 2TB ✓ (Updated from 1.5TB)
-- Family: 5TB ✓ (Updated from 1.5TB)
+- Plus: 2TB ✓
+- Family: 5TB ✓
 
 ## 2. Update Quota Logic ✅ DONE
 - Only count photos against quota ✓
@@ -17,27 +19,40 @@
 - Bonus storage tracked separately ✓ (bonusSizeFormatted)
 - SubscriptionView uses "Photos" terminology ✓
 
-## 4. S3 Storage Classes ✅ PARTIALLY DONE
-- Photos: Uploaded directly to Deep Archive ✓
-- Thumbnails: Uploaded to Standard ✓
-- Metadata: Not yet implemented ❌
-- S3 Lifecycle Rules: Must be configured in AWS Console ❌
+## 4. S3 Path Structure 🔄 IN PROGRESS
+- Current: users/{userId}/photos/, users/{userId}/thumbs/, users/{userId}/metadata/
+- New: photos/{userId}/, thumbnails/{userId}/, metadata/{userId}/
+- Need to update S3BackupService paths ❌
 
-## 5. Retrieval UX ❌ TODO
-- Show "archived" badge on old photos
-- Add restore button with 24-48hr warning
-- Track restore requests
+## 5. S3 Storage Classes & Lifecycle ✅ DESIGNED
+- Photos: Standard → Deep Archive after 180 days ✓
+- Thumbnails: Intelligent-Tiering immediately ✓
+- Metadata: Always Standard ✓
+- S3 Lifecycle Rules: Script ready (configure-s3-lifecycle-final.sh) ✓
 
-## 6. Update Documentation ✅ DONE
-- Created current-status.md with implementation details ✓
-- Technical documentation updated ✓
-- User-facing docs still needed for production
+## 6. Retrieval UX ✅ DONE
+- Show "archived" badge on old photos ✓
+- PhotoRetrievalView with restore options ✓
+- Batch photo selection support ✓
+- Track restore requests ✓
+
+## 7. Update Documentation 🔄 IN PROGRESS
+- CURRENT-pricing-strategy.md ✅ Updated to V5
+- s3-backup-service-design.md ✅ Updated paths and lifecycle
+- key-decisions.md ✅ Updated with universal policy
+- implementation-checklist.md ✅ This file
+- Other docs need updates ❌
 
 ## Summary
-- Storage limits: ✅ Updated to new pricing (2TB Plus, 5TB Family)
-- Quota logic: ✅ Only photos count, bonus storage free
-- UI strings: ✅ Already using "Photos" terminology
-- Storage classes: ✅ Deep Archive for photos, Standard for thumbnails
-- Documentation: ✅ Technical docs updated
+- Storage limits: ✅ Free tier now 5GB, all tiers updated
+- Quota logic: ✅ Only photos count, thumbnails/metadata free
+- Path structure: 🔄 Need to implement new structure in code
+- Lifecycle policy: ✅ Universal 180-day archive designed
+- Retrieval UX: ✅ Fully implemented
+- Documentation: 🔄 Core docs updated, more to go
 
-Remaining work focuses on production deployment and archive retrieval UX.
+Next Steps:
+1. Update S3BackupService to use new path structure
+2. Run configure-s3-lifecycle-final.sh
+3. Update remaining documentation
+4. Test end-to-end with new structure

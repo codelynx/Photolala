@@ -8,7 +8,7 @@ Start simple. Add complexity only when needed.
 
 A Photolala-managed cloud backup service using AWS S3 with:
 - MD5-based deduplication
-- Cost-optimized storage (STANDARD_IA → DEEP_ARCHIVE)
+- Universal 180-day archive policy (STANDARD → DEEP_ARCHIVE)
 - Browse via thumbnails without downloading originals
 - Tied to Apple ID with subscription tiers
 
@@ -85,19 +85,21 @@ A Photolala-managed cloud backup service using AWS S3 with:
 
 ## Key Features
 
-### MD5-Based Storage
+### MD5-Based Storage (New Structure)
 ```
-s3://photolala/users/{user-id}/photos/{md5}.dat
-s3://photolala/users/{user-id}/thumbs/{md5}.dat
-s3://photolala/users/{user-id}/metadata/{md5}.plist
+s3://photolala/photos/{user-id}/{md5}.dat
+s3://photolala/thumbnails/{user-id}/{md5}.dat
+s3://photolala/metadata/{user-id}/{md5}.plist
 ```
 
-### Subscription Tiers
+### Subscription Tiers (Photo Storage)
 - Free: 5 GB
-- Basic: 100 GB ($2.99/mo)
-- Standard: 1 TB ($9.99/mo)
-- Pro: 5 TB ($39.99/mo)
-- Family: 10 TB ($69.99/mo)
+- Starter: 500 GB ($0.99/mo)
+- Essential: 1 TB ($1.99/mo)
+- Plus: 2 TB ($2.99/mo)
+- Family: 5 TB ($5.99/mo)
+
+*Note: Thumbnails and metadata don't count against quota*
 
 ### Next Steps
 
