@@ -30,7 +30,7 @@ This guide walks through setting up S3 lifecycle rules in the AWS Console to aut
 
 **Rule scope**:
 - Choose "Limit the scope of this rule using one or more filters"
-- Prefix: `users/*/photos/`
+- Prefix: `photos/`
 - This will match all user photo files
 
 **Lifecycle rule actions**:
@@ -51,7 +51,7 @@ This guide walks through setting up S3 lifecycle rules in the AWS Console to aut
 **Name**: `keep-metadata-standard`
 
 **Rule scope**:
-- Prefix: `users/*/metadata/`
+- Prefix: `metadata/`
 
 **Lifecycle rule actions**:
 - No transitions needed (metadata stays in STANDARD storage)
@@ -64,7 +64,7 @@ This guide walks through setting up S3 lifecycle rules in the AWS Console to aut
 **Name**: `optimize-thumbnails`
 
 **Rule scope**:
-- Prefix: `users/*/thumbnails/`
+- Prefix: `thumbnails/`
 
 **Lifecycle rule actions**:
 - ✅ Transition current versions of objects between storage classes

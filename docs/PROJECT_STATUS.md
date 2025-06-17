@@ -887,3 +887,24 @@ See sections 30-34 below for detailed implementation notes.
    - **Documentation**:
      - Created metadata-backup-system.md in docs/current/
      - Comprehensive API reference and cost analysis
+
+35. **Implemented New S3 Path Structure (June 17 - Session 7)**:
+   - **Path Migration**:
+     - Changed from `users/{userId}/photos/` to `photos/{userId}/`
+     - Changed from `users/{userId}/thumbs/` to `thumbnails/{userId}/`
+     - Changed from `users/{userId}/metadata/` to `metadata/{userId}/`
+   - **Code Updates**:
+     - Updated all S3BackupService methods to use new paths
+     - Fixed calculateStorageStats() to use new prefixes
+     - Updated all upload methods (uploadPhoto, uploadThumbnail, uploadMetadata)
+     - Updated all list methods (listUserPhotos, listUserMetadata)
+     - Updated restore methods (restorePhoto, checkRestoreStatus)
+   - **Benefits**:
+     - Enables universal lifecycle rules across all users
+     - Simpler S3 lifecycle configuration
+     - Better performance for S3 operations
+     - No migration needed for new project
+   - **Related Updates**:
+     - configure-s3-lifecycle-final.sh already uses new paths
+     - Documentation reflects V5 pricing strategy
+     - Universal 180-day archive policy for all users

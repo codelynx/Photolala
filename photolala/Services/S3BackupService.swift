@@ -195,11 +195,8 @@ class S3BackupService: ObservableObject {
 			self.backupStats.thumbnailSize = 0
 			self.backupStats.metadataSize = 0
 
-			// List all objects for the user
-			let userPrefix = "users/\(userId)/"
-
 			// Calculate photo storage
-			let photoPrefix = "\(userPrefix)photos/"
+			let photoPrefix = "photos/\(userId)/"
 			let photoResponse = try await client.listObjectsV2(input: ListObjectsV2Input(
 				bucket: self.bucketName,
 				prefix: photoPrefix
@@ -212,7 +209,7 @@ class S3BackupService: ObservableObject {
 			}
 
 			// Calculate thumbnail storage
-			let thumbPrefix = "\(userPrefix)thumbs/"
+			let thumbPrefix = "thumbnails/\(userId)/"
 			let thumbResponse = try await client.listObjectsV2(input: ListObjectsV2Input(
 				bucket: self.bucketName,
 				prefix: thumbPrefix
@@ -225,7 +222,7 @@ class S3BackupService: ObservableObject {
 			}
 
 			// Calculate metadata storage
-			let metadataPrefix = "\(userPrefix)metadata/"
+			let metadataPrefix = "metadata/\(userId)/"
 			let metadataResponse = try await client.listObjectsV2(input: ListObjectsV2Input(
 				bucket: self.bucketName,
 				prefix: metadataPrefix
@@ -256,7 +253,7 @@ class S3BackupService: ObservableObject {
 		}
 
 		let md5 = self.calculateMD5(for: data)
-		let key = "users/\(userId)/photos/\(md5).dat"
+		let key = "photos/\(userId)/\(md5).dat"
 
 		// Check if already exists
 		do {
@@ -292,7 +289,7 @@ class S3BackupService: ObservableObject {
 	// MARK: - Upload Thumbnail
 
 	func uploadThumbnail(data: Data, md5: String, userId: String) async throws {
-		let key = "users/\(userId)/thumbs/\(md5).dat"
+		let key = "thumbnails/\(userId)/\(md5).dat"
 
 		let putObjectInput = PutObjectInput(
 			body: .data(data),
@@ -312,7 +309,7 @@ class S3BackupService: ObservableObject {
 	// MARK: - Upload Metadata
 	
 	func uploadMetadata(_ metadata: PhotoMetadata, md5: String, userId: String) async throws {
-		let key = "users/\(userId)/metadata/\(md5).plist"
+		let key = "metadata/\(userId)/\(md5).plist"
 		
 		// Encode metadata to plist
 		let encoder = PropertyListEncoder()
@@ -337,7 +334,7 @@ class S3BackupService: ObservableObject {
 	// MARK: - Download Metadata
 	
 	func downloadMetadata(md5: String, userId: String) async throws -> PhotoMetadata? {
-		let key = "users/\(userId)/metadata/\(md5).plist"
+		let key = "metadata/\(userId)/\(md5).plist"
 		
 		do {
 			let response = try await client.getObject(input: GetObjectInput(
@@ -361,7 +358,7 @@ class S3BackupService: ObservableObject {
 	// MARK: - Get Photo Info
 
 	func getPhotoInfo(md5: String, userId: String) async throws -> (size: Int64, storageClass: String) {
-		let key = "users/\(userId)/photos/\(md5).dat"
+		let key = "photos/\(userId)/\(md5).dat"
 
 		let response = try await client.headObject(input: HeadObjectInput(
 			bucket: self.bucketName,
@@ -377,7 +374,7 @@ class S3BackupService: ObservableObject {
 	// MARK: - List User Photos
 
 	func listUserPhotos(userId: String) async throws -> [PhotoEntry] {
-		let prefix = "users/\(userId)/photos/"
+		let prefix = "photos/\(userId)/"
 
 		let listObjectsInput = ListObjectsV2Input(
 			bucket: bucketName,
@@ -432,7 +429,7 @@ class S3BackupService: ObservableObject {
 	// MARK: - List User Metadata
 	
 	func listUserMetadata(userId: String) async throws -> [String: PhotoMetadata] {
-		let prefix = "users/\(userId)/metadata/"
+		let prefix = "metadata/\(userId)/"
 		var metadataDict: [String: PhotoMetadata] = [:]
 		var continuationToken: String? = nil
 		
@@ -479,7 +476,7 @@ class S3BackupService: ObservableObject {
 	
 	/// Initiate restore for an archived photo
 	func restorePhoto(md5: String, userId: String, rushDelivery: Bool = false) async throws {
-		let key = "users/\(userId)/photos/\(md5).dat"
+		let key = "photos/\(userId)/\(md5).dat"
 		
 		// Create restore request
 		let input = RestoreObjectInput(
@@ -508,7 +505,7 @@ class S3BackupService: ObservableObject {
 	
 	/// Check restore status for a photo
 	func checkRestoreStatus(md5: String, userId: String) async throws -> RestoreStatus {
-		let key = "users/\(userId)/photos/\(md5).dat"
+		let key = "photos/\(userId)/\(md5).dat"
 		
 		let input = HeadObjectInput(
 			bucket: bucketName,

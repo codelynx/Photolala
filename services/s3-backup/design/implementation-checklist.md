@@ -19,10 +19,10 @@ Last Updated: June 16, 2025
 - Bonus storage tracked separately ✓ (bonusSizeFormatted)
 - SubscriptionView uses "Photos" terminology ✓
 
-## 4. S3 Path Structure 🔄 IN PROGRESS
+## 4. S3 Path Structure ✅ DONE
 - Current: users/{userId}/photos/, users/{userId}/thumbs/, users/{userId}/metadata/
 - New: photos/{userId}/, thumbnails/{userId}/, metadata/{userId}/
-- Need to update S3BackupService paths ❌
+- Updated S3BackupService paths ✓
 
 ## 5. S3 Storage Classes & Lifecycle ✅ DESIGNED
 - Photos: Standard → Deep Archive after 180 days ✓
@@ -36,23 +36,23 @@ Last Updated: June 16, 2025
 - Batch photo selection support ✓
 - Track restore requests ✓
 
-## 7. Update Documentation 🔄 IN PROGRESS
+## 7. Update Documentation ✅ DONE
 - CURRENT-pricing-strategy.md ✅ Updated to V5
-- s3-backup-service-design.md ✅ Updated paths and lifecycle
+- s3-lifecycle-configuration.md ✅ Updated paths
 - key-decisions.md ✅ Updated with universal policy
 - implementation-checklist.md ✅ This file
-- Other docs need updates ❌
+- Obsolete scripts archived ✅
 
 ## Summary
 - Storage limits: ✅ Free tier now 5GB, all tiers updated
 - Quota logic: ✅ Only photos count, thumbnails/metadata free
-- Path structure: 🔄 Need to implement new structure in code
+- Path structure: ✅ New structure implemented in code
 - Lifecycle policy: ✅ Universal 180-day archive designed
 - Retrieval UX: ✅ Fully implemented
-- Documentation: 🔄 Core docs updated, more to go
+- Documentation: ✅ All core docs updated
 
 Next Steps:
-1. Update S3BackupService to use new path structure
-2. Run configure-s3-lifecycle-final.sh
-3. Update remaining documentation
-4. Test end-to-end with new structure
+1. Run configure-s3-lifecycle-final.sh in production
+2. Set up AWS infrastructure (STS, IAM roles)
+3. Test IAP subscriptions with TestFlight
+4. Build backend services for usage tracking
