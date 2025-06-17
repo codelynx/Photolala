@@ -139,27 +139,37 @@ struct SubscriptionView: View {
 				title: "End-to-End Encryption",
 				description: "Your photos are encrypted before leaving your device"
 			)
+			.comingSoon(!FeatureFlags.isS3BackupEnabled)
+			
 			FeatureRow(
 				icon: "arrow.up.arrow.down",
 				title: "Automatic Sync",
 				description: "Seamlessly backup new photos as you take them"
 			)
+			.comingSoon(!FeatureFlags.isS3BackupEnabled)
+			
 			FeatureRow(
 				icon: "clock.arrow.circlepath",
 				title: "Version History",
 				description: "Restore previous versions of edited photos"
 			)
+			.comingSoon(!FeatureFlags.isS3BackupEnabled)
+			
 			FeatureRow(
 				icon: "person.2",
 				title: "Family Sharing",
 				description: "Share storage with up to 5 family members (Family plan)"
 			)
+			
 			FeatureRow(icon: "speedometer", title: "Fast Uploads", description: "Optimized for quick, reliable backups")
+			.comingSoon(!FeatureFlags.isS3BackupEnabled)
+			
 			FeatureRow(
 				icon: "checkmark.shield",
 				title: "30-Day Recovery",
 				description: "Recover deleted photos within 30 days"
 			)
+			.comingSoon(!FeatureFlags.isS3BackupEnabled)
 		}
 		.padding(.top)
 	}

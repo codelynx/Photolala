@@ -1,11 +1,13 @@
-# Implementation Checklist - New Pricing Strategy
+# Implementation Checklist - V5 Pricing Strategy
+
+Last Updated: January 17, 2025
 
 ## 1. Update Storage Limits ✅ DONE
-- Free: 200MB ✓
+- Free: 5GB ✓ (Updated from 200MB)
 - Starter: 500GB ✓
 - Essential: 1TB ✓
-- Plus: 2TB ✓ (Updated from 1.5TB)
-- Family: 5TB ✓ (Updated from 1.5TB)
+- Plus: 2TB ✓
+- Family: 5TB ✓
 
 ## 2. Update Quota Logic ✅ DONE
 - Only count photos against quota ✓
@@ -17,27 +19,66 @@
 - Bonus storage tracked separately ✓ (bonusSizeFormatted)
 - SubscriptionView uses "Photos" terminology ✓
 
-## 4. S3 Storage Classes ✅ PARTIALLY DONE
-- Photos: Uploaded directly to Deep Archive ✓
-- Thumbnails: Uploaded to Standard ✓
-- Metadata: Not yet implemented ❌
-- S3 Lifecycle Rules: Must be configured in AWS Console ❌
+## 4. S3 Path Structure ✅ DONE
+- Current: users/{userId}/photos/, users/{userId}/thumbs/, users/{userId}/metadata/
+- New: photos/{userId}/, thumbnails/{userId}/, metadata/{userId}/
+- Updated S3BackupService paths ✓
 
-## 5. Retrieval UX ❌ TODO
-- Show "archived" badge on old photos
-- Add restore button with 24-48hr warning
-- Track restore requests
+## 5. S3 Storage Classes & Lifecycle ✅ DESIGNED
+- Photos: Standard → Deep Archive after 180 days ✓
+- Thumbnails: Intelligent-Tiering immediately ✓
+- Metadata: Always Standard ✓
+- S3 Lifecycle Rules: Script ready (configure-s3-lifecycle-final.sh) ✓
 
-## 6. Update Documentation ✅ DONE
-- Created current-status.md with implementation details ✓
-- Technical documentation updated ✓
-- User-facing docs still needed for production
+## 6. Retrieval UX ✅ DONE
+- Show "archived" badge on old photos ✓
+- PhotoRetrievalView with restore options ✓
+- Batch photo selection support ✓
+- Track restore requests ✓
+
+## 7. Update Documentation ✅ DONE
+- CURRENT-pricing-strategy.md ✅ Updated to V5
+- s3-lifecycle-configuration.md ✅ Updated paths
+- key-decisions.md ✅ Updated with universal policy
+- implementation-checklist.md ✅ This file
+- Obsolete scripts archived ✅
+
+## 8. IAP Integration ✅ DONE
+- StoreKit 2 configuration ✅
+- PhotolalaProducts.storekit file ✅
+- IAPManager service ✅
+- Subscription UI ✅
+- Local receipt validation ✅
+- IAP Developer Tools ✅
+
+## 9. Usage Tracking 🚧 IN PROGRESS
+- Design completed ✅
+- Client-side approach documented ✅
+- StorageUsage model created ✅
+- UsageTrackingService created ✅
+- UI implementation pending ⏳
+- Upload integration pending ⏳
+
+## 10. Monitoring Setup ✅ DESIGNED
+- CloudWatch monitoring design ✅
+- Setup checklist created ✅
+- No Lambda required ✅
+- Manual AWS Console setup ✅
+- Cost: ~$10-50/month ✅
 
 ## Summary
-- Storage limits: ✅ Updated to new pricing (2TB Plus, 5TB Family)
-- Quota logic: ✅ Only photos count, bonus storage free
-- UI strings: ✅ Already using "Photos" terminology
-- Storage classes: ✅ Deep Archive for photos, Standard for thumbnails
-- Documentation: ✅ Technical docs updated
+- Storage limits: ✅ Free tier now 5GB, all tiers updated
+- Quota logic: ✅ Only photos count, thumbnails/metadata free
+- Path structure: ✅ New structure implemented in code
+- Lifecycle policy: ✅ Universal 180-day archive designed
+- IAP system: ✅ Complete with developer tools
+- Usage tracking: 🚧 Designed, implementation in progress
+- Monitoring: ✅ Ready for AWS Console setup
+- Retrieval UX: ✅ Fully implemented
+- Documentation: ✅ All core docs updated
 
-Remaining work focuses on production deployment and archive retrieval UX.
+Next Steps:
+1. Run configure-s3-lifecycle-final.sh in production
+2. Set up AWS infrastructure (STS, IAM roles)
+3. Test IAP subscriptions with TestFlight
+4. Build backend services for usage tracking

@@ -19,6 +19,8 @@ class PhotoReference: Identifiable, Hashable {
 	var metadata: PhotoMetadata?
 	var metadataLoadingState: LoadingState = .idle
 	var fileCreationDate: Date? // Quick access for initial sorting - closer to photo taken date
+	var archiveInfo: ArchivedPhotoInfo? // S3 archive status
+	var md5Hash: String? // Cached MD5 hash for S3 lookups
 
 	enum LoadingState: Equatable {
 		case idle

@@ -14,6 +14,8 @@ Documents describing the current architecture and implementation:
 - **[current/thumbnail-system.md](./current/thumbnail-system.md)** - Thumbnail generation and caching
 - **[current/selection-system.md](./current/selection-system.md)** - Selection management and UI
 - **[current/native-thumbnail-strip.md](./current/native-thumbnail-strip.md)** - Native collection view thumbnail strip
+- **[current/archive-retrieval-system.md](./current/archive-retrieval-system.md)** - S3 Deep Archive photo retrieval
+- **[current/metadata-backup-system.md](./current/metadata-backup-system.md)** - Metadata backup to S3
 
 ### History
 Historical design documents and implementation notes:
@@ -59,4 +61,4 @@ When adding documentation:
 3. **Implementation notes** → Add to `history/implementation-notes/`
 4. **Status updates** → Update `PROJECT_STATUS.md`
 
-Last updated: June 14, 2025
+Last updated: June 16, 2025

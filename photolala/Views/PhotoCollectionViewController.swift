@@ -29,6 +29,7 @@ class PhotoCollectionViewController: XViewController {
 	var onSelectFolder: ((PhotoReference) -> Void)?
 	var onPhotosLoadedWithReferences: (([PhotoReference]) -> Void)?
 	var onSelectionChanged: (([PhotoReference]) -> Void)?
+	var onArchivedPhotoClick: ((PhotoReference) -> Void)?
 
 	var collectionView: XCollectionView!
 
@@ -475,6 +476,25 @@ class PhotoCollectionViewController: XViewController {
 				self.onSelectPhoto?(photo, self.photos)
 			}
 		}
+	}
+	
+	func handleArchivedPhotoClick(at indexPath: IndexPath) {
+		guard indexPath.section < self.photoGroups.count,
+		      indexPath.item < self.photoGroups[indexPath.section].photos.count else { return }
+		
+		let photo = self.photoGroups[indexPath.section].photos[indexPath.item]
+		
+		// Check if archive retrieval is enabled
+		guard FeatureFlags.isArchiveRetrievalEnabled else { return }
+		
+		// Verify this is an archived photo
+		guard let archiveInfo = photo.archiveInfo,
+		      !archiveInfo.storageClass.isImmediatelyAccessible else { return }
+		
+		print("[PhotoCollectionViewController] Showing retrieval dialog for archived photo: \(photo.filename)")
+		
+		// Call the handler to show retrieval dialog
+		onArchivedPhotoClick?(photo)
 	}
 
 }
@@ -943,8 +963,10 @@ extension PhotoCollectionViewController: XCollectionViewDelegate {
 			didSet {
 				self.loadThumbnail()
 				self.updateSelectionState()
+				self.updateArchiveBadge()
 			}
 		}
+		private var archiveBadgeView: NSView?
 
 		override func loadView() {
 			view = NSView()
@@ -984,6 +1006,20 @@ extension PhotoCollectionViewController: XCollectionViewDelegate {
 				// Trigger rightMouseDown to show context menu
 				self.rightMouseDown(with: event)
 				return
+			}
+			
+			// Check if this is an archived photo that needs retrieval
+			if event.clickCount == 1,
+			   let archiveInfo = photoRepresentation?.archiveInfo,
+			   !archiveInfo.storageClass.isImmediatelyAccessible {
+				// Find the collection view controller and call archive handler
+				if let collectionView = self.collectionView,
+				   let viewController = collectionView.delegate as? PhotoCollectionViewController,
+				   let indexPath = collectionView.indexPath(for: self) {
+					print("[PhotoCollectionViewItem] Click on archived photo, showing retrieval dialog")
+					viewController.handleArchivedPhotoClick(at: indexPath)
+					return
+				}
 			}
 
 			if event.clickCount == 2 {
@@ -1026,6 +1062,8 @@ extension PhotoCollectionViewController: XCollectionViewDelegate {
 			super.prepareForReuse()
 			self.imageView?.image = nil
 			self.photoRepresentation = nil
+			self.archiveBadgeView?.removeFromSuperview()
+			self.archiveBadgeView = nil
 		}
 
 		private let loadingSymbol: String = "circle.dotted" // "photo"
@@ -1139,6 +1177,74 @@ extension PhotoCollectionViewController: XCollectionViewDelegate {
 			super.viewDidAppear()
 			self.updateSelectionState()
 		}
+		
+		private func updateArchiveBadge() {
+			// Remove existing badge
+			self.archiveBadgeView?.removeFromSuperview()
+			self.archiveBadgeView = nil
+			
+			// Check if we have archive info to display
+			guard let archiveInfo = photoRepresentation?.archiveInfo else { return }
+			
+			// Create appropriate badge based on status
+			var badgeText: String?
+			var badgeColor: NSColor?
+			
+			if let retrieval = archiveInfo.retrieval {
+				switch retrieval.status {
+				case .pending, .inProgress:
+					badgeText = "⏳"
+					badgeColor = .orange
+				case .completed:
+					badgeText = "✨"
+					badgeColor = .systemYellow
+				case .failed:
+					badgeText = "⚠️"
+					badgeColor = .systemRed
+				}
+			} else if archiveInfo.isPinned {
+				badgeText = "⭐"
+				badgeColor = .systemYellow
+			} else if !archiveInfo.storageClass.isImmediatelyAccessible {
+				badgeText = "❄️"
+				badgeColor = .systemBlue
+			} else if archiveInfo.isExpiringSoon {
+				badgeText = "⚠️"
+				badgeColor = .systemOrange
+			} else if archiveInfo.daysUntilReArchive != nil {
+				badgeText = "✨"
+				badgeColor = .systemYellow
+			}
+			
+			// Create badge if needed
+			guard let text = badgeText else { return }
+			
+			let badge = NSTextField(labelWithString: text)
+			badge.font = .systemFont(ofSize: 14)
+			badge.backgroundColor = badgeColor?.withAlphaComponent(0.9)
+			badge.wantsLayer = true
+			badge.layer?.cornerRadius = 10
+			badge.layer?.masksToBounds = true
+			badge.alignment = .center
+			badge.translatesAutoresizingMaskIntoConstraints = false
+			
+			view.addSubview(badge)
+			self.archiveBadgeView = badge
+			
+			NSLayoutConstraint.activate([
+				badge.topAnchor.constraint(equalTo: view.topAnchor, constant: 4),
+				badge.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -4),
+				badge.widthAnchor.constraint(equalToConstant: 24),
+				badge.heightAnchor.constraint(equalToConstant: 24)
+			])
+			
+			// Add dimming effect for archived photos
+			if !archiveInfo.storageClass.isImmediatelyAccessible {
+				imageView?.alphaValue = 0.7
+			} else {
+				imageView?.alphaValue = 1.0
+			}
+		}
 
 	}
 #else
@@ -1148,10 +1254,12 @@ extension PhotoCollectionViewController: XCollectionViewDelegate {
 			didSet {
 				self.loadThumbnail()
 				self.updateSelectionState()
+				self.updateArchiveBadge()
 			}
 		}
 
 		private let imageView = UIImageView()
+		private var archiveBadgeView: UIView?
 
 		override init(frame: CGRect) {
 			super.init(frame: frame)
@@ -1184,6 +1292,10 @@ extension PhotoCollectionViewController: XCollectionViewDelegate {
 				self.imageView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor),
 				self.imageView.bottomAnchor.constraint(equalTo: contentView.bottomAnchor),
 			])
+			
+			// Add tap gesture for archived photos
+			let tapGesture = UITapGestureRecognizer(target: self, action: #selector(handleTap))
+			contentView.addGestureRecognizer(tapGesture)
 		}
 
 		private let loadingSymbol: String = "circle.dotted"
@@ -1277,7 +1389,91 @@ extension PhotoCollectionViewController: XCollectionViewDelegate {
 			super.prepareForReuse()
 			self.imageView.image = nil
 			self.photoRepresentation = nil
+			self.archiveBadgeView?.removeFromSuperview()
+			self.archiveBadgeView = nil
 			// Don't update selection state here - isSelected will be set by collection view
+		}
+		
+		private func updateArchiveBadge() {
+			// Remove existing badge
+			self.archiveBadgeView?.removeFromSuperview()
+			self.archiveBadgeView = nil
+			
+			// Check if we have archive info to display
+			guard let archiveInfo = photoRepresentation?.archiveInfo else { return }
+			
+			// Create appropriate badge based on status
+			var badgeText: String?
+			var badgeColor: UIColor?
+			
+			if let retrieval = archiveInfo.retrieval {
+				switch retrieval.status {
+				case .pending, .inProgress:
+					badgeText = "⏳"
+					badgeColor = .orange
+				case .completed:
+					badgeText = "✨"
+					badgeColor = .systemYellow
+				case .failed:
+					badgeText = "⚠️"
+					badgeColor = .systemRed
+				}
+			} else if archiveInfo.isPinned {
+				badgeText = "⭐"
+				badgeColor = .systemYellow
+			} else if !archiveInfo.storageClass.isImmediatelyAccessible {
+				badgeText = "❄️"
+				badgeColor = .systemBlue
+			} else if archiveInfo.isExpiringSoon {
+				badgeText = "⚠️"
+				badgeColor = .systemOrange
+			} else if archiveInfo.daysUntilReArchive != nil {
+				badgeText = "✨"
+				badgeColor = .systemYellow
+			}
+			
+			// Create badge if needed
+			guard let text = badgeText else { return }
+			
+			let badge = UILabel()
+			badge.text = text
+			badge.font = .systemFont(ofSize: 14)
+			badge.backgroundColor = badgeColor?.withAlphaComponent(0.9)
+			badge.layer.cornerRadius = 12
+			badge.layer.masksToBounds = true
+			badge.textAlignment = .center
+			badge.translatesAutoresizingMaskIntoConstraints = false
+			
+			contentView.addSubview(badge)
+			self.archiveBadgeView = badge
+			
+			NSLayoutConstraint.activate([
+				badge.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 4),
+				badge.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -4),
+				badge.widthAnchor.constraint(equalToConstant: 24),
+				badge.heightAnchor.constraint(equalToConstant: 24)
+			])
+			
+			// Add dimming effect for archived photos
+			if !archiveInfo.storageClass.isImmediatelyAccessible {
+				imageView.alpha = 0.7
+			} else {
+				imageView.alpha = 1.0
+			}
+		}
+		
+		@objc private func handleTap() {
+			// Check if this is an archived photo that needs retrieval
+			if let archiveInfo = photoRepresentation?.archiveInfo,
+			   !archiveInfo.storageClass.isImmediatelyAccessible {
+				// Find the collection view controller
+				if let collectionView = self.superview?.superview as? UICollectionView,
+				   let viewController = collectionView.delegate as? PhotoCollectionViewController,
+				   let indexPath = collectionView.indexPath(for: self) {
+					print("[PhotoCollectionViewCell] Tap on archived photo, showing retrieval dialog")
+					viewController.handleArchivedPhotoClick(at: indexPath)
+				}
+			}
 		}
 	}
 #endif
@@ -1291,6 +1487,7 @@ struct PhotoCollectionView: XViewControllerRepresentable {
 	var onSelectFolder: ((PhotoReference) -> Void)?
 	var onPhotosLoaded: (([PhotoReference]) -> Void)?
 	var onSelectionChanged: (([PhotoReference]) -> Void)?
+	var onArchivedPhotoClick: ((PhotoReference) -> Void)?
 	#if os(iOS)
 		@Binding var photosCount: Int
 	#endif
@@ -1303,6 +1500,7 @@ struct PhotoCollectionView: XViewControllerRepresentable {
 			controller.onSelectFolder = self.onSelectFolder
 			controller.onPhotosLoadedWithReferences = self.onPhotosLoaded
 			controller.onSelectionChanged = self.onSelectionChanged
+			controller.onArchivedPhotoClick = self.onArchivedPhotoClick
 			return controller
 		}
 
@@ -1311,6 +1509,7 @@ struct PhotoCollectionView: XViewControllerRepresentable {
 			nsViewController.onSelectPhoto = self.onSelectPhoto
 			nsViewController.onSelectFolder = self.onSelectFolder
 			nsViewController.onSelectionChanged = self.onSelectionChanged
+			nsViewController.onArchivedPhotoClick = self.onArchivedPhotoClick
 			// Trigger layout update when settings change
 			nsViewController.updateCollectionViewLayout()
 		}
@@ -1329,6 +1528,7 @@ struct PhotoCollectionView: XViewControllerRepresentable {
 			}
 			controller.onPhotosLoadedWithReferences = self.onPhotosLoaded
 			controller.onSelectionChanged = self.onSelectionChanged
+			controller.onArchivedPhotoClick = self.onArchivedPhotoClick
 			return controller
 		}
 
@@ -1337,6 +1537,7 @@ struct PhotoCollectionView: XViewControllerRepresentable {
 			uiViewController.onSelectPhoto = self.onSelectPhoto
 			uiViewController.onSelectFolder = self.onSelectFolder
 			uiViewController.onSelectionChanged = self.onSelectionChanged
+			uiViewController.onArchivedPhotoClick = self.onArchivedPhotoClick
 			// Trigger layout update when settings change
 			uiViewController.updateCollectionViewLayout()
 		}

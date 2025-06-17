@@ -195,11 +195,8 @@ class S3BackupService: ObservableObject {
 			self.backupStats.thumbnailSize = 0
 			self.backupStats.metadataSize = 0
 
-			// List all objects for the user
-			let userPrefix = "users/\(userId)/"
-
 			// Calculate photo storage
-			let photoPrefix = "\(userPrefix)photos/"
+			let photoPrefix = "photos/\(userId)/"
 			let photoResponse = try await client.listObjectsV2(input: ListObjectsV2Input(
 				bucket: self.bucketName,
 				prefix: photoPrefix
@@ -212,7 +209,7 @@ class S3BackupService: ObservableObject {
 			}
 
 			// Calculate thumbnail storage
-			let thumbPrefix = "\(userPrefix)thumbs/"
+			let thumbPrefix = "thumbnails/\(userId)/"
 			let thumbResponse = try await client.listObjectsV2(input: ListObjectsV2Input(
 				bucket: self.bucketName,
 				prefix: thumbPrefix
@@ -225,7 +222,7 @@ class S3BackupService: ObservableObject {
 			}
 
 			// Calculate metadata storage
-			let metadataPrefix = "\(userPrefix)metadata/"
+			let metadataPrefix = "metadata/\(userId)/"
 			let metadataResponse = try await client.listObjectsV2(input: ListObjectsV2Input(
 				bucket: self.bucketName,
 				prefix: metadataPrefix
@@ -256,7 +253,7 @@ class S3BackupService: ObservableObject {
 		}
 
 		let md5 = self.calculateMD5(for: data)
-		let key = "users/\(userId)/photos/\(md5).dat"
+		let key = "photos/\(userId)/\(md5).dat"
 
 		// Check if already exists
 		do {
@@ -292,7 +289,7 @@ class S3BackupService: ObservableObject {
 	// MARK: - Upload Thumbnail
 
 	func uploadThumbnail(data: Data, md5: String, userId: String) async throws {
-		let key = "users/\(userId)/thumbs/\(md5).dat"
+		let key = "thumbnails/\(userId)/\(md5).dat"
 
 		let putObjectInput = PutObjectInput(
 			body: .data(data),
@@ -308,11 +305,60 @@ class S3BackupService: ObservableObject {
 		// Update stats (thumbnails don't count against quota)
 		self.backupStats.thumbnailSize += Int64(data.count)
 	}
+	
+	// MARK: - Upload Metadata
+	
+	func uploadMetadata(_ metadata: PhotoMetadata, md5: String, userId: String) async throws {
+		let key = "metadata/\(userId)/\(md5).plist"
+		
+		// Encode metadata to plist
+		let encoder = PropertyListEncoder()
+		encoder.outputFormat = .binary
+		let plistData = try encoder.encode(metadata)
+		
+		let putObjectInput = PutObjectInput(
+			body: .data(plistData),
+			bucket: bucketName,
+			contentType: "application/x-plist",
+			key: key,
+			storageClass: .standard // Metadata stays in Standard for quick access
+		)
+		
+		_ = try await self.client.putObject(input: putObjectInput)
+		print("Uploaded metadata: \(md5)")
+		
+		// Update stats
+		self.backupStats.metadataSize += Int64(plistData.count)
+	}
+	
+	// MARK: - Download Metadata
+	
+	func downloadMetadata(md5: String, userId: String) async throws -> PhotoMetadata? {
+		let key = "metadata/\(userId)/\(md5).plist"
+		
+		do {
+			let response = try await client.getObject(input: GetObjectInput(
+				bucket: bucketName,
+				key: key
+			))
+			
+			guard let data = try await response.body?.readData() else {
+				return nil
+			}
+			
+			let decoder = PropertyListDecoder()
+			return try decoder.decode(PhotoMetadata.self, from: data)
+		} catch {
+			// Metadata might not exist for older uploads
+			print("Failed to download metadata for \(md5): \(error)")
+			return nil
+		}
+	}
 
 	// MARK: - Get Photo Info
 
 	func getPhotoInfo(md5: String, userId: String) async throws -> (size: Int64, storageClass: String) {
-		let key = "users/\(userId)/photos/\(md5).dat"
+		let key = "photos/\(userId)/\(md5).dat"
 
 		let response = try await client.headObject(input: HeadObjectInput(
 			bucket: self.bucketName,
@@ -328,7 +374,7 @@ class S3BackupService: ObservableObject {
 	// MARK: - List User Photos
 
 	func listUserPhotos(userId: String) async throws -> [PhotoEntry] {
-		let prefix = "users/\(userId)/photos/"
+		let prefix = "photos/\(userId)/"
 
 		let listObjectsInput = ListObjectsV2Input(
 			bucket: bucketName,
@@ -359,6 +405,165 @@ class S3BackupService: ObservableObject {
 
 		return photos
 	}
+	
+	// MARK: - List Photos with Metadata
+	
+	func listUserPhotosWithMetadata(userId: String) async throws -> [PhotoEntry] {
+		// Get photos and metadata in parallel
+		async let photosTask = listUserPhotos(userId: userId)
+		async let metadataTask = listUserMetadata(userId: userId)
+		
+		var photos = try await photosTask
+		let metadataDict = try await metadataTask
+		
+		// Attach metadata to photos
+		for i in photos.indices {
+			if let metadata = metadataDict[photos[i].md5] {
+				photos[i].metadata = metadata
+			}
+		}
+		
+		return photos
+	}
+	
+	// MARK: - List User Metadata
+	
+	func listUserMetadata(userId: String) async throws -> [String: PhotoMetadata] {
+		let prefix = "metadata/\(userId)/"
+		var metadataDict: [String: PhotoMetadata] = [:]
+		var continuationToken: String? = nil
+		
+		repeat {
+			let listObjectsInput = ListObjectsV2Input(
+				bucket: bucketName,
+				continuationToken: continuationToken,
+				prefix: prefix
+			)
+			
+			let response = try await client.listObjectsV2(input: listObjectsInput)
+			
+			// Process metadata files in parallel
+			await withTaskGroup(of: (String, PhotoMetadata?).self) { group in
+				for object in response.contents ?? [] {
+					guard let key = object.key else { continue }
+					
+					// Extract MD5 from key
+					let md5 = key
+						.replacingOccurrences(of: prefix, with: "")
+						.replacingOccurrences(of: ".plist", with: "")
+					
+					group.addTask {
+						let metadata = try? await self.downloadMetadata(md5: md5, userId: userId)
+						return (md5, metadata)
+					}
+				}
+				
+				// Collect results
+				for await (md5, metadata) in group {
+					if let metadata = metadata {
+						metadataDict[md5] = metadata
+					}
+				}
+			}
+			
+			continuationToken = response.nextContinuationToken
+		} while continuationToken != nil
+		
+		return metadataDict
+	}
+	
+	// MARK: - Restore Operations
+	
+	/// Initiate restore for an archived photo
+	func restorePhoto(md5: String, userId: String, rushDelivery: Bool = false) async throws {
+		let key = "photos/\(userId)/\(md5).dat"
+		
+		// Create restore request
+		let input = RestoreObjectInput(
+			bucket: bucketName,
+			key: key,
+			restoreRequest: S3ClientTypes.RestoreRequest(
+				days: 30, // Keep restored for 30 days
+				glacierJobParameters: S3ClientTypes.GlacierJobParameters(
+					tier: rushDelivery ? .expedited : .standard
+				)
+			)
+		)
+		
+		do {
+			_ = try await client.restoreObject(input: input)
+			print("[S3BackupService] Restore initiated for \(key)")
+		} catch {
+			// Check if already restored/restoring
+			if error.localizedDescription.contains("RestoreAlreadyInProgress") {
+				print("[S3BackupService] Restore already in progress for \(key)")
+				return
+			}
+			throw error
+		}
+	}
+	
+	/// Check restore status for a photo
+	func checkRestoreStatus(md5: String, userId: String) async throws -> RestoreStatus {
+		let key = "photos/\(userId)/\(md5).dat"
+		
+		let input = HeadObjectInput(
+			bucket: bucketName,
+			key: key
+		)
+		
+		let response = try await client.headObject(input: input)
+		
+		// Parse restore header
+		if let restore = response.restore {
+			if restore.contains("ongoing-request=\"true\"") {
+				// Extract expiry time if available
+				if let expiryRange = restore.range(of: "expiry-date=\"([^\"]+)\"", options: .regularExpression),
+				   let dateString = restore[expiryRange].split(separator: "\"").last {
+					let formatter = ISO8601DateFormatter()
+					if let expiryDate = formatter.date(from: String(dateString)) {
+						return .inProgress(estimatedCompletion: expiryDate)
+					}
+				}
+				return .inProgress(estimatedCompletion: nil)
+			} else if restore.contains("ongoing-request=\"false\"") {
+				// Extract expiry date
+				if let expiryRange = restore.range(of: "expiry-date=\"([^\"]+)\"", options: .regularExpression),
+				   let dateString = restore[expiryRange].split(separator: "\"").last {
+					let formatter = ISO8601DateFormatter()
+					if let expiryDate = formatter.date(from: String(dateString)) {
+						return .completed(expiresAt: expiryDate)
+					}
+				}
+				return .completed(expiresAt: nil)
+			}
+		}
+		
+		// Check storage class
+		if let storageClass = response.storageClass,
+		   (storageClass == .deepArchive || storageClass == .glacier) {
+			return .notStarted
+		}
+		
+		return .available
+	}
+	
+	/// Batch restore multiple photos
+	func restorePhotos(md5s: [String], userId: String, rushDelivery: Bool = false) async throws {
+		var errors: [Error] = []
+		
+		for md5 in md5s {
+			do {
+				try await restorePhoto(md5: md5, userId: userId, rushDelivery: rushDelivery)
+			} catch {
+				errors.append(error)
+			}
+		}
+		
+		if !errors.isEmpty {
+			throw S3BackupError.batchRestoreFailed(errors: errors)
+		}
+	}
 }
 
 // MARK: - Supporting Types
@@ -368,12 +573,21 @@ struct PhotoEntry {
 	let size: Int64
 	let lastModified: Date
 	let storageClass: String
+	var metadata: PhotoMetadata?
+}
+
+enum RestoreStatus {
+	case notStarted
+	case inProgress(estimatedCompletion: Date?)
+	case completed(expiresAt: Date?)
+	case available // Not archived, immediately available
 }
 
 enum S3BackupError: Error, LocalizedError {
 	case credentialsNotFound
 	case uploadFailed
 	case photoNotFound
+	case batchRestoreFailed(errors: [Error])
 
 	var errorDescription: String? {
 		switch self {
@@ -383,6 +597,8 @@ enum S3BackupError: Error, LocalizedError {
 			"Failed to upload file to S3"
 		case .photoNotFound:
 			"Photo not found in S3"
+		case .batchRestoreFailed(let errors):
+			"Failed to restore \(errors.count) photos"
 		}
 	}
 }

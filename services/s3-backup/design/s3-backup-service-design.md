@@ -1,8 +1,8 @@
 # S3 Backup Service Design (Simplified)
 
-Version: 0.2.0
-Date: June 15, 2025
-Status: Draft
+Version: 0.3.0
+Date: June 16, 2025
+Status: Implemented (POC)
 Philosophy: Start simple, evolve as needed
 
 ## Table of Contents
@@ -96,20 +96,17 @@ Photos are stored using content-based addressing with MD5 hashes:
 
 ```
 s3://photolala/
-├── users/
+├── photos/
 │   └── {user-id}/
-│       ├── photos/
-│       │   └── {md5}.dat           # Original photo
-│       ├── thumbs/
-│       │   └── {md5}.dat           # Thumbnail image
-│       ├── metadata/
-│       │   └── {md5}.plist         # Photo metadata
-│       └── catalogs/               # Browse catalogs
-│           ├── 2024/
-│           │   └── january.plist   # Monthly catalog
-│           └── recent.plist        # Last 30 days
+│       └── {md5}.dat           # Original photo → Deep Archive after 180 days
+├── thumbnails/
+│   └── {user-id}/
+│       └── {md5}.dat           # Thumbnail → Intelligent-Tiering immediately
+├── metadata/
+│   └── {user-id}/
+│       └── {md5}.plist         # Photo metadata → Always Standard
 └── service/
-    └── config.plist               # Service configuration
+    └── config.plist            # Service configuration
 
 
 ### Benefits of MD5 Structure
@@ -148,23 +145,29 @@ class PhotoLabel {
 
 ## Storage Class Strategy
 
-### Cost-Optimized Storage Tiers
+### Universal 180-Day Archive Policy
 
-Optimized storage strategy for cost-effective long-term backup:
+Simple, universal storage strategy for all users:
 
-- **STANDARD_IA**: Photos from the last 2 years
-  - Quick access for recent memories
-  - $0.004/GB per month ($4/TB/month)
-- **DEEP_ARCHIVE**: Photos older than 2 years  
+- **STANDARD**: Photos from the last 180 days (6 months)
+  - Instant access for recent memories
+  - $0.023/GB per month
+- **DEEP_ARCHIVE**: Photos older than 180 days
   - Long-term preservation at minimal cost
   - $0.00099/GB per month ($0.99/TB/month)
-  - 88% cost savings vs STANDARD_IA
+  - 95% cost savings vs STANDARD
+- **INTELLIGENT_TIERING**: All thumbnails
+  - Automatic optimization based on access patterns
+  - $0.0125/GB per month
+- **STANDARD**: All metadata
+  - Always instant access for search/browsing
+  - $0.023/GB per month (negligible due to small size)
 
-#### Cost Example (100,000 photos = 1TB)
-- Recent photos (STANDARD_IA): $48/year
-- Archived photos (DEEP_ARCHIVE): $12/year
-- Thumbnails (4-5GB in STANDARD): $12/year
-- Blended cost for typical user: ~$20-30/year
+#### Cost Example (1TB photos + thumbnails + metadata)
+- Photos: ~$1.10/month (mostly in Deep Archive)
+- Thumbnails: ~$0.50/month (Intelligent-Tiering)
+- Metadata: ~$0.23/month (Standard)
+- Total: ~$1.83/month per TB
 
 ### Deep Archive UX Design
 
@@ -233,7 +236,7 @@ See [Deep Archive UX Stories](./deep-archive-ux-stories.md) for detailed user jo
 2. For each photo:
    - Calculate MD5 hash
    - Check if already uploaded (via catalog)
-   - Extract EXIF metadata
+   - Extract EXIF metadata (using PhotoManager)
    - Generate thumbnail (using existing app standards: 256px min, 512px max)
    - Upload: photo → thumbnail → metadata
    - Trigger Lambda to update catalog

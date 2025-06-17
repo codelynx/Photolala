@@ -89,6 +89,11 @@ class S3BackupManager: ObservableObject {
 				try await s3Service.uploadThumbnail(data: thumbnailData, md5: md5, userId: userId)
 			}
 		}
+		
+		// Extract and upload metadata
+		if let metadata = try? await PhotoManager.shared.metadata(for: photoRef) {
+			try await s3Service.uploadMetadata(metadata, md5: md5, userId: userId)
+		}
 
 		print("Successfully uploaded: \(photoRef.filename)")
 	}

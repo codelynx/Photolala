@@ -20,6 +20,8 @@ struct PhotoBrowserView: View {
 	@State private var showingS3UploadProgress = false
 	@State private var showingSignInPrompt = false
 	@State private var showingUpgradePrompt = false
+	@State private var archivedPhotoForRetrieval: PhotoReference?
+	@State private var showingRetrievalDialog = false
 	@StateObject private var s3BackupManager = S3BackupManager.shared
 	@StateObject private var identityManager = IdentityManager.shared
 
@@ -59,6 +61,18 @@ struct PhotoBrowserView: View {
 			.sheet(isPresented: self.$showingUpgradePrompt) {
 				SubscriptionView()
 			}
+			.sheet(isPresented: self.$showingRetrievalDialog) {
+				if let photo = archivedPhotoForRetrieval,
+				   let archiveInfo = photo.archiveInfo {
+					PhotoRetrievalView(
+						photoReference: photo,
+						archiveInfo: archiveInfo,
+						isPresented: self.$showingRetrievalDialog
+					)
+					.environmentObject(s3BackupManager)
+					.environmentObject(identityManager)
+				}
+			}
 		#else
 			self.collectionContent
 				.navigationDestination(item: self.$selectedPhotoNavigation) { navigation in
@@ -70,6 +84,19 @@ struct PhotoBrowserView: View {
 				}
 				.sheet(isPresented: self.$showingHelp) {
 					HelpView()
+				}
+				.sheet(isPresented: self.$showingRetrievalDialog) {
+					if let photo = archivedPhotoForRetrieval,
+					   let archiveInfo = photo.archiveInfo {
+						PhotoRetrievalView(
+							photoReference: photo,
+							archiveInfo: archiveInfo,
+							selectedPhotos: self.selectedPhotos,
+							isPresented: self.$showingRetrievalDialog
+						)
+						.environmentObject(s3BackupManager)
+						.environmentObject(identityManager)
+					}
 				}
 				.onReceive(NotificationCenter.default.publisher(for: .showHelp)) { _ in
 					self.showingHelp = true
@@ -87,9 +114,17 @@ struct PhotoBrowserView: View {
 					onSelectPhoto: self.handlePhotoSelection,
 					onPhotosLoaded: { photos in
 						self.allPhotos = photos
+						// Load archive status for all photos
+						Task {
+							await self.loadArchiveStatus(for: photos)
+						}
 					},
 					onSelectionChanged: { photos in
 						self.selectedPhotos = photos
+					},
+					onArchivedPhotoClick: { photo in
+						self.archivedPhotoForRetrieval = photo
+						self.showingRetrievalDialog = true
 					},
 					photosCount: self.$photosCount
 				)
@@ -101,9 +136,17 @@ struct PhotoBrowserView: View {
 					onPhotosLoaded: { photos in
 						self.allPhotos = photos
 						self.photosCount = photos.count
+						// Load archive status for all photos
+						Task {
+							await self.loadArchiveStatus(for: photos)
+						}
 					},
 					onSelectionChanged: { photos in
 						self.selectedPhotos = photos
+					},
+					onArchivedPhotoClick: { photo in
+						self.archivedPhotoForRetrieval = photo
+						self.showingRetrievalDialog = true
 					}
 				)
 			#endif
@@ -281,7 +324,7 @@ struct PhotoBrowserView: View {
 					#endif
 
 					// S3 Backup button
-					if !self.selectedPhotos.isEmpty {
+					if !self.selectedPhotos.isEmpty && FeatureFlags.isS3BackupEnabled {
 						Button(action: self.backupSelectedPhotos) {
 							Label("Backup", systemImage: "icloud.and.arrow.up")
 						}
@@ -420,6 +463,35 @@ struct PhotoBrowserView: View {
 					// Show error
 				}
 			}
+		}
+	}
+	
+	private func loadArchiveStatus(for photos: [PhotoReference]) async {
+		// Only load if S3 backup is configured and user is signed in
+		guard s3BackupManager.isConfigured,
+		      let userId = identityManager.currentUser?.appleUserID else { return }
+		
+		print("[PhotoBrowserView] Loading archive status for \(photos.count) photos")
+		
+		// Load archive status in batches to avoid overwhelming the API
+		let batchSize = 50
+		guard let s3Service = s3BackupManager.s3Service else { return }
+		
+		for batch in photos.chunked(into: batchSize) {
+			await PhotoManager.shared.loadArchiveStatus(
+				for: batch,
+				s3Service: s3Service,
+				userId: userId
+			)
+		}
+	}
+}
+
+// Helper extension for array chunking
+extension Array {
+	func chunked(into size: Int) -> [[Element]] {
+		return stride(from: 0, to: count, by: size).map {
+			Array(self[$0..<Swift.min($0 + size, count)])
 		}
 	}
 }

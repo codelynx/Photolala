@@ -8,7 +8,7 @@ Start simple. Add complexity only when needed.
 
 A Photolala-managed cloud backup service using AWS S3 with:
 - MD5-based deduplication
-- Cost-optimized storage (STANDARD_IA → DEEP_ARCHIVE)
+- Universal 180-day archive policy (STANDARD → DEEP_ARCHIVE)
 - Browse via thumbnails without downloading originals
 - Tied to Apple ID with subscription tiers
 
@@ -19,13 +19,19 @@ A Photolala-managed cloud backup service using AWS S3 with:
   - Identity management design
   - Cross-platform identity strategy
   - Pricing and storage optimization
+  - Usage tracking design
 - `implementation/` - Technical implementation details
   - AWS SDK Swift credentials handling
+  - Usage tracking MVP approach
+  - CloudWatch monitoring setup
+  - Monitoring setup checklist
+  - Next steps and priorities
 - `research/` - Background research
   - Game industry identity patterns
 - `requirements/` - What we're building (and what we're NOT)
 - `api/` - API design (for later)
 - `security/` - Security notes
+- Session summaries and reviews
 
 ## Current Status
 
@@ -38,17 +44,24 @@ A Photolala-managed cloud backup service using AWS S3 with:
 - Subscription tier definitions
 - Storage quota enforcement
 - User interface for auth flow
+- StoreKit 2 integration for IAP
+- Archive retrieval UI with restore dialog
+- S3 RestoreObject API integration
+- Metadata backup system (binary plist)
+- IAP Developer Tools (consolidated UI)
+- Local receipt validation (StoreKit 2)
+- Usage tracking design (client-side approach)
+- CloudWatch monitoring design
 
 ### 🚧 In Progress
-- StoreKit 2 integration for IAP
-- Backend services for user management
+- Usage tracking UI implementation
+- CloudWatch monitoring setup
 - Production AWS credential handling
 
 ### ❌ Not Started
-- Subscription purchase flow
-- Usage tracking persistence
-- Deep Archive lifecycle
-- Family sharing
+- Backend services (deferred - not needed for MVP)
+- S3 lifecycle rules configuration
+- Family sharing implementation
 
 ## Phase 1 Goals (MVP)
 
@@ -82,19 +95,21 @@ A Photolala-managed cloud backup service using AWS S3 with:
 
 ## Key Features
 
-### MD5-Based Storage
+### MD5-Based Storage (New Structure)
 ```
-s3://photolala/users/{user-id}/photos/{md5}.dat
-s3://photolala/users/{user-id}/thumbs/{md5}.dat
-s3://photolala/users/{user-id}/metadata/{md5}.plist
+s3://photolala/photos/{user-id}/{md5}.dat
+s3://photolala/thumbnails/{user-id}/{md5}.dat
+s3://photolala/metadata/{user-id}/{md5}.plist
 ```
 
-### Subscription Tiers
+### Subscription Tiers (Photo Storage)
 - Free: 5 GB
-- Basic: 100 GB ($2.99/mo)
-- Standard: 1 TB ($9.99/mo)
-- Pro: 5 TB ($39.99/mo)
-- Family: 10 TB ($69.99/mo)
+- Starter: 500 GB ($0.99/mo)
+- Essential: 1 TB ($1.99/mo)
+- Plus: 2 TB ($2.99/mo)
+- Family: 5 TB ($5.99/mo)
+
+*Note: Thumbnails and metadata don't count against quota*
 
 ### Next Steps
 
@@ -102,7 +117,8 @@ s3://photolala/users/{user-id}/metadata/{md5}.plist
 2. ~~Build MD5 calculation pipeline~~ ✅
 3. ~~Create thumbnail generation~~ ✅
 4. ~~Implement Sign in with Apple~~ ✅
-5. Add StoreKit 2 for subscriptions
-6. Build backend services
-7. Design Deep Archive UX
-8. Production deployment
+5. ~~Add StoreKit 2 for subscriptions~~ ✅
+6. ~~Design Deep Archive UX~~ ✅
+7. ~~Implement metadata backup~~ ✅
+8. Build backend services
+9. Production deployment

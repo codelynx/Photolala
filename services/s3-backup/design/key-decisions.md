@@ -4,10 +4,9 @@
 
 ### MD5-Based Content Addressing
 ```
-s3://photolala/users/{user-id}/photos/{md5}.dat
-s3://photolala/users/{user-id}/thumbs/{md5}.dat  
-s3://photolala/users/{user-id}/metadata/{md5}.plist
-s3://photolala/users/{user-id}/catalogs/{date-range}.plist
+s3://photolala/photos/{user-id}/{md5}.dat
+s3://photolala/thumbnails/{user-id}/{md5}.dat  
+s3://photolala/metadata/{user-id}/{md5}.plist
 ```
 
 **Benefits:**
@@ -20,19 +19,20 @@ s3://photolala/users/{user-id}/catalogs/{date-range}.plist
 
 ## Cost Optimization Strategy
 
-### Storage Classes by Age & Importance
+### Universal 180-Day Archive Policy
 
-| Photo Type | Storage Class | Monthly Cost/TB | Access Time | Size Estimate |
-|------------|--------------|-----------------|-------------|---------------|
-| < 2 years | STANDARD_IA | $4.00 | Instant | 100% |
-| > 2 years | DEEP_ARCHIVE | $0.99 | 12-48 hours | 100% |
-| Thumbnails | STANDARD | $23.00 | Instant | 0.4-0.5% |
-| Catalogs | STANDARD | $23.00 | Instant | < 0.01% |
+| Content Type | Storage Class | Lifecycle | Monthly Cost/TB | Access Time |
+|------------|--------------|-----------|-----------------|-------------|
+| Photos < 180 days | STANDARD | - | $23.00 | Instant |
+| Photos > 180 days | DEEP_ARCHIVE | Auto-transition | $0.99 | 12-48 hours |
+| Thumbnails | INTELLIGENT_TIERING | Immediate | $12.50 | Instant |
+| Metadata | STANDARD | Always | $23.00 | Instant |
 
-**Storage Examples:**
-- 1TB of photos → 4-5GB thumbnails
-- 50GB of photos after 2 years = $0.05/month (DEEP_ARCHIVE)
-- Thumbnail storage for 1TB = $0.10/month
+**Cost Example (1TB):**
+- Photos: ~$1.10/month (mostly Deep Archive)
+- Thumbnails (41GB): ~$0.50/month 
+- Metadata (10GB): ~$0.23/month
+- Total: ~$1.83/month
 
 ### Smart Browsing
 1. Always keep thumbnails in STANDARD storage
@@ -88,15 +88,17 @@ s3://photolala/users/{user-id}/catalogs/{date-range}.plist
 
 ## Pricing Strategy
 
-### Tier Structure (Post-Apple 30% Cut)
+### Tier Structure (Universal 180-Day Archive)
 
-| Tier | Price | Storage | Storage Strategy | AWS Cost | Net Margin |
-|------|-------|---------|------------------|----------|------------|
-| Free | $0 | 5GB | DEEP_ARCHIVE only | $0.01 | -100% |
-| Starter | $0.99 | 50GB | DEEP_ARCHIVE only | $0.08 | 88% |
-| **Essential** | **$1.99** | **200GB** | **6mo STANDARD_IA + DEEP** | **$0.45** | **68%** |
-| Plus | $3.99 | 500GB | 1yr STANDARD_IA + DEEP | $1.20 | 58% |
-| Family | $5.99 | 1TB | 2yr STANDARD_IA + Smart | $2.50 | 42% |
+| Tier | Price | Photo Storage | Total Storage | Archive Policy | Margin |
+|------|-------|---------------|---------------|----------------|--------|
+| Free | $0 | 5GB | ~5.2GB | 180 days | - |
+| Starter | $0.99 | 500GB | ~525GB | 180 days | 45% |
+| Essential | $1.99 | 1TB | ~1.08TB | 180 days | 22% |
+| Plus | $2.99 | 2TB | ~2.15TB | 180 days | 40% |
+| Family | $5.99 | 5TB | ~5.25TB | 180 days | 35% |
+
+**Key Change:** All tiers use the same 180-day archive policy. Differentiation is by storage quota only.
 
 ### Key Pricing Decisions
 1. **Aggressive use of DEEP_ARCHIVE** for cost control

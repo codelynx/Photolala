@@ -101,12 +101,19 @@ With the StoreKit configuration file:
 
 ## Debug Tools
 
-### IAP Test View
-Access via View → IAP Test... (DEBUG builds only)
-- Shows loaded products
-- Displays purchase status
-- Restore purchases button
-- View receipt data
+### IAP Developer Tools (NEW - Consolidated Interface)
+Access via Photolala → Developer Tools → IAP Developer Tools... (DEBUG builds only)
+
+**Features:**
+- **Status Tab**: View user status, IAP status, and debug info
+- **Products Tab**: See all available products and purchase status
+- **Actions Tab**: Quick actions for testing including:
+  - Open Subscription View
+  - Refresh Products
+  - Restore Purchases
+  - Check Transaction Status
+  - View Receipt (with detailed explanations)
+  - Print Debug Info to console
 
 ### Console Logging
 Watch Xcode console for:
@@ -114,6 +121,7 @@ Watch Xcode console for:
 - Transaction states
 - Receipt validation
 - Error messages
+- Debug output from "Print Debug Info" action
 
 ## Common Issues
 
