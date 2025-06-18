@@ -144,9 +144,11 @@ actor S3CatalogSyncService {
 		// 1. Check manifest ETag first (HeadObject - no download)
 		let manifestKey = "catalogs/\(userId)/.photolala"
 		
-		let manifestNeedsUpdate = try await checkETag(key: manifestKey)
-		
-		guard manifestNeedsUpdate else {
+		let manifestNeedsUpdate: Bool
+		do {
+			manifestNeedsUpdate = try await checkETag(key: manifestKey)
+		} catch {
+			// If we can't check the ETag (e.g., network error), throw timeout
 			throw SyncError.networkTimeout
 		}
 		

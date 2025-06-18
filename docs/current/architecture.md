@@ -1,6 +1,6 @@
 # Photolala Architecture
 
-Last Updated: June 14, 2025
+Last Updated: June 18, 2025
 
 ## Overview
 
@@ -34,6 +34,24 @@ Photolala is a cross-platform photo browser application built with SwiftUI, supp
 - State maintained by UICollectionView/NSCollectionView
 - Selection changes communicated via callbacks
 
+#### S3Photo
+- Represents a photo in S3 storage
+- Combines catalog entry with S3 metadata
+- Properties: md5, filename, size, dates, dimensions
+- Computed keys for S3 paths
+- Storage class awareness (Standard/Deep Archive)
+
+#### PhotoMetadata
+- EXIF and file metadata
+- Codable for plist serialization
+- Camera info, GPS coordinates, dates
+- Original filename preservation
+
+#### ArchiveStatus
+- Deep Archive restoration states
+- Tracks restoration progress
+- Expiration dates for restored files
+
 ### Services
 
 #### PhotoManager (Singleton)
@@ -46,6 +64,49 @@ Photolala is a cross-platform photo browser application built with SwiftUI, supp
 - Scans directories for supported image formats
 - Creates PhotoReference objects
 - Filters: jpg, jpeg, png, heic, heif, tiff, bmp, gif, webp
+
+#### S3BackupService
+- Uploads photos to S3 with Deep Archive storage
+- Generates and uploads thumbnails (Standard storage)
+- Stores metadata in binary plist format
+- File naming: `{md5}.dat` for universal format support
+- Path structure: `photos/{userId}/`, `thumbnails/{userId}/`, `metadata/{userId}/`
+
+#### S3BackupManager (Singleton)
+- Manages S3BackupService lifecycle
+- Tracks upload progress and storage usage
+- Handles quota enforcement
+- AWS credentials from Keychain/environment
+
+#### S3CatalogGenerator
+- Creates 16-shard .photolala catalog format
+- Shards based on MD5 hash prefix (0-f)
+- CSV format: md5,filename,size,photoDate,modified,width,height
+- Enables browsing without ListObjects calls
+
+#### S3CatalogSyncService
+- Syncs catalog from S3 to local cache
+- Manifest-based change detection
+- Atomic updates for consistency
+- Offline mode support
+
+#### S3DownloadService (Actor)
+- Downloads thumbnails and photos from S3
+- Local caching with LRU eviction
+- Handles Deep Archive restore status
+- Thread-safe with actor isolation
+
+#### IdentityManager (Singleton)
+- Sign in with Apple integration
+- User authentication state
+- Service user ID mapping
+- Keychain persistence
+
+#### IAPManager (Singleton)
+- StoreKit 2 implementation
+- Subscription management
+- Receipt validation
+- Product loading and purchasing
 
 ### Views
 
@@ -72,6 +133,38 @@ Photolala is a cross-platform photo browser application built with SwiftUI, supp
 - Full image display with zoom/pan
 - MagnificationGesture + DragGesture
 - Cross-platform image handling
+
+#### S3BackupTestView
+- Development UI for S3 backup testing
+- Photo upload with PhotosPicker
+- AWS credentials configuration
+- Catalog generation controls
+- DEBUG: Clean up all user data
+
+#### S3PhotoBrowserView
+- Browse photos from S3 catalog
+- Grid layout with thumbnails
+- Offline mode support
+- Thumbnail size options
+- Selection for batch operations
+
+#### AWSCredentialsView
+- AWS access key configuration
+- Secure Keychain storage
+- Connection testing
+- Form-based input
+
+#### PhotoRetrievalView
+- Deep Archive restoration UI
+- Batch selection support
+- Cost estimation display
+- Restoration progress tracking
+
+#### UserAccountView
+- Sign in with Apple UI
+- Subscription status display
+- Account information
+- Sign out functionality
 
 ## Navigation Architecture
 

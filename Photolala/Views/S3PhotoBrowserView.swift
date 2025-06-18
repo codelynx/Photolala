@@ -271,35 +271,20 @@ class S3PhotoBrowserViewModel: ObservableObject {
 		
 		do {
 			// Get user ID from identity manager
-			#if DEBUG
-			// Use hardcoded test user ID for development
-			let userId = "test-user-123"
-			print("DEBUG: Using hardcoded userId: \(userId)")
-			
-			// Generate test catalog if needed
-			try await TestCatalogGenerator.generateTestCatalog(userId: userId)
-			#else
-			// TEMPORARY: For S3 testing, allow both signed-in users and hardcoded ID
-			let userId: String
-			if let signedInUserId = IdentityManager.shared.currentUser?.serviceUserID {
-				userId = signedInUserId
-				print("TESTING: Using signed-in userId: \(userId)")
-			} else {
-				userId = "test-s3-user-001"
-				print("TESTING: Using hardcoded userId: \(userId)")
+			guard let userId = IdentityManager.shared.currentUser?.serviceUserID else {
+				print("ERROR: No signed-in user")
+				throw NSError(domain: "S3PhotoBrowser", code: 401, userInfo: [NSLocalizedDescriptionKey: "Please sign in to view cloud photos"])
 			}
-			#endif
 			
-			#if DEBUG
-			// In debug mode, skip S3 sync and work offline
-			isOfflineMode = true
-			#else
+			print("Using signed-in userId: \(userId)")
+			
 			// Initialize sync service if needed
 			if syncService == nil {
-				let config = try await S3Client.S3ClientConfiguration(
-					region: "us-east-1"
-				)
-				let s3Client = try await S3Client(config: config)
+				// Get S3 client from backup manager (which has credentials)
+				guard let s3Client = await S3BackupManager.shared.getS3Client() else {
+					print("ERROR: S3 client not configured")
+					throw NSError(domain: "S3PhotoBrowser", code: 500, userInfo: [NSLocalizedDescriptionKey: "S3 service not configured"])
+				}
 				syncService = try S3CatalogSyncService(s3Client: s3Client, userId: userId)
 			}
 			
@@ -311,31 +296,13 @@ class S3PhotoBrowserViewModel: ObservableObject {
 			} else {
 				isOfflineMode = true
 			}
-			#endif
 			
 			// Load from cached catalog
-			#if DEBUG
-			// In debug mode, load catalog directly
-			let cacheDir = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first!
-			let appCacheDir = cacheDir.appendingPathComponent("com.electricwoods.photolala")
-			let catalogDir = appCacheDir.appendingPathComponent("cloud.s3").appendingPathComponent(userId)
-			
-			catalogService = PhotolalaCatalogService(catalogURL: catalogDir)
-			
-			// Load master catalog
-			let masterCatalogURL = catalogDir.appendingPathComponent("master.photolala.json")
-			if FileManager.default.fileExists(atPath: masterCatalogURL.path) {
-				let masterData = try Data(contentsOf: masterCatalogURL)
-				s3MasterCatalog = try JSONDecoder().decode(S3MasterCatalog.self, from: masterData)
-			}
-			print("DEBUG: Loaded catalog from \(catalogDir.path)")
-			#else
 			if let syncService = syncService {
 				catalogService = try await syncService.loadCachedCatalog()
 				s3MasterCatalog = try await syncService.loadS3MasterCatalog()
 				print("DEBUG: Loaded catalog service and master catalog")
 			}
-			#endif
 			
 			// Build photo list from catalog
 			guard let catalog = catalogService else { 

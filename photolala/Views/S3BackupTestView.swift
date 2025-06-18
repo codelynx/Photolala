@@ -17,24 +17,26 @@ struct S3BackupTestView: View {
 	@State private var isGeneratingCatalog = false
 	@State private var catalogStatus = ""
 	@State private var isGeneratingThumbnails = false
+	@State private var showAWSCredentials = false
 	
-	// TESTING MODE: Allow hardcoded user for S3 testing
-	private let isTestingMode = true
-	private let testUserId = "test-s3-user-001"
+	// Always use Sign in with Apple for both DEBUG and RELEASE
 
 	var body: some View {
 		VStack(spacing: 20) {
 			self.headerSection
 
-			if self.identityManager.isSignedIn || self.isTestingMode {
-				if self.identityManager.isSignedIn {
-					self.userInfoSection
-				} else if self.isTestingMode {
-					self.testingModeSection
+			// Always require Sign in with Apple
+			if self.identityManager.isSignedIn {
+				self.userInfoSection
+				
+				// Check if AWS is configured
+				if !self.backupManager.isConfigured {
+					self.awsConfigurationSection
+				} else {
+					self.uploadSection
+					Divider()
+					self.uploadedPhotosSection
 				}
-				self.uploadSection
-				Divider()
-				self.uploadedPhotosSection
 			} else {
 				self.signInPromptSection
 			}
@@ -48,6 +50,15 @@ struct S3BackupTestView: View {
 		}
 		.sheet(isPresented: self.$showSubscriptionView) {
 			SubscriptionView()
+		}
+		.sheet(isPresented: self.$showAWSCredentials) {
+			NavigationStack {
+				AWSCredentialsView()
+			}
+			.onDisappear {
+				// Refresh configuration after AWS credentials might have been saved
+				self.backupManager.checkConfiguration()
+			}
 		}
 		.task {
 			// Ensure backup manager is configured
@@ -166,27 +177,35 @@ struct S3BackupTestView: View {
 		.padding(40)
 	}
 	
-	private var testingModeSection: some View {
-		VStack(alignment: .leading, spacing: 12) {
-			HStack {
-				Image(systemName: "testtube.2")
-					.font(.title)
-					.foregroundColor(.orange)
-
-				VStack(alignment: .leading) {
-					Text("Testing Mode")
-						.font(.headline)
-					Text("Using test user ID: \(self.testUserId)")
-						.font(.caption)
-						.foregroundColor(.secondary)
-				}
-
-				Spacer()
+	private var awsConfigurationSection: some View {
+		VStack(spacing: 16) {
+			Image(systemName: "exclamationmark.icloud")
+				.font(.system(size: 60))
+				.foregroundColor(.orange)
+			
+			Text("AWS Configuration Required")
+				.font(.title2)
+				.fontWeight(.semibold)
+			
+			Text("To enable cloud backup, you need to configure your AWS credentials.")
+				.font(.body)
+				.foregroundColor(.secondary)
+				.multilineTextAlignment(.center)
+			
+			Button(action: {
+				self.showAWSCredentials = true
+			}) {
+				Label("Configure AWS Credentials", systemImage: "key.fill")
+					.frame(maxWidth: .infinity)
+					.frame(height: 50)
+					.background(Color.orange)
+					.foregroundColor(.white)
+					.cornerRadius(10)
 			}
-			.padding()
-			.background(Color.orange.opacity(0.1))
-			.cornerRadius(12)
+			.buttonStyle(.plain)
 		}
+		.padding()
+		.frame(maxWidth: 400)
 	}
 
 	private var uploadSection: some View {
@@ -258,6 +277,16 @@ struct S3BackupTestView: View {
 					}
 				}
 				.buttonStyle(.bordered)
+				
+				#if DEBUG
+				Button("Clean Up All") {
+					Task {
+						await self.cleanupAllUserData()
+					}
+				}
+				.buttonStyle(.bordered)
+				.foregroundColor(.red)
+				#endif
 			}
 			
 			if !self.catalogStatus.isEmpty {
@@ -327,76 +356,23 @@ struct S3BackupTestView: View {
 
 				self.uploadStatus = "Uploading photo \(index + 1) of \(self.selectedPhotos.count)..."
 
-				// For testing mode, upload directly to S3
-				if self.isTestingMode {
-					// Ensure backup manager is initialized
-					guard await self.backupManager.getS3Client() != nil else {
-						self.uploadStatus = "❌ S3 client not available"
-						self.isUploading = false
-						return
-					}
-					
-					// Get S3 service from backup manager or create new one
-					let s3Service: S3BackupService
-					if let existingService = self.backupManager.s3Service {
-						s3Service = existingService
-					} else {
-						s3Service = try await S3BackupService()
-					}
-					
-					// Use test user ID or signed-in user ID
-					let userId = self.identityManager.currentUser?.serviceUserID ?? self.testUserId
-					
-					// Upload photo with appropriate user ID
-					let md5 = try await s3Service.uploadPhoto(data: data, userId: userId)
-					
-					// Generate and upload thumbnail
-					if let image = XImage(data: data) {
-						let thumbnailSize = CGSize(width: 512, height: 512)
-						let thumbnail: XImage
-						
-						#if os(macOS)
-						let imageSize = image.size
-						let scale = min(thumbnailSize.width / imageSize.width, thumbnailSize.height / imageSize.height)
-						let newSize = CGSize(width: imageSize.width * scale, height: imageSize.height * scale)
-						
-						thumbnail = NSImage(size: newSize)
-						thumbnail.lockFocus()
-						image.draw(in: NSRect(origin: .zero, size: newSize))
-						thumbnail.unlockFocus()
-						#else
-						UIGraphicsBeginImageContextWithOptions(thumbnailSize, false, 0.0)
-						image.draw(in: CGRect(origin: .zero, size: thumbnailSize))
-						thumbnail = UIGraphicsGetImageFromCurrentImageContext()!
-						UIGraphicsEndImageContext()
-						#endif
-						
-						if let thumbnailData = thumbnail.jpegData(compressionQuality: 0.8) {
-							try await s3Service.uploadThumbnail(data: thumbnailData, md5: md5, userId: userId)
-						}
-					}
-					
-					successCount += 1
-				} else {
-					// Use normal flow for signed-in users
-					// Create a temporary photo reference
-					let tempDir = FileManager.default.temporaryDirectory
-					let tempURL = tempDir.appendingPathComponent("temp_photo_\(index).jpg")
-					try data.write(to: tempURL)
+				// Create a temporary photo reference
+				let tempDir = FileManager.default.temporaryDirectory
+				let tempURL = tempDir.appendingPathComponent("temp_photo_\(index).jpg")
+				try data.write(to: tempURL)
 
-					let photoRef = PhotoReference(
-						directoryPath: tempDir.path as NSString,
-						filename: "temp_photo_\(index).jpg"
-					)
+				let photoRef = PhotoReference(
+					directoryPath: tempDir.path as NSString,
+					filename: "temp_photo_\(index).jpg"
+				)
 
-					// Upload using backup manager
-					try await self.backupManager.uploadPhoto(photoRef)
-					
-					// Clean up temp file
-					try? FileManager.default.removeItem(at: tempURL)
-					
-					successCount += 1
-				}
+				// Upload using backup manager
+				try await self.backupManager.uploadPhoto(photoRef)
+				
+				// Clean up temp file
+				try? FileManager.default.removeItem(at: tempURL)
+				
+				successCount += 1
 
 			} catch {
 				print("Failed to upload photo \(index + 1): \(error)")
@@ -417,25 +393,27 @@ struct S3BackupTestView: View {
 		// Clear selection after upload
 		self.selectedPhotos = []
 		
+		// Automatically generate catalog after successful uploads
+		if successCount > 0 {
+			self.catalogStatus = "Generating catalog..."
+			await self.generateCatalogSilently()
+		}
+		
 		// Refresh list and stats
 		await self.loadPhotos()
 		await self.loadUserData()
 	}
 
 	private func loadPhotos() async {
-		// For testing mode, allow loading without sign-in
-		let userId: String
-		if self.identityManager.isSignedIn {
-			userId = self.identityManager.currentUser?.serviceUserID ?? ""
-		} else if self.isTestingMode {
-			userId = self.testUserId
-		} else {
+		// Must be signed in
+		guard self.identityManager.isSignedIn,
+		      let userId = self.identityManager.currentUser?.serviceUserID else {
 			return
 		}
 
 		do {
 			if let service = backupManager.s3Service {
-				// Load photos for the current user (signed-in or test)
+				// Load photos for the current user
 				let photos = try await service.listUserPhotosWithMetadata(
 					userId: userId
 				)
@@ -448,13 +426,7 @@ struct S3BackupTestView: View {
 	}
 
 	private func loadUserData() async {
-		// Skip stats for testing mode without sign-in
-		if !self.identityManager.isSignedIn && self.isTestingMode {
-			// Load photos only
-			await self.loadPhotos()
-			return
-		}
-		
+		// Must be signed in
 		guard self.identityManager.isSignedIn else { return }
 
 		// Load backup stats
@@ -478,13 +450,8 @@ struct S3BackupTestView: View {
 		self.catalogStatus = "Generating catalog..."
 		
 		do {
-			// Use test user ID if in testing mode
-			let userId: String
-			if let signedInUserId = self.identityManager.currentUser?.serviceUserID {
-				userId = signedInUserId
-			} else if self.isTestingMode {
-				userId = self.testUserId
-			} else {
+			// Must be signed in
+			guard let userId = self.identityManager.currentUser?.serviceUserID else {
 				self.catalogStatus = "❌ Not signed in"
 				self.isGeneratingCatalog = false
 				return
@@ -521,14 +488,9 @@ struct S3BackupTestView: View {
 		self.isGeneratingThumbnails = true
 		self.catalogStatus = "Generating thumbnails..."
 		
-		// Use test user ID if in testing mode
-		let userId: String
-		if let signedInUserId = self.identityManager.currentUser?.serviceUserID {
-			userId = signedInUserId
-		} else if self.isTestingMode {
-			userId = self.testUserId
-		} else {
-			self.catalogStatus = "❌ User not signed in"
+		// Must be signed in
+		guard let userId = self.identityManager.currentUser?.serviceUserID else {
+			self.catalogStatus = "❌ Not signed in"
 			self.isGeneratingThumbnails = false
 			return
 		}
@@ -676,6 +638,268 @@ struct S3BackupTestView: View {
 		
 		self.isGeneratingThumbnails = false
 	}
+	
+	private func generateCatalogSilently() async {
+		do {
+			// Must be signed in
+			guard let userId = self.identityManager.currentUser?.serviceUserID else {
+				// Not signed in, skip catalog generation
+				return
+			}
+			
+			// Get S3 client from backup manager
+			guard let s3Client = await backupManager.getS3Client() else {
+				// S3 client not available, skip silently
+				return
+			}
+			
+			// Create catalog generator
+			let generator = S3CatalogGenerator(s3Client: s3Client)
+			
+			// Generate and upload catalog
+			try await generator.generateAndUploadCatalog(for: userId)
+			
+			// Update status briefly to show success
+			self.catalogStatus = "✅ Catalog updated"
+			
+			// Clear status after a short delay
+			try? await Task.sleep(nanoseconds: 2_000_000_000) // 2 seconds
+			self.catalogStatus = ""
+			
+		} catch {
+			// Silently fail - don't show errors for automatic catalog generation
+			print("Failed to generate catalog automatically: \(error)")
+			self.catalogStatus = ""
+		}
+	}
+	
+	#if DEBUG
+	private func cleanupAllUserData() async {
+		// Must be signed in
+		guard let userId = self.identityManager.currentUser?.serviceUserID else {
+			self.catalogStatus = "❌ Not signed in"
+			return
+		}
+		
+		self.catalogStatus = "🗑️ Cleaning up all user data..."
+		
+		do {
+			// Get S3 client
+			guard let s3Client = await self.backupManager.getS3Client() else {
+				self.catalogStatus = "❌ S3 client not available"
+				return
+			}
+			
+			var deletedCount = 0
+			let bucketName = "photolala"
+			
+			// Delete all photos (including all versions if versioning is enabled)
+			let photoPrefix = "photos/\(userId)/"
+			
+			// First, list and delete all object versions
+			var photosVersionIdMarker: String? = nil
+			var photosKeyMarker: String? = nil
+			
+			repeat {
+				let listVersions = try await s3Client.listObjectVersions(input: ListObjectVersionsInput(
+					bucket: bucketName,
+					keyMarker: photosKeyMarker,
+					prefix: photoPrefix,
+					versionIdMarker: photosVersionIdMarker
+				))
+				
+				// Delete all versions
+				if let versions = listVersions.versions, !versions.isEmpty {
+					for version in versions {
+						if let key = version.key, let versionId = version.versionId {
+							_ = try await s3Client.deleteObject(input: DeleteObjectInput(
+								bucket: bucketName,
+								key: key,
+								versionId: versionId
+							))
+							deletedCount += 1
+						}
+					}
+				}
+				
+				// Delete all delete markers
+				if let deleteMarkers = listVersions.deleteMarkers, !deleteMarkers.isEmpty {
+					for marker in deleteMarkers {
+						if let key = marker.key, let versionId = marker.versionId {
+							_ = try await s3Client.deleteObject(input: DeleteObjectInput(
+								bucket: bucketName,
+								key: key,
+								versionId: versionId
+							))
+							deletedCount += 1
+						}
+					}
+				}
+				
+				photosKeyMarker = listVersions.nextKeyMarker
+				photosVersionIdMarker = listVersions.nextVersionIdMarker
+			} while photosKeyMarker != nil
+			
+			// Delete all thumbnails (including all versions)
+			let thumbPrefix = "thumbnails/\(userId)/"
+			var thumbsVersionIdMarker: String? = nil
+			var thumbsKeyMarker: String? = nil
+			
+			repeat {
+				let listVersions = try await s3Client.listObjectVersions(input: ListObjectVersionsInput(
+					bucket: bucketName,
+					keyMarker: thumbsKeyMarker,
+					prefix: thumbPrefix,
+					versionIdMarker: thumbsVersionIdMarker
+				))
+				
+				// Delete all versions
+				if let versions = listVersions.versions, !versions.isEmpty {
+					for version in versions {
+						if let key = version.key, let versionId = version.versionId {
+							_ = try await s3Client.deleteObject(input: DeleteObjectInput(
+								bucket: bucketName,
+								key: key,
+								versionId: versionId
+							))
+							deletedCount += 1
+						}
+					}
+				}
+				
+				// Delete all delete markers
+				if let deleteMarkers = listVersions.deleteMarkers, !deleteMarkers.isEmpty {
+					for marker in deleteMarkers {
+						if let key = marker.key, let versionId = marker.versionId {
+							_ = try await s3Client.deleteObject(input: DeleteObjectInput(
+								bucket: bucketName,
+								key: key,
+								versionId: versionId
+							))
+							deletedCount += 1
+						}
+					}
+				}
+				
+				thumbsKeyMarker = listVersions.nextKeyMarker
+				thumbsVersionIdMarker = listVersions.nextVersionIdMarker
+			} while thumbsKeyMarker != nil
+			
+			// Delete all metadata (including all versions)
+			let metadataPrefix = "metadata/\(userId)/"
+			var metadataVersionIdMarker: String? = nil
+			var metadataKeyMarker: String? = nil
+			
+			repeat {
+				let listVersions = try await s3Client.listObjectVersions(input: ListObjectVersionsInput(
+					bucket: bucketName,
+					keyMarker: metadataKeyMarker,
+					prefix: metadataPrefix,
+					versionIdMarker: metadataVersionIdMarker
+				))
+				
+				// Delete all versions
+				if let versions = listVersions.versions, !versions.isEmpty {
+					for version in versions {
+						if let key = version.key, let versionId = version.versionId {
+							_ = try await s3Client.deleteObject(input: DeleteObjectInput(
+								bucket: bucketName,
+								key: key,
+								versionId: versionId
+							))
+							deletedCount += 1
+						}
+					}
+				}
+				
+				// Delete all delete markers
+				if let deleteMarkers = listVersions.deleteMarkers, !deleteMarkers.isEmpty {
+					for marker in deleteMarkers {
+						if let key = marker.key, let versionId = marker.versionId {
+							_ = try await s3Client.deleteObject(input: DeleteObjectInput(
+								bucket: bucketName,
+								key: key,
+								versionId: versionId
+							))
+							deletedCount += 1
+						}
+					}
+				}
+				
+				metadataKeyMarker = listVersions.nextKeyMarker
+				metadataVersionIdMarker = listVersions.nextVersionIdMarker
+			} while metadataKeyMarker != nil
+			
+			// Delete all catalog files (including all versions)
+			let catalogPrefix = "catalogs/\(userId)/"
+			var catalogVersionIdMarker: String? = nil
+			var catalogKeyMarker: String? = nil
+			
+			repeat {
+				let listVersions = try await s3Client.listObjectVersions(input: ListObjectVersionsInput(
+					bucket: bucketName,
+					keyMarker: catalogKeyMarker,
+					prefix: catalogPrefix,
+					versionIdMarker: catalogVersionIdMarker
+				))
+				
+				// Delete all versions
+				if let versions = listVersions.versions, !versions.isEmpty {
+					for version in versions {
+						if let key = version.key, let versionId = version.versionId {
+							_ = try await s3Client.deleteObject(input: DeleteObjectInput(
+								bucket: bucketName,
+								key: key,
+								versionId: versionId
+							))
+							deletedCount += 1
+						}
+					}
+				}
+				
+				// Delete all delete markers
+				if let deleteMarkers = listVersions.deleteMarkers, !deleteMarkers.isEmpty {
+					for marker in deleteMarkers {
+						if let key = marker.key, let versionId = marker.versionId {
+							_ = try await s3Client.deleteObject(input: DeleteObjectInput(
+								bucket: bucketName,
+								key: key,
+								versionId: versionId
+							))
+							deletedCount += 1
+						}
+					}
+				}
+				
+				catalogKeyMarker = listVersions.nextKeyMarker
+				catalogVersionIdMarker = listVersions.nextVersionIdMarker
+			} while catalogKeyMarker != nil
+			
+			// Clear local cache
+			let cacheDir = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first!
+			let appCacheDir = cacheDir.appendingPathComponent("com.electricwoods.photolala")
+			let s3CacheDir = appCacheDir.appendingPathComponent("cloud.s3").appendingPathComponent(userId)
+			try? FileManager.default.removeItem(at: s3CacheDir)
+			
+			self.catalogStatus = "✅ Cleaned up \(deletedCount) files from S3"
+			
+			// Refresh the list
+			self.uploadedPhotos = []
+			
+			// Force refresh backup stats
+			self.currentStats = nil
+			await self.loadPhotos()
+			await self.loadUserData()
+			
+			// Clear status after delay
+			try? await Task.sleep(nanoseconds: 3_000_000_000) // 3 seconds
+			self.catalogStatus = ""
+			
+		} catch {
+			self.catalogStatus = "❌ Cleanup failed: \(error.localizedDescription)"
+		}
+	}
+	#endif
 }
 
 #Preview {
