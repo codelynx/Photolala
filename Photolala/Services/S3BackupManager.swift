@@ -86,7 +86,11 @@ class S3BackupManager: ObservableObject {
 
 		// Generate and upload thumbnail
 		if let thumbnail = try? await PhotoManager.shared.thumbnail(for: photoRef) {
-			if let thumbnailData = thumbnail.jpegData(compressionQuality: 0.8) {
+			// Convert to data on main actor to avoid sendable warnings
+			let thumbnailData = await MainActor.run {
+				thumbnail.jpegData(compressionQuality: 0.8)
+			}
+			if let thumbnailData {
 				try await s3Service.uploadThumbnail(data: thumbnailData, md5: md5, userId: userId)
 			}
 		}

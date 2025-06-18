@@ -808,6 +808,20 @@ extension PhotoCollectionViewController: XCollectionViewDelegate {
 				}
 			}
 		}
+		
+		@objc private func contextMenuAddToBackupQueue(_ sender: NSMenuItem) {
+			guard let photos = sender.representedObject as? [PhotoReference] else { return }
+			
+			Task { @MainActor in
+				for photo in photos {
+					BackupQueueManager.shared.addToQueue(photo)
+				}
+				
+				// Show feedback
+				let message = photos.count == 1 ? "Added 1 photo to backup queue" : "Added \(photos.count) photos to backup queue"
+				print("[PhotoCollectionViewController] \(message)")
+			}
+		}
 	#endif
 
 	#if os(macOS)
@@ -964,9 +978,12 @@ extension PhotoCollectionViewController: XCollectionViewDelegate {
 				self.loadThumbnail()
 				self.updateSelectionState()
 				self.updateArchiveBadge()
+				self.updateBackupBadge()
 			}
 		}
 		private var archiveBadgeView: NSView?
+		private var backupBadgeView: NSView?
+		private var backupStateObservation: NSObjectProtocol?
 
 		override func loadView() {
 			view = NSView()
@@ -989,6 +1006,21 @@ extension PhotoCollectionViewController: XCollectionViewDelegate {
 				imageView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
 				imageView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
 			])
+			
+			// Observe backup queue changes
+			backupStateObservation = NotificationCenter.default.addObserver(
+				forName: NSNotification.Name("BackupQueueChanged"),
+				object: nil,
+				queue: .main
+			) { [weak self] _ in
+				self?.updateBackupBadge()
+			}
+		}
+		
+		deinit {
+			if let observer = backupStateObservation {
+				NotificationCenter.default.removeObserver(observer)
+			}
 		}
 
 		func configure(with photoRep: PhotoReference) {
@@ -999,6 +1031,19 @@ extension PhotoCollectionViewController: XCollectionViewDelegate {
 			print(
 				"[PhotoCollectionViewItem] mouseDown, clickCount: \(event.clickCount), modifiers: \(event.modifierFlags)"
 			)
+			
+			// Check if click is on backup badge
+			if let backupBadge = backupBadgeView,
+			   let photo = photoRepresentation {
+				let locationInView = view.convert(event.locationInWindow, from: nil)
+				if backupBadge.frame.contains(locationInView) {
+					print("[PhotoCollectionViewItem] Click on backup badge")
+					Task { @MainActor in
+						BackupQueueManager.shared.toggleStar(for: photo)
+					}
+					return
+				}
+			}
 
 			// Check for Control+click (right-click equivalent)
 			if event.modifierFlags.contains(.control) {
@@ -1243,6 +1288,86 @@ extension PhotoCollectionViewController: XCollectionViewDelegate {
 				imageView?.alphaValue = 0.7
 			} else {
 				imageView?.alphaValue = 1.0
+			}
+		}
+		
+		private func updateBackupBadge() {
+			// Remove existing backup badge
+			self.backupBadgeView?.removeFromSuperview()
+			self.backupBadgeView = nil
+			
+			// Get backup state for this photo
+			guard let photo = photoRepresentation else { return }
+			let backupState = BackupQueueManager.shared.backupState(for: photo)
+			
+			// Don't show badge if state is none or if we already have an archive badge
+			if backupState == .none || archiveBadgeView != nil { return }
+			
+			// Create badge view
+			let badgeContainer = NSView()
+			badgeContainer.wantsLayer = true
+			badgeContainer.translatesAutoresizingMaskIntoConstraints = false
+			
+			// Background circle
+			let circleLayer = CALayer()
+			circleLayer.backgroundColor = NSColor.white.cgColor
+			circleLayer.cornerRadius = 12
+			circleLayer.shadowColor = NSColor.black.cgColor
+			circleLayer.shadowOpacity = 0.2
+			circleLayer.shadowOffset = CGSize(width: 0, height: 1)
+			circleLayer.shadowRadius = 2
+			badgeContainer.layer?.addSublayer(circleLayer)
+			
+			// Icon
+			let iconView = NSImageView()
+			let iconName = backupState.iconName
+			if !iconName.isEmpty {
+				let config = NSImage.SymbolConfiguration(pointSize: 14, weight: .regular)
+				iconView.image = NSImage(systemSymbolName: iconName, accessibilityDescription: nil)?
+					.withSymbolConfiguration(config)
+				// Set icon color based on state
+				switch backupState {
+				case .queued:
+					iconView.contentTintColor = .systemYellow
+				case .uploading:
+					iconView.contentTintColor = .systemBlue
+				case .uploaded:
+					iconView.contentTintColor = .systemGreen
+				case .failed:
+					iconView.contentTintColor = .systemRed
+				default:
+					break
+				}
+			}
+			iconView.translatesAutoresizingMaskIntoConstraints = false
+			
+			badgeContainer.addSubview(iconView)
+			view.addSubview(badgeContainer)
+			self.backupBadgeView = badgeContainer
+			
+			// Layout
+			NSLayoutConstraint.activate([
+				badgeContainer.topAnchor.constraint(equalTo: view.topAnchor, constant: 8),
+				badgeContainer.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -8),
+				badgeContainer.widthAnchor.constraint(equalToConstant: 24),
+				badgeContainer.heightAnchor.constraint(equalToConstant: 24),
+				
+				iconView.centerXAnchor.constraint(equalTo: badgeContainer.centerXAnchor),
+				iconView.centerYAnchor.constraint(equalTo: badgeContainer.centerYAnchor)
+			])
+			
+			// Set circle layer frame after layout
+			badgeContainer.layoutSubtreeIfNeeded()
+			circleLayer.frame = badgeContainer.bounds
+			
+			// Add animation for uploading state
+			if backupState == .uploading {
+				let rotation = CABasicAnimation(keyPath: "transform.rotation")
+				rotation.fromValue = 0
+				rotation.toValue = Double.pi * 2
+				rotation.duration = 1
+				rotation.repeatCount = .infinity
+				iconView.layer?.add(rotation, forKey: "rotation")
 			}
 		}
 
@@ -1638,6 +1763,22 @@ struct PhotoCollectionView: XViewControllerRepresentable {
 			infoItem.target = self
 			infoItem.representedObject = photos
 			menu.addItem(infoItem)
+			
+			// S3 Backup items
+			if FeatureFlags.isS3BackupEnabled {
+				menu.addItem(.separator())
+				
+				// Add to backup queue
+				let backupItem = NSMenuItem(
+					title: "Add to Backup Queue",
+					action: #selector(self.contextMenuAddToBackupQueue(_:)),
+					keyEquivalent: ""
+				)
+				backupItem.target = self
+				backupItem.representedObject = photos
+				backupItem.image = NSImage(systemSymbolName: "star.fill", accessibilityDescription: nil)
+				menu.addItem(backupItem)
+			}
 		}
 	}
 #endif

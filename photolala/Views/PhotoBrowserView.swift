@@ -24,6 +24,7 @@ struct PhotoBrowserView: View {
 	@State private var showingRetrievalDialog = false
 	@StateObject private var s3BackupManager = S3BackupManager.shared
 	@StateObject private var identityManager = IdentityManager.shared
+	@StateObject private var backupQueueManager = BackupQueueManager.shared
 
 	init(directoryPath: NSString) {
 		self.directoryPath = directoryPath
@@ -31,47 +32,52 @@ struct PhotoBrowserView: View {
 
 	var body: some View {
 		#if os(macOS)
-			NavigationStack(path: self.$navigationPath) {
-				self.collectionContent
-					.navigationDestination(for: PreviewNavigation.self) { navigation in
-						PhotoPreviewView(
-							photos: navigation.photos,
-							initialIndex: navigation.initialIndex
-						)
-						.navigationBarBackButtonHidden(true)
-					}
-			}
-			.onKeyPress(.space) {
-				self.handleSpaceKeyPress()
-				return .handled
-			}
-			.onKeyPress(keys: ["s"]) { _ in
-				// Print cache statistics
-				PhotoManager.shared.printCacheStatistics()
-				return .handled
-			}
-			.onKeyPress(keys: ["r"]) { _ in
-				// Reset cache statistics
-				PhotoManager.shared.resetStatistics()
-				return .handled
-			}
-			.sheet(isPresented: self.$showingSignInPrompt) {
-				SignInPromptView()
-			}
-			.sheet(isPresented: self.$showingUpgradePrompt) {
-				SubscriptionView()
-			}
-			.sheet(isPresented: self.$showingRetrievalDialog) {
-				if let photo = archivedPhotoForRetrieval,
-				   let archiveInfo = photo.archiveInfo {
-					PhotoRetrievalView(
-						photoReference: photo,
-						archiveInfo: archiveInfo,
-						isPresented: self.$showingRetrievalDialog
-					)
-					.environmentObject(s3BackupManager)
-					.environmentObject(identityManager)
+			VStack(spacing: 0) {
+				NavigationStack(path: self.$navigationPath) {
+					self.collectionContent
+						.navigationDestination(for: PreviewNavigation.self) { navigation in
+							PhotoPreviewView(
+								photos: navigation.photos,
+								initialIndex: navigation.initialIndex
+							)
+							.navigationBarBackButtonHidden(true)
+						}
 				}
+				.onKeyPress(.space) {
+					self.handleSpaceKeyPress()
+					return .handled
+				}
+				.onKeyPress(keys: ["s"]) { _ in
+					// Print cache statistics
+					PhotoManager.shared.printCacheStatistics()
+					return .handled
+				}
+				.onKeyPress(keys: ["r"]) { _ in
+					// Reset cache statistics
+					PhotoManager.shared.resetStatistics()
+					return .handled
+				}
+				.sheet(isPresented: self.$showingSignInPrompt) {
+					SignInPromptView()
+				}
+				.sheet(isPresented: self.$showingUpgradePrompt) {
+					SubscriptionView()
+				}
+				.sheet(isPresented: self.$showingRetrievalDialog) {
+					if let photo = archivedPhotoForRetrieval,
+					   let archiveInfo = photo.archiveInfo {
+						PhotoRetrievalView(
+							photoReference: photo,
+							archiveInfo: archiveInfo,
+							isPresented: self.$showingRetrievalDialog
+						)
+						.environmentObject(s3BackupManager)
+						.environmentObject(identityManager)
+					}
+				}
+				
+				// Backup status bar
+				BackupStatusBar()
 			}
 		#else
 			self.collectionContent
@@ -186,6 +192,25 @@ struct PhotoBrowserView: View {
 			}
 			.toolbar {
 				ToolbarItemGroup(placement: .automatic) {
+					// Backup queue indicator
+					if backupQueueManager.queuedPhotos.count > 0 {
+						Button(action: {
+							// Start manual backup
+							Task {
+								await backupQueueManager.startManualBackup()
+							}
+						}) {
+							HStack(spacing: 4) {
+								Image(systemName: "star.fill")
+									.foregroundColor(.yellow)
+								Text("\(backupQueueManager.queuedPhotos.count)")
+							}
+						}
+						#if os(macOS)
+						.help("Backup \(backupQueueManager.queuedPhotos.count) starred photos")
+						#endif
+					}
+					
 					// Preview selected photos button
 					if !self.selectedPhotos.isEmpty {
 						Button(action: self.previewSelectedPhotos) {
