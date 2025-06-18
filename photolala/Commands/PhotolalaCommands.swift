@@ -17,6 +17,11 @@ struct PhotolalaCommands: Commands {
 				self.openFolder()
 			}
 			.keyboardShortcut("O", modifiers: .command)
+			
+			Button("Browse Cloud Backup") {
+				self.openS3Browser()
+			}
+			.keyboardShortcut("O", modifiers: [.command, .shift])
 
 			Divider()
 		}
@@ -112,6 +117,44 @@ struct PhotolalaCommands: Commands {
 					self.openWindow(value: url)
 				}
 			}
+		#endif
+	}
+	
+	private func openS3Browser() {
+		#if os(macOS)
+			// Check if user is signed in
+			if !IdentityManager.shared.isSignedIn {
+				// Show sign in prompt
+				let window = NSWindow(
+					contentRect: NSRect(x: 0, y: 0, width: 400, height: 300),
+					styleMask: [.titled, .closable],
+					backing: .buffered,
+					defer: false
+				)
+				
+				window.title = "Sign In Required"
+				window.center()
+				window.contentView = NSHostingView(rootView: SignInPromptView())
+				window.makeKeyAndOrderFront(nil)
+				return
+			}
+			
+			// Open S3 browser window
+			let window = NSWindow(
+				contentRect: NSRect(x: 0, y: 0, width: 800, height: 600),
+				styleMask: [.titled, .closable, .resizable, .miniaturizable],
+				backing: .buffered,
+				defer: false
+			)
+			
+			window.title = "Cloud Photos"
+			window.center()
+			window.contentView = NSHostingView(rootView: S3PhotoBrowserView())
+			window.makeKeyAndOrderFront(nil)
+			
+			// Keep window in front but not floating
+			window.level = .normal
+			window.isReleasedWhenClosed = false
 		#endif
 	}
 

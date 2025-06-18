@@ -21,7 +21,7 @@ enum ThumbnailDisplayMode: String, CaseIterable {
 	}
 }
 
-enum ThumbnailOption: CaseIterable {
+enum ThumbnailOption: CaseIterable, Hashable {
 	case small
 	case medium
 	case large

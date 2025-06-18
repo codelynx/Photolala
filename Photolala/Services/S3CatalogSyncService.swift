@@ -210,9 +210,43 @@ actor S3CatalogSyncService {
 	}
 	
 	private func downloadFile(key: String) async throws -> Data? {
-		// TODO: Implement proper S3 download using ByteStream
-		// For now, return mock data for testing
-		throw SyncError.networkTimeout
+		let getRequest = GetObjectInput(
+			bucket: bucketName,
+			key: key
+		)
+		
+		let response = try await s3Client.getObject(input: getRequest)
+		
+		// Update ETag cache
+		if let etag = response.eTag?.trimmingCharacters(in: CharacterSet(charactersIn: "\"")) {
+			etagCache.updateETag(etag, for: key)
+		}
+		
+		// Handle the ByteStream body
+		guard let body = response.body else { return nil }
+		
+		// For catalog files which are small, we can read all data at once
+		switch body {
+		case .data(let data):
+			// If body is already data, return it
+			return data
+			
+		case .stream(let stream):
+			// If body is a stream, collect all chunks
+			var result = Data()
+			while true {
+				guard let chunk = try await stream.readAsync(upToCount: 65536) else {
+					break
+				}
+				result.append(chunk)
+			}
+			return result
+			
+		@unknown default:
+			throw SyncError.syncFailed(NSError(domain: "S3CatalogSync", 
+											   code: -1, 
+											   userInfo: [NSLocalizedDescriptionKey: "Unknown ByteStream type"]))
+		}
 	}
 	
 	private func atomicUpdateCatalog(from tempDir: URL) async throws {
