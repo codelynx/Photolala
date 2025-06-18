@@ -39,6 +39,19 @@ actor PhotolalaCatalogService {
 			return "\(md5),\(escapedFilename),\(size),\(photoDateStr),\(modifiedStr),\(widthStr),\(heightStr)"
 		}
 		
+		// Memberwise initializer for testing
+		#if DEBUG
+		init(md5: String, filename: String, size: Int64, photoDate: Date, modified: Date, width: Int?, height: Int?) {
+			self.md5 = md5
+			self.filename = filename
+			self.size = size
+			self.photoDate = photoDate
+			self.modified = modified
+			self.width = width
+			self.height = height
+		}
+		#endif
+		
 		// Parse from CSV line
 		init?(csvLine: String) {
 			let scanner = Scanner(string: csvLine)

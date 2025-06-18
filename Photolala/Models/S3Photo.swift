@@ -28,6 +28,17 @@ struct S3Photo: Identifiable, Hashable {
 		"thumbnails/\(userId)/\(md5).dat"
 	}
 	
+	#if DEBUG
+	// For testing, provide alternative keys without userId in path
+	var testPhotoKey: String {
+		"photos/test/\(md5).jpg"
+	}
+	
+	var testThumbnailKey: String {
+		"thumbnails/test/\(md5)_thumb.jpg"
+	}
+	#endif
+	
 	var isArchived: Bool {
 		storageClass == .deepArchive
 	}

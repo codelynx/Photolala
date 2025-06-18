@@ -157,10 +157,32 @@ struct S3PhotoBrowserView: View {
 	
 	private func downloadPhoto(_ photo: S3Photo) async {
 		do {
-			// Initialize S3 download service
-			try await S3DownloadService.shared.initialize()
+			#if DEBUG
+			// Simulate download in debug mode
+			print("DEBUG: Simulating download for \(photo.filename)")
 			
-			// Download photo data
+			// Simulate delay
+			try await Task.sleep(nanoseconds: 1_000_000_000) // 1 second
+			
+			// Create test data
+			let testString = "Test photo data for \(photo.filename)"
+			let data = testString.data(using: .utf8)!
+			
+			#if os(macOS)
+			let panel = NSSavePanel()
+			panel.nameFieldStringValue = photo.filename
+			panel.canCreateDirectories = true
+			panel.allowedContentTypes = [.jpeg, .png, .heic]
+			
+			let response = await panel.beginSheetModal(for: NSApp.keyWindow!)
+			if response == .OK, let url = panel.url {
+				try data.write(to: url)
+				print("DEBUG: Saved test file to \(url.path)")
+			}
+			#endif
+			#else
+			// Production: actually download from S3
+			try await S3DownloadService.shared.initialize()
 			let data = try await S3DownloadService.shared.downloadPhoto(for: photo)
 			
 			// Save to Downloads folder
@@ -178,6 +200,7 @@ struct S3PhotoBrowserView: View {
 			// On iOS, save to photo library
 			guard let image = UIImage(data: data) else { return }
 			UIImageWriteToSavedPhotosAlbum(image, nil, nil, nil)
+			#endif
 			#endif
 		} catch {
 			errorMessage = "Download failed: \(error.localizedDescription)"
@@ -245,9 +268,18 @@ class S3PhotoBrowserViewModel: ObservableObject {
 		
 		do {
 			// Get user ID from identity manager
+			#if DEBUG
+			// Use hardcoded test user ID for development
+			let userId = "test-user-123"
+			print("DEBUG: Using hardcoded userId: \(userId)")
+			
+			// Generate test catalog if needed
+			try await TestCatalogGenerator.generateTestCatalog(userId: userId)
+			#else
 			guard let userId = IdentityManager.shared.currentUser?.serviceUserID else {
 				throw S3BrowserError.noUserAuthenticated
 			}
+			#endif
 			
 			// Initialize sync service if needed
 			if syncService == nil {

@@ -194,18 +194,59 @@ struct S3PhotoDetailView: View {
 		defer { isLoadingImage = false }
 		
 		do {
-			// Initialize S3 download service
-			try await S3DownloadService.shared.initialize()
+			#if DEBUG
+			// In debug mode, show a larger placeholder
+			print("DEBUG: Would download full photo for \(photo.md5)")
 			
-			// Download photo data
+			#if os(macOS)
+			let size = NSSize(width: 800, height: 600)
+			let image = NSImage(size: size)
+			image.lockFocus()
+			
+			// Gradient background
+			let gradient = NSGradient(colors: [.systemBlue, .systemPurple])
+			gradient?.draw(in: NSRect(origin: .zero, size: size), angle: 45)
+			
+			// Draw info
+			let attributes: [NSAttributedString.Key: Any] = [
+				.font: NSFont.systemFont(ofSize: 24),
+				.foregroundColor: NSColor.white
+			]
+			let text = photo.filename
+			let textSize = text.size(withAttributes: attributes)
+			let textRect = NSRect(x: (size.width - textSize.width) / 2,
+								  y: (size.height - textSize.height) / 2,
+								  width: textSize.width,
+								  height: textSize.height)
+			text.draw(in: textRect, withAttributes: attributes)
+			
+			image.unlockFocus()
+			fullImage = image
+			#else
+			// iOS placeholder
+			let size = CGSize(width: 800, height: 600)
+			let renderer = UIGraphicsImageRenderer(size: size)
+			fullImage = renderer.image { context in
+				let gradient = CGGradient(colorsSpace: CGColorSpaceCreateDeviceRGB(),
+										  colors: [UIColor.systemBlue.cgColor, UIColor.systemPurple.cgColor] as CFArray,
+										  locations: nil)!
+				context.cgContext.drawLinearGradient(gradient,
+													 start: .zero,
+													 end: CGPoint(x: size.width, y: size.height),
+													 options: [])
+			}
+			#endif
+			#else
+			// Production: actually download from S3
+			try await S3DownloadService.shared.initialize()
 			let data = try await S3DownloadService.shared.downloadPhoto(for: photo)
 			
-			// Convert to image
 			guard let image = XImage(data: data) else {
 				throw S3PhotoError.invalidImageData
 			}
 			
 			fullImage = image
+			#endif
 		} catch {
 			loadError = error
 		}
@@ -216,10 +257,32 @@ struct S3PhotoDetailView: View {
 		defer { isDownloading = false }
 		
 		do {
-			// Initialize S3 download service
-			try await S3DownloadService.shared.initialize()
+			#if DEBUG
+			// Simulate download in debug mode
+			print("DEBUG: Simulating download for \(photo.filename)")
 			
-			// Download photo data
+			// Simulate delay
+			try await Task.sleep(nanoseconds: 1_000_000_000) // 1 second
+			
+			// Create test data
+			let testString = "Test photo data for \(photo.filename)"
+			let data = testString.data(using: .utf8)!
+			
+			#if os(macOS)
+			let panel = NSSavePanel()
+			panel.nameFieldStringValue = photo.filename
+			panel.canCreateDirectories = true
+			panel.allowedContentTypes = [.jpeg, .png, .heic]
+			
+			let response = await panel.beginSheetModal(for: NSApp.keyWindow!)
+			if response == .OK, let url = panel.url {
+				try data.write(to: url)
+				print("DEBUG: Saved test file to \(url.path)")
+			}
+			#endif
+			#else
+			// Production: actually download from S3
+			try await S3DownloadService.shared.initialize()
 			let data = try await S3DownloadService.shared.downloadPhoto(for: photo)
 			
 			// Save to Downloads folder
@@ -237,6 +300,7 @@ struct S3PhotoDetailView: View {
 			// On iOS, save to photo library
 			guard let image = UIImage(data: data) else { return }
 			UIImageWriteToSavedPhotosAlbum(image, nil, nil, nil)
+			#endif
 			#endif
 		} catch {
 			print("Download failed: \(error)")

@@ -61,9 +61,14 @@ actor S3DownloadService {
 	
 	/// Initialize the S3 client
 	func initialize() async throws {
+		#if DEBUG
+		// Skip authentication check in debug mode
+		print("DEBUG: Initializing S3 client without authentication")
+		#else
 		guard await IdentityManager.shared.currentUser?.serviceUserID != nil else {
 			throw DownloadError.userNotAuthenticated
 		}
+		#endif
 		
 		self.s3Client = try await S3Client()
 	}

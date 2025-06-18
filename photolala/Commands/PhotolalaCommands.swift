@@ -122,6 +122,9 @@ struct PhotolalaCommands: Commands {
 	
 	private func openS3Browser() {
 		#if os(macOS)
+			#if DEBUG
+			// Skip login check in debug mode
+			#else
 			// Check if user is signed in
 			if !IdentityManager.shared.isSignedIn {
 				// Show sign in prompt
@@ -138,6 +141,7 @@ struct PhotolalaCommands: Commands {
 				window.makeKeyAndOrderFront(nil)
 				return
 			}
+			#endif
 			
 			// Open S3 browser window
 			let window = NSWindow(
