@@ -16,6 +16,13 @@ actor TestCatalogGenerator {
 		let catalogDir = appCacheDir.appendingPathComponent("cloud.s3").appendingPathComponent(userId)
 		try FileManager.default.createDirectory(at: catalogDir, withIntermediateDirectories: true)
 		
+		print("DEBUG: Test catalog directory: \(catalogDir.path)")
+		
+		// Write debug log to file
+		let debugLog = "TestCatalogGenerator started at \(Date())\nCatalog dir: \(catalogDir.path)\n"
+		let debugURL = FileManager.default.temporaryDirectory.appendingPathComponent("photolala-debug.log")
+		try? debugLog.write(to: debugURL, atomically: true, encoding: .utf8)
+		
 		// Create catalog service
 		let catalogService = PhotolalaCatalogService(catalogURL: catalogDir)
 		
@@ -23,6 +30,9 @@ actor TestCatalogGenerator {
 		let manifestURL = catalogDir.appendingPathComponent(".photolala")
 		if !FileManager.default.fileExists(atPath: manifestURL.path) {
 			try await catalogService.createEmptyCatalog()
+			
+			// Load the manifest after creating the catalog
+			_ = try await catalogService.loadManifest()
 			
 			// Add some test entries
 			let testPhotos = [
@@ -52,16 +62,19 @@ actor TestCatalogGenerator {
 				try await catalogService.upsertEntry(entry)
 			}
 			
-			// Update manifest
-			let manifest = PhotolalaCatalogService.CatalogManifest(
-				version: 1,
-				created: Date(),
-				modified: Date(),
-				shardChecksums: [:], // Will be updated when saving shards
-				photoCount: testPhotos.count
-			)
+			// Save the manifest after adding all entries
+			try await catalogService.saveManifestIfNeeded()
 			
-			try await catalogService.saveManifest(manifest)
+			// Reload to verify
+			let updatedManifest = try await catalogService.loadManifest()
+			print("DEBUG: Manifest has \(updatedManifest.photoCount) photos")
+			
+			// Append to debug log
+			var debugLog2 = (try? String(contentsOf: debugURL, encoding: .utf8)) ?? ""
+			debugLog2 += "Generated \(testPhotos.count) photos\n"
+			debugLog2 += "Manifest photo count: \(updatedManifest.photoCount)\n"
+			debugLog2 += "Manifest version: \(updatedManifest.version)\n"
+			try? debugLog2.write(to: debugURL, atomically: true, encoding: .utf8)
 			
 			// Create a simple S3 master catalog
 			let s3MasterCatalog = S3MasterCatalog(

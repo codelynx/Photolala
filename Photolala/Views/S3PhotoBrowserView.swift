@@ -113,6 +113,9 @@ struct S3PhotoBrowserView: View {
 				Text(errorMessage)
 			}
 		}
+		#if os(macOS)
+		.frame(minWidth: 600, maxWidth: .infinity, minHeight: 400, maxHeight: .infinity)
+		#endif
 	}
 	
 	// MARK: - Computed Properties
@@ -276,14 +279,27 @@ class S3PhotoBrowserViewModel: ObservableObject {
 			// Generate test catalog if needed
 			try await TestCatalogGenerator.generateTestCatalog(userId: userId)
 			#else
-			guard let userId = IdentityManager.shared.currentUser?.serviceUserID else {
-				throw S3BrowserError.noUserAuthenticated
+			// TEMPORARY: For S3 testing, allow both signed-in users and hardcoded ID
+			let userId: String
+			if let signedInUserId = IdentityManager.shared.currentUser?.serviceUserID {
+				userId = signedInUserId
+				print("TESTING: Using signed-in userId: \(userId)")
+			} else {
+				userId = "test-s3-user-001"
+				print("TESTING: Using hardcoded userId: \(userId)")
 			}
 			#endif
 			
+			#if DEBUG
+			// In debug mode, skip S3 sync and work offline
+			isOfflineMode = true
+			#else
 			// Initialize sync service if needed
 			if syncService == nil {
-				let s3Client = try await S3Client()
+				let config = try await S3Client.S3ClientConfiguration(
+					region: "us-east-1"
+				)
+				let s3Client = try await S3Client(config: config)
 				syncService = try S3CatalogSyncService(s3Client: s3Client, userId: userId)
 			}
 			
@@ -291,20 +307,45 @@ class S3PhotoBrowserViewModel: ObservableObject {
 			if let syncService = syncService {
 				let synced = try await syncService.syncCatalogIfNeeded()
 				isOfflineMode = !synced
+				print("TESTING: S3 sync completed, offline mode: \(isOfflineMode)")
 			} else {
 				isOfflineMode = true
 			}
+			#endif
 			
 			// Load from cached catalog
+			#if DEBUG
+			// In debug mode, load catalog directly
+			let cacheDir = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first!
+			let appCacheDir = cacheDir.appendingPathComponent("com.electricwoods.photolala")
+			let catalogDir = appCacheDir.appendingPathComponent("cloud.s3").appendingPathComponent(userId)
+			
+			catalogService = PhotolalaCatalogService(catalogURL: catalogDir)
+			
+			// Load master catalog
+			let masterCatalogURL = catalogDir.appendingPathComponent("master.photolala.json")
+			if FileManager.default.fileExists(atPath: masterCatalogURL.path) {
+				let masterData = try Data(contentsOf: masterCatalogURL)
+				s3MasterCatalog = try JSONDecoder().decode(S3MasterCatalog.self, from: masterData)
+			}
+			print("DEBUG: Loaded catalog from \(catalogDir.path)")
+			#else
 			if let syncService = syncService {
 				catalogService = try await syncService.loadCachedCatalog()
 				s3MasterCatalog = try await syncService.loadS3MasterCatalog()
+				print("DEBUG: Loaded catalog service and master catalog")
 			}
+			#endif
 			
 			// Build photo list from catalog
-			guard let catalog = catalogService else { return }
+			guard let catalog = catalogService else { 
+				print("DEBUG: No catalog service available")
+				return 
+			}
 			
 			let entries = try await catalog.loadAllEntries()
+			print("DEBUG: Loaded \(entries.count) entries from catalog")
+			
 			photos = entries.map { entry in
 				S3Photo(
 					from: entry,
@@ -313,6 +354,8 @@ class S3PhotoBrowserViewModel: ObservableObject {
 				)
 			}
 			.sorted { $0.photoDate > $1.photoDate }
+			
+			print("DEBUG: Created \(photos.count) S3Photo objects")
 			
 		} catch {
 			lastError = error

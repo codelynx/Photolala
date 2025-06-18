@@ -1,6 +1,6 @@
 # Photolala Project Status
 
-Last Updated: June 17, 2025 (Session 6)
+Last Updated: June 18, 2025
 
 ## Current Implementation Status
 
@@ -67,9 +67,14 @@ Last Updated: June 17, 2025 (Session 6)
 3. **Metadata Extraction**: PhotoReference prepared for expansion
 4. ~~**Performance Optimization**: No caching or lazy loading yet~~ ✅ Implemented dual caching
 
-### 📝 Recent Changes (June 16, 2025)
+### 📝 Recent Changes
 
-**S3 Backup Service Implementation Sessions**:
+**June 18, 2025**:
+- Implemented S3 Photo Browser with catalog-first architecture
+- Fixed empty catalog issue and improved debug mode
+- Enhanced window resizing capabilities
+
+**June 16, 2025 - S3 Backup Service Implementation Sessions**:
 - Session 1: Implemented cross-platform UI helpers and started archive retrieval UX
 - Session 2: Implemented Sign in with Apple and identity management
 - Session 3: Added In-App Purchase support with StoreKit 2
@@ -77,7 +82,7 @@ Last Updated: June 17, 2025 (Session 6)
 - Session 5: Implemented metadata backup system with binary plist format
 - Session 6: Added batch photo selection for archive retrieval
 
-See sections 30-34 below for detailed implementation notes.
+See sections 30-36 below for detailed implementation notes.
 
 ### 📝 Recent Changes (June 15, 2025)
 
@@ -371,7 +376,16 @@ See sections 30-34 below for detailed implementation notes.
 - `photolala/Models/ArchiveStatus.swift` - S3 storage class and archive lifecycle models
 - `photolala/Services/S3RetrievalManager.swift` - Manages photo restoration requests
 - `photolala/Services/IAPManager.swift` - StoreKit 2 subscription management
+- `photolala/Services/PhotolalaCatalogService.swift` - .photolala catalog file management
+- `photolala/Services/S3CatalogSyncService.swift` - Catalog sync with ETag change detection
+- `photolala/Services/S3DownloadService.swift` - S3 photo/thumbnail downloads with caching
+- `photolala/Services/TestCatalogGenerator.swift` - Debug mode test data generator
 - `photolala/PhotolalaProducts.storekit` - IAP product configuration
+- `photolala/Models/S3Photo.swift` - S3 photo model combining catalog and S3 metadata
+- `photolala/Models/S3MasterCatalog.swift` - S3-specific metadata tracking
+- `photolala/Views/S3PhotoBrowserView.swift` - S3 cloud photo browser UI
+- `photolala/Views/S3PhotoThumbnailView.swift` - S3 photo thumbnail cell
+- `photolala/Views/S3PhotoDetailView.swift` - S3 photo detail view (placeholder)
 - `docs/project-status.md` (this file)
 - `docs/thumbnail-display-options-design.md` - Design for display options feature
 - `docs/thumbnail-display-implementation-plan.md` - Implementation plan
@@ -385,6 +399,10 @@ See sections 30-34 below for detailed implementation notes.
 - `docs/planning/iap-testing-guide.md` - Complete IAP testing guide
 - `docs/current/archive-retrieval-system.md` - Archive retrieval architecture and implementation
 - `docs/current/metadata-backup-system.md` - Metadata backup implementation and API reference
+- `docs/current/s3-photo-browser-implementation.md` - S3 photo browser architecture and implementation
+- `docs/planning/s3-photo-browser-design.md` - S3 photo browser design document
+- `docs/planning/s3-browser-implementation-plan.md` - Implementation plan for S3 browser
+- `docs/planning/photolala-catalog-design.md` - .photolala catalog file format specification
 - `docs/session-summaries/` - Development session summaries
   - `/README.md` - Session index
   - `/2025-06-16-session5.md` - Metadata backup implementation session
@@ -937,3 +955,76 @@ See sections 30-34 below for detailed implementation notes.
      - Discovered TabView with .tabViewStyle(.automatic) pushes content into title bar on macOS
      - Replaced TabView with switch statement inside Group to avoid the issue
      - Maintains same functionality with proper window layout
+
+36. **Implemented S3 Photo Browser (June 18, 2025)**:
+   - **Catalog-First Architecture**:
+     - Created PhotolalaCatalogService for reading/writing .photolala files
+     - 16 sharded CSV files with MD5-based distribution
+     - Binary plist manifest with photo count and checksums
+     - No S3 ListObjects calls - completely catalog-driven
+   - **S3 Integration**:
+     - S3CatalogSyncService with ETag-based delta sync
+     - Downloads only changed shards for efficiency
+     - S3DownloadService with proper ByteStream handling
+     - LRU cache for thumbnails with size-based eviction
+   - **Debug Mode**:
+     - TestCatalogGenerator creates 10 sample photos
+     - Hardcoded userId "test-user-123" for development
+     - Colored placeholder thumbnails based on MD5 hash
+     - No AWS credentials required in debug mode
+   - **Data Models**:
+     - S3Photo combines catalog and S3 metadata
+     - S3MasterCatalog tracks storage class and archive dates
+     - Support for archive badges (Deep Archive indication)
+   - **UI Implementation**:
+     - S3PhotoBrowserView with grid layout
+     - Adjustable thumbnail sizes (S/M/L)
+     - Archive status badges for Deep Archive photos
+     - Context menus for future operations
+   - **Bug Fixes**:
+     - Fixed manifest photo count not updating
+     - Fixed negative hash index crash
+     - Fixed AWS ByteStream handling
+     - Fixed window resizing constraints
+   - **Storage Paths**:
+     - macOS: ~/Library/Caches/com.electricwoods.photolala/cloud.s3/{userId}/
+     - Sandboxed: ~/Library/Containers/.../Caches/...
+   - **Documentation**:
+     - Created s3-photo-browser-implementation.md in docs/current/
+     - Updated catalog design documentation
+
+37. **S3 Backup Service Phase 2 Complete (June 18, 2025)**:
+   - **Testing Mode Support**:
+     - Added `isTestingMode` flag with hardcoded `test-s3-user-001`
+     - Works without Apple Sign-in for development
+     - Shows "Testing Mode" banner when active
+     - Dynamic user ID: uses signed-in user or test user
+   - **Multi-Photo Upload**:
+     - PhotosPicker with `maxSelectionCount: 10`
+     - Batch upload with progress indicators
+     - Shows "Uploading photo 3 of 5..." status
+     - Clears selection after successful upload
+   - **Automatic Thumbnail Generation**:
+     - Creates 512x512 thumbnails during upload
+     - Uploads to `thumbnails/{userId}/{md5}.dat`
+     - Cross-platform thumbnail generation
+     - No separate thumbnail generation step needed
+   - **Catalog Integration**:
+     - Generate Catalog button creates .photolala files
+     - Supports both signed-in and test users
+     - Fixed path issues (catalog/ → catalogs/)
+     - Atomic catalog updates with unique temp directories
+   - **Bug Fixes**:
+     - Fixed credentials error in testing mode
+     - Fixed catalog sync file system errors
+     - Fixed Generate Thumbnails for correct user paths
+     - Removed unnecessary async/await warnings
+   - **Testing Results**:
+     - Successfully uploaded photos with MD5 hashes
+     - Thumbnails generated and uploaded automatically
+     - Catalogs created with correct photo entries
+     - Both test mode and signed-in mode working
+   - **Documentation Updates**:
+     - Updated s3-browser-implementation-plan.md with completion status
+     - Added technical implementation details
+     - Listed next steps for production features

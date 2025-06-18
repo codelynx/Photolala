@@ -139,7 +139,7 @@ struct S3PhotoThumbnailView: View {
 		
 		// Create a colored placeholder based on MD5
 		let colors: [XColor] = [.red, .blue, .green, .orange, .purple, .yellow, .cyan, .magenta]
-		let colorIndex = photo.md5.hash % colors.count
+		let colorIndex = abs(photo.md5.hash) % colors.count
 		let color = colors[colorIndex]
 		
 		#if os(macOS)

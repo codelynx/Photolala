@@ -126,3 +126,8 @@ If files get converted to spaces, run:
 - Xcode → Settings → Text Editing → Indentation
 - Check "Prefer indent using: Tabs"
 - Set "Tab width" and "Indent width" to 4
+```
+
+## Memories
+
+- 1, question is semi-real user id or sphedo user id?

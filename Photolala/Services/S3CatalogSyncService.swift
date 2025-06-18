@@ -57,6 +57,11 @@ actor S3CatalogSyncService {
 	private let cacheDir: URL
 	private var etagCache: ETagCache
 	
+	/// Get the catalog URL for a given user ID
+	func catalogURL(for userId: String) -> URL {
+		return catalogCacheDir
+	}
+	
 	private var catalogCacheDir: URL {
 		cacheDir.appendingPathComponent("cloud.s3").appendingPathComponent(userId)
 	}
@@ -82,6 +87,10 @@ actor S3CatalogSyncService {
 		// Create catalog cache directory
 		let catalogCacheDir = cacheDir.appendingPathComponent("cloud.s3").appendingPathComponent(userId)
 		try FileManager.default.createDirectory(at: catalogCacheDir, withIntermediateDirectories: true)
+		
+		#if DEBUG
+		print("DEBUG: S3CatalogSyncService catalog cache dir: \(catalogCacheDir.path)")
+		#endif
 		
 		// Load or create ETag cache
 		let etagCacheURL = catalogCacheDir.appendingPathComponent(".etag-cache")
@@ -133,7 +142,7 @@ actor S3CatalogSyncService {
 	
 	private func performSync() async throws -> Bool {
 		// 1. Check manifest ETag first (HeadObject - no download)
-		let manifestKey = "catalog/\(userId)/.photolala"
+		let manifestKey = "catalogs/\(userId)/.photolala"
 		
 		let manifestNeedsUpdate = try await checkETag(key: manifestKey)
 		
@@ -153,16 +162,32 @@ actor S3CatalogSyncService {
 		}
 		
 		// Save manifest temporarily
-		let tempDir = catalogCacheDir.appendingPathComponent(".tmp")
-		try FileManager.default.createDirectory(at: tempDir, withIntermediateDirectories: true)
+		// Use a unique temporary directory name to avoid conflicts
+		let tempDirName = "tmp_\(UUID().uuidString)"
+		let tempDir = catalogCacheDir.appendingPathComponent(tempDirName)
+		
+		print("Creating temp directory at: \(tempDir.path)")
+		print("Parent directory: \(catalogCacheDir.path)")
+		
+		// Ensure parent directory exists
+		try FileManager.default.createDirectory(at: catalogCacheDir, withIntermediateDirectories: true)
+		
+		// Create temp directory
+		try FileManager.default.createDirectory(at: tempDir, withIntermediateDirectories: false)
+		
+		print("Temp directory created successfully")
+		
+		// Save manifest
 		let tempManifestURL = tempDir.appendingPathComponent(".photolala")
 		try manifestData.write(to: tempManifestURL)
+		
+		print("Manifest written to temp directory")
 		
 		// 3. Check each shard's ETag before downloading
 		var shardsToDownload: [String] = []
 		for shardIndex in 0..<16 {
 			let shardHex = String(format: "%x", shardIndex)
-			let shardKey = "catalog/\(userId)/.photolala#\(shardHex)"
+			let shardKey = "catalogs/\(userId)/.photolala#\(shardHex)"
 			
 			if let needsUpdate = try? await checkETag(key: shardKey), needsUpdate {
 				shardsToDownload.append(shardHex)
@@ -171,7 +196,7 @@ actor S3CatalogSyncService {
 		
 		// 4. Download only changed shards
 		for shardHex in shardsToDownload {
-			let shardKey = "catalog/\(userId)/.photolala#\(shardHex)"
+			let shardKey = "catalogs/\(userId)/.photolala#\(shardHex)"
 			if let shardData = try await downloadFile(key: shardKey) {
 				let tempShardURL = tempDir.appendingPathComponent(".photolala#\(shardHex)")
 				try shardData.write(to: tempShardURL)
@@ -271,21 +296,61 @@ actor S3CatalogSyncService {
 		// TODO: Verify shard checksums match manifest
 		
 		// Atomic replace using FileManager
-		if FileManager.default.fileExists(atPath: catalogCacheDir.path) {
-			_ = try FileManager.default.replaceItemAt(catalogCacheDir, withItemAt: tempDir)
-		} else {
-			try FileManager.default.moveItem(at: tempDir, to: catalogCacheDir)
+		print("Starting atomic update from \(tempDir.path) to \(catalogCacheDir.path)")
+		
+		// Ensure temp directory exists
+		guard FileManager.default.fileExists(atPath: tempDir.path) else {
+			print("ERROR: Temp directory does not exist at: \(tempDir.path)")
+			throw SyncError.syncFailed(NSError(domain: "S3CatalogSync", 
+											   code: -1, 
+											   userInfo: [NSLocalizedDescriptionKey: "Temporary catalog directory does not exist"]))
 		}
+		
+		print("Temp directory exists, proceeding with atomic update")
+		
+		// The issue is that catalogCacheDir includes the userId, so we need to be careful
+		// catalogCacheDir = .../cloud.s3/8E9D73F3-A405-4EC2-AF7F-15519DBA4640
+		// tempDir = .../cloud.s3/8E9D73F3-A405-4EC2-AF7F-15519DBA4640/tmp_UUID
+		
+		// Since tempDir is inside catalogCacheDir, we need to move it to a sibling location first
+		let parentDir = catalogCacheDir.deletingLastPathComponent() // .../cloud.s3
+		let tempSiblingDir = parentDir.appendingPathComponent("tmp_move_\(UUID().uuidString)")
+		
+		print("Moving temp directory to sibling location: \(tempSiblingDir.path)")
+		try FileManager.default.moveItem(at: tempDir, to: tempSiblingDir)
+		
+		// Now remove the old catalog directory if it exists
+		if FileManager.default.fileExists(atPath: catalogCacheDir.path) {
+			print("Removing existing catalog directory")
+			try FileManager.default.removeItem(at: catalogCacheDir)
+		}
+		
+		// Move the temp sibling directory to the final location
+		print("Moving to final location")
+		try FileManager.default.moveItem(at: tempSiblingDir, to: catalogCacheDir)
+		print("Atomic update completed successfully")
 	}
 	
 	private func syncMasterCatalogIfNeeded() async throws {
-		let masterKey = "catalog/\(userId)/master.photolala.json"
+		let masterKey = "catalogs/\(userId)/master.photolala.json"
 		
-		if let needsUpdate = try? await checkETag(key: masterKey), needsUpdate {
-			if let data = try await downloadFile(key: masterKey) {
-				let masterURL = catalogCacheDir.appendingPathComponent("master.photolala.json")
-				try data.write(to: masterURL)
+		do {
+			// Check if master catalog exists and needs update
+			let needsUpdate = try await checkETag(key: masterKey)
+			
+			if needsUpdate {
+				// Try to download master catalog
+				if let data = try? await downloadFile(key: masterKey) {
+					let masterURL = catalogCacheDir.appendingPathComponent("master.photolala.json")
+					try data.write(to: masterURL)
+					print("Master catalog synced successfully")
+				} else {
+					print("Master catalog download failed or doesn't exist yet")
+				}
 			}
+		} catch {
+			// Master catalog might not exist yet, which is fine
+			print("Master catalog check failed (might not exist): \(error)")
 		}
 	}
 	

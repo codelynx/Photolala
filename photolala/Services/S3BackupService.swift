@@ -68,6 +68,11 @@ class S3BackupService: ObservableObject {
 
 		self.client = S3Client(config: configuration)
 	}
+	
+	/// Public getter for S3 client (for catalog generation)
+	var s3Client: S3Client? {
+		return client
+	}
 
 	// Convenience init that reads from Keychain, environment, or credentials file
 	convenience init() async throws {

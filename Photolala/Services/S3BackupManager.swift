@@ -1,6 +1,7 @@
 import CryptoKit
 import Foundation
 import SwiftUI
+import AWSS3
 
 @MainActor
 class S3BackupManager: ObservableObject {
@@ -171,6 +172,16 @@ class S3BackupManager: ObservableObject {
 		// Clear any cached data when signing out
 		self.currentUsage = 0
 		self.storageLimit = 0
+	}
+	
+	/// Get the S3 client for catalog generation
+	func getS3Client() async -> S3Client? {
+		// Ensure we're configured
+		if !isConfigured {
+			await self.initializeService()
+		}
+		
+		return s3Service?.s3Client
 	}
 }
 

@@ -223,6 +223,9 @@ actor PhotolalaCatalogService {
 		let index = shardIndex(for: entry.md5)
 		var entries = try await loadShard(index)
 		
+		// Check if this is a new entry
+		let isNew = !entries.contains { $0.md5 == entry.md5 }
+		
 		// Remove existing entry if present
 		entries.removeAll { $0.md5 == entry.md5 }
 		
@@ -231,7 +234,25 @@ actor PhotolalaCatalogService {
 		
 		// Save shard
 		try await saveShard(index, entries: entries)
-		isDirty = true
+		
+		// Update photo count if new entry
+		if isNew, var manifest = self.manifest {
+			self.manifest = CatalogManifest(
+				version: manifest.version,
+				created: manifest.created,
+				modified: Date(),
+				shardChecksums: manifest.shardChecksums,
+				photoCount: manifest.photoCount + 1
+			)
+			isDirty = true
+		}
+	}
+	
+	/// Save the manifest if it's dirty
+	func saveManifestIfNeeded() async throws {
+		if isDirty, let manifest = self.manifest {
+			try await saveManifest(manifest)
+		}
 	}
 	
 	/// Remove an entry by MD5

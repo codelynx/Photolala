@@ -70,7 +70,10 @@ actor S3DownloadService {
 		}
 		#endif
 		
-		self.s3Client = try await S3Client()
+		let config = try await S3Client.S3ClientConfiguration(
+			region: "us-east-1"
+		)
+		self.s3Client = try await S3Client(config: config)
 	}
 	
 	/// Download a thumbnail from S3

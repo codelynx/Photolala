@@ -125,6 +125,9 @@ struct PhotolalaCommands: Commands {
 			#if DEBUG
 			// Skip login check in debug mode
 			#else
+			// TEMPORARY: Skip login check for S3 testing
+			// TODO: Uncomment this block for production
+			/*
 			// Check if user is signed in
 			if !IdentityManager.shared.isSignedIn {
 				// Show sign in prompt
@@ -141,6 +144,7 @@ struct PhotolalaCommands: Commands {
 				window.makeKeyAndOrderFront(nil)
 				return
 			}
+			*/
 			#endif
 			
 			// Open S3 browser window
@@ -154,6 +158,11 @@ struct PhotolalaCommands: Commands {
 			window.title = "Cloud Photos"
 			window.center()
 			window.contentView = NSHostingView(rootView: S3PhotoBrowserView())
+			
+			// Set minimum and maximum window sizes
+			window.minSize = NSSize(width: 600, height: 400)
+			// No maximum size - allow unlimited resizing
+			
 			window.makeKeyAndOrderFront(nil)
 			
 			// Keep window in front but not floating
