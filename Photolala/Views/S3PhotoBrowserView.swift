@@ -1,5 +1,6 @@
 import SwiftUI
 import AWSS3
+import UniformTypeIdentifiers
 
 struct S3PhotoBrowserView: View {
 	@StateObject private var viewModel = S3PhotoBrowserViewModel()
@@ -154,6 +155,36 @@ struct S3PhotoBrowserView: View {
 		await viewModel.syncAndReload()
 	}
 	
+	private func downloadPhoto(_ photo: S3Photo) async {
+		do {
+			// Initialize S3 download service
+			try await S3DownloadService.shared.initialize()
+			
+			// Download photo data
+			let data = try await S3DownloadService.shared.downloadPhoto(for: photo)
+			
+			// Save to Downloads folder
+			#if os(macOS)
+			let panel = NSSavePanel()
+			panel.nameFieldStringValue = photo.filename
+			panel.canCreateDirectories = true
+			panel.allowedContentTypes = [.jpeg, .png, .heic]
+			
+			let response = await panel.beginSheetModal(for: NSApp.keyWindow!)
+			if response == .OK, let url = panel.url {
+				try data.write(to: url)
+			}
+			#else
+			// On iOS, save to photo library
+			guard let image = UIImage(data: data) else { return }
+			UIImageWriteToSavedPhotosAlbum(image, nil, nil, nil)
+			#endif
+		} catch {
+			errorMessage = "Download failed: \(error.localizedDescription)"
+			showingError = true
+		}
+	}
+	
 	// MARK: - Context Menu
 	
 	@ViewBuilder
@@ -175,7 +206,9 @@ struct S3PhotoBrowserView: View {
 		}
 		
 		Button(action: {
-			// TODO: Implement download
+			Task {
+				await downloadPhoto(photo)
+			}
 		}) {
 			Label("Download", systemImage: "arrow.down.to.line")
 		}

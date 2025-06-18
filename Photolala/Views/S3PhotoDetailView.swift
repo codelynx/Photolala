@@ -1,4 +1,5 @@
 import SwiftUI
+import UniformTypeIdentifiers
 
 struct S3PhotoDetailView: View {
 	let photo: S3Photo
@@ -7,6 +8,8 @@ struct S3PhotoDetailView: View {
 	@State private var isLoadingImage = false
 	@State private var loadError: Error?
 	@State private var showingRestoreConfirmation = false
+	@State private var isDownloading = false
+	@State private var downloadProgress: Double = 0
 	
 	var body: some View {
 		NavigationStack {
@@ -115,11 +118,21 @@ struct S3PhotoDetailView: View {
 											await downloadPhoto()
 										}
 									}) {
-										Label("Download Original", systemImage: "arrow.down.to.line")
+										if isDownloading {
+											HStack {
+												ProgressView()
+													.scaleEffect(0.8)
+												Text("Downloading...")
+											}
 											.frame(maxWidth: .infinity)
+										} else {
+											Label("Download Original", systemImage: "arrow.down.to.line")
+												.frame(maxWidth: .infinity)
+										}
 									}
 									.buttonStyle(.borderedProminent)
 									.controlSize(.large)
+									.disabled(isDownloading)
 								}
 								
 								#if os(macOS)
@@ -181,17 +194,54 @@ struct S3PhotoDetailView: View {
 		defer { isLoadingImage = false }
 		
 		do {
-			// TODO: Implement full image loading from S3
-			// For now, just show an error
-			throw S3PhotoError.notImplemented
+			// Initialize S3 download service
+			try await S3DownloadService.shared.initialize()
+			
+			// Download photo data
+			let data = try await S3DownloadService.shared.downloadPhoto(for: photo)
+			
+			// Convert to image
+			guard let image = XImage(data: data) else {
+				throw S3PhotoError.invalidImageData
+			}
+			
+			fullImage = image
 		} catch {
 			loadError = error
 		}
 	}
 	
 	private func downloadPhoto() async {
-		// TODO: Implement photo download
-		print("Download not implemented")
+		isDownloading = true
+		defer { isDownloading = false }
+		
+		do {
+			// Initialize S3 download service
+			try await S3DownloadService.shared.initialize()
+			
+			// Download photo data
+			let data = try await S3DownloadService.shared.downloadPhoto(for: photo)
+			
+			// Save to Downloads folder
+			#if os(macOS)
+			let panel = NSSavePanel()
+			panel.nameFieldStringValue = photo.filename
+			panel.canCreateDirectories = true
+			panel.allowedContentTypes = [.jpeg, .png, .heic]
+			
+			let response = await panel.beginSheetModal(for: NSApp.keyWindow!)
+			if response == .OK, let url = panel.url {
+				try data.write(to: url)
+			}
+			#else
+			// On iOS, save to photo library
+			guard let image = UIImage(data: data) else { return }
+			UIImageWriteToSavedPhotosAlbum(image, nil, nil, nil)
+			#endif
+		} catch {
+			print("Download failed: \(error)")
+			loadError = error
+		}
 	}
 	
 	private func initiateRestore(expedited: Bool) async {
@@ -202,11 +252,14 @@ struct S3PhotoDetailView: View {
 
 enum S3PhotoError: LocalizedError {
 	case notImplemented
+	case invalidImageData
 	
 	var errorDescription: String? {
 		switch self {
 		case .notImplemented:
 			return "This feature is not yet implemented"
+		case .invalidImageData:
+			return "The downloaded data is not a valid image"
 		}
 	}
 }

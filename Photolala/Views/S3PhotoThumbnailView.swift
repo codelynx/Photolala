@@ -133,9 +133,11 @@ struct S3PhotoThumbnailView: View {
 	}
 	
 	private func fetchS3Thumbnail() async throws -> XImage? {
-		// TODO: Implement S3 thumbnail download
-		// For now, return nil
-		return nil
+		// Initialize S3 download service if needed
+		try await S3DownloadService.shared.initialize()
+		
+		// Download thumbnail from S3
+		return try await S3DownloadService.shared.downloadThumbnail(for: photo)
 	}
 }
 
