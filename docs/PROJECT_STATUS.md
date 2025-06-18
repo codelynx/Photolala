@@ -1,6 +1,6 @@
 # Photolala Project Status
 
-Last Updated: June 18, 2025 (Session: S3 Implementation)
+Last Updated: June 18, 2025 (Session: Star-Based Backup Queue)
 
 ## Current Implementation Status
 
@@ -1034,3 +1034,36 @@ See sections 30-36 below for detailed implementation notes.
      - Updated s3-browser-implementation-plan.md with completion status
      - Added technical implementation details
      - Listed next steps for production features
+
+38. **Star-Based Backup Queue Implementation (June 18, 2025)**:
+   - **Core Components**:
+     - BackupState enum: tracks photo states (none, queued, uploading, uploaded, failed)
+     - BackupQueueManager singleton: manages queue with activity timer
+     - BackupStatusManager: shared upload progress tracking
+     - BackupStatusBar: bottom-of-window progress display
+   - **Visual Design**:
+     - Badge overlays on photo thumbnails (top-right corner)
+     - States: ⭐ (queued), ⬆️ (uploading), ☁️ (uploaded), ❌ (failed)
+     - Gray star shown for unstarred photos (click to star)
+     - Badges hidden when archive badges are present
+   - **User Interaction**:
+     - Click badge to star/unstar photos for backup
+     - Toolbar shows queue count when photos are starred
+     - Context menu "Add to Backup Queue" for bulk operations
+     - Manual backup via toolbar button or auto-backup after timer
+   - **Auto-Backup Timer**:
+     - 10-minute inactivity timer (production)
+     - 3-minute timer for DEBUG builds
+     - Resets on any star/unstar action
+     - Triggers automatic upload of queued photos
+   - **Features**:
+     - Queue state persists across app launches
+     - MD5 computation on-demand when photos are starred
+     - Automatic catalog generation after successful uploads
+     - Notifications posted for UI updates
+     - Status bar shows progress like Safari downloads
+   - **Integration**:
+     - Enabled via FeatureFlags.isS3BackupEnabled
+     - Works with existing S3BackupManager infrastructure
+     - Compatible with Sign in with Apple authentication
+     - No test mode - requires real authentication

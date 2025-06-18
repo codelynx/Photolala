@@ -1300,8 +1300,8 @@ extension PhotoCollectionViewController: XCollectionViewDelegate {
 			guard let photo = photoRepresentation else { return }
 			let backupState = BackupQueueManager.shared.backupState(for: photo)
 			
-			// Don't show badge if state is none or if we already have an archive badge
-			if backupState == .none || archiveBadgeView != nil { return }
+			// Don't show badge if we already have an archive badge
+			if archiveBadgeView != nil { return }
 			
 			// Create badge view
 			let badgeContainer = NSView()
@@ -1320,13 +1320,15 @@ extension PhotoCollectionViewController: XCollectionViewDelegate {
 			
 			// Icon
 			let iconView = NSImageView()
-			let iconName = backupState.iconName
+			let iconName = backupState == .none ? "star" : backupState.iconName
 			if !iconName.isEmpty {
 				let config = NSImage.SymbolConfiguration(pointSize: 14, weight: .regular)
 				iconView.image = NSImage(systemSymbolName: iconName, accessibilityDescription: nil)?
 					.withSymbolConfiguration(config)
 				// Set icon color based on state
 				switch backupState {
+				case .none:
+					iconView.contentTintColor = .tertiaryLabelColor // Gray for unstarred
 				case .queued:
 					iconView.contentTintColor = .systemYellow
 				case .uploading:
@@ -1335,8 +1337,6 @@ extension PhotoCollectionViewController: XCollectionViewDelegate {
 					iconView.contentTintColor = .systemGreen
 				case .failed:
 					iconView.contentTintColor = .systemRed
-				default:
-					break
 				}
 			}
 			iconView.translatesAutoresizingMaskIntoConstraints = false

@@ -1,6 +1,6 @@
 # Photolala Architecture
 
-Last Updated: June 18, 2025
+Last Updated: June 18, 2025 (Added Backup Queue System)
 
 ## Overview
 
@@ -102,6 +102,20 @@ Photolala is a cross-platform photo browser application built with SwiftUI, supp
 - Service user ID mapping
 - Keychain persistence
 
+#### BackupQueueManager (Singleton)
+- Manages star-based backup queue
+- Activity timer (10 min prod, 3 min debug)
+- Auto-backup after inactivity
+- Queue persistence across launches
+- MD5 computation on demand
+- Notifications for UI updates
+
+#### BackupStatusManager (Singleton)
+- Shared upload progress tracking
+- Status bar visibility control
+- Speed and time remaining calculations
+- Progress state for all windows
+
 #### IAPManager (Singleton)
 - StoreKit 2 implementation
 - Subscription management
@@ -158,6 +172,18 @@ Photolala is a cross-platform photo browser application built with SwiftUI, supp
 - Deep Archive restoration UI
 - Batch selection support
 - Cost estimation display
+
+#### BackupStatusBar
+- Shared progress display at window bottom
+- Shows upload count, speed, time remaining
+- Safari-style download bar appearance
+- Auto-hides when complete
+
+#### PhotoCellBadge
+- Badge overlay for backup states
+- Click to toggle star/unstar
+- Visual states: ⭐ ⬆️ ☁️ ❌
+- Hover effects and tooltips
 - Restoration progress tracking
 
 #### UserAccountView

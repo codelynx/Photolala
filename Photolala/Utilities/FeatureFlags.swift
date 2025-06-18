@@ -10,7 +10,7 @@ import Foundation
 /// Feature flags for controlling app functionality
 struct FeatureFlags {
 	/// Enable S3 backup functionality
-	static let isS3BackupEnabled = false
+	static let isS3BackupEnabled = true
 	
 	/// Enable archive retrieval features
 	static let isArchiveRetrievalEnabled = false
