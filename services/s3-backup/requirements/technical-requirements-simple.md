@@ -9,63 +9,58 @@
 
 ### Dependencies
 - AWS SDK for Swift
-- SwiftData for local state
+- macOS Keychain (for credentials)
 - Foundation framework
-- CoreImage (thumbnail generation)
-- ImageIO (EXIF extraction)
 
 ### S3 Operations Needed
-1. `PutObject` - Upload photos, thumbnails, metadata
-2. `GetObject` - Download thumbnails and catalogs
-3. `ListObjectsV2` - List user's photos (backup use)
-4. `RestoreObject` - Restore from Deep Archive
-5. Lambda triggers for catalog updates
+1. `ListBuckets` - Show available buckets
+2. `PutObject` - Upload photos
+3. `HeadObject` - Check if already uploaded
 
 ### Data Storage
-- **Use SwiftData** (not JSON files)
-- Track uploaded photos with MD5, date, size
-- Store thumbnail sync state
-- Remember user preferences
+- **No SQL database**
+- Use JSON file: `~/Library/Application Support/Photolala/backup-state.json`
+- Track uploaded files with path, date, size
+
+[KY] No NoSQL - but may be SwiftData
 
 ### Security
-- **Photolala-Managed Service Only**
-- Apple ID authentication
-- Backend API exchanges for STS tokens
-- No local credential storage
-- HTTPS/TLS 1.3 for all transfers
-- Server-side encryption (SSE-S3)
-- Per-user S3 prefix isolation
+- Store AWS credentials in macOS Keychain
+- Use HTTPS for all transfers
+- No custom encryption (use S3's)
+
+[KY] option1:
+  - user's apple-id ties to S3 credential
+  - user signup own AWS credentials (unlikely)
 
 ### UI Requirements
-- Integration with photo selection
-- "Backup Selected" button in toolbar
-- Right-click → "Backup to Cloud"
-- Progress sheet with details
-- Cloud badge on backed-up photos
-- Cost estimation display
+- Simple SwiftUI view
+- "Backup Folder" button
+- Progress indicator
+- Status text
 
-### What We're NOT Doing (Phase 1)
-- ❌ User's own AWS credentials
-- ❌ Multiple regions (us-east-1 only)
+[KY] i like user to select one / multiple/ or group of photos to backup to S3, so selectbly
+- yah, but i could be pain for user
+
+### What We're NOT Doing
+- ❌ Multiple S3 providers
 - ❌ Automatic backup
+- ❌ Resume/pause
+- ❌ Bandwidth throttling
 - ❌ Client-side encryption
+- ❌ Metadata extraction
 - ❌ Intel support
 - ❌ iOS support
 - ❌ Background uploads
+- ❌ Concurrent uploads
 
 ### Success Metrics
-- Can backup selected photos
-- MD5 deduplication works
-- Thumbnails sync for browsing
-- Deep Archive for old photos
-- Cost stays under $1/month for most users
+- Can connect to AWS S3
+- Can upload a folder of photos
+- Skips already uploaded files
+- Shows progress
+- Remembers state between launches
 
-## Summary
+## That's It!
 
-Build a cost-effective cloud backup that:
-1. Uses MD5 for deduplication
-2. Leverages storage classes (STANDARD_IA → DEEP_ARCHIVE)
-3. Enables browsing via thumbnails without downloading originals
-4. Integrates with existing photo selection UI
-5. Photolala-managed service tied to Apple ID
-6. Simple subscription tiers aligned with Apple standards
+Keep it simple. Get it working. Add features later if needed.
