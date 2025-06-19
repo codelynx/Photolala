@@ -135,10 +135,7 @@ struct PhotoBrowserView: View {
 		.onReceive(photoProvider.photosPublisher) { photos in
 			self.allPhotos = photos.compactMap { $0 as? PhotoFile }
 			self.photosCount = photos.count
-			// Load archive status for all photos
-			Task {
-				await self.loadArchiveStatus(for: self.allPhotos)
-			}
+			// Don't load archive status for local photos - it's not needed and causes unnecessary S3 requests
 		}
 		.navigationTitle(self.directoryPath.lastPathComponent)
 		#if os(macOS)

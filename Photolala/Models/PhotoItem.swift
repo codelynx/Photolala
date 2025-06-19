@@ -81,9 +81,7 @@ extension PhotoFile: PhotoItem {
 	
 	func loadThumbnail() async throws -> XImage? {
 		// Load thumbnail through PhotoManager
-		if thumbnail == nil {
-			try await loadPhotoData()
-		}
+		try await loadPhotoData()
 		return thumbnail
 	}
 	

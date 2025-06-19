@@ -19,6 +19,7 @@ class UnifiedPhotoCell: NSCollectionViewItem {
 	
 	// UI Elements
 	private var photoImageView: ScalableImageView!
+	private var placeholderImageView: NSImageView!
 	private var titleLabel: NSTextField!
 	private var badgeView: NSView?
 	private var loadingIndicator: NSProgressIndicator!
@@ -57,6 +58,16 @@ class UnifiedPhotoCell: NSCollectionViewItem {
 		titleLabel.translatesAutoresizingMaskIntoConstraints = false
 		view.addSubview(titleLabel)
 		
+		// Placeholder image view
+		placeholderImageView = NSImageView()
+		placeholderImageView.translatesAutoresizingMaskIntoConstraints = false
+		placeholderImageView.imageScaling = .scaleProportionallyUpOrDown
+		if let placeholder = NSImage(systemSymbolName: "photo", accessibilityDescription: nil) {
+			placeholderImageView.image = placeholder
+			placeholderImageView.contentTintColor = .tertiaryLabelColor
+		}
+		view.addSubview(placeholderImageView)
+		
 		// Loading indicator
 		loadingIndicator = NSProgressIndicator()
 		loadingIndicator.style = .spinning
@@ -86,7 +97,13 @@ class UnifiedPhotoCell: NSCollectionViewItem {
 			
 			// Loading indicator
 			loadingIndicator.centerXAnchor.constraint(equalTo: photoImageView.centerXAnchor),
-			loadingIndicator.centerYAnchor.constraint(equalTo: photoImageView.centerYAnchor)
+			loadingIndicator.centerYAnchor.constraint(equalTo: photoImageView.centerYAnchor),
+			
+			// Placeholder - centered in photo image view, 50% of size
+			placeholderImageView.centerXAnchor.constraint(equalTo: photoImageView.centerXAnchor),
+			placeholderImageView.centerYAnchor.constraint(equalTo: photoImageView.centerYAnchor),
+			placeholderImageView.widthAnchor.constraint(equalTo: photoImageView.widthAnchor, multiplier: 0.5),
+			placeholderImageView.heightAnchor.constraint(equalTo: photoImageView.heightAnchor, multiplier: 0.5)
 		])
 	}
 	
@@ -99,6 +116,7 @@ class UnifiedPhotoCell: NSCollectionViewItem {
 		badgeView?.removeFromSuperview()
 		badgeView = nil
 		loadingIndicator.stopAnimation(nil)
+		placeholderImageView.isHidden = false // Show placeholder again
 	}
 	
 	func configure(with photo: any PhotoItem, settings: ThumbnailDisplaySettings) {
@@ -133,28 +151,38 @@ class UnifiedPhotoCell: NSCollectionViewItem {
 	}
 	
 	private func loadThumbnail(for photo: any PhotoItem) {
+		// Show loading indicator
 		loadingIndicator.startAnimation(nil)
+		
+		print("[UnifiedPhotoCell] Starting thumbnail load for: \(photo.displayName)")
 		
 		thumbnailTask?.cancel()
 		thumbnailTask = Task { @MainActor in
 			do {
 				if let thumbnail = try await photo.loadThumbnail() {
-					guard !Task.isCancelled else { return }
+					guard !Task.isCancelled else { 
+						print("[UnifiedPhotoCell] Task cancelled for: \(photo.displayName)")
+						return 
+					}
+					print("[UnifiedPhotoCell] Thumbnail loaded successfully for: \(photo.displayName)")
 					self.photoImageView.image = thumbnail
+					self.placeholderImageView.isHidden = true // Hide placeholder when thumbnail loads
 					self.photoImageView.needsLayout = true
 					self.view.needsDisplay = true
 				} else {
-					// Show placeholder
-					self.photoImageView.image = NSImage(systemSymbolName: "photo", accessibilityDescription: nil)
-					self.photoImageView.needsLayout = true
-					self.view.needsDisplay = true
+					print("[UnifiedPhotoCell] No thumbnail available for: \(photo.displayName)")
+					// Keep placeholder visible, it's already configured
+					self.placeholderImageView.isHidden = false
 				}
 			} catch {
 				guard !Task.isCancelled else { return }
-				// Show error placeholder
-				self.photoImageView.image = NSImage(systemSymbolName: "exclamationmark.triangle", accessibilityDescription: nil)
-				self.photoImageView.needsLayout = true
-				self.view.needsDisplay = true
+				print("[UnifiedPhotoCell] Error loading thumbnail for \(photo.displayName): \(error)")
+				// Show error icon in placeholder
+				if let errorIcon = NSImage(systemSymbolName: "exclamationmark.triangle", accessibilityDescription: nil) {
+					self.placeholderImageView.image = errorIcon
+					self.placeholderImageView.contentTintColor = .tertiaryLabelColor
+					self.placeholderImageView.isHidden = false
+				}
 			}
 			self.loadingIndicator.stopAnimation(nil)
 		}
@@ -225,6 +253,7 @@ class UnifiedPhotoCell: UICollectionViewCell {
 	
 	// UI Elements
 	private var photoImageView: UIImageView!
+	private var placeholderImageView: UIImageView!
 	private var titleLabel: UILabel!
 	private var badgeView: UIView?
 	private var loadingIndicator: UIActivityIndicatorView!
@@ -262,6 +291,16 @@ class UnifiedPhotoCell: UICollectionViewCell {
 		titleLabel.translatesAutoresizingMaskIntoConstraints = false
 		contentView.addSubview(titleLabel)
 		
+		// Placeholder image view
+		placeholderImageView = UIImageView()
+		placeholderImageView.translatesAutoresizingMaskIntoConstraints = false
+		placeholderImageView.contentMode = .scaleAspectFit
+		if let placeholder = UIImage(systemName: "photo") {
+			let config = UIImage.SymbolConfiguration(hierarchicalColor: .tertiaryLabel)
+			placeholderImageView.image = placeholder.applyingSymbolConfiguration(config)
+		}
+		contentView.addSubview(placeholderImageView)
+		
 		// Loading indicator
 		loadingIndicator = UIActivityIndicatorView(style: .medium)
 		loadingIndicator.hidesWhenStopped = true
@@ -281,7 +320,13 @@ class UnifiedPhotoCell: UICollectionViewCell {
 			titleLabel.heightAnchor.constraint(equalToConstant: 30),
 			
 			loadingIndicator.centerXAnchor.constraint(equalTo: photoImageView.centerXAnchor),
-			loadingIndicator.centerYAnchor.constraint(equalTo: photoImageView.centerYAnchor)
+			loadingIndicator.centerYAnchor.constraint(equalTo: photoImageView.centerYAnchor),
+			
+			// Placeholder - centered in photo image view, 50% of size
+			placeholderImageView.centerXAnchor.constraint(equalTo: photoImageView.centerXAnchor),
+			placeholderImageView.centerYAnchor.constraint(equalTo: photoImageView.centerYAnchor),
+			placeholderImageView.widthAnchor.constraint(equalTo: photoImageView.widthAnchor, multiplier: 0.5),
+			placeholderImageView.heightAnchor.constraint(equalTo: photoImageView.heightAnchor, multiplier: 0.5)
 		])
 	}
 	
@@ -295,11 +340,15 @@ class UnifiedPhotoCell: UICollectionViewCell {
 		badgeView = nil
 		loadingIndicator.stopAnimating()
 		contentView.layer.borderWidth = 0
+		placeholderImageView.isHidden = false // Show placeholder again
 	}
 	
 	func configure(with photo: any PhotoItem, settings: ThumbnailDisplaySettings) {
 		currentPhoto = photo
 		titleLabel.text = photo.displayName
+		
+		// Update title visibility based on showItemInfo
+		titleLabel.isHidden = !settings.showItemInfo
 		
 		// Update display mode
 		updateDisplayMode(settings.displayMode)
@@ -318,28 +367,38 @@ class UnifiedPhotoCell: UICollectionViewCell {
 	}
 	
 	private func loadThumbnail(for photo: any PhotoItem) {
+		// Show loading indicator
 		loadingIndicator.startAnimating()
+		
+		print("[UnifiedPhotoCell] Starting thumbnail load for: \(photo.displayName)")
 		
 		thumbnailTask?.cancel()
 		thumbnailTask = Task { @MainActor in
 			do {
 				if let thumbnail = try await photo.loadThumbnail() {
-					guard !Task.isCancelled else { return }
+					guard !Task.isCancelled else { 
+						print("[UnifiedPhotoCell] Task cancelled for: \(photo.displayName)")
+						return 
+					}
+					print("[UnifiedPhotoCell] Thumbnail loaded successfully for: \(photo.displayName)")
 					self.photoImageView.image = thumbnail
+					self.placeholderImageView.isHidden = true // Hide placeholder when thumbnail loads
 					self.setNeedsLayout()
 					self.layoutIfNeeded()
 				} else {
-					// Show placeholder
-					self.photoImageView.image = UIImage(systemName: "photo")
-					self.setNeedsLayout()
-					self.layoutIfNeeded()
+					print("[UnifiedPhotoCell] No thumbnail available for: \(photo.displayName)")
+					// Keep placeholder visible, it's already configured
+					self.placeholderImageView.isHidden = false
 				}
 			} catch {
 				guard !Task.isCancelled else { return }
-				// Show error placeholder
-				self.photoImageView.image = UIImage(systemName: "exclamationmark.triangle")
-				self.setNeedsLayout()
-				self.layoutIfNeeded()
+				print("[UnifiedPhotoCell] Error loading thumbnail for \(photo.displayName): \(error)")
+				// Show error icon in placeholder
+				if let errorIcon = UIImage(systemName: "exclamationmark.triangle") {
+					let config = UIImage.SymbolConfiguration(hierarchicalColor: .tertiaryLabel)
+					self.placeholderImageView.image = errorIcon.applyingSymbolConfiguration(config)
+					self.placeholderImageView.isHidden = false
+				}
 			}
 			self.loadingIndicator.stopAnimating()
 		}

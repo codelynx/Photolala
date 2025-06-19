@@ -1,6 +1,6 @@
 # Photolala Project Status
 
-Last Updated: June 19, 2025 (Session: Unified Photo Browser Architecture)
+Last Updated: June 19, 2025 (Session: Thumbnail Loading Fixes)
 
 ## Current Implementation Status
 
@@ -1132,3 +1132,29 @@ See sections 30-36 below for detailed implementation notes.
      - S3CatalogSyncService.swift - Updated download/sync paths
      - PhotoCollectionViewController.swift - Uses CatalogAwarePhotoLoader
      - New: CatalogAwarePhotoLoader.swift - Intelligent photo loading
+
+40. **Thumbnail Loading and Display Fixes (June 19, 2025 - Session: Thumbnail Loading Fixes)**:
+   - **Fixed Placeholder Icon Prominence**:
+     - Implemented separate placeholder image view (50% size of cell)
+     - Uses subtle tertiaryLabelColor for better visual hierarchy
+     - Placeholder properly hides when actual thumbnail loads
+     - Shows error icon for failed loads
+   - **Fixed Initial Thumbnail Loading**:
+     - Problem: Thumbnails showed "No thumbnail available" until scrolling
+     - Root cause: `loadPhotoData()` returning early for concurrent requests
+     - Solution: Added `loadingTask` tracking to handle concurrent calls properly
+     - Now all concurrent requests wait for the same loading operation
+   - **Removed Unnecessary S3 Requests**:
+     - PhotoBrowserView was calling `loadArchiveStatus()` for local photos
+     - Removed this call - archive status only relevant for S3 photos
+     - Significantly reduced unnecessary network traffic
+   - **Verified Refresh Functionality**:
+     - Refresh button correctly picks up added files
+     - Properly removes deleted files from view
+     - Uses existing `LocalPhotoProvider.refresh()` implementation
+   - **Implementation Details**:
+     - UnifiedPhotoCell: Added `placeholderImageView` for both platforms
+     - PhotoFile: Added concurrent loading support with Task tracking
+     - PhotoItem: Simplified `loadThumbnail()` to always call `loadPhotoData()`
+   - **Documentation**:
+     - Created `docs/history/implementation-notes/thumbnail-loading-fixes.md`

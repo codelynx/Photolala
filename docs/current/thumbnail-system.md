@@ -122,5 +122,36 @@ Task { @MainActor in
 1. Cache size management
 2. LRU eviction policy
 3. Progressive JPEG loading
-4. Background pre-generation
-5. Intelligent prefetching
+
+## Recent Improvements (June 19, 2025)
+
+### Placeholder Display
+- Added separate placeholder image view (50% size of cell)
+- Uses subtle tertiaryLabelColor for better visual hierarchy
+- Placeholder properly hides when thumbnail loads
+- Shows error icon for failed loads
+
+### Concurrent Loading Fix
+- Fixed issue where thumbnails wouldn't load on initial display
+- Added proper Task tracking in PhotoFile.loadPhotoData()
+- Concurrent requests now wait for existing loading operation
+- Eliminates "No thumbnail available" messages on first view
+
+### Implementation Details
+```swift
+// PhotoFile concurrent loading support
+private var loadingTask: Task<Void, Error>?
+
+func loadPhotoData() async throws {
+    if let existingTask = loadingTask {
+        try await existingTask.value
+        return
+    }
+    // ... create and track new loading task
+}
+```
+
+### Cell Updates
+- UnifiedPhotoCell now has dedicated placeholderImageView
+- Proper show/hide logic based on thumbnail availability
+- Consistent behavior across macOS and iOS platforms
