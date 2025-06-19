@@ -3,19 +3,25 @@ import AWSS3
 import UniformTypeIdentifiers
 
 struct S3PhotoBrowserView: View {
-	@StateObject private var viewModel = S3PhotoBrowserViewModel()
 	@State private var thumbnailSettings = ThumbnailDisplaySettings()
-	@State private var selectedPhotos: Set<PhotoS3> = []
+	@State private var selectedPhotos: [PhotoS3] = []
 	@State private var showingPhotoDetail: PhotoS3?
 	@State private var showingError = false
 	@State private var errorMessage = ""
 	@State private var isRefreshing = false
-	@State private var photoProvider: S3PhotoProvider?
+	@StateObject private var photoProvider: S3PhotoProvider
+	@StateObject private var identityManager = IdentityManager.shared
+	
+	init() {
+		// Initialize with the current user's ID or a placeholder
+		let userId = IdentityManager.shared.currentUser?.serviceUserID ?? "pending"
+		self._photoProvider = StateObject(wrappedValue: S3PhotoProvider(userId: userId))
+	}
 	
 	var body: some View {
 		NavigationStack {
 			Group {
-				if viewModel.isLoading && viewModel.photos.isEmpty {
+				if photoProvider.isLoading && photoProvider.photos.isEmpty {
 					// Initial loading state
 					VStack {
 						ProgressView("Loading catalog...")
@@ -25,7 +31,7 @@ struct S3PhotoBrowserView: View {
 							.font(.caption)
 							.foregroundColor(.secondary)
 					}
-				} else if viewModel.photos.isEmpty {
+				} else if photoProvider.photos.isEmpty {
 					// Empty state
 					ContentUnavailableView(
 						"No Photos in Cloud",
@@ -33,38 +39,38 @@ struct S3PhotoBrowserView: View {
 						description: Text("Upload photos from your local library to see them here")
 					)
 				} else {
-					// Photo grid
-					ScrollView {
-						LazyVGrid(columns: adaptiveColumns, spacing: thumbnailSettings.spacing) {
-							ForEach(viewModel.photos) { photo in
-								S3PhotoThumbnailView(
-									photo: photo,
-									thumbnailSize: thumbnailSettings.thumbnailSize,
-									isSelected: selectedPhotos.contains(photo)
-								)
-								.onTapGesture {
-									handlePhotoTap(photo)
-								}
-								.contextMenu {
-									photoContextMenu(for: photo)
-								}
+					// Use unified collection view
+					UnifiedPhotoCollectionViewRepresentable(
+						photoProvider: photoProvider,
+						settings: thumbnailSettings,
+						onSelectPhoto: { photo, allPhotos in
+							if let s3Photo = photo as? PhotoS3 {
+								handlePhotoTap(s3Photo)
 							}
+						},
+						onSelectionChanged: { photos in
+							self.selectedPhotos = photos.compactMap { $0 as? PhotoS3 }
 						}
-						.padding()
-					}
+					)
 					.refreshable {
 						await refreshCatalog()
 					}
 				}
 			}
+			.onAppear {
+				Task {
+					try? await photoProvider.loadPhotos()
+				}
+			}
 			.navigationTitle("Cloud Photos")
 			#if os(macOS)
-			.navigationSubtitle("\(viewModel.photos.count) photos")
+			.navigationSubtitle("\(photoProvider.photos.count) photos")
 			#endif
 			.toolbar {
 				ToolbarItemGroup(placement: .automatic) {
 					// Offline indicator
-					if viewModel.isOfflineMode {
+					if let s3Provider = photoProvider as? S3PhotoProvider,
+					   s3Provider.displaySubtitle.contains("Offline") {
 						Label("Offline", systemImage: "wifi.slash")
 							.foregroundColor(.orange)
 					}
@@ -76,21 +82,31 @@ struct S3PhotoBrowserView: View {
 					}
 					
 					// Thumbnail size controls
-					Button(action: { thumbnailSettings.decreaseThumbnailSize() }) {
-						Image(systemName: "minus.magnifyingglass")
-					}
-					.disabled(!thumbnailSettings.canDecreaseThumbnailSize)
-					
-					Slider(value: Binding(
-						get: { thumbnailSettings.thumbnailSize },
-						set: { thumbnailSettings.thumbnailSize = $0 }
-					), in: 80...400, step: 20)
-						.frame(width: 100)
-					
-					Button(action: { thumbnailSettings.increaseThumbnailSize() }) {
-						Image(systemName: "plus.magnifyingglass")
-					}
-					.disabled(!thumbnailSettings.canIncreaseThumbnailSize)
+					#if os(iOS)
+						// Size menu for iOS
+						Menu {
+							Button("S") {
+								thumbnailSettings.thumbnailOption = .small
+							}
+							Button("M") {
+								thumbnailSettings.thumbnailOption = .medium
+							}
+							Button("L") {
+								thumbnailSettings.thumbnailOption = .large
+							}
+						} label: {
+							Image(systemName: "slider.horizontal.3")
+						}
+					#else
+						// Size picker for macOS
+						Picker("Size", selection: $thumbnailSettings.thumbnailOption) {
+							Text("S").tag(ThumbnailOption.small)
+							Text("M").tag(ThumbnailOption.medium)
+							Text("L").tag(ThumbnailOption.large)
+						}
+						.pickerStyle(.segmented)
+						.help("Thumbnail size")
+					#endif
 					
 					// Refresh button
 					Button(action: {
@@ -102,16 +118,6 @@ struct S3PhotoBrowserView: View {
 					}
 					.disabled(isRefreshing)
 				}
-			}
-			.task {
-				// Initialize photo provider if needed
-				if photoProvider == nil {
-					if let userId = IdentityManager.shared.currentUser?.serviceUserID {
-						photoProvider = S3PhotoProvider(userId: userId)
-					}
-				}
-				// Load photos through view model for backward compatibility
-				await viewModel.loadPhotosFromCatalog()
 			}
 			.sheet(item: $showingPhotoDetail) { photo in
 				S3PhotoDetailView(photo: photo)
@@ -126,45 +132,23 @@ struct S3PhotoBrowserView: View {
 		.frame(minWidth: 600, maxWidth: .infinity, minHeight: 400, maxHeight: .infinity)
 		#endif
 	}
-	
-	// MARK: - Computed Properties
-	
-	private var adaptiveColumns: [GridItem] {
-		return Array(repeating: GridItem(.adaptive(minimum: thumbnailSettings.thumbnailSize)), count: 1)
-	}
-	
-	private var thumbnailSizeIcon: String {
-		// Map thumbnail size to icon
-		if thumbnailSettings.thumbnailSize < 120 {
-			return "square.grid.3x3"
-		} else if thumbnailSettings.thumbnailSize < 200 {
-			return "square.grid.2x2"
-		} else {
-			return "square"
-		}
-	}
-	
 	// MARK: - Actions
 	
 	private func handlePhotoTap(_ photo: PhotoS3) {
-		#if os(macOS)
-		// macOS: Toggle selection
-		if selectedPhotos.contains(photo) {
-			selectedPhotos.remove(photo)
-		} else {
-			selectedPhotos.insert(photo)
-		}
-		#else
-		// iOS: Show detail
+		// Show detail view
 		showingPhotoDetail = photo
-		#endif
 	}
 	
 	private func refreshCatalog() async {
 		isRefreshing = true
 		defer { isRefreshing = false }
 		
-		await viewModel.syncAndReload()
+		do {
+			try await photoProvider.refresh()
+		} catch {
+			errorMessage = error.localizedDescription
+			showingError = true
+		}
 	}
 	
 	private func downloadPhoto(_ photo: PhotoS3) async {

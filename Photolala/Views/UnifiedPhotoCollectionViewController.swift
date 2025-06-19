@@ -107,31 +107,65 @@ class UnifiedPhotoCollectionViewController: XViewController {
 	private func createLayout() -> XCollectionViewLayout {
 		#if os(macOS)
 		let layout = NSCollectionViewFlowLayout()
-		layout.minimumInteritemSpacing = settings.thumbnailOption.spacing
-		layout.minimumLineSpacing = settings.thumbnailOption.spacing
-		layout.itemSize = NSSize(width: settings.thumbnailSize, height: settings.thumbnailSize)
-		layout.sectionInset = NSEdgeInsets(top: 10, left: 10, bottom: 10, right: 10)
+		let thumbnailOption = settings.thumbnailOption
+		layout.minimumInteritemSpacing = thumbnailOption.spacing
+		layout.minimumLineSpacing = thumbnailOption.spacing
+		layout.itemSize = NSSize(width: thumbnailOption.size, height: thumbnailOption.size)
+		layout.sectionInset = NSEdgeInsets(
+			top: thumbnailOption.sectionInset,
+			left: thumbnailOption.sectionInset,
+			bottom: thumbnailOption.sectionInset,
+			right: thumbnailOption.sectionInset
+		)
+		
+		// Configure headers if grouping is enabled
+		if settings.groupingOption != .none {
+			layout.headerReferenceSize = NSSize(width: 0, height: 40)
+		} else {
+			layout.headerReferenceSize = NSSize.zero
+		}
+		
 		return layout
 		#else
+		let thumbnailOption = settings.thumbnailOption
 		let itemSize = NSCollectionLayoutSize(
-			widthDimension: .absolute(settings.thumbnailSize),
-			heightDimension: .absolute(settings.thumbnailSize)
+			widthDimension: .absolute(thumbnailOption.size),
+			heightDimension: .absolute(thumbnailOption.size)
 		)
 		let item = NSCollectionLayoutItem(layoutSize: itemSize)
 		
 		let groupSize = NSCollectionLayoutSize(
 			widthDimension: .fractionalWidth(1.0),
-			heightDimension: .absolute(settings.thumbnailSize)
+			heightDimension: .absolute(thumbnailOption.size)
 		)
 		let group = NSCollectionLayoutGroup.horizontal(
 			layoutSize: groupSize,
 			subitems: [item]
 		)
-		group.interItemSpacing = .fixed(settings.thumbnailOption.spacing)
+		group.interItemSpacing = .fixed(thumbnailOption.spacing)
 		
 		let section = NSCollectionLayoutSection(group: group)
-		section.interGroupSpacing = settings.thumbnailOption.spacing
-		section.contentInsets = NSDirectionalEdgeInsets(top: 10, leading: 10, bottom: 10, trailing: 10)
+		section.interGroupSpacing = thumbnailOption.spacing
+		section.contentInsets = NSDirectionalEdgeInsets(
+			top: thumbnailOption.sectionInset,
+			leading: thumbnailOption.sectionInset,
+			bottom: thumbnailOption.sectionInset,
+			trailing: thumbnailOption.sectionInset
+		)
+		
+		// Configure headers if grouping is enabled
+		if settings.groupingOption != .none {
+			let headerSize = NSCollectionLayoutSize(
+				widthDimension: .fractionalWidth(1.0),
+				heightDimension: .absolute(40)
+			)
+			let header = NSCollectionLayoutBoundarySupplementaryItem(
+				layoutSize: headerSize,
+				elementKind: UICollectionView.elementKindSectionHeader,
+				alignment: .top
+			)
+			section.boundarySupplementaryItems = [header]
+		}
 		
 		return UICollectionViewCompositionalLayout(section: section)
 		#endif
@@ -140,9 +174,24 @@ class UnifiedPhotoCollectionViewController: XViewController {
 	private func updateLayout() {
 		#if os(macOS)
 		if let layout = collectionView.collectionViewLayout as? NSCollectionViewFlowLayout {
-			layout.itemSize = NSSize(width: settings.thumbnailSize, height: settings.thumbnailSize)
-			layout.minimumInteritemSpacing = settings.thumbnailOption.spacing
-			layout.minimumLineSpacing = settings.thumbnailOption.spacing
+			let thumbnailOption = settings.thumbnailOption
+			layout.itemSize = NSSize(width: thumbnailOption.size, height: thumbnailOption.size)
+			layout.minimumInteritemSpacing = thumbnailOption.spacing
+			layout.minimumLineSpacing = thumbnailOption.spacing
+			layout.sectionInset = NSEdgeInsets(
+				top: thumbnailOption.sectionInset,
+				left: thumbnailOption.sectionInset,
+				bottom: thumbnailOption.sectionInset,
+				right: thumbnailOption.sectionInset
+			)
+			
+			// Configure headers if grouping is enabled
+			if settings.groupingOption != .none {
+				layout.headerReferenceSize = NSSize(width: 0, height: 40)
+			} else {
+				layout.headerReferenceSize = NSSize.zero
+			}
+			
 			layout.invalidateLayout()
 		}
 		#else

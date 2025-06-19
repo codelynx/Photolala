@@ -177,6 +177,14 @@ See sections 30-36 below for detailed implementation notes.
    - Benefits: Code reuse, consistency, extensibility for new photo sources
    - Fixed issues: Thread safety with @MainActor, platform conditionals, thumbnail loading
 
+2. **Fixed Unified Architecture Degradations**:
+   - Fixed thumbnail sizing to use `thumbnailOption.size` instead of direct `thumbnailSize`
+   - Added proper spacing and section insets based on thumbnail options
+   - Added header support for photo grouping (year/month/day)
+   - Unified S3PhotoBrowserView thumbnail controls to match PhotoBrowserView (S/M/L)
+   - Migrated S3PhotoBrowserView to use UnifiedPhotoCollectionViewRepresentable
+   - Removed S3PhotoBrowserViewModel in favor of direct S3PhotoProvider usage
+
 ### 📝 Previous Changes (June 15, 2025)
 
 1. **Refactored Photo Model**:
