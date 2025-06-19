@@ -42,6 +42,16 @@ import SwiftUI
 	public typealias XCollectionViewLayout = UICollectionViewLayout
 #endif
 
+extension XView {
+	#if canImport(AppKit)
+	func setNeedsLayout() {
+		self.needsLayout = true
+	}
+	#elseif canImport(UIKit)
+	// setNeedsLayout() there
+	#endif
+}
+
 // Cross-platform image data extension
 extension XImage {
 

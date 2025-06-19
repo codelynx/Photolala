@@ -126,6 +126,10 @@ class UnifiedPhotoCell: NSCollectionViewItem {
 		
 		// Load thumbnail
 		loadThumbnail(for: photo)
+		
+		// Force initial layout
+		view.needsLayout = true
+		view.needsDisplay = true
 	}
 	
 	private func loadThumbnail(for photo: any PhotoItem) {
@@ -137,14 +141,20 @@ class UnifiedPhotoCell: NSCollectionViewItem {
 				if let thumbnail = try await photo.loadThumbnail() {
 					guard !Task.isCancelled else { return }
 					self.photoImageView.image = thumbnail
+					self.photoImageView.needsLayout = true
+					self.view.needsDisplay = true
 				} else {
 					// Show placeholder
 					self.photoImageView.image = NSImage(systemSymbolName: "photo", accessibilityDescription: nil)
+					self.photoImageView.needsLayout = true
+					self.view.needsDisplay = true
 				}
 			} catch {
 				guard !Task.isCancelled else { return }
 				// Show error placeholder
 				self.photoImageView.image = NSImage(systemSymbolName: "exclamationmark.triangle", accessibilityDescription: nil)
+				self.photoImageView.needsLayout = true
+				self.view.needsDisplay = true
 			}
 			self.loadingIndicator.stopAnimation(nil)
 		}
@@ -301,6 +311,10 @@ class UnifiedPhotoCell: UICollectionViewCell {
 		
 		// Load thumbnail
 		loadThumbnail(for: photo)
+		
+		// Force initial layout
+		setNeedsLayout()
+		layoutIfNeeded()
 	}
 	
 	private func loadThumbnail(for photo: any PhotoItem) {
@@ -312,14 +326,20 @@ class UnifiedPhotoCell: UICollectionViewCell {
 				if let thumbnail = try await photo.loadThumbnail() {
 					guard !Task.isCancelled else { return }
 					self.photoImageView.image = thumbnail
+					self.setNeedsLayout()
+					self.layoutIfNeeded()
 				} else {
 					// Show placeholder
 					self.photoImageView.image = UIImage(systemName: "photo")
+					self.setNeedsLayout()
+					self.layoutIfNeeded()
 				}
 			} catch {
 				guard !Task.isCancelled else { return }
 				// Show error placeholder
 				self.photoImageView.image = UIImage(systemName: "exclamationmark.triangle")
+				self.setNeedsLayout()
+				self.layoutIfNeeded()
 			}
 			self.loadingIndicator.stopAnimating()
 		}
