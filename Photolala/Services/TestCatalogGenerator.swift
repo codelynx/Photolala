@@ -53,7 +53,7 @@ actor TestCatalogGenerator {
 					md5: md5,
 					filename: filename,
 					size: Int64(size),
-					photoDate: Date().addingTimeInterval(-Double.random(in: 0...(365 * 24 * 60 * 60))), // Random date within last year
+					photodate: Date().addingTimeInterval(-Double.random(in: 0...(365 * 24 * 60 * 60))), // Random date within last year
 					modified: Date(),
 					width: Int.random(in: 2000...4000),
 					height: Int.random(in: 1500...3000)

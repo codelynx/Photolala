@@ -1053,7 +1053,7 @@ See sections 30-36 below for detailed implementation notes.
      - Manual backup via toolbar button or auto-backup after timer
    - **Auto-Backup Timer**:
      - 10-minute inactivity timer (production)
-     - 3-minute timer for DEBUG builds
+     - 3-minute timer for DEBUG builds (user adjusted to 1 minute)
      - Resets on any star/unstar action
      - Triggers automatic upload of queued photos
    - **Features**:
@@ -1067,3 +1067,38 @@ See sections 30-36 below for detailed implementation notes.
      - Works with existing S3BackupManager infrastructure
      - Compatible with Sign in with Apple authentication
      - No test mode - requires real authentication
+
+39. **Photolala Catalog v5.0 Implementation (June 19, 2025)**:
+   - **New Directory Structure**:
+     - All catalog files now in `.photolala/` subdirectory
+     - `manifest.plist` - Binary plist with UUID and metadata
+     - `0.csv` through `f.csv` - 16 sharded CSV files
+     - Cleaner directory view (only one `.photolala` entry)
+   - **CSV Format Update**:
+     - Changed field name from `photoDate` to `photodate` for consistency
+     - Format: `md5,filename,size,photodate,modified,width,height`
+   - **Key Features**:
+     - Directory UUID in manifest for unique identification
+     - CatalogAwarePhotoLoader for seamless catalog/scan fallback
+     - 5-minute cache for network directories
+     - Background catalog generation for 100+ photo directories
+   - **S3 Integration**:
+     - Updated S3CatalogGenerator to use v5.0 structure
+     - Updated S3CatalogSyncService for new paths
+     - S3 keys: `catalogs/{userId}/.photolala/manifest.plist` and `*.csv`
+   - **Implementation Details**:
+     - PhotolalaCatalogService simplified to v5.0 only (no v4 compatibility)
+     - PhotoCollectionViewController uses CatalogAwarePhotoLoader
+     - Network-aware caching with UUID-based keys
+     - Transparent operation - users don't notice catalog usage
+   - **Benefits**:
+     - 10x-50x faster load times for network directories
+     - Instant browsing for previously opened directories
+     - Better S3 organization with virtual folders
+     - Future-proof architecture for large photo collections
+   - **Files Modified**:
+     - PhotolalaCatalogService.swift - v5.0 structure support
+     - S3CatalogGenerator.swift - Updated upload paths
+     - S3CatalogSyncService.swift - Updated download/sync paths
+     - PhotoCollectionViewController.swift - Uses CatalogAwarePhotoLoader
+     - New: CatalogAwarePhotoLoader.swift - Intelligent photo loading

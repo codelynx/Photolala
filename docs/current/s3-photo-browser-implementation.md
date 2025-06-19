@@ -98,38 +98,32 @@ window.minSize = NSSize(width: 600, height: 400)
 // No maxSize constraint
 ```
 
-### Catalog Storage Paths
+### Catalog Storage Paths (v5.0)
 
-- **macOS**: `~/Library/Caches/com.electricwoods.photolala/cloud.s3/{userId}/`
-- **iOS**: `~/Library/Caches/cloud.s3/{userId}/`
-- **Sandboxed**: `~/Library/Containers/com.electricwoods.photolala/Data/Library/Caches/...`
+- **macOS**: `~/Library/Caches/com.electricwoods.photolala/cloud.s3/{userId}/.photolala/`
+- **iOS**: `~/Library/Caches/cloud.s3/{userId}/.photolala/`
+- **Sandboxed**: `~/Library/Containers/com.electricwoods.photolala/Data/Library/Caches/.../{userId}/.photolala/`
 
-### Manifest Photo Count Fix
+All catalog files are stored within the `.photolala/` subdirectory for cleaner organization.
 
-The catalog service now properly updates photo count when adding entries:
+### Manifest Updates (v5.0)
+
+The catalog service now uses string version and includes directoryUUID:
 
 ```swift
-func upsertEntry(_ entry: CatalogEntry) async throws {
-    // ... add entry ...
-    
-    // Update photo count if new entry
-    if isNew, var manifest = self.manifest {
-        self.manifest = CatalogManifest(
-            version: manifest.version,
-            created: manifest.created,
-            modified: Date(),
-            shardChecksums: manifest.shardChecksums,
-            photoCount: manifest.photoCount + 1
-        )
-        isDirty = true
-    }
+struct CatalogManifest: Codable {
+    let version: String           // "5.0"
+    let directoryUUID: String?    // For cache invalidation
+    let photoCount: Int
+    let lastUpdated: Date
+    let shardFiles: [String]
+    let shardChecksums: [String: String]?
 }
+```
 
-func saveManifestIfNeeded() async throws {
-    if isDirty, let manifest = self.manifest {
-        try await saveManifest(manifest)
-    }
-}
+CSV format uses lowercase `photodate`:
+```
+md5,filename,size,photodate,modified,width,height
 ```
 
 ## Current Limitations

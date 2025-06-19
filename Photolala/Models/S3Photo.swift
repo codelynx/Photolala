@@ -59,7 +59,7 @@ struct S3Photo: Identifiable, Hashable {
 		self.md5 = catalogEntry.md5
 		self.filename = catalogEntry.filename
 		self.size = catalogEntry.size
-		self.photoDate = catalogEntry.photoDate
+		self.photoDate = catalogEntry.photodate
 		self.modified = catalogEntry.modified
 		self.width = catalogEntry.width
 		self.height = catalogEntry.height

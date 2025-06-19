@@ -8,27 +8,38 @@ actor PhotolalaCatalogService {
 	// MARK: - Types
 	
 	struct CatalogManifest: Codable {
-		let version: Int
+		let version: String // "4.0" or "5.0"
+		let directoryUUID: String? // v5.0 only
 		let created: Date
 		let modified: Date
 		let shardChecksums: [String: String] // shardIndex -> SHA256 checksum
 		let photoCount: Int
+		
+		// Support both old and new field names
+		enum CodingKeys: String, CodingKey {
+			case version
+			case directoryUUID = "directory-uuid"
+			case created
+			case modified
+			case shardChecksums
+			case photoCount
+		}
 	}
 	
 	struct CatalogEntry: Codable {
 		let md5: String
 		let filename: String
 		let size: Int64
-		let photoDate: Date
+		let photodate: Date
 		let modified: Date
 		let width: Int?
 		let height: Int?
 		
-		// CSV format: md5,filename,size,photoDate,modified,width,height
+		// CSV format: md5,filename,size,photodate,modified,width,height
 		var csvLine: String {
 			let widthStr = width.map(String.init) ?? ""
 			let heightStr = height.map(String.init) ?? ""
-			let photoDateStr = String(Int(photoDate.timeIntervalSince1970))
+			let photodateStr = String(Int(photodate.timeIntervalSince1970))
 			let modifiedStr = String(Int(modified.timeIntervalSince1970))
 			
 			// Escape filename if it contains commas or quotes
@@ -36,16 +47,16 @@ actor PhotolalaCatalogService {
 				? "\"\(filename.replacingOccurrences(of: "\"", with: "\"\""))\"" 
 				: filename
 			
-			return "\(md5),\(escapedFilename),\(size),\(photoDateStr),\(modifiedStr),\(widthStr),\(heightStr)"
+			return "\(md5),\(escapedFilename),\(size),\(photodateStr),\(modifiedStr),\(widthStr),\(heightStr)"
 		}
 		
 		// Memberwise initializer for testing
 		#if DEBUG
-		init(md5: String, filename: String, size: Int64, photoDate: Date, modified: Date, width: Int?, height: Int?) {
+		init(md5: String, filename: String, size: Int64, photodate: Date, modified: Date, width: Int?, height: Int?) {
 			self.md5 = md5
 			self.filename = filename
 			self.size = size
-			self.photoDate = photoDate
+			self.photodate = photodate
 			self.modified = modified
 			self.width = width
 			self.height = height
@@ -94,8 +105,8 @@ actor PhotolalaCatalogService {
 				  let size = Int64(sizeStr) else { return nil }
 			_ = scanner.scanCharacter()
 			
-			guard let photoDateStr = scanner.scanUpToCharacters(from: CharacterSet(charactersIn: ",")),
-				  let photoDateTimestamp = TimeInterval(photoDateStr) else { return nil }
+			guard let photodateStr = scanner.scanUpToCharacters(from: CharacterSet(charactersIn: ",")),
+				  let photodateTimestamp = TimeInterval(photodateStr) else { return nil }
 			_ = scanner.scanCharacter()
 			
 			guard let modifiedStr = scanner.scanUpToCharacters(from: CharacterSet(charactersIn: ",")),
@@ -114,7 +125,7 @@ actor PhotolalaCatalogService {
 			self.md5 = md5
 			self.filename = filename
 			self.size = size
-			self.photoDate = Date(timeIntervalSince1970: photoDateTimestamp)
+			self.photodate = Date(timeIntervalSince1970: photodateTimestamp)
 			self.modified = Date(timeIntervalSince1970: modifiedTimestamp)
 			self.width = width
 			self.height = height
@@ -137,16 +148,28 @@ actor PhotolalaCatalogService {
 	
 	/// Load the catalog manifest
 	func loadManifest() async throws -> CatalogManifest {
-		let manifestURL = catalogURL.appendingPathComponent(".photolala")
+		let manifestURL = catalogURL.appendingPathComponent(".photolala").appendingPathComponent("manifest.plist")
+		guard FileManager.default.fileExists(atPath: manifestURL.path) else {
+			throw CatalogError.manifestNotFound
+		}
+		
 		let data = try Data(contentsOf: manifestURL)
 		let manifest = try PropertyListDecoder().decode(CatalogManifest.self, from: data)
 		self.manifest = manifest
 		return manifest
 	}
 	
+	enum CatalogError: Error {
+		case manifestNotFound
+	}
+	
 	/// Save the catalog manifest
 	func saveManifest(_ manifest: CatalogManifest) async throws {
-		let manifestURL = catalogURL.appendingPathComponent(".photolala")
+		// Create .photolala directory if needed
+		let catalogDir = catalogURL.appendingPathComponent(".photolala")
+		try FileManager.default.createDirectory(at: catalogDir, withIntermediateDirectories: true)
+		
+		let manifestURL = catalogDir.appendingPathComponent("manifest.plist")
 		let encoder = PropertyListEncoder()
 		encoder.outputFormat = .binary
 		let data = try encoder.encode(manifest)
@@ -166,12 +189,18 @@ actor PhotolalaCatalogService {
 	
 	/// Get the shard filename for a given index
 	func shardFilename(for index: Int) -> String {
-		return String(format: ".photolala#%x", index)
+		return String(format: "%x.csv", index)
+	}
+	
+	/// Get the full path to a shard file
+	func shardURL(for index: Int) -> URL {
+		let filename = shardFilename(for: index)
+		return catalogURL.appendingPathComponent(".photolala").appendingPathComponent(filename)
 	}
 	
 	/// Load all entries from a specific shard
 	func loadShard(_ index: Int) async throws -> [CatalogEntry] {
-		let shardURL = catalogURL.appendingPathComponent(shardFilename(for: index))
+		let shardURL = self.shardURL(for: index)
 		
 		guard FileManager.default.fileExists(atPath: shardURL.path) else {
 			return []
@@ -188,7 +217,7 @@ actor PhotolalaCatalogService {
 	
 	/// Save entries to a specific shard
 	func saveShard(_ index: Int, entries: [CatalogEntry]) async throws {
-		let shardURL = catalogURL.appendingPathComponent(shardFilename(for: index))
+		let shardURL = self.shardURL(for: index)
 		
 		let content = entries
 			.map { $0.csvLine }
@@ -236,9 +265,10 @@ actor PhotolalaCatalogService {
 		try await saveShard(index, entries: entries)
 		
 		// Update photo count if new entry
-		if isNew, var manifest = self.manifest {
+		if isNew, let manifest = self.manifest {
 			self.manifest = CatalogManifest(
 				version: manifest.version,
+				directoryUUID: manifest.directoryUUID,
 				created: manifest.created,
 				modified: Date(),
 				shardChecksums: manifest.shardChecksums,
@@ -278,18 +308,20 @@ actor PhotolalaCatalogService {
 	
 	/// Create a new empty catalog
 	func createEmptyCatalog() async throws {
-		// Create directory if needed
-		try FileManager.default.createDirectory(at: catalogURL, withIntermediateDirectories: true)
+		// Create .photolala directory
+		let catalogDir = catalogURL.appendingPathComponent(".photolala")
+		try FileManager.default.createDirectory(at: catalogDir, withIntermediateDirectories: true)
 		
 		// Create empty shards
 		for index in 0..<16 {
-			let shardURL = catalogURL.appendingPathComponent(shardFilename(for: index))
+			let shardURL = self.shardURL(for: index)
 			try "".write(to: shardURL, atomically: true, encoding: .utf8)
 		}
 		
-		// Create manifest
+		// Create manifest with UUID
 		let manifest = CatalogManifest(
-			version: 1,
+			version: "5.0",
+			directoryUUID: UUID().uuidString,
 			created: Date(),
 			modified: Date(),
 			shardChecksums: [:],
@@ -308,13 +340,14 @@ actor PhotolalaCatalogService {
 	}
 	
 	private func updateManifestChecksum(shardIndex: Int, checksum: String) async {
-		guard var manifest = self.manifest else { return }
+		guard let manifest = self.manifest else { return }
 		
 		var checksums = manifest.shardChecksums
 		checksums[String(shardIndex)] = checksum
 		
 		self.manifest = CatalogManifest(
 			version: manifest.version,
+			directoryUUID: manifest.directoryUUID,
 			created: manifest.created,
 			modified: Date(),
 			shardChecksums: checksums,

@@ -116,7 +116,8 @@ actor S3CatalogGenerator {
 		
 		// Step 7: Create manifest
 		let manifest = PhotolalaCatalogService.CatalogManifest(
-			version: 1,
+			version: "5.0",
+			directoryUUID: UUID().uuidString,
 			created: Date(),
 			modified: Date(),
 			shardChecksums: shardChecksums,
@@ -136,13 +137,13 @@ actor S3CatalogGenerator {
 	func uploadCatalog(for userId: String, manifest: Data, shards: [Int: Data]) async throws {
 		print("Uploading catalog for user: \(userId)")
 		
-		// Upload manifest
-		let manifestKey = "catalogs/\(userId)/.photolala"
+		// Upload manifest (v5.0 structure)
+		let manifestKey = "catalogs/\(userId)/.photolala/manifest.plist"
 		try await uploadData(manifest, to: manifestKey)
 		
-		// Upload shards
+		// Upload shards (v5.0 structure)
 		for (index, data) in shards {
-			let shardKey = "catalogs/\(userId)/.photolala#\(String(format: "%x", index))"
+			let shardKey = "catalogs/\(userId)/.photolala/\(String(format: "%x", index)).csv"
 			try await uploadData(data, to: shardKey)
 		}
 		

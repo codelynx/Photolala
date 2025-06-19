@@ -142,7 +142,7 @@ actor S3CatalogSyncService {
 	
 	private func performSync() async throws -> Bool {
 		// 1. Check manifest ETag first (HeadObject - no download)
-		let manifestKey = "catalogs/\(userId)/.photolala"
+		let manifestKey = "catalogs/\(userId)/.photolala/manifest.plist"
 		
 		let manifestNeedsUpdate: Bool
 		do {
@@ -179,8 +179,10 @@ actor S3CatalogSyncService {
 		
 		print("Temp directory created successfully")
 		
-		// Save manifest
-		let tempManifestURL = tempDir.appendingPathComponent(".photolala")
+		// Save manifest (v5 structure)
+		let tempCatalogDir = tempDir.appendingPathComponent(".photolala")
+		try FileManager.default.createDirectory(at: tempCatalogDir, withIntermediateDirectories: true)
+		let tempManifestURL = tempCatalogDir.appendingPathComponent("manifest.plist")
 		try manifestData.write(to: tempManifestURL)
 		
 		print("Manifest written to temp directory")
@@ -189,7 +191,7 @@ actor S3CatalogSyncService {
 		var shardsToDownload: [String] = []
 		for shardIndex in 0..<16 {
 			let shardHex = String(format: "%x", shardIndex)
-			let shardKey = "catalogs/\(userId)/.photolala#\(shardHex)"
+			let shardKey = "catalogs/\(userId)/.photolala/\(shardHex).csv"
 			
 			if let needsUpdate = try? await checkETag(key: shardKey), needsUpdate {
 				shardsToDownload.append(shardHex)
@@ -198,9 +200,9 @@ actor S3CatalogSyncService {
 		
 		// 4. Download only changed shards
 		for shardHex in shardsToDownload {
-			let shardKey = "catalogs/\(userId)/.photolala#\(shardHex)"
+			let shardKey = "catalogs/\(userId)/.photolala/\(shardHex).csv"
 			if let shardData = try await downloadFile(key: shardKey) {
-				let tempShardURL = tempDir.appendingPathComponent(".photolala#\(shardHex)")
+				let tempShardURL = tempCatalogDir.appendingPathComponent("\(shardHex).csv")
 				try shardData.write(to: tempShardURL)
 			}
 		}
@@ -277,14 +279,16 @@ actor S3CatalogSyncService {
 	}
 	
 	private func atomicUpdateCatalog(from tempDir: URL) async throws {
-		// Verify all files exist in temp
-		let requiredFiles = [".photolala"] + (0..<16).map { String(format: ".photolala#%x", $0) }
+		// Verify all files exist in temp (v5 structure)
+		let tempCatalogDir = tempDir.appendingPathComponent(".photolala")
+		let requiredFiles = ["manifest.plist"] + (0..<16).map { String(format: "%x.csv", $0) }
 		
 		for filename in requiredFiles {
-			let tempFile = tempDir.appendingPathComponent(filename)
+			let tempFile = tempCatalogDir.appendingPathComponent(filename)
 			if !FileManager.default.fileExists(atPath: tempFile.path) {
 				// Copy from existing catalog if shard wasn't updated
-				let existingFile = catalogCacheDir.appendingPathComponent(filename)
+				let existingCatalogDir = catalogCacheDir.appendingPathComponent(".photolala")
+				let existingFile = existingCatalogDir.appendingPathComponent(filename)
 				if FileManager.default.fileExists(atPath: existingFile.path) {
 					try FileManager.default.copyItem(at: existingFile, to: tempFile)
 				}

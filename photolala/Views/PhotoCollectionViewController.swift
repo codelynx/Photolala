@@ -273,24 +273,35 @@ class PhotoCollectionViewController: XViewController {
 
 	private func loadPhotos() {
 		Task { @MainActor in
-			// Use DirectoryScanner to get PhotoReference objects
-			let scannedPhotos = DirectoryScanner.scanDirectory(atPath: self.directoryPath)
+			// Use CatalogAwarePhotoLoader for better performance with catalogs
+			let loader = CatalogAwarePhotoLoader()
+			let directoryURL = URL(fileURLWithPath: self.directoryPath as String)
+			
+			do {
+				let loadedPhotos = try await loader.loadPhotos(from: directoryURL)
+				
+				// Apply sorting based on current settings
+				let sortedPhotos = self.settings?.sortOption.sort(loadedPhotos) ?? loadedPhotos
+				self.photos = sortedPhotos
 
-			// Apply sorting based on current settings
-			let sortedPhotos = self.settings?.sortOption.sort(scannedPhotos) ?? scannedPhotos
-			self.photos = sortedPhotos
+				// Apply grouping based on current settings
+				let groupingOption = self.settings?.groupingOption ?? .none
+				self.photoGroups = PhotoManager.shared.groupPhotos(sortedPhotos, by: groupingOption)
 
-			// Apply grouping based on current settings
-			let groupingOption = self.settings?.groupingOption ?? .none
-			self.photoGroups = PhotoManager.shared.groupPhotos(sortedPhotos, by: groupingOption)
+				self.reloadData()
 
-			self.reloadData()
-
-			// Notify SwiftUI about photos loaded
-			#if os(iOS)
-				self.onPhotosLoaded?(self.photos.count)
-			#endif
-			self.onPhotosLoadedWithReferences?(self.photos)
+				// Notify SwiftUI about photos loaded
+				#if os(iOS)
+					self.onPhotosLoaded?(self.photos.count)
+				#endif
+				self.onPhotosLoadedWithReferences?(self.photos)
+			} catch {
+				print("Failed to load photos: \(error)")
+				// Fall back to empty photos on error
+				self.photos = []
+				self.photoGroups = []
+				self.reloadData()
+			}
 
 			// No need for metadata loading - we're using file dates only
 		}

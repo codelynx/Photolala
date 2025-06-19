@@ -1,6 +1,6 @@
 # Photolala Architecture
 
-Last Updated: June 18, 2025 (Added Backup Queue System)
+Last Updated: June 19, 2025 (Added v5.0 Catalog System)
 
 ## Overview
 
@@ -65,6 +65,20 @@ Photolala is a cross-platform photo browser application built with SwiftUI, supp
 - Creates PhotoReference objects
 - Filters: jpg, jpeg, png, heic, heif, tiff, bmp, gif, webp
 
+#### CatalogAwarePhotoLoader
+- Intelligent photo loader with catalog support
+- Checks for `.photolala/` catalog directory
+- Falls back to DirectoryScanner if no catalog exists
+- 5-minute caching for network directories using UUID-based keys
+- Background catalog generation for directories with 100+ photos
+
+#### PhotolalaCatalogService
+- Manages v5.0 offline catalogs with `.photolala/` directory structure
+- 16-way MD5-based sharding for scalability
+- CSV format: `md5,filename,size,photodate,modified,width,height`
+- Directory UUID for cache invalidation
+- Atomic updates for consistency
+
 #### S3BackupService
 - Uploads photos to S3 with Deep Archive storage
 - Generates and uploads thumbnails (Standard storage)
@@ -79,15 +93,17 @@ Photolala is a cross-platform photo browser application built with SwiftUI, supp
 - AWS credentials from Keychain/environment
 
 #### S3CatalogGenerator
-- Creates 16-shard .photolala catalog format
-- Shards based on MD5 hash prefix (0-f)
-- CSV format: md5,filename,size,photoDate,modified,width,height
+- Creates v5.0 catalog format with `.photolala/` structure
+- 16-way sharding based on MD5 hash prefix (0-f)
+- CSV format: md5,filename,size,photodate,modified,width,height
+- Uploads to `catalogs/{userId}/.photolala/` path
 - Enables browsing without ListObjects calls
 
 #### S3CatalogSyncService
-- Syncs catalog from S3 to local cache
-- Manifest-based change detection
-- Atomic updates for consistency
+- Syncs v5.0 catalog from S3 to local cache
+- Downloads from `catalogs/{userId}/.photolala/` path
+- Manifest-based change detection with directory UUID
+- Atomic updates with temporary directory swap
 - Offline mode support
 
 #### S3DownloadService (Actor)
@@ -222,7 +238,11 @@ Tap photo → Push PhotoPreviewView
 
 ## Data Flow
 
-1. **Directory Scanning**: DirectoryScanner → [PhotoReference]
+1. **Photo Loading**: 
+   - CatalogAwarePhotoLoader checks for `.photolala/` catalog
+   - If catalog exists: Load from catalog (fast path)
+   - If no catalog: DirectoryScanner → [PhotoReference]
+   - Background catalog generation for 100+ photos
 2. **Thumbnail Loading**: PhotoReference → PhotoManager → Cached Thumbnail
 3. **Selection**: User Interaction → Native Collection View → Callback → UI Updates
 4. **Navigation**: Selection/Tap → NavigationStack → New View
@@ -250,6 +270,9 @@ Tap photo → Push PhotoPreviewView
 3. **Content-Based Keys**: Prevents duplicate processing
 4. **Proper Sizing**: Thumbnails scaled appropriately
 5. **Native Collection Views**: Better performance than SwiftUI Grid
+6. **Catalog-Based Loading**: Instant photo listing for cataloged directories
+7. **16-Way Sharding**: Scalable catalog storage for large collections
+8. **Network Directory Caching**: 5-minute cache with UUID-based invalidation
 
 ## Thread Safety
 

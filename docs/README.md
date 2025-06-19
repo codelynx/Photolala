@@ -16,6 +16,7 @@ Documents describing the current architecture and implementation:
 - **[current/native-thumbnail-strip.md](./current/native-thumbnail-strip.md)** - Native collection view thumbnail strip
 - **[current/archive-retrieval-system.md](./current/archive-retrieval-system.md)** - S3 Deep Archive photo retrieval
 - **[current/metadata-backup-system.md](./current/metadata-backup-system.md)** - Metadata backup to S3
+- **[current/catalog-system.md](./current/catalog-system.md)** - v5.0 Photolala catalog format for fast photo loading
 
 ### History
 Historical design documents and implementation notes:
@@ -61,4 +62,4 @@ When adding documentation:
 3. **Implementation notes** → Add to `history/implementation-notes/`
 4. **Status updates** → Update `PROJECT_STATUS.md`
 
-Last updated: June 16, 2025
+Last updated: June 19, 2025
