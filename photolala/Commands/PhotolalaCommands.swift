@@ -113,8 +113,6 @@ struct PhotolalaCommands: Commands {
 			panel.begin { response in
 				if response == .OK, let url = panel.url {
 					print("[PhotolalaCommands] Opening folder: \(url.path)")
-					// Save bookmark for the selected folder
-					BookmarkManager.shared.saveBookmark(for: url)
 					// Open new window with the selected folder
 					self.openWindow(value: url)
 				}

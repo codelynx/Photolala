@@ -10,13 +10,8 @@ import SwiftUI
 #if os(macOS)
 	class AppDelegate: NSObject, NSApplicationDelegate {
 		func applicationSupportsSecureRestorableState(_ app: NSApplication) -> Bool {
-			// Enable secure window restoration
-			true
-		}
-		
-		func applicationWillTerminate(_ notification: Notification) {
-			// Clean up any security-scoped resources
-			// This is handled automatically by BookmarkManager
+			// Disable window restoration
+			false
 		}
 	}
 #endif
@@ -35,7 +30,6 @@ struct PhotolalaApp: App {
 		// Initialize managers
 		_ = IdentityManager.shared
 		_ = S3BackupManager.shared
-		_ = BookmarkManager.shared
 	}
 
 	var body: some Scene {
@@ -43,16 +37,7 @@ struct PhotolalaApp: App {
 			// Folder browser windows only - no default window
 			WindowGroup("Photolala", for: URL.self) { $folderURL in
 				if let folderURL {
-					// Ensure we have access to the directory
-					if let accessibleURL = ensureAccess(to: folderURL) {
-						PhotoBrowserView(directoryPath: accessibleURL.path as NSString)
-							.onAppear {
-								// Save bookmark when window opens
-								BookmarkManager.shared.saveBookmark(for: accessibleURL)
-							}
-					} else {
-						FolderAccessDeniedView(folderURL: folderURL)
-					}
+					PhotoBrowserView(directoryPath: folderURL.path as NSString)
 				} else {
 					Text("No folder selected")
 						.foregroundStyle(.secondary)
@@ -73,22 +58,3 @@ struct PhotolalaApp: App {
 		#endif
 	}
 }
-
-#if os(macOS)
-// Helper function to ensure access to a directory
-@MainActor
-private func ensureAccess(to url: URL) -> URL? {
-	// First try to access directly (for newly selected folders)
-	if FileManager.default.isReadableFile(atPath: url.path) {
-		return url
-	}
-	
-	// Try to restore access using bookmark
-	if let restoredURL = BookmarkManager.shared.restoreAccess(to: url.path) {
-		return restoredURL
-	}
-	
-	// No access available
-	return nil
-}
-#endif
