@@ -80,6 +80,12 @@ Each option includes:
 - `cornerRadius`: Cell corner radius
 - `sectionInset`: Collection view insets
 
+### Item Info Bar
+- `showItemInfo`: Boolean to show/hide filename below thumbnails
+- Adds 24px to cell height when enabled
+- Displays truncated filename with secondary label color
+- Toggleable via toolbar button
+
 ## Performance Optimizations
 
 1. **Lazy Generation**: Thumbnails created on first request

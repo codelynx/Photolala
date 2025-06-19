@@ -185,6 +185,16 @@ See sections 30-36 below for detailed implementation notes.
    - Migrated S3PhotoBrowserView to use UnifiedPhotoCollectionViewRepresentable
    - Removed S3PhotoBrowserViewModel in favor of direct S3PhotoProvider usage
 
+3. **Implemented Item Info Bar Feature**:
+   - Added toggleable filename display below photo thumbnails
+   - New `showItemInfo` property in ThumbnailDisplaySettings (defaults to true)
+   - Dynamic cell height adjustment: adds 24px when info bar is shown
+   - Updated UnifiedPhotoCell with proper constraints and title visibility
+   - Added toolbar button with "squares.below.rectangle" SF Symbol
+   - Works with all thumbnail sizes (S/M/L) and photo sources
+   - Each window maintains independent info bar preference
+   - Documentation: `docs/history/implementation-notes/item-info-bar-implementation.md`
+
 ### 📝 Previous Changes (June 15, 2025)
 
 1. **Refactored Photo Model**:

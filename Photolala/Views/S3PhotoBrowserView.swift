@@ -92,6 +92,16 @@ struct S3PhotoBrowserView: View {
 					.help(thumbnailSettings.displayMode == .scaleToFit ? "Switch to Fill" : "Switch to Fit")
 					#endif
 					
+					// Item info toggle
+					Button(action: {
+						thumbnailSettings.showItemInfo.toggle()
+					}) {
+						Image(systemName: "squares.below.rectangle")
+					}
+					#if os(macOS)
+					.help(thumbnailSettings.showItemInfo ? "Hide item info" : "Show item info")
+					#endif
+					
 					// Thumbnail size controls
 					#if os(iOS)
 						// Size menu for iOS

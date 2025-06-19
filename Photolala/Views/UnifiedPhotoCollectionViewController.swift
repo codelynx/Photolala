@@ -111,7 +111,9 @@ class UnifiedPhotoCollectionViewController: XViewController {
 		let thumbnailOption = settings.thumbnailOption
 		layout.minimumInteritemSpacing = thumbnailOption.spacing
 		layout.minimumLineSpacing = thumbnailOption.spacing
-		layout.itemSize = NSSize(width: thumbnailOption.size, height: thumbnailOption.size)
+		// Add 24pt for info bar if shown
+		let cellHeight = thumbnailOption.size + (settings.showItemInfo ? 24 : 0)
+		layout.itemSize = NSSize(width: thumbnailOption.size, height: cellHeight)
 		layout.sectionInset = NSEdgeInsets(
 			top: thumbnailOption.sectionInset,
 			left: thumbnailOption.sectionInset,
@@ -129,15 +131,17 @@ class UnifiedPhotoCollectionViewController: XViewController {
 		return layout
 		#else
 		let thumbnailOption = settings.thumbnailOption
+		// Add 24pt for info bar if shown
+		let cellHeight = thumbnailOption.size + (settings.showItemInfo ? 24 : 0)
 		let itemSize = NSCollectionLayoutSize(
 			widthDimension: .absolute(thumbnailOption.size),
-			heightDimension: .absolute(thumbnailOption.size)
+			heightDimension: .absolute(cellHeight)
 		)
 		let item = NSCollectionLayoutItem(layoutSize: itemSize)
 		
 		let groupSize = NSCollectionLayoutSize(
 			widthDimension: .fractionalWidth(1.0),
-			heightDimension: .absolute(thumbnailOption.size)
+			heightDimension: .absolute(cellHeight)
 		)
 		let group = NSCollectionLayoutGroup.horizontal(
 			layoutSize: groupSize,
@@ -176,7 +180,9 @@ class UnifiedPhotoCollectionViewController: XViewController {
 		#if os(macOS)
 		if let layout = collectionView.collectionViewLayout as? NSCollectionViewFlowLayout {
 			let thumbnailOption = settings.thumbnailOption
-			layout.itemSize = NSSize(width: thumbnailOption.size, height: thumbnailOption.size)
+			// Add 24pt for info bar if shown
+			let cellHeight = thumbnailOption.size + (settings.showItemInfo ? 24 : 0)
+			layout.itemSize = NSSize(width: thumbnailOption.size, height: cellHeight)
 			layout.minimumInteritemSpacing = thumbnailOption.spacing
 			layout.minimumLineSpacing = thumbnailOption.spacing
 			layout.sectionInset = NSEdgeInsets(

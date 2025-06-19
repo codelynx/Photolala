@@ -23,6 +23,10 @@ class UnifiedPhotoCell: NSCollectionViewItem {
 	private var badgeView: NSView?
 	private var loadingIndicator: NSProgressIndicator!
 	
+	// Constraints
+	private var imageViewWidthConstraint: NSLayoutConstraint!
+	private var imageViewHeightConstraint: NSLayoutConstraint!
+	
 	// Current photo
 	private var currentPhoto: (any PhotoItem)?
 	private var thumbnailTask: Task<Void, Never>?
@@ -31,13 +35,16 @@ class UnifiedPhotoCell: NSCollectionViewItem {
 		self.view = NSView(frame: NSRect(x: 0, y: 0, width: 150, height: 150))
 		
 		// Image view
-		photoImageView = ScalableImageView(frame: view.bounds)
-		photoImageView.autoresizingMask = [.width, .height]
+		photoImageView = ScalableImageView()
+		photoImageView.translatesAutoresizingMaskIntoConstraints = false
 		photoImageView.scaleMode = .scaleToFit // Default to fit
 		photoImageView.wantsLayer = true
 		photoImageView.layer?.backgroundColor = NSColor.secondarySystemFill.cgColor
 		photoImageView.layer?.cornerRadius = 8
 		photoImageView.layer?.masksToBounds = true
+		photoImageView.layer?.borderWidth = 1.0
+		photoImageView.layer?.borderColor = XColor.black.withAlphaComponent(0.2).cgColor
+		
 		view.addSubview(photoImageView)
 		
 		// Title label
@@ -58,14 +65,28 @@ class UnifiedPhotoCell: NSCollectionViewItem {
 		loadingIndicator.translatesAutoresizingMaskIntoConstraints = false
 		view.addSubview(loadingIndicator)
 		
+		// Create constraints
+		imageViewWidthConstraint = photoImageView.widthAnchor.constraint(equalToConstant: 150)
+		imageViewHeightConstraint = photoImageView.heightAnchor.constraint(equalToConstant: 150)
+		
 		// Constraints
 		NSLayoutConstraint.activate([
+			// Image view - centered and constrained size
+			photoImageView.topAnchor.constraint(equalTo: view.topAnchor),
+			photoImageView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+			photoImageView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+			imageViewWidthConstraint,
+			imageViewHeightConstraint,
+			
+			// Title label
+			titleLabel.topAnchor.constraint(equalTo: photoImageView.bottomAnchor, constant: 4),
 			titleLabel.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 4),
 			titleLabel.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -4),
-			titleLabel.bottomAnchor.constraint(equalTo: view.bottomAnchor, constant: -4),
+			titleLabel.heightAnchor.constraint(equalToConstant: 20),
 			
-			loadingIndicator.centerXAnchor.constraint(equalTo: view.centerXAnchor),
-			loadingIndicator.centerYAnchor.constraint(equalTo: view.centerYAnchor)
+			// Loading indicator
+			loadingIndicator.centerXAnchor.constraint(equalTo: photoImageView.centerXAnchor),
+			loadingIndicator.centerYAnchor.constraint(equalTo: photoImageView.centerYAnchor)
 		])
 	}
 	
@@ -83,6 +104,14 @@ class UnifiedPhotoCell: NSCollectionViewItem {
 	func configure(with photo: any PhotoItem, settings: ThumbnailDisplaySettings) {
 		currentPhoto = photo
 		titleLabel.stringValue = photo.displayName
+		
+		// Update image view constraints based on thumbnail option
+		imageViewWidthConstraint.constant = settings.thumbnailOption.size
+		imageViewHeightConstraint.constant = settings.thumbnailOption.size
+		photoImageView.layer?.cornerRadius = settings.thumbnailOption.cornerRadius
+		
+		// Update title visibility based on showItemInfo
+		titleLabel.isHidden = !settings.showItemInfo
 		
 		// Update display mode
 		updateDisplayMode(settings.displayMode)

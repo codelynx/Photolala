@@ -212,6 +212,16 @@ struct PhotoBrowserView: View {
 					#if os(macOS)
 					.help(self.settings.displayMode == .scaleToFit ? "Switch to Fill" : "Switch to Fit")
 					#endif
+					
+					// Item info toggle
+					Button(action: {
+						self.settings.showItemInfo.toggle()
+					}) {
+						Image(systemName: "squares.below.rectangle")
+					}
+					#if os(macOS)
+					.help(self.settings.showItemInfo ? "Hide item info" : "Show item info")
+					#endif
 
 					#if os(iOS)
 						// Size menu for iOS
