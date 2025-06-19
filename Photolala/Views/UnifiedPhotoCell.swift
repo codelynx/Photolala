@@ -18,7 +18,7 @@ class UnifiedPhotoCell: NSCollectionViewItem {
 	static let identifier = NSUserInterfaceItemIdentifier("UnifiedPhotoCell")
 	
 	// UI Elements
-	private var photoImageView: NSImageView!
+	private var photoImageView: ScalableImageView!
 	private var titleLabel: NSTextField!
 	private var badgeView: NSView?
 	private var loadingIndicator: NSProgressIndicator!
@@ -31,9 +31,9 @@ class UnifiedPhotoCell: NSCollectionViewItem {
 		self.view = NSView(frame: NSRect(x: 0, y: 0, width: 150, height: 150))
 		
 		// Image view
-		photoImageView = NSImageView(frame: view.bounds)
+		photoImageView = ScalableImageView(frame: view.bounds)
 		photoImageView.autoresizingMask = [.width, .height]
-		photoImageView.imageScaling = .scaleProportionallyUpOrDown
+		photoImageView.scaleMode = .scaleToFit // Default to fit
 		photoImageView.wantsLayer = true
 		photoImageView.layer?.backgroundColor = NSColor.secondarySystemFill.cgColor
 		photoImageView.layer?.cornerRadius = 8
@@ -84,6 +84,9 @@ class UnifiedPhotoCell: NSCollectionViewItem {
 		currentPhoto = photo
 		titleLabel.stringValue = photo.displayName
 		
+		// Update display mode
+		updateDisplayMode(settings.displayMode)
+		
 		// Update selection appearance
 		updateSelectionAppearance()
 		
@@ -115,6 +118,16 @@ class UnifiedPhotoCell: NSCollectionViewItem {
 				self.photoImageView.image = NSImage(systemSymbolName: "exclamationmark.triangle", accessibilityDescription: nil)
 			}
 			self.loadingIndicator.stopAnimation(nil)
+		}
+	}
+	
+	private func updateDisplayMode(_ mode: ThumbnailDisplayMode) {
+		// Update image scaling based on display mode
+		switch mode {
+		case .scaleToFit:
+			photoImageView.scaleMode = .scaleToFit
+		case .scaleToFill:
+			photoImageView.scaleMode = .scaleToFill
 		}
 	}
 	
@@ -194,7 +207,7 @@ class UnifiedPhotoCell: UICollectionViewCell {
 	private func setupViews() {
 		// Image view
 		photoImageView = UIImageView()
-		photoImageView.contentMode = .scaleAspectFill
+		photoImageView.contentMode = .scaleAspectFit // Default to fit, will be updated based on settings
 		photoImageView.clipsToBounds = true
 		photoImageView.backgroundColor = .secondarySystemFill
 		photoImageView.layer.cornerRadius = 8
@@ -249,6 +262,9 @@ class UnifiedPhotoCell: UICollectionViewCell {
 		currentPhoto = photo
 		titleLabel.text = photo.displayName
 		
+		// Update display mode
+		updateDisplayMode(settings.displayMode)
+		
 		// Add badge if archived
 		if photo.isArchived {
 			addArchiveBadge()
@@ -277,6 +293,16 @@ class UnifiedPhotoCell: UICollectionViewCell {
 				self.photoImageView.image = UIImage(systemName: "exclamationmark.triangle")
 			}
 			self.loadingIndicator.stopAnimating()
+		}
+	}
+	
+	private func updateDisplayMode(_ mode: ThumbnailDisplayMode) {
+		// Update image content mode based on display mode
+		switch mode {
+		case .scaleToFit:
+			photoImageView.contentMode = .scaleAspectFit
+		case .scaleToFill:
+			photoImageView.contentMode = .scaleAspectFill
 		}
 	}
 	

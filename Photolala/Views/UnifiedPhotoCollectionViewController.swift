@@ -34,9 +34,10 @@ class UnifiedPhotoCollectionViewController: XViewController {
 	// Settings
 	var settings = ThumbnailDisplaySettings() {
 		didSet {
-			// Only update layout if view is loaded
+			// Only update if view is loaded
 			if isViewLoaded {
 				updateLayout()
+				updateVisibleCells()
 			}
 		}
 	}
@@ -321,6 +322,29 @@ class UnifiedPhotoCollectionViewController: XViewController {
 		collectionView.selectionIndexPaths = Set(selectedIndexPaths)
 		#else
 		// iOS handles selection differently
+		#endif
+	}
+	
+	// MARK: - Private Methods
+	
+	private func updateVisibleCells() {
+		#if os(macOS)
+		// Update all visible items
+		for indexPath in collectionView.indexPathsForVisibleItems() {
+			if let item = collectionView.item(at: indexPath) as? UnifiedPhotoCell,
+			   let photo = dataSource.itemIdentifier(for: indexPath)?.base as? (any PhotoItem) {
+				item.configure(with: photo, settings: settings)
+			}
+		}
+		#else
+		// Update all visible cells
+		for cell in collectionView.visibleCells {
+			if let photoCell = cell as? UnifiedPhotoCell,
+			   let indexPath = collectionView.indexPath(for: cell),
+			   let photo = dataSource.itemIdentifier(for: indexPath)?.base as? (any PhotoItem) {
+				photoCell.configure(with: photo, settings: settings)
+			}
+		}
 		#endif
 	}
 	

@@ -81,6 +81,17 @@ struct S3PhotoBrowserView: View {
 							.foregroundColor(.secondary)
 					}
 					
+					// Display mode toggle
+					Button(action: {
+						thumbnailSettings.displayMode = thumbnailSettings
+							.displayMode == .scaleToFit ? .scaleToFill : .scaleToFit
+					}) {
+						Image(systemName: thumbnailSettings.displayMode == .scaleToFit ? "aspectratio" : "aspectratio.fill")
+					}
+					#if os(macOS)
+					.help(thumbnailSettings.displayMode == .scaleToFit ? "Switch to Fill" : "Switch to Fit")
+					#endif
+					
 					// Thumbnail size controls
 					#if os(iOS)
 						// Size menu for iOS
