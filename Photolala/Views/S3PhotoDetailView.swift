@@ -20,7 +20,7 @@ struct S3PhotoDetailView: View {
 						Color.black
 						
 						if let image = fullImage {
-							Image(xImage: image)
+							Image(image)
 								.resizable()
 								.aspectRatio(contentMode: .fit)
 								.frame(maxWidth: geometry.size.width, maxHeight: geometry.size.height)

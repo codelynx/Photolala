@@ -4,12 +4,13 @@ import UniformTypeIdentifiers
 
 struct S3PhotoBrowserView: View {
 	@StateObject private var viewModel = S3PhotoBrowserViewModel()
-	@State private var thumbnailOption: ThumbnailOption = .medium
+	@State private var thumbnailSettings = ThumbnailDisplaySettings()
 	@State private var selectedPhotos: Set<PhotoS3> = []
 	@State private var showingPhotoDetail: PhotoS3?
 	@State private var showingError = false
 	@State private var errorMessage = ""
 	@State private var isRefreshing = false
+	@State private var photoProvider: S3PhotoProvider?
 	
 	var body: some View {
 		NavigationStack {
@@ -34,11 +35,11 @@ struct S3PhotoBrowserView: View {
 				} else {
 					// Photo grid
 					ScrollView {
-						LazyVGrid(columns: adaptiveColumns, spacing: thumbnailOption.spacing) {
+						LazyVGrid(columns: adaptiveColumns, spacing: thumbnailSettings.spacing) {
 							ForEach(viewModel.photos) { photo in
 								S3PhotoThumbnailView(
 									photo: photo,
-									thumbnailSize: thumbnailOption.size,
+									thumbnailSize: thumbnailSettings.thumbnailSize,
 									isSelected: selectedPhotos.contains(photo)
 								)
 								.onTapGesture {
@@ -57,7 +58,9 @@ struct S3PhotoBrowserView: View {
 				}
 			}
 			.navigationTitle("Cloud Photos")
+			#if os(macOS)
 			.navigationSubtitle("\(viewModel.photos.count) photos")
+			#endif
 			.toolbar {
 				ToolbarItemGroup(placement: .automatic) {
 					// Offline indicator
@@ -72,23 +75,22 @@ struct S3PhotoBrowserView: View {
 							.foregroundColor(.secondary)
 					}
 					
-					// Thumbnail size toggle
-					Menu {
-						ForEach(ThumbnailOption.allCases, id: \.self) { option in
-							Button(action: {
-								thumbnailOption = option
-							}) {
-								HStack {
-									Text(option.name)
-									if thumbnailOption == option {
-										Image(systemName: "checkmark")
-									}
-								}
-							}
-						}
-					} label: {
-						Label("Thumbnail Size", systemImage: thumbnailSizeIcon)
+					// Thumbnail size controls
+					Button(action: { thumbnailSettings.decreaseThumbnailSize() }) {
+						Image(systemName: "minus.magnifyingglass")
 					}
+					.disabled(!thumbnailSettings.canDecreaseThumbnailSize)
+					
+					Slider(value: Binding(
+						get: { thumbnailSettings.thumbnailSize },
+						set: { thumbnailSettings.thumbnailSize = $0 }
+					), in: 80...400, step: 20)
+						.frame(width: 100)
+					
+					Button(action: { thumbnailSettings.increaseThumbnailSize() }) {
+						Image(systemName: "plus.magnifyingglass")
+					}
+					.disabled(!thumbnailSettings.canIncreaseThumbnailSize)
 					
 					// Refresh button
 					Button(action: {
@@ -102,6 +104,13 @@ struct S3PhotoBrowserView: View {
 				}
 			}
 			.task {
+				// Initialize photo provider if needed
+				if photoProvider == nil {
+					if let userId = IdentityManager.shared.currentUser?.serviceUserID {
+						photoProvider = S3PhotoProvider(userId: userId)
+					}
+				}
+				// Load photos through view model for backward compatibility
 				await viewModel.loadPhotosFromCatalog()
 			}
 			.sheet(item: $showingPhotoDetail) { photo in
@@ -121,16 +130,16 @@ struct S3PhotoBrowserView: View {
 	// MARK: - Computed Properties
 	
 	private var adaptiveColumns: [GridItem] {
-		return Array(repeating: GridItem(.adaptive(minimum: thumbnailOption.size)), count: 1)
+		return Array(repeating: GridItem(.adaptive(minimum: thumbnailSettings.thumbnailSize)), count: 1)
 	}
 	
 	private var thumbnailSizeIcon: String {
-		switch thumbnailOption {
-		case .small:
+		// Map thumbnail size to icon
+		if thumbnailSettings.thumbnailSize < 120 {
 			return "square.grid.3x3"
-		case .medium:
+		} else if thumbnailSettings.thumbnailSize < 200 {
 			return "square.grid.2x2"
-		case .large:
+		} else {
 			return "square"
 		}
 	}
@@ -363,3 +372,4 @@ enum S3BrowserError: LocalizedError {
 		}
 	}
 }
+

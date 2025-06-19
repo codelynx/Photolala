@@ -59,7 +59,7 @@ struct BackupStatusBar: View {
 				}
 				.padding(.horizontal, 12)
 				.padding(.vertical, 6)
-				.background(Color(XColor.controlBackgroundColor))
+				.background(Color(XPlatform.primaryBackgroundColor))
 			}
 		}
 		.animation(.easeInOut(duration: 0.2), value: status.isVisible)

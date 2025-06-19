@@ -25,9 +25,11 @@ struct PhotoBrowserView: View {
 	@StateObject private var s3BackupManager = S3BackupManager.shared
 	@StateObject private var identityManager = IdentityManager.shared
 	@StateObject private var backupQueueManager = BackupQueueManager.shared
+	@StateObject private var photoProvider: LocalPhotoProvider
 
 	init(directoryPath: NSString) {
 		self.directoryPath = directoryPath
+		self._photoProvider = StateObject(wrappedValue: LocalPhotoProvider(directoryPath: directoryPath as String))
 	}
 
 	var body: some View {
@@ -112,50 +114,30 @@ struct PhotoBrowserView: View {
 
 	@ViewBuilder
 	private var collectionContent: some View {
-		Group {
-			#if os(iOS)
-				PhotoCollectionView(
-					directoryPath: self.directoryPath,
-					settings: self.settings,
-					onSelectPhoto: self.handlePhotoSelection,
-					onPhotosLoaded: { photos in
-						self.allPhotos = photos
-						// Load archive status for all photos
-						Task {
-							await self.loadArchiveStatus(for: photos)
-						}
-					},
-					onSelectionChanged: { photos in
-						self.selectedPhotos = photos
-					},
-					onArchivedPhotoClick: { photo in
-						self.archivedPhotoForRetrieval = photo
-						self.showingRetrievalDialog = true
-					},
-					photosCount: self.$photosCount
-				)
-			#else
-				PhotoCollectionView(
-					directoryPath: self.directoryPath,
-					settings: self.settings,
-					onSelectPhoto: self.handlePhotoSelection,
-					onPhotosLoaded: { photos in
-						self.allPhotos = photos
-						self.photosCount = photos.count
-						// Load archive status for all photos
-						Task {
-							await self.loadArchiveStatus(for: photos)
-						}
-					},
-					onSelectionChanged: { photos in
-						self.selectedPhotos = photos
-					},
-					onArchivedPhotoClick: { photo in
-						self.archivedPhotoForRetrieval = photo
-						self.showingRetrievalDialog = true
-					}
-				)
-			#endif
+		UnifiedPhotoCollectionViewRepresentable(
+			photoProvider: photoProvider,
+			settings: settings,
+			onSelectPhoto: { photo, allPhotos in
+				if let photoFile = photo as? PhotoFile {
+					handlePhotoSelection(photoFile, allPhotos.compactMap { $0 as? PhotoFile })
+				}
+			},
+			onSelectionChanged: { photos in
+				self.selectedPhotos = photos.compactMap { $0 as? PhotoFile }
+			}
+		)
+		.onAppear {
+			Task {
+				try? await photoProvider.loadPhotos()
+			}
+		}
+		.onReceive(photoProvider.photosPublisher) { photos in
+			self.allPhotos = photos.compactMap { $0 as? PhotoFile }
+			self.photosCount = photos.count
+			// Load archive status for all photos
+			Task {
+				await self.loadArchiveStatus(for: self.allPhotos)
+			}
 		}
 		.navigationTitle(self.directoryPath.lastPathComponent)
 		#if os(macOS)
@@ -263,6 +245,9 @@ struct PhotoBrowserView: View {
 							ForEach(PhotoSortOption.allCases, id: \.self) { option in
 								Button(action: {
 									self.settings.sortOption = option
+									Task {
+										await photoProvider.applySorting(option)
+									}
 								}) {
 									Label(option.rawValue, systemImage: option.systemImage)
 									if option == self.settings.sortOption {
@@ -275,7 +260,15 @@ struct PhotoBrowserView: View {
 						}
 					#else
 						// macOS: Use a picker with menu style
-						Picker("Sort", selection: self.$settings.sortOption) {
+						Picker("Sort", selection: Binding(
+							get: { self.settings.sortOption },
+							set: { newValue in
+								self.settings.sortOption = newValue
+								Task {
+									await photoProvider.applySorting(newValue)
+								}
+							}
+						)) {
 							ForEach(PhotoSortOption.allCases, id: \.self) { option in
 								Text(option.rawValue)
 									.tag(option)
@@ -291,6 +284,9 @@ struct PhotoBrowserView: View {
 						Menu {
 							Button(action: {
 								self.settings.groupingOption = .year
+								Task {
+									await photoProvider.applyGrouping(.year)
+								}
 							}) {
 								Label("Year", systemImage: "calendar")
 								if self.settings.groupingOption == .year {
@@ -299,6 +295,9 @@ struct PhotoBrowserView: View {
 							}
 							Button(action: {
 								self.settings.groupingOption = .month
+								Task {
+									await photoProvider.applyGrouping(.month)
+								}
 							}) {
 								Label("Month", systemImage: "calendar.badge.clock")
 								if self.settings.groupingOption == .month {
@@ -307,6 +306,9 @@ struct PhotoBrowserView: View {
 							}
 							Button(action: {
 								self.settings.groupingOption = .day
+								Task {
+									await photoProvider.applyGrouping(.day)
+								}
 							}) {
 								Label("Day", systemImage: "calendar.circle")
 								if self.settings.groupingOption == .day {
@@ -318,6 +320,9 @@ struct PhotoBrowserView: View {
 
 							Button(action: {
 								self.settings.groupingOption = .none
+								Task {
+									await photoProvider.applyGrouping(.none)
+								}
 							}) {
 								Label("None", systemImage: "square.grid.3x3")
 								if self.settings.groupingOption == .none {
@@ -336,7 +341,15 @@ struct PhotoBrowserView: View {
 						}
 					#else
 						// macOS: Use a picker with menu style
-						Picker("Group by", selection: self.$settings.groupingOption) {
+						Picker("Group by", selection: Binding(
+							get: { self.settings.groupingOption },
+							set: { newValue in
+								self.settings.groupingOption = newValue
+								Task {
+									await photoProvider.applyGrouping(newValue)
+								}
+							}
+						)) {
 							Text("Year").tag(PhotoGroupingOption.year)
 							Text("Month").tag(PhotoGroupingOption.month)
 							Text("Day").tag(PhotoGroupingOption.day)
@@ -512,6 +525,13 @@ struct PhotoBrowserView: View {
 	}
 }
 
+// Navigation data model
+struct PreviewNavigation: Hashable {
+	let photos: [PhotoFile]
+	let initialIndex: Int
+}
+
+
 // Helper extension for array chunking
 extension Array {
 	func chunked(into size: Int) -> [[Element]] {
@@ -519,12 +539,6 @@ extension Array {
 			Array(self[$0..<Swift.min($0 + size, count)])
 		}
 	}
-}
-
-// Navigation data model
-struct PreviewNavigation: Hashable {
-	let photos: [PhotoFile]
-	let initialIndex: Int
 }
 
 #Preview {

@@ -1,16 +1,5 @@
 import SwiftUI
 
-// MARK: - Image Extension
-
-extension Image {
-	init(xImage: XImage) {
-		#if os(macOS)
-		self.init(nsImage: xImage)
-		#else
-		self.init(uiImage: xImage)
-		#endif
-	}
-}
 
 struct S3PhotoThumbnailView: View {
 	let photo: PhotoS3
@@ -33,7 +22,7 @@ struct S3PhotoThumbnailView: View {
 			
 			// Thumbnail or placeholder
 			if let thumbnail = thumbnail {
-				Image(xImage: thumbnail)
+				Image(thumbnail)
 					.resizable()
 					.aspectRatio(contentMode: .fill)
 					.frame(width: thumbnailSize, height: thumbnailSize)

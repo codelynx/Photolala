@@ -1,10 +1,10 @@
 # Photolala Architecture
 
-Last Updated: June 19, 2025 (Added v5.0 Catalog System)
+Last Updated: June 19, 2025 (Added Unified Photo Browser Architecture)
 
 ## Overview
 
-Photolala is a cross-platform photo browser application built with SwiftUI, supporting macOS, iOS, and tvOS. It follows a window-per-folder architecture on macOS and uses native collection views for optimal performance with large photo collections.
+Photolala is a cross-platform photo browser application built with SwiftUI, supporting macOS, iOS, and tvOS. It follows a window-per-folder architecture on macOS and uses native collection views for optimal performance with large photo collections. The application now features a unified photo browser architecture that supports multiple photo sources (local files, S3 cloud storage) through a consistent interface.
 
 ## Core Architecture Principles
 
@@ -12,16 +12,30 @@ Photolala is a cross-platform photo browser application built with SwiftUI, supp
 2. **Efficient Memory Management**: Lightweight PhotoReference model with lazy thumbnail loading
 3. **Window-Per-Folder** (macOS): Each folder opens in its own window, allowing side-by-side comparison
 4. **Reactive Updates**: @Observable models for automatic UI updates
+5. **Protocol-Oriented Design**: PhotoItem protocol enables unified handling of different photo sources
+6. **Provider Pattern**: PhotoProvider abstraction allows extensible photo source support
 
 ## Component Architecture
 
 ### Models
 
-#### PhotoReference
+#### PhotoItem Protocol
+- Common interface for all photo types (PhotoFile, PhotoS3)
+- Key methods: `loadThumbnail()`, `loadImageData()`, `contextMenuItems()`
+- Properties: dimensions, dates, archive status, MD5 hash
+- Enables unified UI components to work with any photo source
+
+#### PhotoReference (Legacy)
 - Lightweight file representation
 - Properties: `directoryPath` (NSString), `filename` (String)
 - Computed: `fileURL`, `filePath`
 - Observable with thumbnail caching
+- Being replaced by PhotoFile in unified architecture
+
+#### PhotoFile
+- Enhanced local photo representation implementing PhotoItem
+- Includes metadata, archive info, thumbnail state
+- Works with PhotoManager for efficient loading
 
 #### ThumbnailDisplaySettings
 - Per-window display preferences
@@ -53,6 +67,13 @@ Photolala is a cross-platform photo browser application built with SwiftUI, supp
 - Expiration dates for restored files
 
 ### Services
+
+#### PhotoProvider Protocol & Implementations
+- **BasePhotoProvider**: Common functionality, @MainActor for thread safety
+- **LocalPhotoProvider**: Loads photos from local directories via CatalogAwarePhotoLoader
+- **S3PhotoProvider**: Loads photos from S3 with catalog sync support
+- Protocol includes: loading, refreshing, grouping, sorting capabilities
+- Observable with Combine publishers for reactive UI updates
 
 #### PhotoManager (Singleton)
 - Dual caching: memory (NSCache) + disk
@@ -140,8 +161,15 @@ Photolala is a cross-platform photo browser application built with SwiftUI, supp
 
 ### Views
 
+#### Unified Photo Browser Components
+- **UnifiedPhotoCollectionViewController**: Platform-agnostic controller working with any PhotoProvider
+- **UnifiedPhotoCollectionViewRepresentable**: SwiftUI bridge for the unified controller
+- **UnifiedPhotoCell**: Collection view cell displaying any PhotoItem
+- Used by both PhotoBrowserView and S3PhotoBrowserView for consistency
+
 #### PhotoBrowserView
 - Main container with toolbar
+- Now uses UnifiedPhotoCollectionViewRepresentable with LocalPhotoProvider
 - Platform-specific navigation:
   - macOS: Own NavigationStack
   - iOS: Uses parent NavigationStack

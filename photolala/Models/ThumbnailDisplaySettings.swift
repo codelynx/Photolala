@@ -75,12 +75,33 @@ class ThumbnailDisplaySettings {
 	var thumbnailOption: ThumbnailOption = .default
 	var sortOption: PhotoSortOption = .filename
 	var groupingOption: PhotoGroupingOption = .none
+	var thumbnailSize: CGFloat = 150
+	var spacing: CGFloat = 8
 
-	var thumbnailSize: CGFloat {
-		self.thumbnailOption.size
+	// Convenience properties
+	var canIncreaseThumbnailSize: Bool {
+		thumbnailSize < 400
+	}
+	
+	var canDecreaseThumbnailSize: Bool {
+		thumbnailSize > 80
 	}
 
 	init() {
 		// No UserDefaults - each window gets its own settings
+		self.thumbnailSize = thumbnailOption.size
+		self.spacing = thumbnailOption.spacing
+	}
+	
+	func increaseThumbnailSize() {
+		if canIncreaseThumbnailSize {
+			thumbnailSize += 20
+		}
+	}
+	
+	func decreaseThumbnailSize() {
+		if canDecreaseThumbnailSize {
+			thumbnailSize -= 20
+		}
 	}
 }

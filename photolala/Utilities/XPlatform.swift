@@ -10,7 +10,7 @@ import SwiftUI
 
 #if canImport(AppKit)
 	import AppKit
-
+	public typealias XView = NSView
 	public typealias XViewController = NSViewController
 	public typealias XWindow = NSWindow
 	public typealias XImage = NSImage
@@ -20,11 +20,14 @@ import SwiftUI
 	public typealias XCollectionViewDataSource = NSCollectionViewDataSource
 	public typealias XViewControllerRepresentable = NSViewControllerRepresentable
 	public typealias XViewRepresentable = NSViewRepresentable
+	public typealias XMenu = NSMenu
+	public typealias XCollectionViewDiffableDataSource = NSCollectionViewDiffableDataSource
+	public typealias XCollectionViewLayout = NSCollectionViewLayout
 #endif
 
 #if canImport(UIKit)
 	import UIKit
-
+	public typealias XView = UIView
 	public typealias XViewController = UIViewController
 	public typealias XWindow = UIWindow
 	public typealias XImage = UIImage
@@ -34,6 +37,9 @@ import SwiftUI
 	public typealias XCollectionViewDataSource = UICollectionViewDataSource
 	public typealias XViewControllerRepresentable = UIViewControllerRepresentable
 	public typealias XViewRepresentable = UIViewRepresentable
+	public typealias XMenu = UIMenu
+	public typealias XCollectionViewDiffableDataSource = UICollectionViewDiffableDataSource
+	public typealias XCollectionViewLayout = UICollectionViewLayout
 #endif
 
 // Cross-platform image data extension
@@ -47,6 +53,19 @@ extension XImage {
 		}
 	#endif
 }
+
+// MARK: - Image Extension
+
+extension Image {
+	init(_ image: XImage) {
+		#if os(macOS)
+		self.init(nsImage: image)
+		#else
+		self.init(uiImage: image)
+		#endif
+	}
+}
+
 
 // MARK: - Cross-platform Button Styles
 
@@ -84,9 +103,11 @@ extension View {
 
 struct XPlatform {
 	#if os(macOS)
+	static let primaryBackgroundColor = NSColor.controlBackgroundColor
 	static let secondaryBackgroundColor = NSColor.windowBackgroundColor
 	static let tertiaryBackgroundColor = NSColor.controlBackgroundColor
 	#else
+	static let primaryBackgroundColor = UIColor.systemBackground
 	static let secondaryBackgroundColor = UIColor.systemBackground
 	static let tertiaryBackgroundColor = UIColor.secondarySystemBackground
 	#endif
