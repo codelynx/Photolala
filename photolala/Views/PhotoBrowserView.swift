@@ -22,6 +22,7 @@ struct PhotoBrowserView: View {
 	@State private var showingUpgradePrompt = false
 	@State private var archivedPhotoForRetrieval: PhotoFile?
 	@State private var showingRetrievalDialog = false
+	@State private var isRefreshing = false
 	@StateObject private var s3BackupManager = S3BackupManager.shared
 	@StateObject private var identityManager = IdentityManager.shared
 	@StateObject private var backupQueueManager = BackupQueueManager.shared
@@ -369,6 +370,21 @@ struct PhotoBrowserView: View {
 						.pickerStyle(.menu)
 						.frame(width: 120)
 						.help("Group photos by date")
+					#endif
+					
+					// Refresh button
+					Button(action: {
+						Task {
+							isRefreshing = true
+							defer { isRefreshing = false }
+							try? await photoProvider.refresh()
+						}
+					}) {
+						Label("Refresh", systemImage: "arrow.clockwise")
+					}
+					.disabled(isRefreshing)
+					#if os(macOS)
+					.help("Refresh folder contents")
 					#endif
 
 					// S3 Backup button
