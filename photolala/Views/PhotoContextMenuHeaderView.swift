@@ -18,7 +18,7 @@
 		private let loadingSpinner: NSProgressIndicator
 		private let metadataStack: NSStackView
 
-		private var photo: PhotoReference?
+		private var photo: PhotoFile?
 		private var loadingTask: Task<Void, Never>?
 
 		override init(frame frameRect: NSRect) {
@@ -121,7 +121,7 @@
 			])
 		}
 
-		func configure(with photo: PhotoReference, displayMode: ThumbnailDisplayMode) {
+		func configure(with photo: PhotoFile, displayMode: ThumbnailDisplayMode) {
 			self.photo = photo
 
 			// Cancel any existing loading task

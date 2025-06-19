@@ -2,7 +2,7 @@ import SwiftUI
 import UniformTypeIdentifiers
 
 struct S3PhotoDetailView: View {
-	let photo: S3Photo
+	let photo: PhotoS3
 	@Environment(\.dismiss) private var dismiss
 	@State private var fullImage: XImage?
 	@State private var isLoadingImage = false

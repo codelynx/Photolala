@@ -89,7 +89,7 @@ class PhotoManager {
 	private let metadataCache = NSCache<NSString, PhotoMetadata>() // filePath: PhotoMetadata
 	private let queue = DispatchQueue(label: "com.photolala.PhotoManager", qos: .userInitiated, attributes: .concurrent)
 
-	func loadImage(for photo: PhotoReference) async throws -> XImage? {
+	func loadImage(for photo: PhotoFile) async throws -> XImage? {
 		try await withCheckedThrowingContinuation { continuation in
 			self.queue.async {
 				do {
@@ -102,7 +102,7 @@ class PhotoManager {
 		}
 	}
 
-	func loadFullImage(for photo: PhotoReference) async throws -> XImage? {
+	func loadFullImage(for photo: PhotoFile) async throws -> XImage? {
 		try await withCheckedThrowingContinuation { continuation in
 			self.queue.async {
 				do {
@@ -163,7 +163,7 @@ class PhotoManager {
 		}
 	}
 
-	private func syncLoadImage(for photo: PhotoReference) throws -> XImage? {
+	private func syncLoadImage(for photo: PhotoFile) throws -> XImage? {
 		if let image = imageCache.object(forKey: photo.id as NSString) {
 			return image
 		}
@@ -326,7 +326,7 @@ class PhotoManager {
 		return nil
 	}
 
-	func thumbnail(for photoRep: PhotoReference) async throws -> XThumbnail? {
+	func thumbnail(for photoRep: PhotoFile) async throws -> XThumbnail? {
 		try await withCheckedThrowingContinuation { continuation in
 			self.queue.async {
 				do {
@@ -339,7 +339,7 @@ class PhotoManager {
 		}
 	}
 
-	private func syncThumbnail(for photoRep: PhotoReference) throws -> XThumbnail? {
+	private func syncThumbnail(for photoRep: PhotoFile) throws -> XThumbnail? {
 		let startTime = Date()
 
 		// First check memory cache with file path (faster)
@@ -466,7 +466,7 @@ class PhotoManager {
 
 	// MARK: - Prefetching
 
-	func prefetchThumbnails(for photos: [PhotoReference]) async {
+	func prefetchThumbnails(for photos: [PhotoFile]) async {
 		// Process in parallel but limit concurrency
 		await withTaskGroup(of: Void.self) { group in
 			for photo in photos {
@@ -482,7 +482,7 @@ class PhotoManager {
 		}
 	}
 
-	func prefetchImages(for photos: [PhotoReference], priority: TaskPriority = .medium) async {
+	func prefetchImages(for photos: [PhotoFile], priority: TaskPriority = .medium) async {
 		// Limit concurrent full image loads to prevent memory spikes
 		let maxConcurrent = 2
 
@@ -505,7 +505,7 @@ class PhotoManager {
 		}
 	}
 
-	func prefetchThumbnails(for photos: [PhotoReference], priority: TaskPriority = .low) async {
+	func prefetchThumbnails(for photos: [PhotoFile], priority: TaskPriority = .low) async {
 		// Limit concurrent thumbnail loads
 		let maxConcurrent = 4
 
@@ -764,7 +764,7 @@ class PhotoManager {
 	}
 
 	// Combined thumbnail and metadata loading for efficiency
-	func loadPhotoData(for photo: PhotoReference) async throws -> (thumbnail: XThumbnail?, metadata: PhotoMetadata?) {
+	func loadPhotoData(for photo: PhotoFile) async throws -> (thumbnail: XThumbnail?, metadata: PhotoMetadata?) {
 		try await withCheckedThrowingContinuation { continuation in
 			self.queue.async {
 				do {
@@ -777,7 +777,7 @@ class PhotoManager {
 		}
 	}
 
-	private func syncLoadPhotoData(for photo: PhotoReference) throws
+	private func syncLoadPhotoData(for photo: PhotoFile) throws
 		-> (thumbnail: XThumbnail?, metadata: PhotoMetadata?)
 	{
 		// Load image data once
@@ -822,7 +822,7 @@ class PhotoManager {
 	}
 
 	// Public API for metadata
-	func metadata(for photo: PhotoReference) async throws -> PhotoMetadata? {
+	func metadata(for photo: PhotoFile) async throws -> PhotoMetadata? {
 		try await withCheckedThrowingContinuation { continuation in
 			self.queue.async {
 				do {
@@ -835,7 +835,7 @@ class PhotoManager {
 		}
 	}
 
-	private func syncMetadata(for photo: PhotoReference) throws -> PhotoMetadata? {
+	private func syncMetadata(for photo: PhotoFile) throws -> PhotoMetadata? {
 		// Check memory cache first
 		if let cached = metadataCache.object(forKey: photo.filePath as NSString) {
 			self.stats.thumbnailHits += 1 // Reuse thumbnail stats for now
@@ -889,7 +889,7 @@ class PhotoManager {
 
 	// MARK: - Photo Grouping
 
-	func groupPhotos(_ photos: [PhotoReference], by option: PhotoGroupingOption) -> [PhotoGroup] {
+	func groupPhotos(_ photos: [PhotoFile], by option: PhotoGroupingOption) -> [PhotoGroup] {
 		guard option != .none else {
 			// Single group with all photos
 			return [PhotoGroup(title: "", photos: photos, dateRepresentative: Date())]
@@ -903,13 +903,13 @@ class PhotoManager {
 		}
 
 		let calendar = Calendar.current
-		let sortedPhotos = photos.sorted { (photo1: PhotoReference, photo2: PhotoReference) -> Bool in
+		let sortedPhotos = photos.sorted { (photo1: PhotoFile, photo2: PhotoFile) -> Bool in
 			return (photo1.fileCreationDate ?? Date()) > (photo2.fileCreationDate ?? Date())
 		}
 
 		switch option {
 		case .year:
-			let grouped = Dictionary(grouping: sortedPhotos) { (photo: PhotoReference) -> Int in
+			let grouped = Dictionary(grouping: sortedPhotos) { (photo: PhotoFile) -> Int in
 				calendar.component(.year, from: photo.fileCreationDate ?? Date())
 			}
 
@@ -927,7 +927,7 @@ class PhotoManager {
 			let formatter = DateFormatter()
 			formatter.dateFormat = "MMMM yyyy" // e.g., "April 2024"
 
-			let grouped = Dictionary(grouping: sortedPhotos) { (photo: PhotoReference) -> Date in
+			let grouped = Dictionary(grouping: sortedPhotos) { (photo: PhotoFile) -> Date in
 				let date = photo.fileCreationDate ?? Date()
 				let components = calendar.dateComponents([.year, .month], from: date)
 				return calendar.date(from: components) ?? date
@@ -947,7 +947,7 @@ class PhotoManager {
 			let formatter = DateFormatter()
 			formatter.dateFormat = "MMMM d, yyyy" // e.g., "April 15, 2024"
 
-			let grouped = Dictionary(grouping: sortedPhotos) { (photo: PhotoReference) -> Date in
+			let grouped = Dictionary(grouping: sortedPhotos) { (photo: PhotoFile) -> Date in
 				let date = photo.fileCreationDate ?? Date()
 				let components = calendar.dateComponents([.year, .month, .day], from: date)
 				return calendar.date(from: components) ?? date
@@ -971,7 +971,7 @@ class PhotoManager {
 	// MARK: - Archive Status
 	
 	/// Load archive status from S3 for a photo
-	func loadArchiveStatus(for photo: PhotoReference, s3Service: S3BackupService, userId: String) async throws {
+	func loadArchiveStatus(for photo: PhotoFile, s3Service: S3BackupService, userId: String) async throws {
 		// First ensure we have MD5 hash
 		if photo.md5Hash == nil {
 			let data = try Data(contentsOf: photo.fileURL)
@@ -1007,7 +1007,7 @@ class PhotoManager {
 	}
 	
 	/// Load archive status for multiple photos
-	func loadArchiveStatus(for photos: [PhotoReference], s3Service: S3BackupService, userId: String) async {
+	func loadArchiveStatus(for photos: [PhotoFile], s3Service: S3BackupService, userId: String) async {
 		// Load in parallel with limited concurrency
 		await withTaskGroup(of: Void.self) { group in
 			for photo in photos {

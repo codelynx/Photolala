@@ -8,7 +8,7 @@
 import SwiftUI
 
 struct ThumbnailStripView: XViewControllerRepresentable {
-	let photos: [PhotoReference]
+	let photos: [PhotoFile]
 	@Binding var currentIndex: Int
 	let thumbnailSize: CGSize
 	let onTimerExtend: (() -> Void)?

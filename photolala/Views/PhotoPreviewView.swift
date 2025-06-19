@@ -5,7 +5,7 @@ struct PhotoPreviewView: View {
 	private let controlStripHeight: CGFloat = 44
 	private let useNativeThumbnailStrip = true // Feature flag for testing
 
-	let photos: [PhotoReference]
+	let photos: [PhotoFile]
 	let initialIndex: Int
 	@Binding var isPresented: Bool
 
@@ -37,7 +37,7 @@ struct PhotoPreviewView: View {
 		#endif
 	}
 
-	init(photos: [PhotoReference], initialIndex: Int, isPresented: Binding<Bool> = .constant(false)) {
+	init(photos: [PhotoFile], initialIndex: Int, isPresented: Binding<Bool> = .constant(false)) {
 		self.photos = photos
 		self.initialIndex = initialIndex
 		self._isPresented = isPresented
@@ -482,7 +482,7 @@ struct ControlStrip: View {
 // Current LazyHStack solution works well for moderate collections (<1000 photos)
 
 struct ThumbnailStrip: View {
-	let photos: [PhotoReference]
+	let photos: [PhotoFile]
 	@Binding var currentIndex: Int
 	let thumbnailSize: CGSize
 	let onTimerExtend: (() -> Void)?
@@ -531,7 +531,7 @@ struct ThumbnailStrip: View {
 }
 
 struct ThumbnailView: View {
-	let photo: PhotoReference
+	let photo: PhotoFile
 	let isSelected: Bool
 	let size: CGSize
 
@@ -616,7 +616,7 @@ struct ThumbnailView: View {
 // MARK: - Metadata HUD
 
 struct MetadataHUD: View {
-	let photo: PhotoReference
+	let photo: PhotoFile
 	let metadata: PhotoMetadata?
 	let geometry: GeometryProxy
 	let topMargin: CGFloat

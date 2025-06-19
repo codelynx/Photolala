@@ -29,8 +29,8 @@ enum PhotoSortOption: String, CaseIterable {
 		}
 	}
 
-	// Sort comparator for PhotoReference - using file dates only
-	func comparator(for photo1: PhotoReference, photo2: PhotoReference) -> Bool {
+	// Sort comparator for PhotoFile - using file dates only
+	func comparator(for photo1: PhotoFile, photo2: PhotoFile) -> Bool {
 		switch self {
 		case .filename:
 			return photo1.filename.localizedStandardCompare(photo2.filename) == .orderedAscending
@@ -46,7 +46,7 @@ enum PhotoSortOption: String, CaseIterable {
 	}
 
 	// Sort an array of photos
-	func sort(_ photos: [PhotoReference]) -> [PhotoReference] {
+	func sort(_ photos: [PhotoFile]) -> [PhotoFile] {
 		photos.sorted { self.comparator(for: $0, photo2: $1) }
 	}
 }

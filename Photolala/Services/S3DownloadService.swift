@@ -73,7 +73,7 @@ actor S3DownloadService {
 	}
 	
 	/// Download a thumbnail from S3
-	func downloadThumbnail(for photo: S3Photo) async throws -> XImage {
+	func downloadThumbnail(for photo: PhotoS3) async throws -> XImage {
 		let key = photo.thumbnailKey
 		
 		// Check if already downloading
@@ -118,7 +118,7 @@ actor S3DownloadService {
 	}
 	
 	/// Download a full photo from S3
-	func downloadPhoto(for photo: S3Photo) async throws -> Data {
+	func downloadPhoto(for photo: PhotoS3) async throws -> Data {
 		let key = photo.photoKey
 		
 		// Check cache first

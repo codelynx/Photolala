@@ -52,7 +52,7 @@ class S3BackupManager: ObservableObject {
 		}
 	}
 
-	func uploadPhoto(_ photoRef: PhotoReference) async throws {
+	func uploadPhoto(_ photoRef: PhotoFile) async throws {
 		// Check authentication
 		guard let userId else {
 			throw S3BackupError.notSignedIn
@@ -103,7 +103,7 @@ class S3BackupManager: ObservableObject {
 		print("Successfully uploaded: \(photoRef.filename)")
 	}
 
-	func uploadPhotos(_ photos: [PhotoReference]) async throws {
+	func uploadPhotos(_ photos: [PhotoFile]) async throws {
 		let total = photos.count
 		var completed = 0
 
@@ -116,7 +116,7 @@ class S3BackupManager: ObservableObject {
 		self.uploadProgress = 0
 	}
 
-	func isPhotoBackedUp(_ photoRef: PhotoReference) async -> Bool {
+	func isPhotoBackedUp(_ photoRef: PhotoFile) async -> Bool {
 		guard let s3Service,
 		      let userId else { return false }
 

@@ -361,7 +361,7 @@ struct S3BackupTestView: View {
 				let tempURL = tempDir.appendingPathComponent("temp_photo_\(index).jpg")
 				try data.write(to: tempURL)
 
-				let photoRef = PhotoReference(
+				let photoRef = PhotoFile(
 					directoryPath: tempDir.path as NSString,
 					filename: "temp_photo_\(index).jpg"
 				)

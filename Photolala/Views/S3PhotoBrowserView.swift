@@ -5,8 +5,8 @@ import UniformTypeIdentifiers
 struct S3PhotoBrowserView: View {
 	@StateObject private var viewModel = S3PhotoBrowserViewModel()
 	@State private var thumbnailOption: ThumbnailOption = .medium
-	@State private var selectedPhotos: Set<S3Photo> = []
-	@State private var showingPhotoDetail: S3Photo?
+	@State private var selectedPhotos: Set<PhotoS3> = []
+	@State private var showingPhotoDetail: PhotoS3?
 	@State private var showingError = false
 	@State private var errorMessage = ""
 	@State private var isRefreshing = false
@@ -137,7 +137,7 @@ struct S3PhotoBrowserView: View {
 	
 	// MARK: - Actions
 	
-	private func handlePhotoTap(_ photo: S3Photo) {
+	private func handlePhotoTap(_ photo: PhotoS3) {
 		#if os(macOS)
 		// macOS: Toggle selection
 		if selectedPhotos.contains(photo) {
@@ -158,7 +158,7 @@ struct S3PhotoBrowserView: View {
 		await viewModel.syncAndReload()
 	}
 	
-	private func downloadPhoto(_ photo: S3Photo) async {
+	private func downloadPhoto(_ photo: PhotoS3) async {
 		do {
 			#if DEBUG
 			// Simulate download in debug mode
@@ -214,7 +214,7 @@ struct S3PhotoBrowserView: View {
 	// MARK: - Context Menu
 	
 	@ViewBuilder
-	private func photoContextMenu(for photo: S3Photo) -> some View {
+	private func photoContextMenu(for photo: PhotoS3) -> some View {
 		Button(action: {
 			showingPhotoDetail = photo
 		}) {
@@ -256,7 +256,7 @@ struct S3PhotoBrowserView: View {
 
 @MainActor
 class S3PhotoBrowserViewModel: ObservableObject {
-	@Published var photos: [S3Photo] = []
+	@Published var photos: [PhotoS3] = []
 	@Published var isLoading = false
 	@Published var isOfflineMode = false
 	@Published var lastError: Error?
@@ -314,7 +314,7 @@ class S3PhotoBrowserViewModel: ObservableObject {
 			print("DEBUG: Loaded \(entries.count) entries from catalog")
 			
 			photos = entries.map { entry in
-				S3Photo(
+				PhotoS3(
 					from: entry,
 					s3Info: s3MasterCatalog?.photos[entry.md5],
 					userId: userId

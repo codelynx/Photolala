@@ -1,5 +1,5 @@
 //
-//  PhotoReference.swift
+//  PhotoFile.swift
 //  Photolala
 //
 //  Created by Kaz Yoshikawa on 2025/06/12.
@@ -10,7 +10,7 @@ import Observation
 import SwiftUI
 
 @Observable
-class PhotoReference: Identifiable, Hashable {
+class PhotoFile: Identifiable, Hashable {
 	var id: String { self.filePath }
 	let directoryPath: NSString
 	let filename: String
@@ -60,7 +60,7 @@ class PhotoReference: Identifiable, Hashable {
 		guard self.fileCreationDate == nil else { return }
 
 		let startTime = Date()
-		print("[PhotoReference] Loading file date for: \(self.filename)")
+		print("[PhotoFile] Loading file date for: \(self.filename)")
 
 		do {
 			let attributes = try FileManager.default.attributesOfItem(atPath: self.filePath)
@@ -70,12 +70,12 @@ class PhotoReference: Identifiable, Hashable {
 			let elapsed = Date().timeIntervalSince(startTime)
 			if elapsed > 0.1 {
 				print(
-					"[PhotoReference] Warning: Slow file attribute access for \(self.filename): \(String(format: "%.3f", elapsed))s"
+					"[PhotoFile] Warning: Slow file attribute access for \(self.filename): \(String(format: "%.3f", elapsed))s"
 				)
 			}
 		} catch {
 			// Silently fail, will use current date as fallback
-			print("[PhotoReference] Failed to get file date for \(self.filename): \(error)")
+			print("[PhotoFile] Failed to get file date for \(self.filename): \(error)")
 		}
 	}
 
@@ -86,7 +86,7 @@ class PhotoReference: Identifiable, Hashable {
 	}
 
 	// Equatable
-	static func == (lhs: PhotoReference, rhs: PhotoReference) -> Bool {
+	static func == (lhs: PhotoFile, rhs: PhotoFile) -> Bool {
 		lhs.directoryPath == rhs.directoryPath && lhs.filename == rhs.filename
 	}
 

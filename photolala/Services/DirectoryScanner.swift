@@ -10,8 +10,8 @@ import Foundation
 class DirectoryScanner {
 	static let imageExtensions = ["jpg", "jpeg", "png", "heic", "heif", "tiff", "bmp", "gif", "webp"]
 
-	static func scanDirectory(atPath path: NSString) -> [PhotoReference] {
-		var photos: [PhotoReference] = []
+	static func scanDirectory(atPath path: NSString) -> [PhotoFile] {
+		var photos: [PhotoFile] = []
 
 		print("[DirectoryScanner] Starting scan of directory: \(path)")
 		let startTime = Date()
@@ -51,7 +51,7 @@ class DirectoryScanner {
 
 				if self.imageExtensions.contains(fileExtension) {
 					let filename = fileURL.lastPathComponent
-					let photo = PhotoReference(directoryPath: path, filename: filename)
+					let photo = PhotoFile(directoryPath: path, filename: filename)
 					photos.append(photo)
 				}
 			}

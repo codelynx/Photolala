@@ -22,7 +22,7 @@ class CatalogAwarePhotoLoader {
 	private let cacheValidityDuration: TimeInterval = 300 // 5 minutes
 	
 	private struct CachedCatalog {
-		let photos: [PhotoReference]
+		let photos: [PhotoFile]
 		let cachedAt: Date
 		let directoryUUID: String?
 		
@@ -36,7 +36,7 @@ class CatalogAwarePhotoLoader {
 	}
 	
 	/// Load photos from a directory, using catalog if available
-	func loadPhotos(from directory: URL) async throws -> [PhotoReference] {
+	func loadPhotos(from directory: URL) async throws -> [PhotoFile] {
 		// Check cache first for network directories
 		if isNetworkLocation(directory), let cached = getCachedPhotos(for: directory) {
 			logger.debug("Using cached photos for \(directory.path)")
@@ -80,7 +80,7 @@ class CatalogAwarePhotoLoader {
 	}
 	
 	/// Force refresh catalog, bypassing cache
-	func refreshCatalog(for directory: URL) async throws -> [PhotoReference] {
+	func refreshCatalog(for directory: URL) async throws -> [PhotoFile] {
 		// Clear cache
 		clearCache(for: directory)
 		
@@ -90,7 +90,7 @@ class CatalogAwarePhotoLoader {
 	
 	// MARK: - Private Methods
 	
-	private func loadFromCatalog(_ directory: URL) async throws -> [PhotoReference] {
+	private func loadFromCatalog(_ directory: URL) async throws -> [PhotoFile] {
 		// Create a new catalog service for this directory
 		let catalogService = PhotolalaCatalogService(catalogURL: directory)
 		
@@ -100,9 +100,9 @@ class CatalogAwarePhotoLoader {
 		// Load all entries
 		let entries = try await catalogService.loadAllEntries()
 		
-		// Convert to PhotoReference objects
+		// Convert to PhotoFile objects
 		let photos = entries.map { entry in
-			let photo = PhotoReference(
+			let photo = PhotoFile(
 				directoryPath: directory.path as NSString,
 				filename: entry.filename
 			)
@@ -123,7 +123,7 @@ class CatalogAwarePhotoLoader {
 		return photos
 	}
 	
-	private func generateCatalog(for directory: URL, photos: [PhotoReference]) async throws {
+	private func generateCatalog(for directory: URL, photos: [PhotoFile]) async throws {
 		logger.info("Generating catalog for \(directory.path) with \(photos.count) photos")
 		
 		// Create catalog service for this directory
@@ -187,7 +187,7 @@ class CatalogAwarePhotoLoader {
 		return networkPrefixes.contains { url.absoluteString.hasPrefix($0) }
 	}
 	
-	private func getCachedPhotos(for directory: URL) -> [PhotoReference]? {
+	private func getCachedPhotos(for directory: URL) -> [PhotoFile]? {
 		cacheQueue.sync {
 			guard let cached = cachedCatalogs[directory],
 			      cached.isValid else {
@@ -197,7 +197,7 @@ class CatalogAwarePhotoLoader {
 		}
 	}
 	
-	private func cachePhotos(_ photos: [PhotoReference], for directory: URL) {
+	private func cachePhotos(_ photos: [PhotoFile], for directory: URL) {
 		cacheQueue.async {
 			self.cachedCatalogs[directory] = CachedCatalog(
 				photos: photos,

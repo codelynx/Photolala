@@ -12,15 +12,15 @@ struct PhotoBrowserView: View {
 	let directoryPath: NSString
 	@State private var settings = ThumbnailDisplaySettings()
 	@State private var photosCount = 0
-	@State private var selectedPhotos: [PhotoReference] = []
+	@State private var selectedPhotos: [PhotoFile] = []
 	@State private var navigationPath = NavigationPath()
 	@State private var selectedPhotoNavigation: PreviewNavigation?
-	@State private var allPhotos: [PhotoReference] = []
+	@State private var allPhotos: [PhotoFile] = []
 	@State private var showingHelp = false
 	@State private var showingS3UploadProgress = false
 	@State private var showingSignInPrompt = false
 	@State private var showingUpgradePrompt = false
-	@State private var archivedPhotoForRetrieval: PhotoReference?
+	@State private var archivedPhotoForRetrieval: PhotoFile?
 	@State private var showingRetrievalDialog = false
 	@StateObject private var s3BackupManager = S3BackupManager.shared
 	@StateObject private var identityManager = IdentityManager.shared
@@ -67,7 +67,7 @@ struct PhotoBrowserView: View {
 					if let photo = archivedPhotoForRetrieval,
 					   let archiveInfo = photo.archiveInfo {
 						PhotoRetrievalView(
-							photoReference: photo,
+							PhotoFile: photo,
 							archiveInfo: archiveInfo,
 							isPresented: self.$showingRetrievalDialog
 						)
@@ -95,7 +95,7 @@ struct PhotoBrowserView: View {
 					if let photo = archivedPhotoForRetrieval,
 					   let archiveInfo = photo.archiveInfo {
 						PhotoRetrievalView(
-							photoReference: photo,
+							PhotoFile: photo,
 							archiveInfo: archiveInfo,
 							selectedPhotos: self.selectedPhotos,
 							isPresented: self.$showingRetrievalDialog
@@ -397,14 +397,14 @@ struct PhotoBrowserView: View {
 		#endif
 	}
 
-	private func handlePhotoSelection(_ photo: PhotoReference, _ allPhotos: [PhotoReference]) {
+	private func handlePhotoSelection(_ photo: PhotoFile, _ allPhotos: [PhotoFile]) {
 		print("[PhotoBrowserView] handlePhotoSelection called for: \(photo.filename)")
 
 		// Store all photos for space key navigation
 		self.allPhotos = allPhotos
 
 		// If there's an active selection, show only selected photos
-		let photosToShow: [PhotoReference]
+		let photosToShow: [PhotoFile]
 		let initialIndex: Int
 
 		if !self.selectedPhotos.isEmpty {
@@ -491,7 +491,7 @@ struct PhotoBrowserView: View {
 		}
 	}
 	
-	private func loadArchiveStatus(for photos: [PhotoReference]) async {
+	private func loadArchiveStatus(for photos: [PhotoFile]) async {
 		// Only load if S3 backup is configured and user is signed in
 		guard s3BackupManager.isConfigured,
 		      let userId = identityManager.currentUser?.appleUserID else { return }
@@ -523,7 +523,7 @@ extension Array {
 
 // Navigation data model
 struct PreviewNavigation: Hashable {
-	let photos: [PhotoReference]
+	let photos: [PhotoFile]
 	let initialIndex: Int
 }
 

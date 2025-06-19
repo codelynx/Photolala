@@ -22,14 +22,14 @@ class PhotoCollectionViewController: XViewController {
 	private var lastSortOption: PhotoSortOption?
 
 	@MainActor
-	var photos: [PhotoReference] = []
+	var photos: [PhotoFile] = []
 	@MainActor
 	var photoGroups: [PhotoGroup] = []
-	var onSelectPhoto: ((PhotoReference, [PhotoReference]) -> Void)?
-	var onSelectFolder: ((PhotoReference) -> Void)?
-	var onPhotosLoadedWithReferences: (([PhotoReference]) -> Void)?
-	var onSelectionChanged: (([PhotoReference]) -> Void)?
-	var onArchivedPhotoClick: ((PhotoReference) -> Void)?
+	var onSelectPhoto: ((PhotoFile, [PhotoFile]) -> Void)?
+	var onSelectFolder: ((PhotoFile) -> Void)?
+	var onPhotosLoadedWithReferences: (([PhotoFile]) -> Void)?
+	var onSelectionChanged: (([PhotoFile]) -> Void)?
+	var onArchivedPhotoClick: ((PhotoFile) -> Void)?
 
 	var collectionView: XCollectionView!
 
@@ -40,11 +40,11 @@ class PhotoCollectionViewController: XViewController {
 	#endif
 
 	#if os(macOS)
-		private var quickLookPhotos: [PhotoReference] = []
+		private var quickLookPhotos: [PhotoFile] = []
 	#endif
 
 	// Get currently selected photos
-	var selectedPhotos: [PhotoReference] {
+	var selectedPhotos: [PhotoFile] {
 		#if os(macOS)
 			return self.collectionView.selectionIndexPaths.compactMap { indexPath in
 				guard indexPath.section < self.photoGroups.count,
@@ -693,7 +693,7 @@ extension PhotoCollectionViewController: XCollectionViewDelegate {
 			self.collectionView.menu = menu
 		}
 
-		private func createOpenWithMenu(for photo: PhotoReference) -> NSMenu {
+		private func createOpenWithMenu(for photo: PhotoFile) -> NSMenu {
 			let menu = NSMenu()
 
 			// Get applications that can open this file
@@ -744,7 +744,7 @@ extension PhotoCollectionViewController: XCollectionViewDelegate {
 		// MARK: - Context Menu Actions
 
 		@objc private func contextMenuOpen(_ sender: NSMenuItem) {
-			guard let photos = sender.representedObject as? [PhotoReference],
+			guard let photos = sender.representedObject as? [PhotoFile],
 			      let firstPhoto = photos.first else { return }
 
 			// Find the photo in our groups
@@ -758,7 +758,7 @@ extension PhotoCollectionViewController: XCollectionViewDelegate {
 		}
 
 		@objc private func contextMenuQuickLook(_ sender: NSMenuItem) {
-			guard let photos = sender.representedObject as? [PhotoReference] else { return }
+			guard let photos = sender.representedObject as? [PhotoFile] else { return }
 
 			// Import QuickLook
 			if #available(macOS 10.15, *) {
@@ -778,7 +778,7 @@ extension PhotoCollectionViewController: XCollectionViewDelegate {
 		}
 
 		@objc private func contextMenuOpenWith(_ sender: NSMenuItem) {
-			guard let (photo, appURL) = sender.representedObject as? (PhotoReference, URL) else { return }
+			guard let (photo, appURL) = sender.representedObject as? (PhotoFile, URL) else { return }
 
 			NSWorkspace.shared.open(
 				[photo.fileURL],
@@ -788,7 +788,7 @@ extension PhotoCollectionViewController: XCollectionViewDelegate {
 		}
 
 		@objc private func contextMenuRevealInFinder(_ sender: NSMenuItem) {
-			guard let photos = sender.representedObject as? [PhotoReference] else { return }
+			guard let photos = sender.representedObject as? [PhotoFile] else { return }
 
 			if photos.count == 1 {
 				NSWorkspace.shared.selectFile(photos[0].filePath, inFileViewerRootedAtPath: "")
@@ -799,7 +799,7 @@ extension PhotoCollectionViewController: XCollectionViewDelegate {
 		}
 
 		@objc private func contextMenuGetInfo(_ sender: NSMenuItem) {
-			guard let photos = sender.representedObject as? [PhotoReference] else { return }
+			guard let photos = sender.representedObject as? [PhotoFile] else { return }
 
 			// Open info panel for each photo
 			for photo in photos {
@@ -821,7 +821,7 @@ extension PhotoCollectionViewController: XCollectionViewDelegate {
 		}
 		
 		@objc private func contextMenuAddToBackupQueue(_ sender: NSMenuItem) {
-			guard let photos = sender.representedObject as? [PhotoReference] else { return }
+			guard let photos = sender.representedObject as? [PhotoFile] else { return }
 			
 			Task { @MainActor in
 				for photo in photos {
@@ -879,7 +879,7 @@ extension PhotoCollectionViewController: XCollectionViewDelegate {
 #if os(macOS)
 	extension PhotoCollectionViewController: NSCollectionViewPrefetching {
 		func collectionView(_ collectionView: NSCollectionView, prefetchItemsAt indexPaths: [IndexPath]) {
-			let photos: [PhotoReference] = indexPaths.compactMap { indexPath in
+			let photos: [PhotoFile] = indexPaths.compactMap { indexPath in
 				guard indexPath.section < self.photoGroups.count,
 				      indexPath.item < self.photoGroups[indexPath.section].photos.count else { return nil }
 				return self.photoGroups[indexPath.section].photos[indexPath.item]
@@ -897,7 +897,7 @@ extension PhotoCollectionViewController: XCollectionViewDelegate {
 #else
 	extension PhotoCollectionViewController: UICollectionViewDataSourcePrefetching {
 		func collectionView(_ collectionView: UICollectionView, prefetchItemsAt indexPaths: [IndexPath]) {
-			let photos: [PhotoReference] = indexPaths.compactMap { indexPath in
+			let photos: [PhotoFile] = indexPaths.compactMap { indexPath in
 				guard indexPath.section < self.photoGroups.count,
 				      indexPath.item < self.photoGroups[indexPath.section].photos.count else { return nil }
 				return self.photoGroups[indexPath.section].photos[indexPath.item]
@@ -984,7 +984,7 @@ extension PhotoCollectionViewController: XCollectionViewDelegate {
 #if os(macOS)
 	class PhotoCollectionViewItem: NSCollectionViewItem {
 		weak var settings: ThumbnailDisplaySettings?
-		var photoRepresentation: PhotoReference? {
+		var photoRepresentation: PhotoFile? {
 			didSet {
 				self.loadThumbnail()
 				self.updateSelectionState()
@@ -1034,7 +1034,7 @@ extension PhotoCollectionViewController: XCollectionViewDelegate {
 			}
 		}
 
-		func configure(with photoRep: PhotoReference) {
+		func configure(with photoRep: PhotoFile) {
 			self.photoRepresentation = photoRep
 		}
 
@@ -1182,7 +1182,7 @@ extension PhotoCollectionViewController: XCollectionViewDelegate {
 		}
 
 		@MainActor
-		func updateThumbnail(thumbnail: XImage?, for photoRep: PhotoReference) {
+		func updateThumbnail(thumbnail: XImage?, for photoRep: PhotoFile) {
 			if self.photoRepresentation == photoRep {
 				imageView?.image = thumbnail
 			}
@@ -1386,7 +1386,7 @@ extension PhotoCollectionViewController: XCollectionViewDelegate {
 #else
 	class PhotoCollectionViewCell: UICollectionViewCell {
 		weak var settings: ThumbnailDisplaySettings?
-		var photoRepresentation: PhotoReference? {
+		var photoRepresentation: PhotoFile? {
 			didSet {
 				self.loadThumbnail()
 				self.updateSelectionState()
@@ -1619,11 +1619,11 @@ extension PhotoCollectionViewController: XCollectionViewDelegate {
 struct PhotoCollectionView: XViewControllerRepresentable {
 	let directoryPath: NSString
 	let settings: ThumbnailDisplaySettings
-	var onSelectPhoto: ((PhotoReference, [PhotoReference]) -> Void)?
-	var onSelectFolder: ((PhotoReference) -> Void)?
-	var onPhotosLoaded: (([PhotoReference]) -> Void)?
-	var onSelectionChanged: (([PhotoReference]) -> Void)?
-	var onArchivedPhotoClick: ((PhotoReference) -> Void)?
+	var onSelectPhoto: ((PhotoFile, [PhotoFile]) -> Void)?
+	var onSelectFolder: ((PhotoFile) -> Void)?
+	var onPhotosLoaded: (([PhotoFile]) -> Void)?
+	var onSelectionChanged: (([PhotoFile]) -> Void)?
+	var onArchivedPhotoClick: ((PhotoFile) -> Void)?
 	#if os(iOS)
 		@Binding var photosCount: Int
 	#endif

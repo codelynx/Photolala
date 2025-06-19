@@ -13,7 +13,7 @@ import SwiftUI
 		private var loadingIndicator: NSProgressIndicator!
 		private var selectionBorder: CALayer!
 
-		private var currentPhoto: PhotoReference?
+		private var currentPhoto: PhotoFile?
 		private var loadTask: Task<Void, Never>?
 		private var isSelectedState: Bool = false
 
@@ -87,11 +87,11 @@ import SwiftUI
 			view.layer?.backgroundColor = NSColor.gray.withAlphaComponent(0.3).cgColor
 		}
 
-		func configure(with photo: PhotoReference, isSelected: Bool) {
+		func configure(with photo: PhotoFile, isSelected: Bool) {
 			self.currentPhoto = photo
 			self.setSelected(isSelected, animated: false)
 
-			// Check if thumbnail is already cached in PhotoReference
+			// Check if thumbnail is already cached in PhotoFile
 			if let cached = photo.thumbnail {
 				self.thumbnailImageView.image = cached
 				view.layer?.backgroundColor = nil
@@ -132,7 +132,7 @@ import SwiftUI
 			}
 		}
 
-		private func loadThumbnail(for photo: PhotoReference) async {
+		private func loadThumbnail(for photo: PhotoFile) async {
 			do {
 				// Check for cancellation
 				if Task.isCancelled { return }
@@ -163,7 +163,7 @@ import SwiftUI
 		private var loadingIndicator: UIActivityIndicatorView!
 		private var selectionBorder: CALayer!
 
-		private var currentPhoto: PhotoReference?
+		private var currentPhoto: PhotoFile?
 		private var loadTask: Task<Void, Never>?
 		private var isSelectedState: Bool = false
 
@@ -238,11 +238,11 @@ import SwiftUI
 			contentView.backgroundColor = UIColor.gray.withAlphaComponent(0.3)
 		}
 
-		func configure(with photo: PhotoReference, isSelected: Bool) {
+		func configure(with photo: PhotoFile, isSelected: Bool) {
 			self.currentPhoto = photo
 			self.setSelected(isSelected, animated: false)
 
-			// Check if thumbnail is already cached in PhotoReference
+			// Check if thumbnail is already cached in PhotoFile
 			if let cached = photo.thumbnail {
 				self.thumbnailImageView.image = cached
 				contentView.backgroundColor = nil
@@ -278,7 +278,7 @@ import SwiftUI
 			}
 		}
 
-		private func loadThumbnail(for photo: PhotoReference) async {
+		private func loadThumbnail(for photo: PhotoFile) async {
 			do {
 				// Check for cancellation
 				if Task.isCancelled { return }

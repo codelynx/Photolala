@@ -10,7 +10,7 @@ import Foundation
 struct PhotoGroup: Identifiable {
 	let id = UUID()
 	let title: String
-	let photos: [PhotoReference]
+	let photos: [PhotoFile]
 	let dateRepresentative: Date
 
 	var photoCount: Int {

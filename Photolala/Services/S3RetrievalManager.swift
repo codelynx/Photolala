@@ -17,7 +17,7 @@ class S3RetrievalManager: ObservableObject {
 	}
 	
 	/// Request retrieval for a single photo
-	func requestRetrieval(for photo: PhotoReference, rushDelivery: Bool = false) async throws {
+	func requestRetrieval(for photo: PhotoFile, rushDelivery: Bool = false) async throws {
 		guard let md5 = photo.md5Hash,
 		      let userId = identityManager.currentUser?.appleUserID else {
 			throw PhotoRetrievalError.missingUserInfo
@@ -71,7 +71,7 @@ class S3RetrievalManager: ObservableObject {
 	}
 	
 	/// Request retrieval for multiple photos
-	func requestBatchRetrieval(for photos: [PhotoReference], rushDelivery: Bool = false) async throws {
+	func requestBatchRetrieval(for photos: [PhotoFile], rushDelivery: Bool = false) async throws {
 		var errors: [Error] = []
 		
 		for photo in photos {
@@ -195,13 +195,13 @@ class S3RetrievalManager: ObservableObject {
 	}
 	
 	/// Get retrieval status for a photo
-	func retrievalStatus(for photo: PhotoReference) -> PhotoRetrieval? {
+	func retrievalStatus(for photo: PhotoFile) -> PhotoRetrieval? {
 		guard let md5 = photo.md5Hash else { return nil }
 		return activeRetrievals[md5]
 	}
 	
 	/// Cancel a retrieval request (if possible)
-	func cancelRetrieval(for photo: PhotoReference) {
+	func cancelRetrieval(for photo: PhotoFile) {
 		guard let md5 = photo.md5Hash else { return }
 		activeRetrievals.removeValue(forKey: md5)
 	}

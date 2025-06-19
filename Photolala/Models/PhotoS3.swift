@@ -1,7 +1,7 @@
 import Foundation
 
 /// Photo model for S3 browser, combining catalog data with S3 metadata
-struct S3Photo: Identifiable, Hashable {
+struct PhotoS3: Identifiable, Hashable {
 	// From .photolala catalog (CSV fields)
 	var id: String { md5 }  // Conformance to Identifiable
 	let md5: String
@@ -74,7 +74,7 @@ struct S3Photo: Identifiable, Hashable {
 		hasher.combine(md5)
 	}
 	
-	static func == (lhs: S3Photo, rhs: S3Photo) -> Bool {
+	static func == (lhs: PhotoS3, rhs: PhotoS3) -> Bool {
 		lhs.md5 == rhs.md5
 	}
 }

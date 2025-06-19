@@ -13,7 +13,7 @@ import CryptoKit
 class BackupQueueManager: ObservableObject {
 	static let shared = BackupQueueManager()
 
-	@Published var queuedPhotos: Set<PhotoReference> = []
+	@Published var queuedPhotos: Set<PhotoFile> = []
 	@Published var backupStatus: [String: BackupState] = [:] // MD5 -> State
 	@Published var isUploading = false
 	@Published var uploadProgress: Double = 0.0
@@ -35,7 +35,7 @@ class BackupQueueManager: ObservableObject {
 
 	// MARK: - Queue Management
 
-	func toggleStar(for photo: PhotoReference) {
+	func toggleStar(for photo: PhotoFile) {
 		if queuedPhotos.contains(photo) {
 			removeFromQueue(photo)
 		} else {
@@ -44,7 +44,7 @@ class BackupQueueManager: ObservableObject {
 		resetInactivityTimer()
 	}
 
-	func addToQueue(_ photo: PhotoReference) {
+	func addToQueue(_ photo: PhotoFile) {
 		queuedPhotos.insert(photo)
 		// Ensure MD5 hash is computed
 		if photo.md5Hash == nil {
@@ -59,7 +59,7 @@ class BackupQueueManager: ObservableObject {
 		NotificationCenter.default.post(name: NSNotification.Name("BackupQueueChanged"), object: nil)
 	}
 
-	func removeFromQueue(_ photo: PhotoReference) {
+	func removeFromQueue(_ photo: PhotoFile) {
 		queuedPhotos.remove(photo)
 		if let md5 = photo.md5Hash, backupStatus[md5] == .queued {
 			backupStatus[md5] = BackupState.none
@@ -68,11 +68,11 @@ class BackupQueueManager: ObservableObject {
 		NotificationCenter.default.post(name: NSNotification.Name("BackupQueueChanged"), object: nil)
 	}
 
-	func isQueued(_ photo: PhotoReference) -> Bool {
+	func isQueued(_ photo: PhotoFile) -> Bool {
 		queuedPhotos.contains(photo)
 	}
 
-	func backupState(for photo: PhotoReference) -> BackupState {
+	func backupState(for photo: PhotoFile) -> BackupState {
 		guard let md5 = photo.md5Hash else { return BackupState.none }
 		return backupStatus[md5] ?? BackupState.none
 	}
@@ -166,7 +166,7 @@ class BackupQueueManager: ObservableObject {
 		}
 	}
 
-	private func uploadPhoto(_ photo: PhotoReference) async throws {
+	private func uploadPhoto(_ photo: PhotoFile) async throws {
 		// S3BackupManager will check authentication internally
 		try await S3BackupManager.shared.uploadPhoto(photo)
 		print("Successfully uploaded \(photo.filename)")
@@ -190,7 +190,7 @@ class BackupQueueManager: ObservableObject {
 
 	// MARK: - MD5 Computation
 
-	private func computeMD5(for photo: PhotoReference) async {
+	private func computeMD5(for photo: PhotoFile) async {
 		do {
 			let data = try Data(contentsOf: photo.fileURL)
 			let digest = Insecure.MD5.hash(data: data)
@@ -226,7 +226,7 @@ class BackupQueueManager: ObservableObject {
 		// Restore backup status
 		backupStatus = state.backupStatus
 
-		// Note: We can't restore PhotoReference objects from just MD5
+		// Note: We can't restore PhotoFile objects from just MD5
 		// This would need to be enhanced to store more info or
 		// cross-reference with PhotoManager
 

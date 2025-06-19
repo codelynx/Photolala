@@ -13,7 +13,7 @@ extension Image {
 }
 
 struct S3PhotoThumbnailView: View {
-	let photo: S3Photo
+	let photo: PhotoS3
 	let thumbnailSize: CGFloat
 	let isSelected: Bool
 	

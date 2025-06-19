@@ -2,9 +2,9 @@ import SwiftUI
 import CryptoKit
 
 struct PhotoRetrievalView: View {
-	let photoReference: PhotoReference
+	let PhotoFile: PhotoFile
 	let archiveInfo: ArchivedPhotoInfo
-	let selectedPhotos: [PhotoReference]
+	let selectedPhotos: [PhotoFile]
 	@State private var selectedOption: RetrievalOption = .singlePhoto
 	@State private var rushDelivery = false
 	@Binding var isPresented: Bool
@@ -14,8 +14,8 @@ struct PhotoRetrievalView: View {
 	@State private var isRetrieving = false
 	@State private var retrievalError: String?
 	
-	init(photoReference: PhotoReference, archiveInfo: ArchivedPhotoInfo, selectedPhotos: [PhotoReference] = [], isPresented: Binding<Bool>) {
-		self.photoReference = photoReference
+	init(PhotoFile: PhotoFile, archiveInfo: ArchivedPhotoInfo, selectedPhotos: [PhotoFile] = [], isPresented: Binding<Bool>) {
+		self.PhotoFile = PhotoFile
 		self.archiveInfo = archiveInfo
 		self.selectedPhotos = selectedPhotos
 		self._isPresented = isPresented
@@ -309,7 +309,7 @@ struct PhotoRetrievalView: View {
 				case .singlePhoto:
 					// Restore single photo
 					let md5: String
-					if let existingMD5 = photoReference.md5Hash {
+					if let existingMD5 = PhotoFile.md5Hash {
 						md5 = existingMD5
 					} else {
 						guard let computedMD5 = await computeMD5() else {
@@ -321,7 +321,7 @@ struct PhotoRetrievalView: View {
 					
 				case .selectedPhotos:
 					// Restore all archived photos in selection
-					var photosToRestore: [PhotoReference] = []
+					var photosToRestore: [PhotoFile] = []
 					
 					// Add selected archived photos
 					for photo in selectedPhotos {
@@ -332,8 +332,8 @@ struct PhotoRetrievalView: View {
 					}
 					
 					// Include current photo if not already in list
-					if !photosToRestore.contains(where: { $0.fileURL == photoReference.fileURL }) {
-						photosToRestore.append(photoReference)
+					if !photosToRestore.contains(where: { $0.fileURL == PhotoFile.fileURL }) {
+						photosToRestore.append(PhotoFile)
 					}
 					
 					// Restore each photo
@@ -363,7 +363,7 @@ struct PhotoRetrievalView: View {
 					// TODO: Get all photos in album
 					// For now, just restore the single photo
 					let md5: String
-					if let existingMD5 = photoReference.md5Hash {
+					if let existingMD5 = PhotoFile.md5Hash {
 						md5 = existingMD5
 					} else {
 						guard let computedMD5 = await computeMD5() else {
@@ -389,7 +389,7 @@ struct PhotoRetrievalView: View {
 	
 	private func computeMD5() async -> String? {
 		do {
-			let data = try Data(contentsOf: photoReference.fileURL)
+			let data = try Data(contentsOf: PhotoFile.fileURL)
 			let digest = Insecure.MD5.hash(data: data)
 			return digest.map { String(format: "%02hhx", $0) }.joined()
 		} catch {
@@ -397,7 +397,7 @@ struct PhotoRetrievalView: View {
 		}
 	}
 	
-	private func computeMD5(for photo: PhotoReference) async -> String? {
+	private func computeMD5(for photo: PhotoFile) async -> String? {
 		do {
 			let data = try Data(contentsOf: photo.fileURL)
 			let digest = Insecure.MD5.hash(data: data)
@@ -497,7 +497,7 @@ enum PhotoRetrievalError: LocalizedError {
 struct PhotoRetrievalView_Previews: PreviewProvider {
 	static var previews: some View {
 		PhotoRetrievalView(
-			photoReference: PhotoReference(directoryPath: "/test" as NSString, filename: "test.jpg"),
+			PhotoFile: PhotoFile(directoryPath: "/test" as NSString, filename: "test.jpg"),
 			archiveInfo: ArchivedPhotoInfo(
 				md5: "test",
 				archivedDate: Date(),
@@ -508,8 +508,8 @@ struct PhotoRetrievalView_Previews: PreviewProvider {
 				originalSize: 12_000_000
 			),
 			selectedPhotos: [
-				PhotoReference(directoryPath: "/test" as NSString, filename: "test2.jpg"),
-				PhotoReference(directoryPath: "/test" as NSString, filename: "test3.jpg")
+				PhotoFile(directoryPath: "/test" as NSString, filename: "test2.jpg"),
+				PhotoFile(directoryPath: "/test" as NSString, filename: "test3.jpg")
 			],
 			isPresented: .constant(true)
 		)

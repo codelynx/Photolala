@@ -8,7 +8,7 @@
 import SwiftUI
 
 class ThumbnailStripViewController: XViewController {
-	let photos: [PhotoReference]
+	let photos: [PhotoFile]
 	var currentIndex: Int
 	let thumbnailSize: CGSize
 	let onTimerExtend: (() -> Void)?
@@ -27,7 +27,7 @@ class ThumbnailStripViewController: XViewController {
 	private let sectionInset: CGFloat = 16
 	private let containerPadding: CGFloat = 12
 
-	init(photos: [PhotoReference], currentIndex: Int, thumbnailSize: CGSize, onTimerExtend: (() -> Void)?) {
+	init(photos: [PhotoFile], currentIndex: Int, thumbnailSize: CGSize, onTimerExtend: (() -> Void)?) {
 		self.photos = photos
 		self.currentIndex = currentIndex
 		self.thumbnailSize = thumbnailSize
