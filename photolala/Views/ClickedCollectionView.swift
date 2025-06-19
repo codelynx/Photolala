@@ -34,9 +34,8 @@
 					deselectAll(nil)
 					selectItems(at: Set([indexPath]), scrollPosition: [])
 					// Force update the selection
-					if let delegate = delegate as? PhotoCollectionViewController {
-						delegate.collectionView(self, didSelectItemsAt: Set([indexPath]))
-					}
+					// The delegate should conform to NSCollectionViewDelegate
+					delegate?.collectionView?(self, didSelectItemsAt: Set([indexPath]))
 				}
 			} else {
 				print("[ClickedCollectionView] No item at click point")
