@@ -27,7 +27,7 @@ struct PhotoBrowserView: View {
 	@StateObject private var s3BackupManager = S3BackupManager.shared
 	@StateObject private var identityManager = IdentityManager.shared
 	@StateObject private var backupQueueManager = BackupQueueManager.shared
-	@StateObject private var photoProvider: LocalPhotoProvider
+	@StateObject private var photoProvider: EnhancedLocalPhotoProvider
 	
 	// Computed property to ensure inspector gets PhotoItems
 	private var inspectorSelection: [any PhotoItem] {
@@ -36,7 +36,7 @@ struct PhotoBrowserView: View {
 
 	init(directoryPath: NSString) {
 		self.directoryPath = directoryPath
-		self._photoProvider = StateObject(wrappedValue: LocalPhotoProvider(directoryPath: directoryPath as String))
+		self._photoProvider = StateObject(wrappedValue: EnhancedLocalPhotoProvider(directoryPath: directoryPath as String))
 	}
 
 	var body: some View {
@@ -186,6 +186,27 @@ struct PhotoBrowserView: View {
 						.padding(32)
 						.background(Color.secondary.opacity(0.9))
 						.cornerRadius(16)
+					}
+				} else if photoProvider.isLoading && photoProvider.loadingProgress > 0 {
+					// Show progressive loading status at the top
+					VStack {
+						HStack {
+							ProgressView(value: photoProvider.loadingProgress) {
+								Text(photoProvider.loadingStatusText)
+									.font(.caption)
+									.foregroundColor(.secondary)
+							}
+							.progressViewStyle(.linear)
+							.frame(maxWidth: 300)
+							.padding(.horizontal)
+							.padding(.vertical, 8)
+							.background(Color(NSColor.controlBackgroundColor))
+							.cornerRadius(8)
+							.shadow(radius: 2)
+						}
+						.padding(.top, 8)
+						
+						Spacer()
 					}
 				}
 			}

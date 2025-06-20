@@ -97,6 +97,9 @@ class UnifiedPhotoCollectionViewController: XViewController {
 		// Update layout with current settings
 		updateLayout()
 		
+		// Set up scroll monitoring for priority loading
+		setupScrollMonitoring()
+		
 		// Load photos
 		Task {
 			try? await photoProvider.loadPhotos()
@@ -269,12 +272,33 @@ class UnifiedPhotoCollectionViewController: XViewController {
 	}
 	
 	private func updatePhotos(_ photos: [any PhotoItem]) {
-		var snapshot = NSDiffableDataSourceSnapshot<Int, AnyHashable>()
-		snapshot.appendSections([0])
+		// Get current snapshot
+		var snapshot = dataSource.snapshot()
+		
+		// If no sections exist, create one
+		if snapshot.numberOfSections == 0 {
+			snapshot.appendSections([0])
+		}
 		
 		// Convert photos to AnyHashable
-		let hashablePhotos = photos.map { AnyHashable($0) }
-		snapshot.appendItems(hashablePhotos, toSection: 0)
+		let newHashablePhotos = photos.map { AnyHashable($0) }
+		let newPhotosSet = Set(newHashablePhotos)
+		
+		// Get current items
+		let currentItems = snapshot.itemIdentifiers
+		let currentItemsSet = Set(currentItems)
+		
+		// Find items to remove (in current but not in new)
+		let itemsToRemove = currentItems.filter { !newPhotosSet.contains($0) }
+		if !itemsToRemove.isEmpty {
+			snapshot.deleteItems(itemsToRemove)
+		}
+		
+		// Find items to add (in new but not in current)
+		let itemsToAdd = newHashablePhotos.filter { !currentItemsSet.contains($0) }
+		if !itemsToAdd.isEmpty {
+			snapshot.appendItems(itemsToAdd, toSection: 0)
+		}
 		
 		#if os(macOS)
 		dataSource.apply(snapshot, animatingDifferences: true)
@@ -283,8 +307,50 @@ class UnifiedPhotoCollectionViewController: XViewController {
 		#endif
 		
 		// Update selection to remove any photos that no longer exist
-		selectedPhotos = selectedPhotos.intersection(Set(hashablePhotos))
+		selectedPhotos = selectedPhotos.intersection(newPhotosSet)
 		updateSelectionUI()
+	}
+	
+	// MARK: - Scroll Monitoring for Priority Loading
+	
+	private func setupScrollMonitoring() {
+		// Only set up for EnhancedLocalPhotoProvider
+		guard let enhancedProvider = photoProvider as? EnhancedLocalPhotoProvider else { return }
+		
+		#if os(macOS)
+		// Get the scroll view
+		guard let scrollView = collectionView.enclosingScrollView else { return }
+		
+		// Monitor scroll events
+		NotificationCenter.default.publisher(for: NSScrollView.didLiveScrollNotification, object: scrollView)
+			.throttle(for: .milliseconds(100), scheduler: DispatchQueue.main, latest: true)
+			.sink { [weak self] _ in
+				self?.updateVisibleRange(for: enhancedProvider)
+			}
+			.store(in: &cancellables)
+		
+		NotificationCenter.default.publisher(for: NSScrollView.didEndLiveScrollNotification, object: scrollView)
+			.sink { [weak self] _ in
+				self?.updateVisibleRange(for: enhancedProvider)
+			}
+			.store(in: &cancellables)
+		#else
+		// iOS uses scroll view delegate methods (implemented below)
+		#endif
+	}
+	
+	private func updateVisibleRange(for provider: EnhancedLocalPhotoProvider) {
+		#if os(macOS)
+		provider.updateVisibleRange(for: collectionView)
+		#else
+		// Calculate visible indices for iOS
+		let visibleCells = collectionView.visibleCells
+		let visibleIndexPaths = visibleCells.compactMap { collectionView.indexPath(for: $0) }
+		if let minIndex = visibleIndexPaths.map({ $0.item }).min(),
+		   let maxIndex = visibleIndexPaths.map({ $0.item }).max() {
+			provider.updateVisibleRange(minIndex..<(maxIndex + 1))
+		}
+		#endif
 	}
 	
 	// MARK: - Selection Handling
@@ -439,6 +505,25 @@ extension UnifiedPhotoCollectionViewController: NSCollectionViewDelegate {
 extension UnifiedPhotoCollectionViewController: UICollectionViewDelegate {
 	func collectionView(_ collectionView: UICollectionView, didSelectItemAt indexPath: IndexPath) {
 		handleItemClick(at: indexPath)
+	}
+	
+	// Scroll monitoring for iOS
+	func scrollViewDidScroll(_ scrollView: UIScrollView) {
+		if let provider = photoProvider as? EnhancedLocalPhotoProvider {
+			updateVisibleRange(for: provider)
+		}
+	}
+	
+	func scrollViewDidEndDecelerating(_ scrollView: UIScrollView) {
+		if let provider = photoProvider as? EnhancedLocalPhotoProvider {
+			updateVisibleRange(for: provider)
+		}
+	}
+	
+	func scrollViewDidEndDragging(_ scrollView: UIScrollView, willDecelerate decelerate: Bool) {
+		if !decelerate, let provider = photoProvider as? EnhancedLocalPhotoProvider {
+			updateVisibleRange(for: provider)
+		}
 	}
 }
 #endif

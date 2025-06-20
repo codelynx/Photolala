@@ -88,7 +88,7 @@ class CatalogAwarePhotoLoader {
 	
 	// MARK: - Private Methods
 	
-	private func loadFromCatalog(_ directory: URL) async throws -> [PhotoFile] {
+	func loadFromCatalog(_ directory: URL) async throws -> [PhotoFile] {
 		// Create a new catalog service for this directory
 		let catalogService = PhotolalaCatalogService(catalogURL: directory)
 		
@@ -121,7 +121,7 @@ class CatalogAwarePhotoLoader {
 		return photos
 	}
 	
-	private func generateCatalog(for directory: URL, photos: [PhotoFile]) async throws {
+	func generateCatalog(for directory: URL, photos: [PhotoFile]) async throws {
 		logger.info("Generating catalog for \(directory.path) with \(photos.count) photos")
 		
 		// Create catalog service for this directory
@@ -233,12 +233,17 @@ class CatalogAwarePhotoLoader {
 	// MARK: - UUID Management
 	
 	private var catalogUUIDs: [URL: String] = [:]
+	private let uuidQueue = DispatchQueue(label: "com.electricwoods.photolala.cataloguuids", attributes: .concurrent)
 	
 	private func storeCatalogUUID(_ uuid: String, for directory: URL) {
-		catalogUUIDs[directory] = uuid
+		uuidQueue.async(flags: .barrier) {
+			self.catalogUUIDs[directory] = uuid
+		}
 	}
 	
 	private func getCatalogUUID(for directory: URL) -> String? {
-		catalogUUIDs[directory]
+		uuidQueue.sync {
+			catalogUUIDs[directory]
+		}
 	}
 }

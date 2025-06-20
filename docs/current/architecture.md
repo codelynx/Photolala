@@ -71,6 +71,11 @@ Photolala is a cross-platform photo browser application built with SwiftUI, supp
 #### PhotoProvider Protocol & Implementations
 - **BasePhotoProvider**: Common functionality, @MainActor for thread safety
 - **LocalPhotoProvider**: Loads photos from local directories via CatalogAwarePhotoLoader
+- **EnhancedLocalPhotoProvider**: Advanced local provider with progressive loading and priority thumbnails
+  - Uses ProgressivePhotoLoader for fast initial display (first 200 photos)
+  - Integrates PriorityThumbnailLoader for visible-first loading
+  - Provides loading progress and status updates
+  - Supports dynamic visible range updates from scroll monitoring
 - **S3PhotoProvider**: Loads photos from S3 with catalog sync support
 - Protocol includes: loading, refreshing, grouping, sorting capabilities
 - Observable with Combine publishers for reactive UI updates
@@ -92,6 +97,21 @@ Photolala is a cross-platform photo browser application built with SwiftUI, supp
 - Falls back to DirectoryScanner if no catalog exists
 - 5-minute caching for network directories using UUID-based keys
 - Background catalog generation for directories with 100+ photos
+- Thread-safe UUID management with concurrent queue
+
+#### ProgressivePhotoLoader
+- Loads photos in stages for better perceived performance
+- Initial batch: First 200 photos loaded immediately
+- Background loading: Remaining photos in 100-photo batches
+- Catalog-aware: Uses catalog for instant loading when available
+- Background catalog generation after loading completes
+
+#### PriorityThumbnailLoader
+- Priority-based thumbnail loading system
+- Priority levels: visible, nearVisible, prefetch, background
+- Dynamic priority updates based on scroll position
+- Cancels non-visible requests during fast scrolling
+- Integrates with PhotoManager for actual thumbnail generation
 
 #### PhotolalaCatalogService
 - Manages v5.0 offline catalogs with `.photolala/` directory structure
@@ -169,7 +189,8 @@ Photolala is a cross-platform photo browser application built with SwiftUI, supp
 
 #### PhotoBrowserView
 - Main container with toolbar
-- Now uses UnifiedPhotoCollectionViewRepresentable with LocalPhotoProvider
+- Now uses UnifiedPhotoCollectionViewRepresentable with EnhancedLocalPhotoProvider
+- Shows progressive loading status with progress bar
 - Platform-specific navigation:
   - macOS: Own NavigationStack
   - iOS: Uses parent NavigationStack
