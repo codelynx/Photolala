@@ -20,7 +20,6 @@ class UnifiedPhotoCell: NSCollectionViewItem {
 	// UI Elements
 	private var photoImageView: ScalableImageView!
 	private var placeholderImageView: NSImageView!
-	private var titleLabel: NSTextField!
 	private var starImageView: NSImageView!
 	private var fileSizeLabel: NSTextField!
 	private var badgeView: NSView?
@@ -49,12 +48,6 @@ class UnifiedPhotoCell: NSCollectionViewItem {
 		photoImageView.layer?.borderColor = XColor.black.withAlphaComponent(0.2).cgColor
 		
 		view.addSubview(photoImageView)
-		
-		// Title label (hidden but kept for compatibility)
-		titleLabel = NSTextField(labelWithString: "")
-		titleLabel.isHidden = true
-		titleLabel.translatesAutoresizingMaskIntoConstraints = false
-		view.addSubview(titleLabel)
 		
 		// Star image view
 		starImageView = NSImageView()
@@ -102,21 +95,15 @@ class UnifiedPhotoCell: NSCollectionViewItem {
 			imageViewWidthConstraint,
 			imageViewHeightConstraint,
 			
-			// Title label (hidden)
-			titleLabel.topAnchor.constraint(equalTo: photoImageView.bottomAnchor, constant: 4),
-			titleLabel.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 4),
-			titleLabel.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -4),
-			titleLabel.heightAnchor.constraint(equalToConstant: 20),
-			
-			// Star image view
+			// Star image view - positioned at bottom of view
 			starImageView.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 4),
-			starImageView.centerYAnchor.constraint(equalTo: titleLabel.centerYAnchor),
+			starImageView.topAnchor.constraint(equalTo: photoImageView.bottomAnchor, constant: 2),
 			starImageView.widthAnchor.constraint(equalToConstant: 16),
 			starImageView.heightAnchor.constraint(equalToConstant: 16),
 			
-			// File size label
+			// File size label - positioned at bottom of view
 			fileSizeLabel.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -4),
-			fileSizeLabel.centerYAnchor.constraint(equalTo: titleLabel.centerYAnchor),
+			fileSizeLabel.centerYAnchor.constraint(equalTo: starImageView.centerYAnchor),
 			fileSizeLabel.leadingAnchor.constraint(greaterThanOrEqualTo: starImageView.trailingAnchor, constant: 4),
 			
 			// Loading indicator
@@ -136,7 +123,6 @@ class UnifiedPhotoCell: NSCollectionViewItem {
 		thumbnailTask?.cancel()
 		thumbnailTask = nil
 		photoImageView.image = nil
-		titleLabel.stringValue = ""
 		starImageView.image = nil
 		fileSizeLabel.stringValue = ""
 		badgeView?.removeFromSuperview()
@@ -147,7 +133,6 @@ class UnifiedPhotoCell: NSCollectionViewItem {
 	
 	func configure(with photo: any PhotoItem, settings: ThumbnailDisplaySettings) {
 		currentPhoto = photo
-		titleLabel.stringValue = photo.displayName
 		
 		// Update image view constraints based on thumbnail option
 		imageViewWidthConstraint.constant = settings.thumbnailOption.size
@@ -336,7 +321,6 @@ class UnifiedPhotoCell: UICollectionViewCell {
 	// UI Elements
 	private var photoImageView: UIImageView!
 	private var placeholderImageView: UIImageView!
-	private var titleLabel: UILabel!
 	private var starImageView: UIImageView!
 	private var fileSizeLabel: UILabel!
 	private var badgeView: UIView?
@@ -365,12 +349,6 @@ class UnifiedPhotoCell: UICollectionViewCell {
 		photoImageView.layer.cornerRadius = 8
 		photoImageView.translatesAutoresizingMaskIntoConstraints = false
 		contentView.addSubview(photoImageView)
-		
-		// Title label (hidden but kept for compatibility)
-		titleLabel = UILabel()
-		titleLabel.isHidden = true
-		titleLabel.translatesAutoresizingMaskIntoConstraints = false
-		contentView.addSubview(titleLabel)
 		
 		// Star image view
 		starImageView = UIImageView()
@@ -408,22 +386,17 @@ class UnifiedPhotoCell: UICollectionViewCell {
 			photoImageView.topAnchor.constraint(equalTo: contentView.topAnchor),
 			photoImageView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor),
 			photoImageView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor),
-			photoImageView.bottomAnchor.constraint(equalTo: titleLabel.topAnchor, constant: -4),
+			photoImageView.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -24),
 			
-			titleLabel.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 4),
-			titleLabel.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -4),
-			titleLabel.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -4),
-			titleLabel.heightAnchor.constraint(equalToConstant: 30),
-			
-			// Star image view
+			// Star image view - positioned at bottom of contentView
 			starImageView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 4),
-			starImageView.centerYAnchor.constraint(equalTo: titleLabel.centerYAnchor),
+			starImageView.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -4),
 			starImageView.widthAnchor.constraint(equalToConstant: 16),
 			starImageView.heightAnchor.constraint(equalToConstant: 16),
 			
-			// File size label
+			// File size label - positioned at bottom of contentView
 			fileSizeLabel.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -4),
-			fileSizeLabel.centerYAnchor.constraint(equalTo: titleLabel.centerYAnchor),
+			fileSizeLabel.centerYAnchor.constraint(equalTo: starImageView.centerYAnchor),
 			fileSizeLabel.leadingAnchor.constraint(greaterThanOrEqualTo: starImageView.trailingAnchor, constant: 4),
 			
 			loadingIndicator.centerXAnchor.constraint(equalTo: photoImageView.centerXAnchor),
@@ -442,7 +415,6 @@ class UnifiedPhotoCell: UICollectionViewCell {
 		thumbnailTask?.cancel()
 		thumbnailTask = nil
 		photoImageView.image = nil
-		titleLabel.text = ""
 		starImageView.image = nil
 		fileSizeLabel.text = ""
 		badgeView?.removeFromSuperview()
@@ -454,7 +426,6 @@ class UnifiedPhotoCell: UICollectionViewCell {
 	
 	func configure(with photo: any PhotoItem, settings: ThumbnailDisplaySettings) {
 		currentPhoto = photo
-		titleLabel.text = photo.displayName
 		
 		// Update info bar visibility based on showItemInfo
 		let showInfo = settings.showItemInfo
