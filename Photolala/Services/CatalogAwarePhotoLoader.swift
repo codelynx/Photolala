@@ -69,11 +69,9 @@ class CatalogAwarePhotoLoader {
 		logger.debug("Scanning directory at \(directory.path)")
 		let photos = DirectoryScanner.scanDirectory(atPath: directory.path as NSString)
 		
-		// Generate catalog in background for future use
-		if photos.count >= 100 { // Only for directories with many photos
-			Task.detached(priority: .background) {
-				try? await self.generateCatalog(for: directory, photos: photos)
-			}
+		// Generate catalog in background for all directories
+		Task.detached(priority: .background) {
+			try? await self.generateCatalog(for: directory, photos: photos)
 		}
 		
 		return photos
@@ -134,38 +132,57 @@ class CatalogAwarePhotoLoader {
 		
 		// Convert photos to catalog entries
 		for photo in photos {
-			// Get file attributes for size and dates
+			// Get file attributes for basic info
 			let fileURL = photo.fileURL
 			let attributes = try FileManager.default.attributesOfItem(atPath: fileURL.path)
-			let fileSize = attributes[.size] as? Int64 ?? 0
 			let modificationDate = attributes[.modificationDate] as? Date ?? Date()
 			
-			// Calculate MD5 if not already present
-			let md5: String
-			if let existingMD5 = photo.md5Hash {
-				md5 = existingMD5
+			// Check if we already have all the data we need
+			if let existingMD5 = photo.md5Hash,
+			   let existingMetadata = photo.metadata {
+				// Use existing data
+				let entry = PhotolalaCatalogService.CatalogEntry(
+					md5: existingMD5,
+					filename: photo.filename,
+					size: existingMetadata.fileSize,
+					photodate: existingMetadata.dateTaken ?? photo.fileCreationDate ?? modificationDate,
+					modified: modificationDate,
+					width: existingMetadata.pixelWidth,
+					height: existingMetadata.pixelHeight
+				)
+				try await catalogService.upsertEntry(entry)
 			} else {
-				// Calculate MD5 manually
-				let data = try Data(contentsOf: fileURL)
-				let digest = Insecure.MD5.hash(data: data)
-				md5 = digest.map { String(format: "%02x", $0) }.joined()
-				photo.md5Hash = md5
+				// Use PhotoProcessor for unified processing
+				do {
+					let processed = try await PhotoProcessor.processPhoto(photo)
+					
+					// Update photo object
+					photo.md5Hash = processed.md5
+					photo.metadata = processed.metadata
+					
+					// Create catalog entry
+					let entry = PhotolalaCatalogService.CatalogEntry(
+						md5: processed.md5,
+						filename: photo.filename,
+						size: processed.metadata.fileSize,
+						photodate: processed.metadata.dateTaken ?? photo.fileCreationDate ?? modificationDate,
+						modified: modificationDate,
+						width: processed.metadata.pixelWidth,
+						height: processed.metadata.pixelHeight
+					)
+					
+					try await catalogService.upsertEntry(entry)
+					
+					// Save thumbnail while we have it
+					let identifier = PhotoManager.Identifier.md5(Insecure.MD5Digest(rawBytes: Data(hexadecimalString: processed.md5)!)!)
+					let thumbnailURL = PhotoManager.shared.thumbnailURL(for: identifier)
+					try processed.thumbnailData.write(to: thumbnailURL)
+					
+				} catch {
+					logger.error("Failed to process photo \(photo.filename): \(error)")
+					// Continue with next photo
+				}
 			}
-			
-			// Get dimensions from metadata if available
-			let metadata = try? await photo.loadMetadata()
-			
-			let entry = PhotolalaCatalogService.CatalogEntry(
-				md5: md5,
-				filename: photo.filename,
-				size: fileSize,
-				photodate: photo.fileCreationDate ?? modificationDate,
-				modified: modificationDate,
-				width: metadata?.pixelWidth,
-				height: metadata?.pixelHeight
-			)
-			
-			try await catalogService.upsertEntry(entry)
 		}
 		
 		// Save manifest

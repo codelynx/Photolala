@@ -71,7 +71,10 @@ class PhotoManager {
 	static let shared = PhotoManager()
 
 	func thumbnailURL(for identifier: Identifier) -> URL {
-		let fileName = identifier.string + ".jpg"
+		// Use .dat extension to match S3 format
+		// Replace # with _ for filesystem compatibility
+		let safeIdentifier = identifier.string.replacingOccurrences(of: "#", with: "_")
+		let fileName = safeIdentifier + ".dat"
 		let filePath = (self.thumbnailStoragePath as NSString).appendingPathComponent(fileName)
 		return URL(fileURLWithPath: filePath)
 	}
@@ -405,7 +408,34 @@ class PhotoManager {
 	}
 
 	func hasThumbnail(for identifier: Identifier) -> Bool {
-		FileManager.default.fileExists(atPath: self.thumbnailURL(for: identifier).path)
+		// Check for .dat file first
+		if FileManager.default.fileExists(atPath: self.thumbnailURL(for: identifier).path) {
+			return true
+		}
+		
+		// Check for legacy .jpg file and migrate if found
+		let legacyFileName = identifier.string + ".jpg"
+		let legacyPath = (self.thumbnailStoragePath as NSString).appendingPathComponent(legacyFileName)
+		
+		if FileManager.default.fileExists(atPath: legacyPath) {
+			// Migrate to new format
+			migrateLegacyThumbnail(identifier: identifier, legacyPath: legacyPath)
+			return true
+		}
+		
+		return false
+	}
+	
+	private func migrateLegacyThumbnail(identifier: Identifier, legacyPath: String) {
+		Task.detached(priority: .background) {
+			do {
+				let newURL = self.thumbnailURL(for: identifier)
+				try FileManager.default.moveItem(atPath: legacyPath, toPath: newURL.path)
+				print("[PhotoManager] Migrated thumbnail from .jpg to .dat: \(identifier.string)")
+			} catch {
+				print("[PhotoManager] Failed to migrate thumbnail: \(error)")
+			}
+		}
 	}
 
 	private let photolalaStoragePath: NSString
@@ -1020,6 +1050,26 @@ class PhotoManager {
 				}
 			}
 		}
+	}
+	
+	// MARK: - Cache Access Methods for PhotoProcessor
+	
+	func getThumbnail(for identifier: Identifier) -> XThumbnail? {
+		return thumbnailCache.object(forKey: identifier.string as NSString)
+	}
+	
+	func cacheThumbnail(_ thumbnail: XThumbnail, for identifier: Identifier) {
+		thumbnailCache.setObject(thumbnail, forKey: identifier.string as NSString)
+		stats.thumbnailMisses += 1
+		stats.diskWrites += 1
+	}
+	
+	func cacheMetadata(_ metadata: PhotoMetadata, for filePath: String) {
+		metadataCache.setObject(metadata, forKey: filePath as NSString)
+	}
+	
+	func updateCacheHit() {
+		stats.thumbnailHits += 1
 	}
 
 }

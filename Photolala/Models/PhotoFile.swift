@@ -124,16 +124,27 @@ class PhotoFile: Identifiable, Hashable {
 			self.metadataLoadingState = .loading
 			
 			do {
-				let (loadedThumbnail, loadedMetadata) = try await PhotoManager.shared.loadPhotoData(for: self)
-				
-				if let loadedThumbnail {
-					self.thumbnail = loadedThumbnail
+				// Try unified loading first
+				if let unifiedThumbnail = try? await PhotoManager.shared.loadThumbnailUnified(for: self) {
+					self.thumbnail = unifiedThumbnail
 					self.thumbnailLoadingState = .loaded
-				}
-				
-				if let loadedMetadata {
-					self.metadata = loadedMetadata
-					self.metadataLoadingState = .loaded
+					// Metadata should already be set by PhotoProcessor
+					if self.metadata != nil {
+						self.metadataLoadingState = .loaded
+					}
+				} else {
+					// Fall back to legacy method
+					let (loadedThumbnail, loadedMetadata) = try await PhotoManager.shared.loadPhotoData(for: self)
+					
+					if let loadedThumbnail {
+						self.thumbnail = loadedThumbnail
+						self.thumbnailLoadingState = .loaded
+					}
+					
+					if let loadedMetadata {
+						self.metadata = loadedMetadata
+						self.metadataLoadingState = .loaded
+					}
 				}
 			} catch {
 				self.thumbnailLoadingState = .failed(error)
