@@ -160,10 +160,46 @@ class UnifiedPhotoCell: NSCollectionViewItem {
 		fileSizeLabel.isHidden = !showInfo
 		
 		// Configure star based on backup state
-		if let photoFile = photo as? PhotoFile,
-		   let md5 = photoFile.md5Hash,
-		   BackupQueueManager.shared.backupStatus[md5] == .queued {
-			starImageView.image = NSImage(systemSymbolName: "star.fill", accessibilityDescription: nil)
+		if let photoFile = photo as? PhotoFile {
+			// Only show backup status for local PhotoFile items
+			if let md5 = photoFile.md5Hash {
+				let status = BackupQueueManager.shared.backupStatus[md5]
+				switch status {
+				case .queued, .uploaded:
+					starImageView.image = NSImage(systemSymbolName: "star.fill", accessibilityDescription: nil)
+					starImageView.contentTintColor = .systemYellow
+				case .failed:
+					starImageView.image = NSImage(systemSymbolName: "exclamationmark.circle.fill", accessibilityDescription: nil)
+					starImageView.contentTintColor = .systemRed
+				default:
+					starImageView.image = nil
+					starImageView.contentTintColor = .systemYellow
+				}
+			} else {
+				// MD5 not computed yet - check if we can find a match later
+				starImageView.image = nil
+				// Compute MD5 asynchronously
+				Task {
+					if let status = await BackupQueueManager.shared.getBackupStatus(for: photoFile) {
+						await MainActor.run {
+							switch status {
+							case .queued, .uploaded:
+								starImageView.image = NSImage(systemSymbolName: "star.fill", accessibilityDescription: nil)
+								starImageView.contentTintColor = .systemYellow
+							case .failed:
+								starImageView.image = NSImage(systemSymbolName: "exclamationmark.circle.fill", accessibilityDescription: nil)
+								starImageView.contentTintColor = .systemRed
+							default:
+								starImageView.image = nil
+							}
+						}
+					}
+				}
+			}
+		} else if let photoS3 = photo as? PhotoS3 {
+			// For S3 photos, show a cloud icon to indicate they're already backed up
+			starImageView.image = NSImage(systemSymbolName: "icloud.fill", accessibilityDescription: nil)
+			starImageView.contentTintColor = .systemBlue
 		} else {
 			starImageView.image = nil
 		}
@@ -426,10 +462,45 @@ class UnifiedPhotoCell: UICollectionViewCell {
 		fileSizeLabel.isHidden = !showInfo
 		
 		// Configure star based on backup state
-		if let photoFile = photo as? PhotoFile,
-		   let md5 = photoFile.md5Hash,
-		   BackupQueueManager.shared.backupStatus[md5] == .queued {
-			starImageView.image = UIImage(systemName: "star.fill")
+		if let photoFile = photo as? PhotoFile {
+			// Only show backup status for local PhotoFile items
+			if let md5 = photoFile.md5Hash {
+				let status = BackupQueueManager.shared.backupStatus[md5]
+				switch status {
+				case .queued, .uploaded:
+					starImageView.image = UIImage(systemName: "star.fill")
+					starImageView.tintColor = .systemYellow
+				case .failed:
+					starImageView.image = UIImage(systemName: "exclamationmark.circle.fill")
+					starImageView.tintColor = .systemRed
+				default:
+					starImageView.image = nil
+				}
+			} else {
+				// MD5 not computed yet - check if we can find a match later
+				starImageView.image = nil
+				// Compute MD5 asynchronously
+				Task {
+					if let status = await BackupQueueManager.shared.getBackupStatus(for: photoFile) {
+						await MainActor.run {
+							switch status {
+							case .queued, .uploaded:
+								starImageView.image = UIImage(systemName: "star.fill")
+								starImageView.tintColor = .systemYellow
+							case .failed:
+								starImageView.image = UIImage(systemName: "exclamationmark.circle.fill")
+								starImageView.tintColor = .systemRed
+							default:
+								starImageView.image = nil
+							}
+						}
+					}
+				}
+			}
+		} else if let photoS3 = photo as? PhotoS3 {
+			// For S3 photos, show a cloud icon to indicate they're already backed up
+			starImageView.image = UIImage(systemName: "icloud.fill")
+			starImageView.tintColor = .systemBlue
 		} else {
 			starImageView.image = nil
 		}
