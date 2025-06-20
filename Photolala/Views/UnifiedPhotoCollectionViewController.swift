@@ -34,9 +34,10 @@ class UnifiedPhotoCollectionViewController: XViewController {
 	// Settings
 	var settings = ThumbnailDisplaySettings() {
 		didSet {
-			// Only update layout if view is loaded
+			// Only update if view is loaded
 			if isViewLoaded {
 				updateLayout()
+				updateVisibleCells()
 			}
 		}
 	}
@@ -107,31 +108,69 @@ class UnifiedPhotoCollectionViewController: XViewController {
 	private func createLayout() -> XCollectionViewLayout {
 		#if os(macOS)
 		let layout = NSCollectionViewFlowLayout()
-		layout.minimumInteritemSpacing = settings.thumbnailOption.spacing
-		layout.minimumLineSpacing = settings.thumbnailOption.spacing
-		layout.itemSize = NSSize(width: settings.thumbnailSize, height: settings.thumbnailSize)
-		layout.sectionInset = NSEdgeInsets(top: 10, left: 10, bottom: 10, right: 10)
+		let thumbnailOption = settings.thumbnailOption
+		layout.minimumInteritemSpacing = thumbnailOption.spacing
+		layout.minimumLineSpacing = thumbnailOption.spacing
+		// Add 24pt for info bar if shown
+		let cellHeight = thumbnailOption.size + (settings.showItemInfo ? 24 : 0)
+		layout.itemSize = NSSize(width: thumbnailOption.size, height: cellHeight)
+		layout.sectionInset = NSEdgeInsets(
+			top: thumbnailOption.sectionInset,
+			left: thumbnailOption.sectionInset,
+			bottom: thumbnailOption.sectionInset,
+			right: thumbnailOption.sectionInset
+		)
+		
+		// Configure headers if grouping is enabled
+		if settings.groupingOption != .none {
+			layout.headerReferenceSize = NSSize(width: 0, height: 40)
+		} else {
+			layout.headerReferenceSize = NSSize.zero
+		}
+		
 		return layout
 		#else
+		let thumbnailOption = settings.thumbnailOption
+		// Add 24pt for info bar if shown
+		let cellHeight = thumbnailOption.size + (settings.showItemInfo ? 24 : 0)
 		let itemSize = NSCollectionLayoutSize(
-			widthDimension: .absolute(settings.thumbnailSize),
-			heightDimension: .absolute(settings.thumbnailSize)
+			widthDimension: .absolute(thumbnailOption.size),
+			heightDimension: .absolute(cellHeight)
 		)
 		let item = NSCollectionLayoutItem(layoutSize: itemSize)
 		
 		let groupSize = NSCollectionLayoutSize(
 			widthDimension: .fractionalWidth(1.0),
-			heightDimension: .absolute(settings.thumbnailSize)
+			heightDimension: .absolute(cellHeight)
 		)
 		let group = NSCollectionLayoutGroup.horizontal(
 			layoutSize: groupSize,
 			subitems: [item]
 		)
-		group.interItemSpacing = .fixed(settings.thumbnailOption.spacing)
+		group.interItemSpacing = .fixed(thumbnailOption.spacing)
 		
 		let section = NSCollectionLayoutSection(group: group)
-		section.interGroupSpacing = settings.thumbnailOption.spacing
-		section.contentInsets = NSDirectionalEdgeInsets(top: 10, leading: 10, bottom: 10, trailing: 10)
+		section.interGroupSpacing = thumbnailOption.spacing
+		section.contentInsets = NSDirectionalEdgeInsets(
+			top: thumbnailOption.sectionInset,
+			leading: thumbnailOption.sectionInset,
+			bottom: thumbnailOption.sectionInset,
+			trailing: thumbnailOption.sectionInset
+		)
+		
+		// Configure headers if grouping is enabled
+		if settings.groupingOption != .none {
+			let headerSize = NSCollectionLayoutSize(
+				widthDimension: .fractionalWidth(1.0),
+				heightDimension: .absolute(40)
+			)
+			let header = NSCollectionLayoutBoundarySupplementaryItem(
+				layoutSize: headerSize,
+				elementKind: UICollectionView.elementKindSectionHeader,
+				alignment: .top
+			)
+			section.boundarySupplementaryItems = [header]
+		}
 		
 		return UICollectionViewCompositionalLayout(section: section)
 		#endif
@@ -140,9 +179,26 @@ class UnifiedPhotoCollectionViewController: XViewController {
 	private func updateLayout() {
 		#if os(macOS)
 		if let layout = collectionView.collectionViewLayout as? NSCollectionViewFlowLayout {
-			layout.itemSize = NSSize(width: settings.thumbnailSize, height: settings.thumbnailSize)
-			layout.minimumInteritemSpacing = settings.thumbnailOption.spacing
-			layout.minimumLineSpacing = settings.thumbnailOption.spacing
+			let thumbnailOption = settings.thumbnailOption
+			// Add 24pt for info bar if shown
+			let cellHeight = thumbnailOption.size + (settings.showItemInfo ? 24 : 0)
+			layout.itemSize = NSSize(width: thumbnailOption.size, height: cellHeight)
+			layout.minimumInteritemSpacing = thumbnailOption.spacing
+			layout.minimumLineSpacing = thumbnailOption.spacing
+			layout.sectionInset = NSEdgeInsets(
+				top: thumbnailOption.sectionInset,
+				left: thumbnailOption.sectionInset,
+				bottom: thumbnailOption.sectionInset,
+				right: thumbnailOption.sectionInset
+			)
+			
+			// Configure headers if grouping is enabled
+			if settings.groupingOption != .none {
+				layout.headerReferenceSize = NSSize(width: 0, height: 40)
+			} else {
+				layout.headerReferenceSize = NSSize.zero
+			}
+			
 			layout.invalidateLayout()
 		}
 		#else
@@ -272,6 +328,29 @@ class UnifiedPhotoCollectionViewController: XViewController {
 		collectionView.selectionIndexPaths = Set(selectedIndexPaths)
 		#else
 		// iOS handles selection differently
+		#endif
+	}
+	
+	// MARK: - Private Methods
+	
+	private func updateVisibleCells() {
+		#if os(macOS)
+		// Update all visible items
+		for indexPath in collectionView.indexPathsForVisibleItems() {
+			if let item = collectionView.item(at: indexPath) as? UnifiedPhotoCell,
+			   let photo = dataSource.itemIdentifier(for: indexPath)?.base as? (any PhotoItem) {
+				item.configure(with: photo, settings: settings)
+			}
+		}
+		#else
+		// Update all visible cells
+		for cell in collectionView.visibleCells {
+			if let photoCell = cell as? UnifiedPhotoCell,
+			   let indexPath = collectionView.indexPath(for: cell),
+			   let photo = dataSource.itemIdentifier(for: indexPath)?.base as? (any PhotoItem) {
+				photoCell.configure(with: photo, settings: settings)
+			}
+		}
 		#endif
 	}
 	

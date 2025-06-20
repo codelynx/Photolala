@@ -1,6 +1,6 @@
 # Photolala Project Status
 
-Last Updated: June 19, 2025 (Session: Unified Photo Browser Architecture)
+Last Updated: June 19, 2025 (Session: Inspector Panel)
 
 ## Current Implementation Status
 
@@ -40,6 +40,15 @@ Last Updated: June 19, 2025 (Session: Unified Photo Browser Architecture)
   - Shows selected folder information
   - iOS: Automatically navigates to PhotoBrowserView after selection
   - macOS: Opens new window via menu command
+
+- **Inspector Panel**: Modern alternative to context menus
+  - InspectorView: Adaptive content (empty/single/multiple selection states)
+  - InspectorContainer: Platform-specific presentation
+  - macOS: Sidebar with HStack layout (content area adjusts)
+  - iOS/iPad: Modal sheet or popover
+  - Toggle via toolbar button, ⌘I shortcut, or View menu
+  - Shows photo info, quick actions, metadata
+  - Fixed selection sync and layout overlap issues
 
 #### Platform Features
 - **macOS**:
@@ -176,6 +185,24 @@ See sections 30-36 below for detailed implementation notes.
    - Refactored PhotoBrowserView to use unified architecture
    - Benefits: Code reuse, consistency, extensibility for new photo sources
    - Fixed issues: Thread safety with @MainActor, platform conditionals, thumbnail loading
+
+2. **Fixed Unified Architecture Degradations**:
+   - Fixed thumbnail sizing to use `thumbnailOption.size` instead of direct `thumbnailSize`
+   - Added proper spacing and section insets based on thumbnail options
+   - Added header support for photo grouping (year/month/day)
+   - Unified S3PhotoBrowserView thumbnail controls to match PhotoBrowserView (S/M/L)
+   - Migrated S3PhotoBrowserView to use UnifiedPhotoCollectionViewRepresentable
+   - Removed S3PhotoBrowserViewModel in favor of direct S3PhotoProvider usage
+
+3. **Implemented Item Info Bar Feature**:
+   - Added toggleable filename display below photo thumbnails
+   - New `showItemInfo` property in ThumbnailDisplaySettings (defaults to true)
+   - Dynamic cell height adjustment: adds 24px when info bar is shown
+   - Updated UnifiedPhotoCell with proper constraints and title visibility
+   - Added toolbar button with "squares.below.rectangle" SF Symbol
+   - Works with all thumbnail sizes (S/M/L) and photo sources
+   - Each window maintains independent info bar preference
+   - Documentation: `docs/history/implementation-notes/item-info-bar-implementation.md`
 
 ### 📝 Previous Changes (June 15, 2025)
 
@@ -1114,3 +1141,29 @@ See sections 30-36 below for detailed implementation notes.
      - S3CatalogSyncService.swift - Updated download/sync paths
      - PhotoCollectionViewController.swift - Uses CatalogAwarePhotoLoader
      - New: CatalogAwarePhotoLoader.swift - Intelligent photo loading
+
+40. **Thumbnail Loading and Display Fixes (June 19, 2025 - Session: Thumbnail Loading Fixes)**:
+   - **Fixed Placeholder Icon Prominence**:
+     - Implemented separate placeholder image view (50% size of cell)
+     - Uses subtle tertiaryLabelColor for better visual hierarchy
+     - Placeholder properly hides when actual thumbnail loads
+     - Shows error icon for failed loads
+   - **Fixed Initial Thumbnail Loading**:
+     - Problem: Thumbnails showed "No thumbnail available" until scrolling
+     - Root cause: `loadPhotoData()` returning early for concurrent requests
+     - Solution: Added `loadingTask` tracking to handle concurrent calls properly
+     - Now all concurrent requests wait for the same loading operation
+   - **Removed Unnecessary S3 Requests**:
+     - PhotoBrowserView was calling `loadArchiveStatus()` for local photos
+     - Removed this call - archive status only relevant for S3 photos
+     - Significantly reduced unnecessary network traffic
+   - **Verified Refresh Functionality**:
+     - Refresh button correctly picks up added files
+     - Properly removes deleted files from view
+     - Uses existing `LocalPhotoProvider.refresh()` implementation
+   - **Implementation Details**:
+     - UnifiedPhotoCell: Added `placeholderImageView` for both platforms
+     - PhotoFile: Added concurrent loading support with Task tracking
+     - PhotoItem: Simplified `loadThumbnail()` to always call `loadPhotoData()`
+   - **Documentation**:
+     - Created `docs/history/implementation-notes/thumbnail-loading-fixes.md`

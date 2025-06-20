@@ -77,6 +77,7 @@ class ThumbnailDisplaySettings {
 	var groupingOption: PhotoGroupingOption = .none
 	var thumbnailSize: CGFloat = 150
 	var spacing: CGFloat = 8
+	var showItemInfo: Bool = true
 
 	// Convenience properties
 	var canIncreaseThumbnailSize: Bool {

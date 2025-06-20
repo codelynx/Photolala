@@ -106,33 +106,45 @@ class PhotoFile: Identifiable, Hashable {
 	}
 
 	// Combined loading for efficiency
+	private var loadingTask: Task<Void, Error>?
+	
 	func loadPhotoData() async throws {
-		// Skip if already loading or loaded
-		guard self.thumbnailLoadingState != .loading, self.metadataLoadingState != .loading else { return }
-
+		// If already loading, wait for the existing task
+		if let existingTask = loadingTask {
+			try await existingTask.value
+			return
+		}
+		
 		// Skip if both already loaded
 		if self.thumbnail != nil, self.metadata != nil { return }
-
-		self.thumbnailLoadingState = .loading
-		self.metadataLoadingState = .loading
-
-		do {
-			let (loadedThumbnail, loadedMetadata) = try await PhotoManager.shared.loadPhotoData(for: self)
-
-			if let loadedThumbnail {
-				self.thumbnail = loadedThumbnail
-				self.thumbnailLoadingState = .loaded
+		
+		// Create new loading task
+		let task = Task {
+			self.thumbnailLoadingState = .loading
+			self.metadataLoadingState = .loading
+			
+			do {
+				let (loadedThumbnail, loadedMetadata) = try await PhotoManager.shared.loadPhotoData(for: self)
+				
+				if let loadedThumbnail {
+					self.thumbnail = loadedThumbnail
+					self.thumbnailLoadingState = .loaded
+				}
+				
+				if let loadedMetadata {
+					self.metadata = loadedMetadata
+					self.metadataLoadingState = .loaded
+				}
+			} catch {
+				self.thumbnailLoadingState = .failed(error)
+				self.metadataLoadingState = .failed(error)
+				throw error
 			}
-
-			if let loadedMetadata {
-				self.metadata = loadedMetadata
-				self.metadataLoadingState = .loaded
-			}
-		} catch {
-			self.thumbnailLoadingState = .failed(error)
-			self.metadataLoadingState = .failed(error)
-			throw error
 		}
+		
+		self.loadingTask = task
+		try await task.value
+		self.loadingTask = nil
 	}
 
 	/*

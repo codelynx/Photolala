@@ -22,10 +22,17 @@ struct PhotoBrowserView: View {
 	@State private var showingUpgradePrompt = false
 	@State private var archivedPhotoForRetrieval: PhotoFile?
 	@State private var showingRetrievalDialog = false
+	@State private var isRefreshing = false
+	@State private var showingInspector = false
 	@StateObject private var s3BackupManager = S3BackupManager.shared
 	@StateObject private var identityManager = IdentityManager.shared
 	@StateObject private var backupQueueManager = BackupQueueManager.shared
 	@StateObject private var photoProvider: LocalPhotoProvider
+	
+	// Computed property to ensure inspector gets PhotoItems
+	private var inspectorSelection: [any PhotoItem] {
+		selectedPhotos.map { $0 as any PhotoItem }
+	}
 
 	init(directoryPath: NSString) {
 		self.directoryPath = directoryPath
@@ -81,6 +88,10 @@ struct PhotoBrowserView: View {
 				// Backup status bar
 				BackupStatusBar()
 			}
+			.inspector(
+				isPresented: $showingInspector,
+				selection: inspectorSelection
+			)
 		#else
 			self.collectionContent
 				.navigationDestination(item: self.$selectedPhotoNavigation) { navigation in
@@ -124,6 +135,7 @@ struct PhotoBrowserView: View {
 			},
 			onSelectionChanged: { photos in
 				self.selectedPhotos = photos.compactMap { $0 as? PhotoFile }
+				print("[PhotoBrowserView] Selection changed: \(photos.count) photos selected")
 			}
 		)
 		.onAppear {
@@ -134,10 +146,7 @@ struct PhotoBrowserView: View {
 		.onReceive(photoProvider.photosPublisher) { photos in
 			self.allPhotos = photos.compactMap { $0 as? PhotoFile }
 			self.photosCount = photos.count
-			// Load archive status for all photos
-			Task {
-				await self.loadArchiveStatus(for: self.allPhotos)
-			}
+			// Don't load archive status for local photos - it's not needed and causes unnecessary S3 requests
 		}
 		.navigationTitle(self.directoryPath.lastPathComponent)
 		#if os(macOS)
@@ -145,6 +154,9 @@ struct PhotoBrowserView: View {
 		#endif
 			.onReceive(NotificationCenter.default.publisher(for: .deselectAll)) { _ in
 				self.selectedPhotos = []
+			}
+			.onReceive(NotificationCenter.default.publisher(for: .toggleInspector)) { _ in
+				self.showingInspector.toggle()
 			}
 			.overlay {
 				if self.showingS3UploadProgress {
@@ -211,6 +223,16 @@ struct PhotoBrowserView: View {
 					}
 					#if os(macOS)
 					.help(self.settings.displayMode == .scaleToFit ? "Switch to Fill" : "Switch to Fit")
+					#endif
+					
+					// Item info toggle
+					Button(action: {
+						self.settings.showItemInfo.toggle()
+					}) {
+						Image(systemName: "squares.below.rectangle")
+					}
+					#if os(macOS)
+					.help(self.settings.showItemInfo ? "Hide item info" : "Show item info")
 					#endif
 
 					#if os(iOS)
@@ -359,6 +381,31 @@ struct PhotoBrowserView: View {
 						.pickerStyle(.menu)
 						.frame(width: 120)
 						.help("Group photos by date")
+					#endif
+					
+					// Refresh button
+					Button(action: {
+						Task {
+							isRefreshing = true
+							defer { isRefreshing = false }
+							try? await photoProvider.refresh()
+						}
+					}) {
+						Label("Refresh", systemImage: "arrow.clockwise")
+					}
+					.disabled(isRefreshing)
+					#if os(macOS)
+					.help("Refresh folder contents")
+					#endif
+					
+					// Inspector button
+					Button(action: {
+						showingInspector.toggle()
+					}) {
+						Label("Inspector", systemImage: "info.circle")
+					}
+					#if os(macOS)
+					.help(showingInspector ? "Hide Inspector" : "Show Inspector")
 					#endif
 
 					// S3 Backup button
