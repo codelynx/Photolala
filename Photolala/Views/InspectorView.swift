@@ -184,6 +184,43 @@ struct QuickActionsSection: View {
 			Text("Quick Actions")
 				.font(.headline)
 			
+			// Star toggle for PhotoFile
+			if let photoFile = photo as? PhotoFile,
+			   !photoFile.isArchived {
+				let backupStatus = photoFile.md5Hash != nil ? 
+					BackupQueueManager.shared.backupStatus[photoFile.md5Hash!] : nil
+				let isStarred = backupStatus == .queued || backupStatus == .uploaded
+				let isFailed = backupStatus == .failed
+				
+				if isFailed {
+					// Show error state with retry option
+					ActionButton(
+						title: "Retry Backup",
+						systemImage: "exclamationmark.circle.fill"
+					) {
+						Task { @MainActor in
+							print("[InspectorView] Retry backup for: \(photoFile.filename)")
+							BackupQueueManager.shared.addToQueue(photoFile)
+						}
+					}
+					.foregroundColor(.red)
+				} else {
+					ActionButton(
+						title: isStarred ? "Unstar" : "Star",
+						systemImage: isStarred ? "star.fill" : "star"
+					) {
+						Task { @MainActor in
+							print("[InspectorView] Star toggle clicked for: \(photoFile.filename)")
+							print("[InspectorView] Current starred state: \(isStarred)")
+							print("[InspectorView] Current backup status: \(String(describing: backupStatus))")
+							print("[InspectorView] MD5 hash: \(photoFile.md5Hash ?? "nil")")
+							BackupQueueManager.shared.toggleStar(for: photoFile)
+							print("[InspectorView] Toggle completed")
+						}
+					}
+				}
+			}
+			
 			if photo is PhotoFile {
 				ActionButton(title: "Show in Finder", systemImage: "folder") {
 					Task {
@@ -195,16 +232,6 @@ struct QuickActionsSection: View {
 			ActionButton(title: "Share", systemImage: "square.and.arrow.up") {
 				// TODO: Implement share
 			}
-			
-			// TODO: Add star functionality when implemented
-			// if let file = photo as? PhotoFile {
-			// 	ActionButton(
-			// 		title: file.isStarred ? "Unstar" : "Star for Backup",
-			// 		systemImage: file.isStarred ? "star.fill" : "star"
-			// 	) {
-			// 		Task { await toggleStar(file) }
-			// 	}
-			// }
 		}
 	}
 }
@@ -270,6 +297,7 @@ struct ActionButton: View {
 	let title: String
 	let systemImage: String
 	let action: () async -> Void
+	@State private var isHovered = false
 	
 	var body: some View {
 		Button {
@@ -279,9 +307,17 @@ struct ActionButton: View {
 		} label: {
 			Label(title, systemImage: systemImage)
 				.frame(maxWidth: .infinity, alignment: .leading)
+				.padding(.horizontal, 8)
+				.padding(.vertical, 4)
+				.background(
+					RoundedRectangle(cornerRadius: 6)
+						.fill(isHovered ? Color.accentColor.opacity(0.1) : Color.clear)
+				)
 		}
 		.buttonStyle(.plain)
-		.padding(.vertical, 4)
+		.onHover { hovering in
+			isHovered = hovering
+		}
 	}
 }
 
@@ -354,24 +390,63 @@ struct BulkActionsSection: View {
 		photos.compactMap { $0 as? PhotoFile }
 	}
 	
+	var availablePhotos: [PhotoFile] {
+		localPhotos.filter { !$0.isArchived }
+	}
+	
+	var starredPhotos: [PhotoFile] {
+		availablePhotos.filter { photo in
+			guard let md5 = photo.md5Hash else { return false }
+			let status = BackupQueueManager.shared.backupStatus[md5]
+			return status == .queued || status == .uploaded
+		}
+	}
+	
 	var body: some View {
 		VStack(alignment: .leading, spacing: 8) {
 			Text("Actions")
 				.font(.headline)
 			
+			// Show status icons for mixed states
+			if photos.count > 1 {
+				StatusIconsView(selection: photos)
+					.padding(.vertical, 4)
+			}
+			
+			// Star toggle - only show if all available photos are in same state
+			if availablePhotos.count == photos.count && !availablePhotos.isEmpty {
+				if starredPhotos.count == 0 {
+					// All unstarred
+					ActionButton(title: "Star All", systemImage: "star") {
+						Task { @MainActor in
+							print("[InspectorView] Star All clicked for \(availablePhotos.count) photos")
+							for photo in availablePhotos {
+								print("[InspectorView] Adding to queue: \(photo.filename)")
+								BackupQueueManager.shared.addToQueue(photo)
+							}
+							print("[InspectorView] Star All completed")
+						}
+					}
+				} else if starredPhotos.count == availablePhotos.count {
+					// All starred
+					ActionButton(title: "Unstar All", systemImage: "star.fill") {
+						Task { @MainActor in
+							print("[InspectorView] Unstar All clicked for \(starredPhotos.count) photos")
+							for photo in starredPhotos {
+								print("[InspectorView] Removing from queue: \(photo.filename)")
+								BackupQueueManager.shared.removeFromQueue(photo)
+							}
+							print("[InspectorView] Unstar All completed")
+						}
+					}
+				}
+				// Mixed state - no button shown
+			}
+			
 			if !localPhotos.isEmpty {
 				ActionButton(title: "Show All in Finder", systemImage: "folder") {
 					// TODO: Implement
 				}
-				
-				// TODO: Add star functionality when implemented
-				// let allStarred = localPhotos.allSatisfy { $0.isStarred }
-				// ActionButton(
-				// 	title: allStarred ? "Unstar All" : "Star All for Backup",
-				// 	systemImage: allStarred ? "star.fill" : "star"
-				// ) {
-				// 	// TODO: Implement bulk star
-				// }
 			}
 		}
 	}

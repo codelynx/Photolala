@@ -135,6 +135,11 @@ class LocalPhotoProvider: BasePhotoProvider {
 			do {
 				let files = try await photoLoader.loadPhotos(from: URL(fileURLWithPath: directoryPath))
 				guard !Task.isCancelled else { return }
+				
+				// Match photos with backup status BEFORE updating UI
+				await BackupQueueManager.shared.matchPhotosWithBackupStatus(files)
+				
+				// Now update the UI with photos that have MD5 hashes computed
 				updatePhotos(files)
 			} catch {
 				// Handle error silently as the task doesn't throw

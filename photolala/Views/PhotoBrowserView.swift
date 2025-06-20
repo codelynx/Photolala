@@ -158,6 +158,11 @@ struct PhotoBrowserView: View {
 			.onReceive(NotificationCenter.default.publisher(for: .toggleInspector)) { _ in
 				self.showingInspector.toggle()
 			}
+			.onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("BackupQueueChanged"))) { _ in
+				// Force refresh of collection view to update star states
+				self.photosCount = self.allPhotos.count + 1  // Trigger a refresh
+				self.photosCount = self.allPhotos.count      // Reset to correct count
+			}
 			.overlay {
 				if self.showingS3UploadProgress {
 					ZStack {

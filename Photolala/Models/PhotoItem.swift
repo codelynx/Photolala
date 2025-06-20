@@ -143,7 +143,15 @@ extension PhotoS3: PhotoItem {
 	
 	func loadThumbnail() async throws -> XImage? {
 		// Load from S3 or cache
-		return try await S3DownloadService.shared.downloadThumbnail(for: self)
+		do {
+			// First try to initialize the service if needed
+			try await S3DownloadService.shared.initialize()
+			return try await S3DownloadService.shared.downloadThumbnail(for: self)
+		} catch {
+			print("[PhotoS3] Failed to load thumbnail for \(filename): \(error)")
+			// Re-throw to show error in UI
+			throw error
+		}
 	}
 	
 	func loadImageData() async throws -> Data {
