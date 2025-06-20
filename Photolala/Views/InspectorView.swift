@@ -12,6 +12,11 @@ struct InspectorView: View {
 	@Environment(\.horizontalSizeClass) var horizontalSizeClass
 	@Environment(\.dismiss) var dismiss
 	
+	init(selection: [any PhotoItem]) {
+		self.selection = selection
+		print("[InspectorView] Init with \(selection.count) items")
+	}
+	
 	var body: some View {
 		Group {
 			if selection.isEmpty {

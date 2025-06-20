@@ -28,6 +28,11 @@ struct PhotoBrowserView: View {
 	@StateObject private var identityManager = IdentityManager.shared
 	@StateObject private var backupQueueManager = BackupQueueManager.shared
 	@StateObject private var photoProvider: LocalPhotoProvider
+	
+	// Computed property to ensure inspector gets PhotoItems
+	private var inspectorSelection: [any PhotoItem] {
+		selectedPhotos.map { $0 as any PhotoItem }
+	}
 
 	init(directoryPath: NSString) {
 		self.directoryPath = directoryPath
@@ -85,7 +90,7 @@ struct PhotoBrowserView: View {
 			}
 			.inspector(
 				isPresented: $showingInspector,
-				selection: selectedPhotos.map { $0 as any PhotoItem }
+				selection: inspectorSelection
 			)
 		#else
 			self.collectionContent
@@ -130,6 +135,7 @@ struct PhotoBrowserView: View {
 			},
 			onSelectionChanged: { photos in
 				self.selectedPhotos = photos.compactMap { $0 as? PhotoFile }
+				print("[PhotoBrowserView] Selection changed: \(photos.count) photos selected")
 			}
 		)
 		.onAppear {

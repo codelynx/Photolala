@@ -1,6 +1,6 @@
 # Photolala Project Status
 
-Last Updated: June 19, 2025 (Session: Thumbnail Loading Fixes)
+Last Updated: June 19, 2025 (Session: Inspector Panel)
 
 ## Current Implementation Status
 
@@ -40,6 +40,15 @@ Last Updated: June 19, 2025 (Session: Thumbnail Loading Fixes)
   - Shows selected folder information
   - iOS: Automatically navigates to PhotoBrowserView after selection
   - macOS: Opens new window via menu command
+
+- **Inspector Panel**: Modern alternative to context menus
+  - InspectorView: Adaptive content (empty/single/multiple selection states)
+  - InspectorContainer: Platform-specific presentation
+  - macOS: Sidebar with HStack layout (content area adjusts)
+  - iOS/iPad: Modal sheet or popover
+  - Toggle via toolbar button, ⌘I shortcut, or View menu
+  - Shows photo info, quick actions, metadata
+  - Fixed selection sync and layout overlap issues
 
 #### Platform Features
 - **macOS**:

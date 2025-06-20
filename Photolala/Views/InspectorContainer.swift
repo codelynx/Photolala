@@ -12,10 +12,16 @@ struct InspectorContainer: View {
 	let selection: [any PhotoItem]
 	@Environment(\.horizontalSizeClass) var horizontalSizeClass
 	
+	// Force view update when selection changes
+	private var selectionID: String {
+		selection.map { $0.id }.joined(separator: ",")
+	}
+	
 	var body: some View {
 		#if os(macOS)
 		// Always use sidebar on macOS
 		InspectorView(selection: selection)
+			.id(selectionID)
 		#else
 		if horizontalSizeClass == .regular {
 			// iPad in regular width - use sidebar
@@ -47,18 +53,24 @@ extension View {
 		selection: [any PhotoItem]
 	) -> some View {
 		#if os(macOS)
-		// On macOS, show as a sidebar
-		self.overlay(alignment: .trailing) {
+		// On macOS, show as a sidebar that adjusts content
+		HStack(spacing: 0) {
+			self
+				.frame(maxWidth: .infinity)
+			
 			if isPresented.wrappedValue {
+				Divider()
+				
 				InspectorContainer(
 					isShowingInspector: isPresented,
 					selection: selection
 				)
 				.frame(width: 300)
 				.background(Color(NSColor.controlBackgroundColor))
-				.transition(.move(edge: .trailing))
+				.transition(.move(edge: .trailing).combined(with: .opacity))
 			}
 		}
+		.animation(.easeInOut(duration: 0.3), value: isPresented.wrappedValue)
 		#else
 		// On iOS/iPadOS, show as sheet or popover based on size class
 		self.sheet(isPresented: isPresented) {

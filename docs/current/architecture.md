@@ -1,6 +1,6 @@
 # Photolala Architecture
 
-Last Updated: June 19, 2025 (Added Unified Photo Browser Architecture)
+Last Updated: June 19, 2025 (Added Inspector Panel)
 
 ## Overview
 
@@ -197,7 +197,18 @@ Photolala is a cross-platform photo browser application built with SwiftUI, supp
 - Photo upload with PhotosPicker
 - AWS credentials configuration
 - Catalog generation controls
-- DEBUG: Clean up all user data
+
+#### Inspector Panel
+- **InspectorView**: Main content view showing photo details
+  - Adaptive layout: empty state, single selection, multiple selection
+  - Shows information, quick actions, metadata
+- **InspectorContainer**: Platform-specific presentation wrapper
+  - macOS: Sidebar using HStack layout (content shrinks)
+  - iOS/iPad: Modal sheet or popover
+- **Integration**: 
+  - Toggle via toolbar button, ⌘I shortcut, or View menu
+  - Responsive to selection changes
+  - Smooth slide animation
 
 #### S3PhotoBrowserView
 - Browse photos from S3 catalog
