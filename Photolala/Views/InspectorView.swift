@@ -161,8 +161,6 @@ struct PhotoInfoSection: View {
 			Text("Information")
 				.font(.headline)
 			
-			InfoRow(label: "Name", value: photo.displayName)
-			
 			if let size = photo.fileSize {
 				InfoRow(label: "Size", value: formatFileSize(size))
 			}
