@@ -21,6 +21,8 @@ class UnifiedPhotoCell: NSCollectionViewItem {
 	private var photoImageView: ScalableImageView!
 	private var placeholderImageView: NSImageView!
 	private var titleLabel: NSTextField!
+	private var starImageView: NSImageView!
+	private var fileSizeLabel: NSTextField!
 	private var badgeView: NSView?
 	private var loadingIndicator: NSProgressIndicator!
 	
@@ -48,15 +50,26 @@ class UnifiedPhotoCell: NSCollectionViewItem {
 		
 		view.addSubview(photoImageView)
 		
-		// Title label
+		// Title label (hidden but kept for compatibility)
 		titleLabel = NSTextField(labelWithString: "")
-		titleLabel.font = .systemFont(ofSize: 11)
-		titleLabel.textColor = .labelColor
-		titleLabel.alignment = .center
-		titleLabel.lineBreakMode = .byTruncatingTail
-		titleLabel.maximumNumberOfLines = 2
+		titleLabel.isHidden = true
 		titleLabel.translatesAutoresizingMaskIntoConstraints = false
 		view.addSubview(titleLabel)
+		
+		// Star image view
+		starImageView = NSImageView()
+		starImageView.translatesAutoresizingMaskIntoConstraints = false
+		starImageView.imageScaling = .scaleProportionallyDown
+		starImageView.contentTintColor = .systemYellow
+		view.addSubview(starImageView)
+		
+		// File size label
+		fileSizeLabel = NSTextField(labelWithString: "")
+		fileSizeLabel.font = .systemFont(ofSize: 11)
+		fileSizeLabel.textColor = .secondaryLabelColor
+		fileSizeLabel.alignment = .right
+		fileSizeLabel.translatesAutoresizingMaskIntoConstraints = false
+		view.addSubview(fileSizeLabel)
 		
 		// Placeholder image view
 		placeholderImageView = NSImageView()
@@ -89,11 +102,22 @@ class UnifiedPhotoCell: NSCollectionViewItem {
 			imageViewWidthConstraint,
 			imageViewHeightConstraint,
 			
-			// Title label
+			// Title label (hidden)
 			titleLabel.topAnchor.constraint(equalTo: photoImageView.bottomAnchor, constant: 4),
 			titleLabel.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 4),
 			titleLabel.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -4),
 			titleLabel.heightAnchor.constraint(equalToConstant: 20),
+			
+			// Star image view
+			starImageView.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 4),
+			starImageView.centerYAnchor.constraint(equalTo: titleLabel.centerYAnchor),
+			starImageView.widthAnchor.constraint(equalToConstant: 16),
+			starImageView.heightAnchor.constraint(equalToConstant: 16),
+			
+			// File size label
+			fileSizeLabel.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -4),
+			fileSizeLabel.centerYAnchor.constraint(equalTo: titleLabel.centerYAnchor),
+			fileSizeLabel.leadingAnchor.constraint(greaterThanOrEqualTo: starImageView.trailingAnchor, constant: 4),
 			
 			// Loading indicator
 			loadingIndicator.centerXAnchor.constraint(equalTo: photoImageView.centerXAnchor),
@@ -113,6 +137,8 @@ class UnifiedPhotoCell: NSCollectionViewItem {
 		thumbnailTask = nil
 		photoImageView.image = nil
 		titleLabel.stringValue = ""
+		starImageView.image = nil
+		fileSizeLabel.stringValue = ""
 		badgeView?.removeFromSuperview()
 		badgeView = nil
 		loadingIndicator.stopAnimation(nil)
@@ -128,8 +154,64 @@ class UnifiedPhotoCell: NSCollectionViewItem {
 		imageViewHeightConstraint.constant = settings.thumbnailOption.size
 		photoImageView.layer?.cornerRadius = settings.thumbnailOption.cornerRadius
 		
-		// Update title visibility based on showItemInfo
-		titleLabel.isHidden = !settings.showItemInfo
+		// Update info bar visibility based on showItemInfo
+		let showInfo = settings.showItemInfo
+		starImageView.isHidden = !showInfo
+		fileSizeLabel.isHidden = !showInfo
+		
+		// Configure star based on backup state
+		if let photoFile = photo as? PhotoFile {
+			// Only show backup status for local PhotoFile items
+			if let md5 = photoFile.md5Hash {
+				let status = BackupQueueManager.shared.backupStatus[md5]
+				switch status {
+				case .queued, .uploaded:
+					starImageView.image = NSImage(systemSymbolName: "star.fill", accessibilityDescription: nil)
+					starImageView.contentTintColor = .systemYellow
+				case .failed:
+					starImageView.image = NSImage(systemSymbolName: "exclamationmark.circle.fill", accessibilityDescription: nil)
+					starImageView.contentTintColor = .systemRed
+				default:
+					starImageView.image = nil
+					starImageView.contentTintColor = .systemYellow
+				}
+			} else {
+				// MD5 not computed yet - check if we can find a match later
+				starImageView.image = nil
+				// Compute MD5 asynchronously
+				Task {
+					if let status = await BackupQueueManager.shared.getBackupStatus(for: photoFile) {
+						await MainActor.run {
+							switch status {
+							case .queued, .uploaded:
+								starImageView.image = NSImage(systemSymbolName: "star.fill", accessibilityDescription: nil)
+								starImageView.contentTintColor = .systemYellow
+							case .failed:
+								starImageView.image = NSImage(systemSymbolName: "exclamationmark.circle.fill", accessibilityDescription: nil)
+								starImageView.contentTintColor = .systemRed
+							default:
+								starImageView.image = nil
+							}
+						}
+					}
+				}
+			}
+		} else if let photoS3 = photo as? PhotoS3 {
+			// For S3 photos, show a cloud icon to indicate they're already backed up
+			starImageView.image = NSImage(systemSymbolName: "icloud.fill", accessibilityDescription: nil)
+			starImageView.contentTintColor = .systemBlue
+		} else {
+			starImageView.image = nil
+		}
+		
+		// Configure file size
+		if let fileSize = photo.fileSize {
+			let formatter = ByteCountFormatter()
+			formatter.countStyle = .file
+			fileSizeLabel.stringValue = formatter.string(fromByteCount: fileSize)
+		} else {
+			fileSizeLabel.stringValue = ""
+		}
 		
 		// Update display mode
 		updateDisplayMode(settings.displayMode)
@@ -255,6 +337,8 @@ class UnifiedPhotoCell: UICollectionViewCell {
 	private var photoImageView: UIImageView!
 	private var placeholderImageView: UIImageView!
 	private var titleLabel: UILabel!
+	private var starImageView: UIImageView!
+	private var fileSizeLabel: UILabel!
 	private var badgeView: UIView?
 	private var loadingIndicator: UIActivityIndicatorView!
 	
@@ -282,14 +366,26 @@ class UnifiedPhotoCell: UICollectionViewCell {
 		photoImageView.translatesAutoresizingMaskIntoConstraints = false
 		contentView.addSubview(photoImageView)
 		
-		// Title label
+		// Title label (hidden but kept for compatibility)
 		titleLabel = UILabel()
-		titleLabel.font = .systemFont(ofSize: 11)
-		titleLabel.textColor = .label
-		titleLabel.textAlignment = .center
-		titleLabel.numberOfLines = 2
+		titleLabel.isHidden = true
 		titleLabel.translatesAutoresizingMaskIntoConstraints = false
 		contentView.addSubview(titleLabel)
+		
+		// Star image view
+		starImageView = UIImageView()
+		starImageView.translatesAutoresizingMaskIntoConstraints = false
+		starImageView.contentMode = .scaleAspectFit
+		starImageView.tintColor = .systemYellow
+		contentView.addSubview(starImageView)
+		
+		// File size label
+		fileSizeLabel = UILabel()
+		fileSizeLabel.font = .systemFont(ofSize: 11)
+		fileSizeLabel.textColor = .secondaryLabel
+		fileSizeLabel.textAlignment = .right
+		fileSizeLabel.translatesAutoresizingMaskIntoConstraints = false
+		contentView.addSubview(fileSizeLabel)
 		
 		// Placeholder image view
 		placeholderImageView = UIImageView()
@@ -319,6 +415,17 @@ class UnifiedPhotoCell: UICollectionViewCell {
 			titleLabel.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -4),
 			titleLabel.heightAnchor.constraint(equalToConstant: 30),
 			
+			// Star image view
+			starImageView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 4),
+			starImageView.centerYAnchor.constraint(equalTo: titleLabel.centerYAnchor),
+			starImageView.widthAnchor.constraint(equalToConstant: 16),
+			starImageView.heightAnchor.constraint(equalToConstant: 16),
+			
+			// File size label
+			fileSizeLabel.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -4),
+			fileSizeLabel.centerYAnchor.constraint(equalTo: titleLabel.centerYAnchor),
+			fileSizeLabel.leadingAnchor.constraint(greaterThanOrEqualTo: starImageView.trailingAnchor, constant: 4),
+			
 			loadingIndicator.centerXAnchor.constraint(equalTo: photoImageView.centerXAnchor),
 			loadingIndicator.centerYAnchor.constraint(equalTo: photoImageView.centerYAnchor),
 			
@@ -336,6 +443,8 @@ class UnifiedPhotoCell: UICollectionViewCell {
 		thumbnailTask = nil
 		photoImageView.image = nil
 		titleLabel.text = ""
+		starImageView.image = nil
+		fileSizeLabel.text = ""
 		badgeView?.removeFromSuperview()
 		badgeView = nil
 		loadingIndicator.stopAnimating()
@@ -347,8 +456,63 @@ class UnifiedPhotoCell: UICollectionViewCell {
 		currentPhoto = photo
 		titleLabel.text = photo.displayName
 		
-		// Update title visibility based on showItemInfo
-		titleLabel.isHidden = !settings.showItemInfo
+		// Update info bar visibility based on showItemInfo
+		let showInfo = settings.showItemInfo
+		starImageView.isHidden = !showInfo
+		fileSizeLabel.isHidden = !showInfo
+		
+		// Configure star based on backup state
+		if let photoFile = photo as? PhotoFile {
+			// Only show backup status for local PhotoFile items
+			if let md5 = photoFile.md5Hash {
+				let status = BackupQueueManager.shared.backupStatus[md5]
+				switch status {
+				case .queued, .uploaded:
+					starImageView.image = UIImage(systemName: "star.fill")
+					starImageView.tintColor = .systemYellow
+				case .failed:
+					starImageView.image = UIImage(systemName: "exclamationmark.circle.fill")
+					starImageView.tintColor = .systemRed
+				default:
+					starImageView.image = nil
+				}
+			} else {
+				// MD5 not computed yet - check if we can find a match later
+				starImageView.image = nil
+				// Compute MD5 asynchronously
+				Task {
+					if let status = await BackupQueueManager.shared.getBackupStatus(for: photoFile) {
+						await MainActor.run {
+							switch status {
+							case .queued, .uploaded:
+								starImageView.image = UIImage(systemName: "star.fill")
+								starImageView.tintColor = .systemYellow
+							case .failed:
+								starImageView.image = UIImage(systemName: "exclamationmark.circle.fill")
+								starImageView.tintColor = .systemRed
+							default:
+								starImageView.image = nil
+							}
+						}
+					}
+				}
+			}
+		} else if let photoS3 = photo as? PhotoS3 {
+			// For S3 photos, show a cloud icon to indicate they're already backed up
+			starImageView.image = UIImage(systemName: "icloud.fill")
+			starImageView.tintColor = .systemBlue
+		} else {
+			starImageView.image = nil
+		}
+		
+		// Configure file size
+		if let fileSize = photo.fileSize {
+			let formatter = ByteCountFormatter()
+			formatter.countStyle = .file
+			fileSizeLabel.text = formatter.string(fromByteCount: fileSize)
+		} else {
+			fileSizeLabel.text = ""
+		}
 		
 		// Update display mode
 		updateDisplayMode(settings.displayMode)
