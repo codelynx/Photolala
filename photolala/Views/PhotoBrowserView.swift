@@ -23,6 +23,7 @@ struct PhotoBrowserView: View {
 	@State private var archivedPhotoForRetrieval: PhotoFile?
 	@State private var showingRetrievalDialog = false
 	@State private var isRefreshing = false
+	@State private var showingInspector = false
 	@StateObject private var s3BackupManager = S3BackupManager.shared
 	@StateObject private var identityManager = IdentityManager.shared
 	@StateObject private var backupQueueManager = BackupQueueManager.shared
@@ -82,6 +83,10 @@ struct PhotoBrowserView: View {
 				// Backup status bar
 				BackupStatusBar()
 			}
+			.inspector(
+				isPresented: $showingInspector,
+				selection: selectedPhotos.map { $0 as any PhotoItem }
+			)
 		#else
 			self.collectionContent
 				.navigationDestination(item: self.$selectedPhotoNavigation) { navigation in
@@ -143,6 +148,9 @@ struct PhotoBrowserView: View {
 		#endif
 			.onReceive(NotificationCenter.default.publisher(for: .deselectAll)) { _ in
 				self.selectedPhotos = []
+			}
+			.onReceive(NotificationCenter.default.publisher(for: .toggleInspector)) { _ in
+				self.showingInspector.toggle()
 			}
 			.overlay {
 				if self.showingS3UploadProgress {
@@ -382,6 +390,16 @@ struct PhotoBrowserView: View {
 					.disabled(isRefreshing)
 					#if os(macOS)
 					.help("Refresh folder contents")
+					#endif
+					
+					// Inspector button
+					Button(action: {
+						showingInspector.toggle()
+					}) {
+						Label("Inspector", systemImage: "info.circle")
+					}
+					#if os(macOS)
+					.help(showingInspector ? "Hide Inspector" : "Show Inspector")
 					#endif
 
 					// S3 Backup button

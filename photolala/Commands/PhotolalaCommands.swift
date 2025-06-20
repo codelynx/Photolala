@@ -46,6 +46,14 @@ struct PhotolalaCommands: Commands {
 		CommandGroup(after: .toolbar) {
 			Divider()
 			
+			Button("Show Inspector") {
+				// Post notification to toggle inspector
+				NotificationCenter.default.post(name: .toggleInspector, object: nil)
+			}
+			.keyboardShortcut("I", modifiers: .command)
+			
+			Divider()
+			
 			Button("Show Cache Statistics...") {
 				#if os(macOS)
 					self.showCacheStatistics()
@@ -273,4 +281,5 @@ struct PhotolalaCommands: Commands {
 extension Notification.Name {
 	static let deselectAll = Notification.Name("com.electricwoods.photolala.deselectAll")
 	static let showHelp = Notification.Name("com.electricwoods.photolala.showHelp")
+	static let toggleInspector = Notification.Name("com.electricwoods.photolala.toggleInspector")
 }
