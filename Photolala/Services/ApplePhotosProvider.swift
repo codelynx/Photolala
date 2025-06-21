@@ -143,7 +143,6 @@ class ApplePhotosProvider: BasePhotoProvider {
 			.smartAlbumScreenshots,
 			.smartAlbumSelfPortraits,
 			.smartAlbumLivePhotos,
-			.smartAlbumPortrait,
 			.smartAlbumPanoramas
 		]
 		

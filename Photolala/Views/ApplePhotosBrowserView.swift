@@ -10,7 +10,7 @@ import Photos
 
 struct ApplePhotosBrowserView: View {
 	@StateObject private var photoProvider = ApplePhotosProvider()
-	@StateObject private var settings = ThumbnailDisplaySettings()
+	@State private var settings = ThumbnailDisplaySettings()
 	@State private var selection: Set<PhotoApple> = []
 	@State private var showingInspector = false
 	@State private var isLoading = false
@@ -211,8 +211,6 @@ struct AlbumPickerView: View {
 			return "person.crop.circle"
 		case .smartAlbumLivePhotos:
 			return "livephoto"
-		case .smartAlbumPortrait:
-			return "person.crop.rectangle"
 		case .smartAlbumPanoramas:
 			return "pano"
 		default:
