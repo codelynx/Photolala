@@ -33,28 +33,13 @@ actor S3DownloadService {
 	private let bucketName = "photolala"
 	private var downloadTasks: [String: Task<Data, Error>] = [:] // Key -> Download task
 	
-	// Cache directories
-	private let thumbnailCacheURL: URL
-	private let photoCacheURL: URL
+	// Cache configuration
 	private let maxCacheSize: Int64 = 1_000_000_000 // 1GB
 	
 	// MARK: - Initialization
 	
 	init() {
-		// Set up cache directories
-		let cacheDir = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first!
-		#if os(macOS)
-		let appCacheDir = cacheDir.appendingPathComponent("com.electricwoods.photolala")
-		#else
-		let appCacheDir = cacheDir
-		#endif
-		
-		self.thumbnailCacheURL = appCacheDir.appendingPathComponent("thumbnails.s3")
-		self.photoCacheURL = appCacheDir.appendingPathComponent("photos.s3")
-		
-		// Create directories if needed
-		try? FileManager.default.createDirectory(at: thumbnailCacheURL, withIntermediateDirectories: true)
-		try? FileManager.default.createDirectory(at: photoCacheURL, withIntermediateDirectories: true)
+		// CacheManager handles directory creation
 	}
 	
 	// MARK: - Public Methods
@@ -86,7 +71,10 @@ actor S3DownloadService {
 		}
 		
 		// Check cache first
-		let cacheFile = thumbnailCacheURL.appendingPathComponent(photo.md5)
+		guard let userId = await IdentityManager.shared.currentUser?.serviceUserID else {
+			throw DownloadError.userNotAuthenticated
+		}
+		let cacheFile = CacheManager.shared.cloudThumbnailURL(service: .s3, userId: userId, md5: photo.md5)
 		if let cachedImage = loadCachedImage(at: cacheFile) {
 			return cachedImage
 		}
@@ -122,7 +110,10 @@ actor S3DownloadService {
 		let key = photo.photoKey
 		
 		// Check cache first
-		let cacheFile = photoCacheURL.appendingPathComponent(photo.md5)
+		guard let userId = await IdentityManager.shared.currentUser?.serviceUserID else {
+			throw DownloadError.userNotAuthenticated
+		}
+		let cacheFile = CacheManager.shared.cloudPhotoURL(service: .s3, userId: userId, md5: photo.md5)
 		if let cachedData = try? Data(contentsOf: cacheFile) {
 			return cachedData
 		}
@@ -139,12 +130,7 @@ actor S3DownloadService {
 	
 	/// Clear all caches
 	func clearCache() throws {
-		try FileManager.default.removeItem(at: thumbnailCacheURL)
-		try FileManager.default.removeItem(at: photoCacheURL)
-		
-		// Recreate directories
-		try FileManager.default.createDirectory(at: thumbnailCacheURL, withIntermediateDirectories: true)
-		try FileManager.default.createDirectory(at: photoCacheURL, withIntermediateDirectories: true)
+		try CacheManager.shared.clearCloudCaches(for: .s3)
 	}
 	
 	// MARK: - Private Methods
@@ -219,7 +205,16 @@ actor S3DownloadService {
 		Task.detached {
 			let maxSize: Int64 = 500_000_000 // 500MB per cache type
 			
-			for cacheURL in [self.thumbnailCacheURL, self.photoCacheURL] {
+			// Get user ID for cache paths
+			guard let userId = await IdentityManager.shared.currentUser?.serviceUserID else { return }
+			
+			// Get cache directories
+			let thumbnailDir = CacheManager.shared.cloudThumbnailURL(service: .s3, userId: userId, md5: "dummy")
+				.deletingLastPathComponent()
+			let photoDir = CacheManager.shared.cloudPhotoURL(service: .s3, userId: userId, md5: "dummy")
+				.deletingLastPathComponent()
+			
+			for cacheURL in [thumbnailDir, photoDir] {
 				guard let files = try? FileManager.default.contentsOfDirectory(
 					at: cacheURL,
 					includingPropertiesForKeys: [.fileSizeKey, .contentModificationDateKey]

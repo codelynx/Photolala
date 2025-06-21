@@ -8,6 +8,13 @@
 import SwiftUI
 
 struct PhotolalaCommands: Commands {
+	#if os(macOS)
+	// Keep strong references to windows to prevent them from being deallocated
+	static var cloudBrowserWindow: NSWindow?
+	static var cacheStatisticsWindow: NSWindow?
+	static var s3BackupWindow: NSWindow?
+	static var iapDeveloperWindow: NSWindow?
+	#endif
 	@Environment(\.openWindow) private var openWindow
 
 	var body: some Commands {
@@ -90,6 +97,11 @@ struct PhotolalaCommands: Commands {
 				}
 				
 				Divider()
+				
+				Button("Reveal Cache Folder in Finder") {
+					self.revealCacheFolder()
+				}
+				.keyboardShortcut("R", modifiers: [.command, .option])
 				
 				Button("Log Cache Contents") {
 					self.logCacheContents()
@@ -175,6 +187,11 @@ struct PhotolalaCommands: Commands {
 			*/
 			#endif
 			
+			// Close existing window if open
+			if let existingWindow = Self.cloudBrowserWindow {
+				existingWindow.close()
+			}
+			
 			// Open S3 browser window
 			let window = NSWindow(
 				contentRect: NSRect(x: 0, y: 0, width: 800, height: 600),
@@ -196,11 +213,19 @@ struct PhotolalaCommands: Commands {
 			// Keep window in front but not floating
 			window.level = .normal
 			window.isReleasedWhenClosed = false
+			
+			// Store reference to keep window alive
+			Self.cloudBrowserWindow = window
 		#endif
 	}
 
 	#if os(macOS)
 		private func showCacheStatistics() {
+			// Close existing window if open
+			if let existingWindow = Self.cacheStatisticsWindow {
+				existingWindow.close()
+			}
+			
 			let window = NSWindow(
 				contentRect: NSRect(x: 0, y: 0, width: 500, height: 600),
 				styleMask: [.titled, .closable, .resizable],
@@ -216,6 +241,9 @@ struct PhotolalaCommands: Commands {
 			// Keep window in front but not floating
 			window.level = .normal
 			window.isReleasedWhenClosed = false
+			
+			// Store reference to keep window alive
+			Self.cacheStatisticsWindow = window
 		}
 
 		private func showS3BackupTest() {
@@ -296,33 +324,64 @@ struct PhotolalaCommands: Commands {
 	
 	// MARK: - Cache Management
 	
+	private func revealCacheFolder() {
+		#if os(macOS)
+		let cacheRoot = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)[0]
+			.appendingPathComponent("com.electricwoods.photolala")
+		
+		// Create directory if it doesn't exist
+		try? FileManager.default.createDirectory(at: cacheRoot, withIntermediateDirectories: true)
+		
+		// Open in Finder
+		NSWorkspace.shared.selectFile(nil, inFileViewerRootedAtPath: cacheRoot.path)
+		
+		print("[Cache] Revealed cache folder: \(cacheRoot.path)")
+		#endif
+	}
+	
 	private func clearAllCaches() {
-		// Clear local
-		PhotoManager.shared.clearAllCaches()
-		PhotoManager.shared.clearDiskCache()
-		self.clearCatalogCache()
-		
-		// Clear cloud
-		self.clearCloudCacheDirectory()
-		
-		print("[Cache] All caches cleared")
-		self.showCacheClearedAlert(message: "All caches have been cleared")
+		do {
+			// Clear memory caches
+			PhotoManager.shared.clearAllCaches()
+			
+			// Clear all disk caches using CacheManager
+			try CacheManager.shared.clearAllCaches()
+			
+			print("[Cache] All caches cleared")
+			self.showCacheClearedAlert(message: "All caches have been cleared")
+		} catch {
+			print("[Cache] Failed to clear caches: \(error)")
+			self.showCacheClearedAlert(message: "Failed to clear some caches: \(error.localizedDescription)")
+		}
 	}
 	
 	private func clearLocalCaches() {
-		PhotoManager.shared.clearAllCaches()
-		PhotoManager.shared.clearDiskCache()
-		self.clearCatalogCache()
-		
-		print("[Cache] Local caches cleared")
-		self.showCacheClearedAlert(message: "Local caches have been cleared")
+		do {
+			// Clear memory caches
+			PhotoManager.shared.clearAllCaches()
+			
+			// Clear local disk caches using CacheManager
+			try CacheManager.shared.clearLocalCaches()
+			
+			print("[Cache] Local caches cleared")
+			self.showCacheClearedAlert(message: "Local caches have been cleared")
+		} catch {
+			print("[Cache] Failed to clear local caches: \(error)")
+			self.showCacheClearedAlert(message: "Failed to clear local caches: \(error.localizedDescription)")
+		}
 	}
 	
 	private func clearCloudCaches() {
-		self.clearCloudCacheDirectory()
-		
-		print("[Cache] Cloud caches cleared")
-		self.showCacheClearedAlert(message: "Cloud caches have been cleared")
+		do {
+			// Clear cloud caches using CacheManager
+			try CacheManager.shared.clearCloudCaches(for: .s3)
+			
+			print("[Cache] Cloud caches cleared")
+			self.showCacheClearedAlert(message: "Cloud caches have been cleared")
+		} catch {
+			print("[Cache] Failed to clear cloud caches: \(error)")
+			self.showCacheClearedAlert(message: "Failed to clear cloud caches: \(error.localizedDescription)")
+		}
 	}
 	
 	private func clearCloudCacheDirectory() {
@@ -378,27 +437,49 @@ struct PhotolalaCommands: Commands {
 		print("📱 MEMORY CACHES:")
 		print(PhotoManager.shared.getCacheInfo())
 		
-		// Disk Thumbnail Cache
-		print("\n💾 DISK THUMBNAIL CACHE:")
-		let thumbnailPath = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first!
-			.appendingPathComponent("Photolala")
-			.appendingPathComponent("Thumbnails")
-		self.logDirectoryContents(at: thumbnailPath, prefix: "  ")
+		// Overall cache info
+		print("\n📊 CACHE SIZES:")
+		let totalSize = CacheManager.shared.cacheSize()
+		let localSize = CacheManager.shared.localCacheSize()
+		let cloudSize = CacheManager.shared.cloudCacheSize(for: .s3)
+		print("  Total cache: \(formatBytes(totalSize))")
+		print("  Local cache: \(formatBytes(localSize))")
+		print("  Cloud cache (S3): \(formatBytes(cloudSize))")
 		
-		// Local Catalog Cache
-		print("\n📁 LOCAL CATALOG CACHE:")
-		let catalogPath = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first!
-			.appendingPathComponent("Photolala")
-		self.logCatalogContents(at: catalogPath, prefix: "  ")
+		// Local Thumbnail Cache (new structure)
+		print("\n💾 LOCAL THUMBNAIL CACHE:")
+		let localThumbnailPath = CacheManager.shared.localThumbnailURL(for: "dummy").deletingLastPathComponent()
+		self.logDirectoryContents(at: localThumbnailPath, prefix: "  ")
 		
-		// Cloud S3 Cache
+		// Legacy cache check
+		if CacheManager.shared.hasLegacyCaches() {
+			print("\n⚠️ LEGACY CACHES DETECTED:")
+			if let legacyLocal = CacheManager.shared.legacyLocalThumbnailDirectory() {
+				print("  Legacy local: \(legacyLocal.path)")
+			}
+			if let legacyS3 = CacheManager.shared.legacyS3ThumbnailDirectory() {
+				print("  Legacy S3 thumbnails: \(legacyS3.path)")
+			}
+			if let legacyCatalog = CacheManager.shared.legacyS3CatalogDirectory() {
+				print("  Legacy S3 catalog: \(legacyCatalog.path)")
+			}
+		}
+		
+		// Cloud S3 Cache (new structure)
 		print("\n☁️ CLOUD S3 CACHE:")
-		let cloudPath = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first!
+		let rootURL = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first!
 			.appendingPathComponent("com.electricwoods.photolala")
-			.appendingPathComponent("cloud.s3")
-		self.logDirectoryContents(at: cloudPath, prefix: "  ", showSize: true)
+			.appendingPathComponent("cloud")
+			.appendingPathComponent("s3")
+		self.logDirectoryContents(at: rootURL, prefix: "  ", showSize: true)
 		
 		print("\n=== END CACHE CONTENTS ===\n")
+	}
+	
+	private func formatBytes(_ bytes: Int64) -> String {
+		let formatter = ByteCountFormatter()
+		formatter.countStyle = .file
+		return formatter.string(fromByteCount: bytes)
 	}
 	
 	private func logDirectoryContents(at url: URL, prefix: String = "", showSize: Bool = false) {

@@ -63,7 +63,14 @@ actor S3CatalogSyncService {
 	}
 	
 	private var catalogCacheDir: URL {
-		cacheDir.appendingPathComponent("cloud.s3").appendingPathComponent(userId)
+		// Don't use CacheManager.cloudCatalogURL as it auto-creates the directory
+		// We need to manage directory creation ourselves for atomic updates
+		return CacheManager.shared.cacheRootURL
+			.appendingPathComponent("cloud")
+			.appendingPathComponent("s3")
+			.appendingPathComponent("catalogs")
+			.appendingPathComponent(userId)
+			.appendingPathComponent(".photolala")
 	}
 	
 	// MARK: - Initialization
@@ -74,31 +81,31 @@ actor S3CatalogSyncService {
 		self.s3Client = s3Client
 		self.userId = userId
 		
-		// Set up cache directory
-		#if os(iOS)
-		let cacheDir = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first!
-		#else
-		let cacheDir = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first!
-			.appendingPathComponent("com.electricwoods.photolala")
-		#endif
+		// We'll manage directory creation ourselves for atomic updates
+		self.cacheDir = CacheManager.shared.cacheRootURL
+			.appendingPathComponent("cloud")
+			.appendingPathComponent("s3")
 		
-		self.cacheDir = cacheDir
+		// Initialize etagCache before using catalogCacheDir
+		self.etagCache = ETagCache(etags: [:], lastSync: .distantPast)
 		
-		// Create catalog cache directory
-		let catalogCacheDir = cacheDir.appendingPathComponent("cloud.s3").appendingPathComponent(userId)
-		try FileManager.default.createDirectory(at: catalogCacheDir, withIntermediateDirectories: true)
+		// Now we can use catalogCacheDir safely
+		let catalogDir = CacheManager.shared.cacheRootURL
+			.appendingPathComponent("cloud")
+			.appendingPathComponent("s3")
+			.appendingPathComponent("catalogs")
+			.appendingPathComponent(userId)
+			.appendingPathComponent(".photolala")
 		
 		#if DEBUG
-		print("DEBUG: S3CatalogSyncService catalog cache dir: \(catalogCacheDir.path)")
+		print("DEBUG: S3CatalogSyncService catalog cache dir: \(catalogDir.path)")
 		#endif
 		
-		// Load or create ETag cache
-		let etagCacheURL = catalogCacheDir.appendingPathComponent(".etag-cache")
+		// Load ETag cache if it exists
+		let etagCacheURL = catalogDir.appendingPathComponent(".etag-cache")
 		if let data = try? Data(contentsOf: etagCacheURL),
 		   let cache = try? JSONDecoder().decode(ETagCache.self, from: data) {
 			self.etagCache = cache
-		} else {
-			self.etagCache = ETagCache(etags: [:], lastSync: .distantPast)
 		}
 	}
 	
@@ -121,9 +128,19 @@ actor S3CatalogSyncService {
 	
 	/// Load the cached catalog
 	func loadCachedCatalog() async throws -> PhotolalaCatalogService {
-		let catalogService = PhotolalaCatalogService(catalogURL: catalogCacheDir)
-		_ = try await catalogService.loadManifest()
-		return catalogService
+		// PhotolalaCatalogService expects the parent directory (it adds .photolala itself)
+		let parentDir = catalogCacheDir.deletingLastPathComponent()
+		print("[S3CatalogSyncService] Loading cached catalog from: \(parentDir.path)")
+		
+		let catalogService = PhotolalaCatalogService(catalogURL: parentDir)
+		do {
+			let manifest = try await catalogService.loadManifest()
+			print("[S3CatalogSyncService] Loaded manifest with \(manifest.photoCount) photos")
+			return catalogService
+		} catch {
+			print("[S3CatalogSyncService] Failed to load manifest: \(error)")
+			throw error
+		}
 	}
 	
 	/// Load the S3 master catalog
@@ -164,18 +181,19 @@ actor S3CatalogSyncService {
 		}
 		
 		// Save manifest temporarily
-		// Use a unique temporary directory name to avoid conflicts
+		// Create temp directory at the user level, not inside .photolala
+		let userDir = catalogCacheDir.deletingLastPathComponent() // .../catalogs/{userId}
 		let tempDirName = "tmp_\(UUID().uuidString)"
-		let tempDir = catalogCacheDir.appendingPathComponent(tempDirName)
+		let tempDir = userDir.appendingPathComponent(tempDirName)
 		
 		print("Creating temp directory at: \(tempDir.path)")
-		print("Parent directory: \(catalogCacheDir.path)")
+		print("User directory: \(userDir.path)")
 		
-		// Ensure parent directory exists
-		try FileManager.default.createDirectory(at: catalogCacheDir, withIntermediateDirectories: true)
+		// Ensure user directory exists
+		try FileManager.default.createDirectory(at: userDir, withIntermediateDirectories: true)
 		
 		// Create temp directory
-		try FileManager.default.createDirectory(at: tempDir, withIntermediateDirectories: false)
+		try FileManager.default.createDirectory(at: tempDir, withIntermediateDirectories: true)
 		
 		print("Temp directory created successfully")
 		
@@ -208,14 +226,30 @@ actor S3CatalogSyncService {
 		}
 		
 		// 5. Verify integrity and perform atomic update
-		try await atomicUpdateCatalog(from: tempDir)
+		do {
+			try await atomicUpdateCatalog(from: tempDir)
+		} catch {
+			print("[S3CatalogSync] Atomic update failed: \(error)")
+			throw error
+		}
 		
 		// 6. Also sync master catalog
-		try await syncMasterCatalogIfNeeded()
+		do {
+			try await syncMasterCatalogIfNeeded()
+		} catch {
+			print("[S3CatalogSync] Master catalog sync failed: \(error)")
+			throw error
+		}
 		
 		// 7. Save ETag cache
-		try saveETagCache()
+		do {
+			try saveETagCache()
+		} catch {
+			print("[S3CatalogSync] ETag cache save failed: \(error)")
+			throw error
+		}
 		
+		print("[S3CatalogSync] Sync completed successfully")
 		return true
 	}
 	
@@ -271,6 +305,10 @@ actor S3CatalogSyncService {
 			}
 			return result
 			
+		case .noStream:
+			// No data available
+			return nil
+			
 		@unknown default:
 			throw SyncError.syncFailed(NSError(domain: "S3CatalogSync", 
 											   code: -1, 
@@ -287,8 +325,7 @@ actor S3CatalogSyncService {
 			let tempFile = tempCatalogDir.appendingPathComponent(filename)
 			if !FileManager.default.fileExists(atPath: tempFile.path) {
 				// Copy from existing catalog if shard wasn't updated
-				let existingCatalogDir = catalogCacheDir.appendingPathComponent(".photolala")
-				let existingFile = existingCatalogDir.appendingPathComponent(filename)
+				let existingFile = catalogCacheDir.appendingPathComponent(filename)
 				if FileManager.default.fileExists(atPath: existingFile.path) {
 					try FileManager.default.copyItem(at: existingFile, to: tempFile)
 				}
@@ -304,37 +341,79 @@ actor S3CatalogSyncService {
 		// Atomic replace using FileManager
 		print("Starting atomic update from \(tempDir.path) to \(catalogCacheDir.path)")
 		
-		// Ensure temp directory exists
-		guard FileManager.default.fileExists(atPath: tempDir.path) else {
-			print("ERROR: Temp directory does not exist at: \(tempDir.path)")
+		// Ensure temp catalog directory exists
+		guard FileManager.default.fileExists(atPath: tempCatalogDir.path) else {
+			print("ERROR: Temp catalog directory does not exist at: \(tempCatalogDir.path)")
 			throw SyncError.syncFailed(NSError(domain: "S3CatalogSync", 
 											   code: -1, 
 											   userInfo: [NSLocalizedDescriptionKey: "Temporary catalog directory does not exist"]))
 		}
 		
-		print("Temp directory exists, proceeding with atomic update")
+		print("Temp catalog directory exists, proceeding with atomic update")
 		
-		// The issue is that catalogCacheDir includes the userId, so we need to be careful
-		// catalogCacheDir = .../cloud.s3/8E9D73F3-A405-4EC2-AF7F-15519DBA4640
-		// tempDir = .../cloud.s3/8E9D73F3-A405-4EC2-AF7F-15519DBA4640/tmp_UUID
+		// The catalogCacheDir is already the .photolala directory where catalog files should go
+		// catalogCacheDir = .../cloud/s3/catalogs/{userId}/.photolala
+		// tempDir = .../cloud/s3/catalogs/{userId}/tmp_UUID
+		// tempCatalogDir = .../cloud/s3/catalogs/{userId}/tmp_UUID/.photolala
 		
-		// Since tempDir is inside catalogCacheDir, we need to move it to a sibling location first
-		let parentDir = catalogCacheDir.deletingLastPathComponent() // .../cloud.s3
-		let tempSiblingDir = parentDir.appendingPathComponent("tmp_move_\(UUID().uuidString)")
+		// Since tempDir is already at the user level, we can directly work with tempCatalogDir
+		let userDir = catalogCacheDir.deletingLastPathComponent() // .../cloud/s3/catalogs/{userId}
 		
-		print("Moving temp directory to sibling location: \(tempSiblingDir.path)")
-		try FileManager.default.moveItem(at: tempDir, to: tempSiblingDir)
+		// Move the old catalog out of the way if it exists
+		let backupDir = userDir.appendingPathComponent("backup_\(UUID().uuidString)")
 		
-		// Now remove the old catalog directory if it exists
+		// Move existing catalog to backup location if it exists
 		if FileManager.default.fileExists(atPath: catalogCacheDir.path) {
-			print("Removing existing catalog directory")
-			try FileManager.default.removeItem(at: catalogCacheDir)
+			print("Moving existing catalog to backup: \(backupDir.path)")
+			do {
+				try FileManager.default.moveItem(at: catalogCacheDir, to: backupDir)
+				print("Successfully moved existing catalog to backup")
+			} catch {
+				print("ERROR: Failed to move existing catalog to backup: \(error)")
+				// If we can't move it, try to remove it
+				print("Attempting to remove existing catalog instead")
+				try FileManager.default.removeItem(at: catalogCacheDir)
+			}
 		}
 		
-		// Move the temp sibling directory to the final location
-		print("Moving to final location")
-		try FileManager.default.moveItem(at: tempSiblingDir, to: catalogCacheDir)
-		print("Atomic update completed successfully")
+		// Move the temp catalog directory to the final location
+		print("Moving new catalog from \(tempCatalogDir.path) to \(catalogCacheDir.path)")
+		do {
+			try FileManager.default.moveItem(at: tempCatalogDir, to: catalogCacheDir)
+			print("Atomic update completed successfully")
+			
+			// Clean up backup directory if it exists
+			if FileManager.default.fileExists(atPath: backupDir.path) {
+				print("Cleaning up backup directory")
+				try? FileManager.default.removeItem(at: backupDir)
+			}
+			
+			// Clean up temp directory
+			if FileManager.default.fileExists(atPath: tempDir.path) {
+				print("Cleaning up temp directory")
+				try? FileManager.default.removeItem(at: tempDir)
+			}
+		} catch {
+			print("ERROR: Failed to move catalog to final location: \(error)")
+			print("Source: \(tempCatalogDir.path)")
+			print("Destination: \(catalogCacheDir.path)")
+			// Check what exists
+			print("Source exists: \(FileManager.default.fileExists(atPath: tempCatalogDir.path))")
+			print("Destination exists: \(FileManager.default.fileExists(atPath: catalogCacheDir.path))")
+			
+			// Try to restore backup if move failed
+			if FileManager.default.fileExists(atPath: backupDir.path) && !FileManager.default.fileExists(atPath: catalogCacheDir.path) {
+				print("Attempting to restore backup")
+				try? FileManager.default.moveItem(at: backupDir, to: catalogCacheDir)
+			}
+			
+			// Clean up temp directory on failure
+			if FileManager.default.fileExists(atPath: tempDir.path) {
+				try? FileManager.default.removeItem(at: tempDir)
+			}
+			
+			throw error
+		}
 	}
 	
 	private func syncMasterCatalogIfNeeded() async throws {

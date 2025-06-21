@@ -115,10 +115,41 @@ catalogs/
 
 ### S3CatalogSyncService
 
-- Downloads catalog from S3 to local cache
-- Atomic updates using temporary directory
-- Manifest-based change detection
-- Supports offline mode
+Downloads and manages S3 catalog synchronization with local cache.
+
+#### Cache Location
+```
+Library/Caches/com.electricwoods.photolala/
+└── cloud/
+    └── s3/
+        └── catalogs/
+            └── {userId}/
+                ├── .photolala/          # Catalog files
+                │   ├── manifest.plist
+                │   ├── 0.csv
+                │   └── ...
+                └── .etag-cache         # ETag cache for change detection
+```
+
+#### Sync Process
+1. **ETag-based Change Detection**: Checks remote ETags against cached values
+2. **Selective Download**: Only downloads changed files (manifest + modified shards)
+3. **Atomic Update Process**:
+   - Creates temporary directory at user level: `{userId}/tmp_{UUID}/`
+   - Downloads files to: `{userId}/tmp_{UUID}/.photolala/`
+   - Backs up existing catalog: `{userId}/backup_{UUID}/`
+   - Atomically moves new catalog to final location
+   - Cleans up temp and backup directories
+4. **Offline Support**: Uses cached catalog when S3 is unavailable
+
+#### Directory Structure During Sync
+```
+catalogs/{userId}/
+├── .photolala/              # Current catalog (final location)
+├── tmp_{UUID}/              # Temporary download location
+│   └── .photolala/          # New catalog being downloaded
+└── backup_{UUID}/           # Backup of previous catalog (during update)
+```
 
 ## Performance Benefits
 
