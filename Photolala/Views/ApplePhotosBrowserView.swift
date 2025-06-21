@@ -27,22 +27,24 @@ struct ApplePhotosBrowserView: View {
 	var body: some View {
 		UnifiedPhotoCollectionViewRepresentable(
 			photoProvider: photoProvider,
-			settings: $settings,
-			selection: Binding(
-				get: { Set(selection.map { $0 as any PhotoItem }) },
-				set: { newSelection in
-					selection = Set(newSelection.compactMap { $0 as? PhotoApple })
+			settings: settings,
+			onSelectPhoto: { photo, allPhotos in
+				// Handle photo selection
+				if let applePhoto = photo as? PhotoApple {
+					if selection.contains(applePhoto) {
+						selection.remove(applePhoto)
+					} else {
+						selection.insert(applePhoto)
+					}
 				}
-			),
-			onArchivedPhotoClick: { _ in
-				// Apple Photos don't have archive status
+			},
+			onSelectionChanged: { photos in
+				// Update selection
+				selection = Set(photos.compactMap { $0 as? PhotoApple })
 			}
 		)
 		.navigationTitle(photoProvider.displayTitle)
 		.navigationSubtitle(photoProvider.displaySubtitle)
-		#if os(macOS)
-		.navigationBarTitleDisplayMode(.inline)
-		#endif
 		.inspector(isPresented: $showingInspector) {
 			InspectorView(selection: inspectorSelection)
 				.inspectorColumnWidth(min: 250, ideal: 300, max: 400)

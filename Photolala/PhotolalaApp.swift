@@ -77,12 +77,7 @@ struct PhotolalaApp: App {
 			// Folder browser windows only - no default window
 			WindowGroup("Photolala", for: URL.self) { $folderURL in
 				if let folderURL {
-					// Check if it's a special Photos Library URL
-					if folderURL.absoluteString == "photolala://photos-library" {
-						ApplePhotosBrowserView()
-					} else {
-						DirectoryPhotoBrowserView(directoryPath: folderURL.path as NSString)
-					}
+					DirectoryPhotoBrowserView(directoryPath: folderURL.path as NSString)
 				}
 //				else {
 //					Text("No folder selected")

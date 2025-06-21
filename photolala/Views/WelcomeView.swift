@@ -15,6 +15,14 @@ struct WelcomeView: View {
 	#if os(macOS)
 		@Environment(\.openWindow) private var openWindow
 	#endif
+	
+	private var welcomeMessage: String {
+		#if os(macOS)
+			"Choose a folder to browse photos"
+		#else
+			"Choose a source to browse photos"
+		#endif
+	}
 
 	var body: some View {
 		VStack(spacing: 30) {
@@ -30,11 +38,21 @@ struct WelcomeView: View {
 			}
 
 			// Welcome message
-			Text("Choose a source to browse photos")
+			Text(welcomeMessage)
 				.font(.headline)
 				.foregroundStyle(.secondary)
 
 			// Source selection buttons
+			#if os(macOS)
+			// On macOS, only show folder selection - other options are in Window menu
+			Button(action: self.selectFolder) {
+				Label("Browse Folder", systemImage: "folder")
+					.frame(minWidth: 200)
+			}
+			.controlSize(.large)
+			.buttonStyle(.borderedProminent)
+			#else
+			// On iOS, show both buttons since there's no menu bar
 			VStack(spacing: 12) {
 				// Select folder button
 				Button(action: self.selectFolder) {
@@ -42,9 +60,6 @@ struct WelcomeView: View {
 						.frame(minWidth: 200)
 				}
 				.controlSize(.large)
-				#if os(macOS)
-					.buttonStyle(.borderedProminent)
-				#endif
 				
 				// Photos Library button
 				Button(action: self.openPhotoLibrary) {
@@ -52,10 +67,8 @@ struct WelcomeView: View {
 						.frame(minWidth: 200)
 				}
 				.controlSize(.large)
-				#if os(macOS)
-					.buttonStyle(.bordered)
-				#endif
 			}
+			#endif
 
 			// Selected folder display
 			if let folder = selectedFolder {
@@ -135,11 +148,8 @@ struct WelcomeView: View {
 	
 	private func openPhotoLibrary() {
 		#if os(macOS)
-			// For macOS, we need to update PhotolalaApp to handle this
-			// For now, open a new window with a special URL
-			if let url = URL(string: "photolala://photos-library") {
-				self.openWindow(value: url)
-			}
+			// This method is not used on macOS anymore
+			// Apple Photos Library is accessed from Window menu
 		#else
 			self.navigateToPhotoLibrary = true
 		#endif
