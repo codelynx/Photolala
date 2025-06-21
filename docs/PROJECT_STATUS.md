@@ -750,3 +750,33 @@ The application is a functional photo browser with complete S3 backup capabiliti
 - **macOS**: Primary platform, all features working
 - **iOS**: Secondary platform, touch-optimized, some features limited
 - **tvOS**: Experimental, basic browsing only
+
+## 🏗️ Recent Architecture Improvements (June 21)
+
+40. **Unified Browser Architecture - Phase 1 & 2**:
+   - **Inspector Support for S3PhotoBrowserView**:
+     - Added inspector panel to cloud browser
+     - Works seamlessly with PhotoItem protocol
+     - Shows S3-specific metadata (backup date, archive status)
+     - Maintains type safety without complex abstractions
+   
+   - **Common Toolbar Components**:
+     - Created PhotoBrowserCoreToolbar for shared UI elements
+     - Extracted display mode, info toggle, size picker, refresh, inspector buttons
+     - Added photoBrowserToolbar() view modifier for easy application
+     - Reduced code duplication by ~150 lines
+     - Each browser maintains its unique features alongside common items
+   
+   - **PhotoProvider Capabilities System**:
+     - Added PhotoProviderCapabilities OptionSet for feature discovery
+     - Enhanced PhotoProvider protocol (no new protocol needed)
+     - EnhancedLocalPhotoProvider: [.hierarchicalNavigation, .backup, .sorting, .grouping, .preview, .star]
+     - S3PhotoProvider: [.download, .search]
+     - Prepared for future data sources (Apple Photos Library)
+     - No type erasure complexity - kept everything simple
+   
+   - **Documentation**:
+     - Created comprehensive unified-browser-architecture.md
+     - Phased implementation plan for future UnifiedPhotoBrowser
+     - Clear migration path for Apple Photos support
+     - Type erasure mitigation strategies documented
