@@ -8,8 +8,8 @@ This session focused on implementing Phase 2 of the photo loading enhancements, 
 
 ## Key Accomplishments
 
-### 1. EnhancedLocalPhotoProvider Integration
-- Replaced LocalPhotoProvider with EnhancedLocalPhotoProvider in PhotoBrowserView
+### 1. DirectoryPhotoProvider Integration
+- Replaced LocalPhotoProvider with DirectoryPhotoProvider in PhotoBrowserView
 - Added progress indicator UI for progressive loading feedback
 - Integrated with existing unified photo browser architecture
 
@@ -46,12 +46,12 @@ This session focused on implementing Phase 2 of the photo loading enhancements, 
 ## Technical Details
 
 ### Files Modified
-- `PhotoBrowserView.swift` - Integrated EnhancedLocalPhotoProvider, added progress UI
+- `PhotoBrowserView.swift` - Integrated DirectoryPhotoProvider, added progress UI
 - `UnifiedPhotoCollectionViewController.swift` - Added scroll monitoring, fixed incremental updates
 - `CatalogAwarePhotoLoader.swift` - Fixed thread safety with concurrent queue
 
 ### New Components Used
-- `EnhancedLocalPhotoProvider` - Combines progressive and priority loading
+- `DirectoryPhotoProvider` - Combines progressive and priority loading
 - `ProgressivePhotoLoader` - Handles staged photo loading
 - `PriorityThumbnailLoader` - Manages thumbnail loading priorities
 

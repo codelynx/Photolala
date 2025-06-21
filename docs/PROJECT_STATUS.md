@@ -559,7 +559,7 @@ The application is a functional photo browser with complete S3 backup capabiliti
      - Support for grouping and sorting
      - Async/await based API
      - Progress reporting capabilities
-   - **EnhancedLocalPhotoProvider**:
+   - **DirectoryPhotoProvider**:
      - Implements PhotoProvider protocol
      - Integrates ProgressivePhotoLoader
      - Manages PriorityThumbnailLoader
@@ -770,7 +770,7 @@ The application is a functional photo browser with complete S3 backup capabiliti
    - **PhotoProvider Capabilities System**:
      - Added PhotoProviderCapabilities OptionSet for feature discovery
      - Enhanced PhotoProvider protocol (no new protocol needed)
-     - EnhancedLocalPhotoProvider: [.hierarchicalNavigation, .backup, .sorting, .grouping, .preview, .star]
+     - DirectoryPhotoProvider: [.hierarchicalNavigation, .backup, .sorting, .grouping, .preview, .star]
      - S3PhotoProvider: [.download, .search]
      - Prepared for future data sources (Apple Photos Library)
      - No type erasure complexity - kept everything simple

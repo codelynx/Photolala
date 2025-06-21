@@ -4,7 +4,7 @@
 
 ### 1. Verify Capabilities Declaration
 
-#### EnhancedLocalPhotoProvider
+#### DirectoryPhotoProvider
 - [ ] Check capabilities include: hierarchicalNavigation, backup, sorting, grouping, preview, star
 - [ ] Verify supportsGrouping = true
 - [ ] Verify supportsSorting = true

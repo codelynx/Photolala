@@ -71,7 +71,7 @@ Photolala is a cross-platform photo browser application built with SwiftUI, supp
 #### PhotoProvider Protocol & Implementations
 - **BasePhotoProvider**: Common functionality, @MainActor for thread safety
 - **LocalPhotoProvider**: Loads photos from local directories via CatalogAwarePhotoLoader
-- **EnhancedLocalPhotoProvider**: Advanced local provider with progressive loading and priority thumbnails
+- **DirectoryPhotoProvider**: Advanced local directory provider with progressive loading and priority thumbnails
   - Uses ProgressivePhotoLoader for fast initial display (first 200 photos)
   - Integrates PriorityThumbnailLoader for visible-first loading
   - Provides loading progress and status updates
@@ -189,7 +189,7 @@ Photolala is a cross-platform photo browser application built with SwiftUI, supp
 
 #### PhotoBrowserView
 - Main container with toolbar
-- Now uses UnifiedPhotoCollectionViewRepresentable with EnhancedLocalPhotoProvider
+- Now uses UnifiedPhotoCollectionViewRepresentable with DirectoryPhotoProvider
 - Shows progressive loading status with progress bar
 - Platform-specific navigation:
   - macOS: Own NavigationStack

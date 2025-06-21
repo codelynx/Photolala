@@ -10,8 +10,8 @@ import XCTest
 
 final class PhotoProviderCapabilitiesTests: XCTestCase {
 	
-	func testEnhancedLocalPhotoProviderCapabilities() async {
-		let provider = await EnhancedLocalPhotoProvider(directoryPath: "/tmp")
+	func testDirectoryPhotoProviderCapabilities() async {
+		let provider = await DirectoryPhotoProvider(directoryPath: "/tmp")
 		let caps = await provider.capabilities
 		
 		// Local provider should have these capabilities

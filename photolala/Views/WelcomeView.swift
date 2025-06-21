@@ -71,7 +71,7 @@ struct WelcomeView: View {
 		#if os(iOS)
 			.navigationDestination(isPresented: self.$navigateToPhotoBrowser) {
 				if let folder = selectedFolder {
-					PhotoBrowserView(directoryPath: folder.path as NSString)
+					DirectoryPhotoBrowserView(directoryPath: folder.path as NSString)
 				}
 			}
 		#endif

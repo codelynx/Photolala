@@ -8,7 +8,7 @@
 import Observation
 import SwiftUI
 
-struct PhotoBrowserView: View {
+struct DirectoryPhotoBrowserView: View {
 	let directoryPath: NSString
 	@State private var settings = ThumbnailDisplaySettings()
 	@State private var photosCount = 0
@@ -27,7 +27,7 @@ struct PhotoBrowserView: View {
 	@StateObject private var s3BackupManager = S3BackupManager.shared
 	@StateObject private var identityManager = IdentityManager.shared
 	@StateObject private var backupQueueManager = BackupQueueManager.shared
-	@StateObject private var photoProvider: EnhancedLocalPhotoProvider
+	@StateObject private var photoProvider: DirectoryPhotoProvider
 	
 	// Computed property to ensure inspector gets PhotoItems
 	private var inspectorSelection: [any PhotoItem] {
@@ -36,7 +36,7 @@ struct PhotoBrowserView: View {
 
 	init(directoryPath: NSString) {
 		self.directoryPath = directoryPath
-		self._photoProvider = StateObject(wrappedValue: EnhancedLocalPhotoProvider(directoryPath: directoryPath as String))
+		self._photoProvider = StateObject(wrappedValue: DirectoryPhotoProvider(directoryPath: directoryPath as String))
 	}
 
 	var body: some View {
@@ -557,5 +557,5 @@ extension Array {
 }
 
 #Preview {
-	PhotoBrowserView(directoryPath: "/Users/example/Pictures")
+	DirectoryPhotoBrowserView(directoryPath: "/Users/example/Pictures")
 }

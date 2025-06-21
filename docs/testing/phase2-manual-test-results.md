@@ -46,7 +46,7 @@
 
 ### 6. Capabilities System
 ✅ **Infrastructure in place**
-- EnhancedLocalPhotoProvider declares: [.hierarchicalNavigation, .backup, .sorting, .grouping, .preview, .star]
+- DirectoryPhotoProvider declares: [.hierarchicalNavigation, .backup, .sorting, .grouping, .preview, .star]
 - S3PhotoProvider declares: [.download, .search]
 - Capabilities not yet used for automatic UI adaptation (Phase 3)
 

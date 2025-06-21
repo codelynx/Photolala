@@ -180,7 +180,7 @@ private func preloadAdjacentImages() {
 ### ✅ Phase 2: Performance Optimization (Completed - June 20, 2025)
 
 #### 2.1 Progressive Loading
-- **Implemented**: EnhancedLocalPhotoProvider with ProgressivePhotoLoader
+- **Implemented**: DirectoryPhotoProvider with ProgressivePhotoLoader
 - **Initial Batch**: First 200 photos load immediately
 - **Background Loading**: Remaining photos in 100-photo batches
 - **UI Feedback**: Progress bar shows loading status

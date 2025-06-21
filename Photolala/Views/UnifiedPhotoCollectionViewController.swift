@@ -314,8 +314,8 @@ class UnifiedPhotoCollectionViewController: XViewController {
 	// MARK: - Scroll Monitoring for Priority Loading
 	
 	private func setupScrollMonitoring() {
-		// Only set up for EnhancedLocalPhotoProvider
-		guard let enhancedProvider = photoProvider as? EnhancedLocalPhotoProvider else { return }
+		// Only set up for DirectoryPhotoProvider
+		guard let enhancedProvider = photoProvider as? DirectoryPhotoProvider else { return }
 		
 		#if os(macOS)
 		// Get the scroll view
@@ -339,7 +339,7 @@ class UnifiedPhotoCollectionViewController: XViewController {
 		#endif
 	}
 	
-	private func updateVisibleRange(for provider: EnhancedLocalPhotoProvider) {
+	private func updateVisibleRange(for provider: DirectoryPhotoProvider) {
 		#if os(macOS)
 		provider.updateVisibleRange(for: collectionView)
 		#else
@@ -509,19 +509,19 @@ extension UnifiedPhotoCollectionViewController: UICollectionViewDelegate {
 	
 	// Scroll monitoring for iOS
 	func scrollViewDidScroll(_ scrollView: UIScrollView) {
-		if let provider = photoProvider as? EnhancedLocalPhotoProvider {
+		if let provider = photoProvider as? DirectoryPhotoProvider {
 			updateVisibleRange(for: provider)
 		}
 	}
 	
 	func scrollViewDidEndDecelerating(_ scrollView: UIScrollView) {
-		if let provider = photoProvider as? EnhancedLocalPhotoProvider {
+		if let provider = photoProvider as? DirectoryPhotoProvider {
 			updateVisibleRange(for: provider)
 		}
 	}
 	
 	func scrollViewDidEndDragging(_ scrollView: UIScrollView, willDecelerate decelerate: Bool) {
-		if !decelerate, let provider = photoProvider as? EnhancedLocalPhotoProvider {
+		if !decelerate, let provider = photoProvider as? DirectoryPhotoProvider {
 			updateVisibleRange(for: provider)
 		}
 	}

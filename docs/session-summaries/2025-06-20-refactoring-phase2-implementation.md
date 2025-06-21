@@ -42,9 +42,9 @@ Loads photos progressively for instant perceived performance:
   - Cancellable operations
   - Background catalog generation
 
-### 3. EnhancedLocalPhotoProvider
+### 3. DirectoryPhotoProvider
 
-**File**: `Photolala/Services/EnhancedLocalPhotoProvider.swift`
+**File**: `Photolala/Services/DirectoryPhotoProvider.swift`
 
 Integrates both systems into a cohesive photo provider:
 
@@ -108,7 +108,7 @@ func visibleIndices(for collectionView: NSCollectionView) -> Range<Int> {
 
 To use the enhanced loading in existing views:
 
-1. Replace `LocalPhotoProvider` with `EnhancedLocalPhotoProvider`
+1. Replace `LocalPhotoProvider` with `DirectoryPhotoProvider`
 2. Add scroll monitoring for priority updates
 3. Update visible range in collection view updates
 

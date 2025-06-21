@@ -1,5 +1,5 @@
 //
-//  EnhancedLocalPhotoProvider.swift
+//  DirectoryPhotoProvider.swift
 //  Photolala
 //
 //  Enhanced local photo provider with progressive loading and priority thumbnails
@@ -11,7 +11,7 @@ import SwiftUI
 import OSLog
 
 @MainActor
-class EnhancedLocalPhotoProvider: ObservableObject, PhotoProvider {
+class DirectoryPhotoProvider: ObservableObject, PhotoProvider {
 	
 	// MARK: - PhotoProvider Protocol
 	
@@ -43,7 +43,7 @@ class EnhancedLocalPhotoProvider: ObservableObject, PhotoProvider {
 	private let progressiveLoader = ProgressivePhotoLoader()
 	private let priorityLoader = PriorityThumbnailLoader()
 	private let backupQueueManager = BackupQueueManager.shared
-	private let logger = Logger(subsystem: "com.photolala", category: "EnhancedPhotoProvider")
+	private let logger = Logger(subsystem: "com.photolala", category: "DirectoryPhotoProvider")
 	
 	// Grouping and sorting
 	@Published var currentGrouping: PhotoGroupingOption = .none
@@ -191,7 +191,7 @@ class EnhancedLocalPhotoProvider: ObservableObject, PhotoProvider {
 
 // MARK: - Collection View Scroll Monitoring
 
-extension EnhancedLocalPhotoProvider {
+extension DirectoryPhotoProvider {
 	#if os(macOS)
 	/// Monitor scroll events to optimize loading
 	func setupScrollMonitoring(for scrollView: NSScrollView) {

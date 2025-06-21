@@ -8,17 +8,17 @@ This document describes the implementation of Phase 2 photo loading enhancements
 
 ## What Was Implemented
 
-### 1. EnhancedLocalPhotoProvider Integration
+### 1. DirectoryPhotoProvider Integration
 
-The main PhotoBrowserView was updated to use the new EnhancedLocalPhotoProvider instead of the basic LocalPhotoProvider:
+The main PhotoBrowserView was updated to use the new DirectoryPhotoProvider instead of the basic LocalPhotoProvider:
 
 ```swift
 // PhotoBrowserView.swift
-@StateObject private var photoProvider: EnhancedLocalPhotoProvider
+@StateObject private var photoProvider: DirectoryPhotoProvider
 
 init(directoryPath: NSString) {
     self.directoryPath = directoryPath
-    self._photoProvider = StateObject(wrappedValue: EnhancedLocalPhotoProvider(directoryPath: directoryPath as String))
+    self._photoProvider = StateObject(wrappedValue: DirectoryPhotoProvider(directoryPath: directoryPath as String))
 }
 ```
 
@@ -57,8 +57,8 @@ Implemented scroll monitoring in UnifiedPhotoCollectionViewController to update 
 
 ```swift
 private func setupScrollMonitoring() {
-    // Only set up for EnhancedLocalPhotoProvider
-    guard let enhancedProvider = photoProvider as? EnhancedLocalPhotoProvider else { return }
+    // Only set up for DirectoryPhotoProvider
+    guard let enhancedProvider = photoProvider as? DirectoryPhotoProvider else { return }
     
     #if os(macOS)
     // Get the scroll view
@@ -74,7 +74,7 @@ private func setupScrollMonitoring() {
     #endif
 }
 
-private func updateVisibleRange(for provider: EnhancedLocalPhotoProvider) {
+private func updateVisibleRange(for provider: DirectoryPhotoProvider) {
     #if os(macOS)
     let visibleRect = collectionView.visibleRect
     let visibleIndexPaths = collectionView.indexPathsForVisibleItems()
@@ -162,7 +162,7 @@ private func getCatalogUUID(for directory: URL) -> String? {
 
 ## Architecture Components
 
-### EnhancedLocalPhotoProvider
+### DirectoryPhotoProvider
 - Combines ProgressivePhotoLoader and PriorityThumbnailLoader
 - Provides loading progress and status updates
 - Manages visible range updates for priority loading
