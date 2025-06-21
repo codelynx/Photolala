@@ -12,19 +12,19 @@ Build commands for different platforms:
 
 ```bash
 # Build for macOS
-xcodebuild -scheme Photolala -destination 'platform=macOS' build
+xcodebuild -scheme photolala -destination 'platform=macOS' build
 
 # Build for iOS Simulator
-xcodebuild -scheme Photolala -destination 'platform=iOS Simulator,name=iPhone 16 Pro' build
+xcodebuild -scheme photolala -destination 'platform=iOS Simulator,name=iPhone 16 Pro' build
 
 # Build for tvOS Simulator  
-xcodebuild -scheme Photolala -destination 'platform=tvOS Simulator,name=Apple TV' build
+xcodebuild -scheme photolala -destination 'platform=tvOS Simulator,name=Apple TV' build
 
 # Clean build
-xcodebuild -scheme Photolala clean
+xcodebuild -scheme photolala clean
 
 # Run tests
-xcodebuild -scheme Photolala test
+xcodebuild -scheme photolala test
 ```
 
 ## Project Structure
@@ -56,20 +56,25 @@ Photolala/
 - Key features implemented:
   - Window-per-folder architecture (each window shows one folder)
   - Menu-driven folder selection on macOS (⌘O)
+  - Apple Photos Library browser (Window → Apple Photos Library, ⌘⌥L)
+  - Cloud browser for S3 storage (Window → Cloud Browser, ⌘⌥B)
   - NavigationStack for folder hierarchy navigation
   - Native collection views (NSCollectionView/UICollectionView)
   - Platform-specific navigation patterns
   - No welcome screen on macOS (opens directly to browser)
   - Multi-window support on macOS
   - Bundle resource support (Photos folder reference)
+  - Unified photo browser architecture supporting multiple sources
 
 ## Navigation Architecture
 
 ### macOS
 - Opens directly to photo browser (no welcome screen)
 - File → Open Folder... (⌘O) for folder selection
-- Each folder opens in its own window
-- NavigationStack within each window for subfolder navigation
+- Window → Apple Photos Library (⌘⌥L) for Photos app browsing
+- Window → Cloud Browser (⌘⌥B) for S3 cloud storage
+- Each source opens in its own window
+- NavigationStack within each window for navigation
 
 ### iOS/iPadOS
 - Welcome screen for initial folder selection

@@ -62,4 +62,4 @@ When adding documentation:
 3. **Implementation notes** → Add to `history/implementation-notes/`
 4. **Status updates** → Update `PROJECT_STATUS.md`
 
-Last updated: June 19, 2025
+Last updated: June 21, 2025
