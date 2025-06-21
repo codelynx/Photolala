@@ -1,8 +1,10 @@
 # Unified Photo Browser Architecture
 
+Last Updated: June 21, 2025
+
 ## Overview
 
-The unified photo browser architecture provides a consistent interface for browsing photos from different sources (local files, S3, etc.) using a protocol-oriented design with dependency injection.
+The unified photo browser architecture provides a consistent interface for browsing photos from different sources (local files, S3, Apple Photos Library) using a protocol-oriented design with dependency injection.
 
 ## Key Components
 
@@ -19,7 +21,7 @@ The unified photo browser architecture provides a consistent interface for brows
 - **Location**: `Services/PhotoProvider.swift`
 - **Implementations**:
   - `BasePhotoProvider` - Common functionality with @MainActor for thread safety
-  - `LocalPhotoProvider` - Loads photos from local directories
+  - `DirectoryPhotoProvider` - Loads photos from local directories with progressive loading
   - `S3PhotoProvider` - Loads photos from S3 with catalog support
   - `ApplePhotosProvider` - Loads photos from Apple Photos Library via PhotoKit
 
@@ -58,7 +60,7 @@ The unified photo browser architecture provides a consistent interface for brows
 
 ```swift
 // For local photos
-let photoProvider = LocalPhotoProvider(directoryPath: "/path/to/photos")
+let photoProvider = DirectoryPhotoProvider(directoryPath: "/path/to/photos")
 
 // For S3 photos
 let photoProvider = S3PhotoProvider(userId: "user123")
@@ -85,17 +87,41 @@ UnifiedPhotoCollectionViewRepresentable(
 - **iOS**: Uses UICollectionView with UICollectionViewCell
 - **Cross-platform**: XPlatform utilities provide consistent APIs
 
+## Apple Photos Integration
+
+The Apple Photos integration demonstrates the flexibility of the unified architecture:
+
+### PhotoApple Implementation
+- Wraps PHAsset from PhotoKit framework
+- Implements PhotoItem protocol seamlessly
+- Uses PHCachingImageManager for efficient thumbnails
+- Provides Photos metadata through common interface
+
+### ApplePhotosProvider Features
+- Authorization handling with clear user communication
+- Album browsing (smart albums and user collections)
+- Automatic loading state management
+- Thread-safe with @MainActor
+
+### User Access Points
+- **macOS**: Window → Apple Photos Library (⌘⌥L)
+- **iOS**: "Photos Library" button on welcome screen
+- Opens in new window (macOS) or pushes navigation (iOS)
+
 ## Implementation Status
 
 ### ✅ Completed
 - PhotoItem protocol implementation
-- PhotoProvider implementations (Local, S3)
+- PhotoProvider implementations (Local, S3, Apple Photos)
 - UnifiedPhotoCollectionViewController
 - UnifiedPhotoCell with thumbnail loading
 - Migration of PhotoBrowserView
 - Migration of S3PhotoBrowserView
+- Apple Photos Library integration
 - Thumbnail sizing with S/M/L options
 - Basic header support for grouping
+- Album browsing for Apple Photos
+- Authorization handling for PhotoKit
 
 ### 🚧 In Progress
 - Header view registration and display
@@ -107,6 +133,8 @@ UnifiedPhotoCollectionViewRepresentable(
 - Enhanced selection handling
 - Keyboard navigation
 - Performance optimizations for very large collections
+- Search integration for Apple Photos
+- Live Photos support
 
 ## Future Enhancements
 

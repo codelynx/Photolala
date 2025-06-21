@@ -15,7 +15,7 @@ User Action: Open Directory
     ↓
 PhotoBrowserView created with directoryPath
     ↓
-LocalPhotoProvider initialized
+DirectoryPhotoProvider initialized
     ↓
 CatalogAwarePhotoLoader.loadPhotos()
 ```

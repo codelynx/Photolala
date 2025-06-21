@@ -44,7 +44,9 @@ struct ApplePhotosBrowserView: View {
 			}
 		)
 		.navigationTitle(photoProvider.displayTitle)
+		#if os(macOS)
 		.navigationSubtitle(photoProvider.displaySubtitle)
+		#endif
 		.inspector(isPresented: $showingInspector) {
 			InspectorView(selection: inspectorSelection)
 				.inspectorColumnWidth(min: 250, ideal: 300, max: 400)
@@ -53,16 +55,16 @@ struct ApplePhotosBrowserView: View {
 			settings: $settings,
 			showingInspector: $showingInspector,
 			isRefreshing: isLoading,
-			onRefresh: { await refreshPhotos() }
-		)
-		.toolbar {
-			ToolbarItem(placement: .primaryAction) {
-				Button(action: { showingAlbumPicker.toggle() }) {
-					Label("Albums", systemImage: "square.stack.3d.up")
+			onRefresh: { await refreshPhotos() },
+			additionalItems: {
+				ToolbarItem(placement: .primaryAction) {
+					Button(action: { showingAlbumPicker.toggle() }) {
+						Label("Albums", systemImage: "square.stack.3d.up")
+					}
+					.help("Show album picker")
 				}
-				.help("Show album picker")
 			}
-		}
+		)
 		.sheet(isPresented: $showingAlbumPicker) {
 			AlbumPickerView(
 				albums: albums,

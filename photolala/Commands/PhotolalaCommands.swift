@@ -126,6 +126,7 @@ struct PhotolalaCommands: Commands {
 		}
 		
 		// Add special browsers to Window menu
+		#if os(macOS)
 		CommandGroup(before: .windowList) {
 			Button("Apple Photos Library") {
 				self.openApplePhotosLibrary()
@@ -139,6 +140,7 @@ struct PhotolalaCommands: Commands {
 			
 			Divider()
 		}
+		#endif
 
 		// Help menu - Add to existing help menu
 		CommandGroup(replacing: .help) {
