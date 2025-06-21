@@ -71,7 +71,7 @@ enum ThumbnailOption: CaseIterable, Hashable {
 
 @Observable
 class ThumbnailDisplaySettings {
-	var displayMode: ThumbnailDisplayMode = .scaleToFit
+	var displayMode: ThumbnailDisplayMode = .scaleToFill
 	var thumbnailOption: ThumbnailOption = .default
 	var sortOption: PhotoSortOption = .filename
 	var groupingOption: PhotoGroupingOption = .none

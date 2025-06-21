@@ -73,17 +73,18 @@ struct PhotoApple: PhotoItem {
 	
 	func loadThumbnail() async throws -> XImage? {
 		try await withCheckedThrowingContinuation { continuation in
-			let targetSize = CGSize(width: 256, height: 256)
+			// Request uncropped image at reasonable size
+			let targetSize = CGSize(width: 512, height: 512)
 			let options = PHImageRequestOptions()
 			options.isSynchronous = false
 			options.deliveryMode = .highQualityFormat
-			options.resizeMode = .exact
+			options.resizeMode = .fast
 			options.isNetworkAccessAllowed = true // Allow iCloud download
 			
 			imageManager.requestImage(
 				for: asset,
 				targetSize: targetSize,
-				contentMode: .aspectFill,
+				contentMode: .aspectFit, // Get full uncropped image
 				options: options
 			) { image, info in
 				if let error = info?[PHImageErrorKey] as? Error {

@@ -38,6 +38,7 @@ class UnifiedPhotoCollectionViewController: XViewController {
 			if isViewLoaded {
 				updateLayout()
 				updateVisibleCells()
+			} else {
 			}
 		}
 	}
@@ -402,10 +403,13 @@ class UnifiedPhotoCollectionViewController: XViewController {
 	private func updateVisibleCells() {
 		#if os(macOS)
 		// Update all visible items
-		for indexPath in collectionView.indexPathsForVisibleItems() {
-			if let item = collectionView.item(at: indexPath) as? UnifiedPhotoCell,
-			   let photo = dataSource.itemIdentifier(for: indexPath)?.base as? (any PhotoItem) {
-				item.configure(with: photo, settings: settings)
+		let visiblePaths = collectionView.indexPathsForVisibleItems()
+		for indexPath in visiblePaths {
+			if let item = collectionView.item(at: indexPath) as? UnifiedPhotoCell {
+				// Need to reconfigure the entire cell to update size constraints
+				if let photo = dataSource.itemIdentifier(for: indexPath)?.base as? (any PhotoItem) {
+					item.configure(with: photo, settings: settings)
+				}
 			}
 		}
 		#else

@@ -25,7 +25,8 @@ struct ApplePhotosBrowserView: View {
 	}
 	
 	var body: some View {
-		UnifiedPhotoCollectionViewRepresentable(
+		NavigationStack {
+			UnifiedPhotoCollectionViewRepresentable(
 			photoProvider: photoProvider,
 			settings: $settings,
 			onSelectPhoto: { photo, allPhotos in
@@ -88,6 +89,7 @@ struct ApplePhotosBrowserView: View {
 			Button("OK") { errorMessage = nil }
 		} message: {
 			Text(errorMessage ?? "Unknown error")
+		}
 		}
 	}
 	

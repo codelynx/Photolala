@@ -39,7 +39,6 @@
 		}
 
 		override func draw(_ dirtyRect: NSRect) {
-
 			NSColor.clear.set()
 			self.bounds.fill()
 
@@ -60,10 +59,8 @@
 			// Save graphics state for clipping
 			NSGraphicsContext.saveGraphicsState()
 
-			// Clip to bounds for scale to fill
-			if self.scaleMode == .scaleToFill {
-				NSBezierPath(rect: bounds).setClip()
-			}
+			// Always clip to bounds to prevent overflow
+			NSBezierPath(rect: bounds).setClip()
 
 			// Draw the image
 			image.draw(

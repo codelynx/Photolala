@@ -25,6 +25,13 @@ struct PhotolalaCommands: Commands {
 				self.openFolder()
 			}
 			.keyboardShortcut("O", modifiers: .command)
+			
+			#if os(macOS)
+			Button("Open Apple Photos Library") {
+				self.openApplePhotosLibrary()
+			}
+			.keyboardShortcut("L", modifiers: [.command, .shift])
+			#endif
 
 			Divider()
 		}

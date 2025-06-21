@@ -1,6 +1,6 @@
 # Unified Photo Browser Architecture
 
-Last Updated: June 21, 2025
+Last Updated: June 21, 2025 (Added Apple Photos scale fix details)
 
 ## Overview
 
@@ -122,6 +122,9 @@ The Apple Photos integration demonstrates the flexibility of the unified archite
 - Basic header support for grouping
 - Album browsing for Apple Photos
 - Authorization handling for PhotoKit
+- Scale to fit/fill display modes working across all browsers
+- Proper constraint management for square thumbnails
+- Dynamic cell resizing when changing thumbnail sizes
 
 ### 🚧 In Progress
 - Header view registration and display
@@ -135,6 +138,26 @@ The Apple Photos integration demonstrates the flexibility of the unified archite
 - Performance optimizations for very large collections
 - Search integration for Apple Photos
 - Live Photos support
+
+## Technical Details
+
+### Display Mode Implementation
+The unified browser supports two display modes:
+- **Scale to Fit**: Shows entire image with letterboxing/pillarboxing as needed
+- **Scale to Fill**: Crops image to fill the entire cell (default)
+
+Key components:
+- `ScalableImageView`: Custom NSImageView that implements proper scaling on macOS
+- `ThumbnailDisplaySettings`: Observable settings object with display mode
+- Settings are passed as @Binding for two-way updates
+- `updateDisplayModeOnly()` method for efficient display updates without reloading
+
+### Constraint Management
+Cells use centered image views with fixed size constraints to avoid conflicts:
+- Image view uses centerX instead of leading/trailing constraints
+- Cell view has `masksToBounds = true` for proper clipping
+- ScalableImageView always clips to bounds regardless of mode
+- Layout updates trigger full cell reconfiguration for size changes
 
 ## Future Enhancements
 

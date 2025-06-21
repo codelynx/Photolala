@@ -547,6 +547,28 @@ The application is a functional photo browser with complete S3 backup capabiliti
      - Directory change detection and catalog regeneration
      - Network-aware caching strategies
      - Seamless fallback when catalog unavailable
+
+30. **Apple Photos Library Integration & Scale Fix (June 21)**:
+   - **Apple Photos Browser**:
+     - Full integration with unified photo browser architecture
+     - Support for viewing all photos or specific albums
+     - Proper authorization handling
+     - Menu item with ⇧⌘L shortcut
+   - **Scale to Fit/Fill Issues Fixed**:
+     - Fixed toggle not working due to value vs binding issue
+     - Changed Photos API from .aspectFill to .aspectFit for uncropped images
+     - Added updateDisplayModeOnly() method for efficient display updates
+     - Fixed toolbar functionality with NavigationStack wrapper
+   - **Thumbnail Display Fixes**:
+     - Resolved constraint conflicts causing non-square thumbnails
+     - Fixed clipping issues by always clipping to bounds
+     - Fixed thumbnail size changes not applying to existing cells
+     - Proper center alignment for image views
+   - **UI Improvements**:
+     - Default to .scaleToFill for consistent grid appearance
+     - Thumbnail size toggle (S/M/L) works correctly
+     - Consistent behavior between Directory and Apple Photos browsers
+     - No more console warnings about constraints
    - **Architecture Documentation**:
      - Created comprehensive photo-loading-architecture.md
      - Detailed component interaction diagrams
