@@ -56,6 +56,12 @@ class EnhancedLocalPhotoProvider: ObservableObject, PhotoProvider {
 	// Cancellables
 	private var cancellables = Set<AnyCancellable>()
 	
+	// MARK: - Capabilities
+	
+	var capabilities: PhotoProviderCapabilities {
+		[.hierarchicalNavigation, .backup, .sorting, .grouping, .preview, .star]
+	}
+	
 	// MARK: - Initialization
 	
 	init(directoryPath: String) {

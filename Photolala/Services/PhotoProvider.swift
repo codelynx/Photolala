@@ -8,6 +8,22 @@
 import Foundation
 import Combine
 
+/// Capabilities that a photo provider can support
+struct PhotoProviderCapabilities: OptionSet {
+	let rawValue: Int
+	
+	static let hierarchicalNavigation = PhotoProviderCapabilities(rawValue: 1 << 0)
+	static let backup = PhotoProviderCapabilities(rawValue: 1 << 1)
+	static let download = PhotoProviderCapabilities(rawValue: 1 << 2)
+	static let delete = PhotoProviderCapabilities(rawValue: 1 << 3)
+	static let albums = PhotoProviderCapabilities(rawValue: 1 << 4)
+	static let search = PhotoProviderCapabilities(rawValue: 1 << 5)
+	static let sorting = PhotoProviderCapabilities(rawValue: 1 << 6)
+	static let grouping = PhotoProviderCapabilities(rawValue: 1 << 7)
+	static let preview = PhotoProviderCapabilities(rawValue: 1 << 8)
+	static let star = PhotoProviderCapabilities(rawValue: 1 << 9)
+}
+
 /// Protocol for providing photos from different sources (local directory, S3, etc.)
 protocol PhotoProvider: AnyObject {
 	/// The current list of photos
@@ -45,6 +61,31 @@ protocol PhotoProvider: AnyObject {
 	
 	/// Apply sorting option if supported
 	func applySorting(_ option: PhotoSortOption) async
+	
+	/// Get the capabilities of this provider
+	var capabilities: PhotoProviderCapabilities { get }
+	
+	/// Progress tracking for loading operations
+	var loadingProgress: Double { get }
+	var loadingStatusText: String { get }
+}
+
+// MARK: - Default implementations
+
+extension PhotoProvider {
+	/// Default capabilities based on boolean flags
+	var capabilities: PhotoProviderCapabilities {
+		var caps: PhotoProviderCapabilities = []
+		if supportsGrouping { caps.insert(.grouping) }
+		if supportsSorting { caps.insert(.sorting) }
+		return caps
+	}
+	
+	/// Default loading progress
+	var loadingProgress: Double { 0.0 }
+	
+	/// Default loading status
+	var loadingStatusText: String { "Loading..." }
 }
 
 /// Base implementation with common functionality
@@ -65,6 +106,17 @@ class BasePhotoProvider: PhotoProvider, ObservableObject {
 	
 	var supportsGrouping: Bool { true }
 	var supportsSorting: Bool { true }
+	
+	// Default capabilities implementation
+	var capabilities: PhotoProviderCapabilities {
+		var caps: PhotoProviderCapabilities = []
+		if supportsGrouping { caps.insert(.grouping) }
+		if supportsSorting { caps.insert(.sorting) }
+		return caps
+	}
+	
+	var loadingProgress: Double { 0.0 }
+	var loadingStatusText: String { "Loading..." }
 	
 	func loadPhotos() async throws {
 		// Subclasses implement
@@ -163,6 +215,12 @@ class S3PhotoProvider: BasePhotoProvider {
 	private var syncService: S3CatalogSyncService?
 	private let userId: String
 	private var isOfflineMode: Bool = false
+	
+	// MARK: - Capabilities
+	
+	override var capabilities: PhotoProviderCapabilities {
+		[.download, .search]
+	}
 	
 	override var displayTitle: String { "Cloud Photos" }
 	override var displaySubtitle: String {

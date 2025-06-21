@@ -9,8 +9,14 @@ struct S3PhotoBrowserView: View {
 	@State private var showingError = false
 	@State private var errorMessage = ""
 	@State private var isRefreshing = false
+	@State private var showingInspector = false
 	@StateObject private var photoProvider: S3PhotoProvider
 	@StateObject private var identityManager = IdentityManager.shared
+	
+	// Computed property to ensure inspector gets PhotoItems
+	private var inspectorSelection: [any PhotoItem] {
+		selectedPhotos.map { $0 as any PhotoItem }
+	}
 	
 	init() {
 		// Initialize with the current user's ID or a placeholder
@@ -71,8 +77,15 @@ struct S3PhotoBrowserView: View {
 			#if os(macOS)
 			.navigationSubtitle("\(photoProvider.photos.count) photos")
 			#endif
-			.toolbar {
+			.photoBrowserToolbar(
+				settings: $thumbnailSettings,
+				showingInspector: $showingInspector,
+				isRefreshing: isRefreshing,
+				onRefresh: refreshCatalog
+			) {
 				ToolbarItemGroup(placement: .automatic) {
+					// S3-specific items before core items
+					
 					// Offline indicator
 					if let s3Provider = photoProvider as? S3PhotoProvider,
 					   s3Provider.displaySubtitle.contains("Offline") {
@@ -85,64 +98,6 @@ struct S3PhotoBrowserView: View {
 						Text("\(selectedPhotos.count) selected")
 							.foregroundColor(.secondary)
 					}
-					
-					// Display mode toggle
-					Button(action: {
-						thumbnailSettings.displayMode = thumbnailSettings
-							.displayMode == .scaleToFit ? .scaleToFill : .scaleToFit
-					}) {
-						Image(systemName: thumbnailSettings.displayMode == .scaleToFit ? "aspectratio" : "aspectratio.fill")
-					}
-					#if os(macOS)
-					.help(thumbnailSettings.displayMode == .scaleToFit ? "Switch to Fill" : "Switch to Fit")
-					#endif
-					
-					// Item info toggle
-					Button(action: {
-						thumbnailSettings.showItemInfo.toggle()
-					}) {
-						Image(systemName: "squares.below.rectangle")
-					}
-					#if os(macOS)
-					.help(thumbnailSettings.showItemInfo ? "Hide item info" : "Show item info")
-					#endif
-					
-					// Thumbnail size controls
-					#if os(iOS)
-						// Size menu for iOS
-						Menu {
-							Button("S") {
-								thumbnailSettings.thumbnailOption = .small
-							}
-							Button("M") {
-								thumbnailSettings.thumbnailOption = .medium
-							}
-							Button("L") {
-								thumbnailSettings.thumbnailOption = .large
-							}
-						} label: {
-							Image(systemName: "slider.horizontal.3")
-						}
-					#else
-						// Size picker for macOS
-						Picker("Size", selection: $thumbnailSettings.thumbnailOption) {
-							Text("S").tag(ThumbnailOption.small)
-							Text("M").tag(ThumbnailOption.medium)
-							Text("L").tag(ThumbnailOption.large)
-						}
-						.pickerStyle(.segmented)
-						.help("Thumbnail size")
-					#endif
-					
-					// Refresh button
-					Button(action: {
-						Task {
-							await refreshCatalog()
-						}
-					}) {
-						Label("Refresh", systemImage: "arrow.clockwise")
-					}
-					.disabled(isRefreshing)
 				}
 			}
 			.sheet(item: $showingPhotoDetail) { photo in
@@ -157,6 +112,10 @@ struct S3PhotoBrowserView: View {
 		#if os(macOS)
 		.frame(minWidth: 600, maxWidth: .infinity, minHeight: 400, maxHeight: .infinity)
 		#endif
+		.inspector(
+			isPresented: $showingInspector,
+			selection: inspectorSelection
+		)
 	}
 	// MARK: - Actions
 	
