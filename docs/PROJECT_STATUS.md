@@ -1,10 +1,10 @@
 ## 📍 PROJECT STATUS REPORT
 
-Last Updated: June 20, 2025
+Last Updated: June 21, 2025
 
-### 🚀 Current Status: S3 Backup System with Metadata Fix
+### 🚀 Current Status: Fully Functional S3 Backup & Cloud Browser
 
-The application is a functional photo browser with S3 backup capabilities. Recent fixes have resolved backup status persistence issues and metadata decoding errors.
+The application is a functional photo browser with complete S3 backup capabilities. The cloud browser now works reliably after fixing the catalog sync issue. Users can backup photos to S3 and browse them from any device.
 
 ### ✅ Completed Features
 
@@ -697,6 +697,17 @@ The application is a functional photo browser with S3 backup capabilities. Recen
      - Multiple delegate methods to prevent state encoding
      - Should eliminate restoration errors on launch
 
+39. **S3 Catalog Sync Fix (June 21)**:
+   - **Fixed "file exists" error during atomic updates**:
+     - Root cause: CacheManager.cloudCatalogURL() auto-creating directories
+     - Solution: Create temp directories at user level, not inside .photolala
+     - Improved atomic update process with proper backup handling
+   - **Directory structure during sync**:
+     - Temp download: `{userId}/tmp_{UUID}/.photolala/`
+     - Backup location: `{userId}/backup_{UUID}/`
+     - Final location: `{userId}/.photolala/`
+   - **Result**: Cloud browser now reliably syncs and displays S3 photos
+
 ### 🔧 Recent Bug Fixes
 
 1. Fixed backup status not persisting correctly between app launches
@@ -704,6 +715,7 @@ The application is a functional photo browser with S3 backup capabilities. Recen
 3. Fixed window restoration attempting to restore with null class name
 4. Fixed duplicate thumbnail loading in collection views
 5. Fixed photo matching logic in BackupQueueManager
+6. Fixed S3 catalog sync "file exists" error preventing cloud browser from working
 
 ### 📋 Technical Debt
 

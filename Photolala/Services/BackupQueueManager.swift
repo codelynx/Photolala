@@ -104,6 +104,9 @@ class BackupQueueManager: ObservableObject {
 		}
 		saveQueueState()
 		NotificationCenter.default.post(name: NSNotification.Name("BackupQueueChanged"), object: nil)
+		
+		// Start/reset the inactivity timer
+		resetInactivityTimer()
 	}
 
 	func removeFromQueue(_ photo: PhotoFile) {
@@ -143,8 +146,14 @@ class BackupQueueManager: ObservableObject {
 		inactivityTimer?.invalidate()
 
 		// Start timer if we have photos to upload or delete
-		guard !queuedPhotos.isEmpty || !photosToDelete.isEmpty else { return }
+		guard !queuedPhotos.isEmpty || !photosToDelete.isEmpty else { 
+			print("[BackupQueueManager] No photos in queue, not starting timer")
+			return 
+		}
 
+		print("[BackupQueueManager] Starting backup timer for \(Int(inactivityInterval)) seconds")
+		print("[BackupQueueManager] Queue has \(queuedPhotos.count) photos to upload, \(photosToDelete.count) to delete")
+		
 		inactivityTimer = Timer.scheduledTimer(
 			withTimeInterval: inactivityInterval,
 			repeats: false
@@ -167,15 +176,25 @@ class BackupQueueManager: ObservableObject {
 	}
 
 	private func performBackup() async {
+		print("[BackupQueueManager] Starting backup process...")
+		print("[BackupQueueManager] Photos to delete: \(photosToDelete.count), Photos to upload: \(queuedPhotos.count)")
+		
 		// Handle deletions first
 		if !photosToDelete.isEmpty {
 			await performDeletions()
 		}
 		
 		// Then handle uploads
-		guard !queuedPhotos.isEmpty else { return }
-		guard !isUploading else { return }
+		guard !queuedPhotos.isEmpty else { 
+			print("[BackupQueueManager] No photos in queue to upload")
+			return 
+		}
+		guard !isUploading else { 
+			print("[BackupQueueManager] Already uploading, skipping")
+			return 
+		}
 
+		print("[BackupQueueManager] Starting upload of \(queuedPhotos.count) photos")
 		isUploading = true
 		uploadProgress = 0.0
 

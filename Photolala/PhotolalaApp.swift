@@ -17,6 +17,18 @@ import SwiftUI
 			if let bundleID = Bundle.main.bundleIdentifier {
 				UserDefaults.standard.removePersistentDomain(forName: bundleID)
 			}
+			
+			// Also disable window restoration at the app level
+			NSApp.disableRelaunchOnLogin()
+		}
+		
+		func applicationDidFinishLaunching(_ notification: Notification) {
+			// Ensure no windows are restored
+			NSApp.windows.forEach { window in
+				if window.identifier?.rawValue.contains("NSWindow") == true {
+					window.close()
+				}
+			}
 		}
 		
 		func applicationSupportsSecureRestorableState(_ app: NSApplication) -> Bool {
@@ -50,6 +62,14 @@ struct PhotolalaApp: App {
 		// Initialize managers
 		_ = IdentityManager.shared
 		_ = S3BackupManager.shared
+		
+		// Print cache root directory for debugging
+		let cacheRoot = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)[0]
+			.appendingPathComponent("com.electricwoods.photolala")
+		print("[CacheManager] Cache root directory: \(cacheRoot.path)")
+		
+		// Perform cache migration if needed
+		CacheManager.shared.performMigrationIfNeeded()
 	}
 
 	var body: some Scene {

@@ -71,12 +71,14 @@ class PhotoManager {
 	static let shared = PhotoManager()
 
 	func thumbnailURL(for identifier: Identifier) -> URL {
-		// Use .dat extension to match S3 format
-		// Replace # with _ for filesystem compatibility
-		let safeIdentifier = identifier.string.replacingOccurrences(of: "#", with: "_")
-		let fileName = safeIdentifier + ".dat"
-		let filePath = (self.thumbnailStoragePath as NSString).appendingPathComponent(fileName)
-		return URL(fileURLWithPath: filePath)
+		// Extract just the hash part for the new structure
+		switch identifier {
+		case .md5(let digest):
+			return CacheManager.shared.localThumbnailURL(for: digest.data.hexadecimalString)
+		case .applePhotoLibrary(let id):
+			// For APL identifiers, use the full identifier string
+			return CacheManager.shared.localThumbnailURL(for: id)
+		}
 	}
 
 	private func error(message: String) -> Error {
@@ -408,19 +410,27 @@ class PhotoManager {
 	}
 
 	func hasThumbnail(for identifier: Identifier) -> Bool {
-		// Check for .dat file first
+		// Check new location first
 		if FileManager.default.fileExists(atPath: self.thumbnailURL(for: identifier).path) {
 			return true
 		}
 		
-		// Check for legacy .jpg file and migrate if found
-		let legacyFileName = identifier.string + ".jpg"
-		let legacyPath = (self.thumbnailStoragePath as NSString).appendingPathComponent(legacyFileName)
-		
-		if FileManager.default.fileExists(atPath: legacyPath) {
-			// Migrate to new format
-			migrateLegacyThumbnail(identifier: identifier, legacyPath: legacyPath)
-			return true
+		// Check legacy locations and migrate if found
+		if let legacyThumbnailDir = CacheManager.shared.legacyLocalThumbnailDirectory() {
+			// Check for legacy file with full identifier string
+			let safeIdentifier = identifier.string.replacingOccurrences(of: "#", with: "_")
+			let legacyDatPath = (legacyThumbnailDir.path as NSString).appendingPathComponent(safeIdentifier + ".dat")
+			let legacyJpgPath = (legacyThumbnailDir.path as NSString).appendingPathComponent(identifier.string + ".jpg")
+			
+			if FileManager.default.fileExists(atPath: legacyDatPath) {
+				// Migrate from legacy .dat format
+				migrateLegacyThumbnail(identifier: identifier, legacyPath: legacyDatPath)
+				return true
+			} else if FileManager.default.fileExists(atPath: legacyJpgPath) {
+				// Migrate from legacy .jpg format
+				migrateLegacyThumbnail(identifier: identifier, legacyPath: legacyJpgPath)
+				return true
+			}
 		}
 		
 		return false
@@ -430,47 +440,17 @@ class PhotoManager {
 		Task.detached(priority: .background) {
 			do {
 				let newURL = self.thumbnailURL(for: identifier)
+				// Ensure parent directory exists
+				try FileManager.default.createDirectory(at: newURL.deletingLastPathComponent(), withIntermediateDirectories: true)
 				try FileManager.default.moveItem(atPath: legacyPath, toPath: newURL.path)
-				print("[PhotoManager] Migrated thumbnail from .jpg to .dat: \(identifier.string)")
+				print("[PhotoManager] Migrated thumbnail from \(legacyPath) to new structure")
 			} catch {
 				print("[PhotoManager] Failed to migrate thumbnail: \(error)")
 			}
 		}
 	}
 
-	private let photolalaStoragePath: NSString
-	private let thumbnailStoragePath: NSString // Keep for backward compatibility
-	private let cacheDirectoryPath: NSString
-
 	private init() {
-		let photolalaStoragePath = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first!
-			.appendingPathComponent("Photolala").path
-		do { try FileManager.default.createDirectory(atPath: photolalaStoragePath, withIntermediateDirectories: true) }
-		catch { fatalError("\(error): cannot create photolala storage directory: \(photolalaStoragePath)") }
-		self.photolalaStoragePath = photolalaStoragePath as NSString
-		print("photolala directory: \(photolalaStoragePath)")
-
-		// Migration: Check if 'thumbnails' directory exists and rename to 'cache'
-		let oldThumbnailPath = (photolalaStoragePath as NSString).appendingPathComponent("thumbnails")
-		let newCachePath = (photolalaStoragePath as NSString).appendingPathComponent("cache")
-
-		if FileManager.default.fileExists(atPath: oldThumbnailPath),
-		   !FileManager.default.fileExists(atPath: newCachePath)
-		{
-			do {
-				try FileManager.default.moveItem(atPath: oldThumbnailPath, toPath: newCachePath)
-				print("[PhotoManager] Migrated thumbnails directory to cache directory")
-			} catch {
-				print("[PhotoManager] Failed to migrate thumbnails directory: \(error)")
-			}
-		}
-
-		// Create cache directory if needed
-		do { try FileManager.default.createDirectory(atPath: newCachePath, withIntermediateDirectories: true) }
-		catch { fatalError("\(error): cannot create cache directory: \(newCachePath)") }
-
-		self.cacheDirectoryPath = newCachePath as NSString
-		self.thumbnailStoragePath = newCachePath as NSString // Point to same location for backward compatibility
 
 		// Configure cache limits based on available memory
 		let totalMemory = ProcessInfo.processInfo.physicalMemory
@@ -595,15 +575,8 @@ class PhotoManager {
 	// Clear disk cache (thumbnails stored on disk)
 	func clearDiskCache() {
 		do {
-			let thumbnailPath = thumbnailStoragePath
-			if FileManager.default.fileExists(atPath: thumbnailPath as String) {
-				let contents = try FileManager.default.contentsOfDirectory(atPath: thumbnailPath as String)
-				for file in contents {
-					let filePath = (thumbnailPath as NSString).appendingPathComponent(file)
-					try FileManager.default.removeItem(atPath: filePath)
-				}
-				print("[PhotoManager] Disk cache cleared: \(contents.count) files removed")
-			}
+			try CacheManager.shared.clearLocalCaches()
+			print("[PhotoManager] Disk cache cleared")
 		} catch {
 			print("[PhotoManager] Failed to clear disk cache: \(error)")
 		}
@@ -711,9 +684,25 @@ class PhotoManager {
 	}
 
 	private func cacheURL(for identifier: Identifier, type: CacheType) -> URL {
-		let fileName = identifier.string + "." + type.fileExtension
-		let filePath = (self.cacheDirectoryPath as NSString).appendingPathComponent(fileName)
-		return URL(fileURLWithPath: filePath)
+		// For now, still use legacy location for metadata until we implement full migration
+		if let legacyDir = CacheManager.shared.legacyLocalThumbnailDirectory() {
+			let fileName = identifier.string + "." + type.fileExtension
+			let filePath = (legacyDir.path as NSString).appendingPathComponent(fileName)
+			return URL(fileURLWithPath: filePath)
+		}
+		// Fallback to new structure (though metadata migration not implemented yet)
+		switch identifier {
+		case .md5(let digest):
+			let hash = digest.data.hexadecimalString
+			// TODO: Implement metadata URL in CacheManager
+			return CacheManager.shared.localThumbnailURL(for: hash)
+				.deletingLastPathComponent()
+				.appendingPathComponent("\(hash).\(type.fileExtension)")
+		case .applePhotoLibrary(let id):
+			return CacheManager.shared.localThumbnailURL(for: id)
+				.deletingLastPathComponent()
+				.appendingPathComponent("\(id).\(type.fileExtension)")
+		}
 	}
 
 	private func parseEXIFDate(_ dateString: String) -> Date? {

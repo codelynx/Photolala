@@ -181,6 +181,8 @@ class S3PhotoProvider: BasePhotoProvider {
 		await setLoading(true)
 		defer { Task { await setLoading(false) } }
 		
+		print("[S3PhotoProvider] Loading photos for user: \(userId)")
+		
 		// Initialize sync service if needed
 		if syncService == nil {
 			// Get S3 client from backup manager
@@ -188,7 +190,15 @@ class S3PhotoProvider: BasePhotoProvider {
 				throw NSError(domain: "S3PhotoProvider", code: 500, 
 							userInfo: [NSLocalizedDescriptionKey: "S3 service not configured"])
 			}
-			syncService = try S3CatalogSyncService(s3Client: s3Client, userId: userId)
+			
+			print("[S3PhotoProvider] Creating S3CatalogSyncService with userId: \(userId)")
+			do {
+				syncService = try S3CatalogSyncService(s3Client: s3Client, userId: userId)
+				print("[S3PhotoProvider] S3CatalogSyncService created successfully")
+			} catch {
+				print("[S3PhotoProvider] Failed to create S3CatalogSyncService: \(error)")
+				throw error
+			}
 		}
 		
 		// Try to sync catalog (non-blocking)
@@ -201,27 +211,48 @@ class S3PhotoProvider: BasePhotoProvider {
 		
 		// Load from cached catalog
 		if let syncService = syncService {
-			catalogService = try await syncService.loadCachedCatalog()
+			print("[S3PhotoProvider] Loading cached catalog...")
+			do {
+				catalogService = try await syncService.loadCachedCatalog()
+				print("[S3PhotoProvider] Catalog loaded successfully")
+			} catch {
+				print("[S3PhotoProvider] Failed to load catalog: \(error)")
+				throw error
+			}
+			
 			s3MasterCatalog = try await syncService.loadS3MasterCatalog()
 		}
 		
 		// Build photo list from catalog
 		guard let catalog = catalogService else { 
+			print("[S3PhotoProvider] No catalog available")
 			updatePhotos([])
 			return 
 		}
 		
-		let entries = try await catalog.loadAllEntries()
-		let s3Photos = entries.map { entry in
-			PhotoS3(
-				from: entry,
-				s3Info: s3MasterCatalog?.photos[entry.md5],
-				userId: userId
-			)
+		print("[S3PhotoProvider] Loading catalog entries...")
+		do {
+			let entries = try await catalog.loadAllEntries()
+			print("[S3PhotoProvider] Loaded \(entries.count) entries from catalog")
+			
+			let s3Photos = entries.map { entry in
+				PhotoS3(
+					from: entry,
+					s3Info: s3MasterCatalog?.photos[entry.md5],
+					userId: userId
+				)
+			}
+			.sorted { $0.photoDate > $1.photoDate }
+			
+			print("[S3PhotoProvider] Created \(s3Photos.count) S3 photos")
+			updatePhotos(s3Photos)
+			print("[S3PhotoProvider] Photos updated successfully")
+		} catch {
+			print("[S3PhotoProvider] Error loading catalog entries: \(error)")
+			print("[S3PhotoProvider] Error type: \(type(of: error))")
+			print("[S3PhotoProvider] Error localized: \(error.localizedDescription)")
+			throw error
 		}
-		.sorted { $0.photoDate > $1.photoDate }
-		
-		updatePhotos(s3Photos)
 	}
 	
 	override func refresh() async throws {

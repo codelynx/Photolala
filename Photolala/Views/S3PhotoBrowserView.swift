@@ -59,7 +59,12 @@ struct S3PhotoBrowserView: View {
 			}
 			.onAppear {
 				Task {
-					try? await photoProvider.loadPhotos()
+					do {
+						try await photoProvider.loadPhotos()
+					} catch {
+						errorMessage = error.localizedDescription
+						showingError = true
+					}
 				}
 			}
 			.navigationTitle("Cloud Photos")
