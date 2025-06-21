@@ -155,59 +155,6 @@ class BasePhotoProvider: PhotoProvider, ObservableObject {
 	}
 }
 
-/// Local directory photo provider
-class LocalPhotoProvider: BasePhotoProvider {
-	private let directoryPath: String
-	private let photoLoader: CatalogAwarePhotoLoader
-	private var loadTask: Task<Void, Never>?
-	
-	override var displayTitle: String { 
-		(directoryPath as NSString).lastPathComponent 
-	}
-	
-	init(directoryPath: String) {
-		self.directoryPath = directoryPath
-		self.photoLoader = CatalogAwarePhotoLoader()
-		super.init()
-	}
-	
-	deinit {
-		loadTask?.cancel()
-	}
-	
-	override func loadPhotos() async throws {
-		setLoading(true)
-		defer { setLoading(false) }
-		
-		// Cancel any existing load task
-		loadTask?.cancel()
-		
-		// Start new load task
-		loadTask = Task {
-			do {
-				let files = try await photoLoader.loadPhotos(from: URL(fileURLWithPath: directoryPath))
-				guard !Task.isCancelled else { return }
-				
-				// Match photos with backup status BEFORE updating UI
-				await BackupQueueManager.shared.matchPhotosWithBackupStatus(files)
-				
-				// Now update the UI with photos that have MD5 hashes computed
-				updatePhotos(files)
-			} catch {
-				// Handle error silently as the task doesn't throw
-				print("Error loading photos: \(error)")
-			}
-		}
-		
-		await loadTask?.value
-	}
-	
-	override func refresh() async throws {
-		// Reload photos (CatalogAwarePhotoLoader will handle cache invalidation internally)
-		try await loadPhotos()
-	}
-}
-
 /// S3 photo provider
 class S3PhotoProvider: BasePhotoProvider {
 	private var catalogService: PhotolalaCatalogService?
