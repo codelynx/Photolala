@@ -11,6 +11,7 @@ struct WelcomeView: View {
 	@State private var selectedFolder: URL?
 	@State private var showingFolderPicker = false
 	@State private var navigateToPhotoBrowser = false
+	@State private var navigateToPhotoLibrary = false
 	#if os(macOS)
 		@Environment(\.openWindow) private var openWindow
 	#endif
@@ -29,19 +30,32 @@ struct WelcomeView: View {
 			}
 
 			// Welcome message
-			Text("Choose a folder to browse photos")
+			Text("Choose a source to browse photos")
 				.font(.headline)
 				.foregroundStyle(.secondary)
 
-			// Select folder button
-			Button(action: self.selectFolder) {
-				Label("Select Folder", systemImage: "folder")
-					.frame(minWidth: 200)
+			// Source selection buttons
+			VStack(spacing: 12) {
+				// Select folder button
+				Button(action: self.selectFolder) {
+					Label("Browse Folder", systemImage: "folder")
+						.frame(minWidth: 200)
+				}
+				.controlSize(.large)
+				#if os(macOS)
+					.buttonStyle(.borderedProminent)
+				#endif
+				
+				// Photos Library button
+				Button(action: self.openPhotoLibrary) {
+					Label("Photos Library", systemImage: "photo.on.rectangle")
+						.frame(minWidth: 200)
+				}
+				.controlSize(.large)
+				#if os(macOS)
+					.buttonStyle(.bordered)
+				#endif
 			}
-			.controlSize(.large)
-			#if os(macOS)
-				.buttonStyle(.borderedProminent)
-			#endif
 
 			// Selected folder display
 			if let folder = selectedFolder {
@@ -73,6 +87,9 @@ struct WelcomeView: View {
 				if let folder = selectedFolder {
 					DirectoryPhotoBrowserView(directoryPath: folder.path as NSString)
 				}
+			}
+			.navigationDestination(isPresented: self.$navigateToPhotoLibrary) {
+				ApplePhotosBrowserView()
 			}
 		#endif
 		#if os(macOS)
@@ -113,6 +130,18 @@ struct WelcomeView: View {
 			self.openWindow(value: url)
 		#else
 			self.navigateToPhotoBrowser = true
+		#endif
+	}
+	
+	private func openPhotoLibrary() {
+		#if os(macOS)
+			// For macOS, we need to update PhotolalaApp to handle this
+			// For now, open a new window with a special URL
+			if let url = URL(string: "photolala://photos-library") {
+				self.openWindow(value: url)
+			}
+		#else
+			self.navigateToPhotoLibrary = true
 		#endif
 	}
 }
