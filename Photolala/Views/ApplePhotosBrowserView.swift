@@ -27,7 +27,7 @@ struct ApplePhotosBrowserView: View {
 	var body: some View {
 		UnifiedPhotoCollectionViewRepresentable(
 			photoProvider: photoProvider,
-			settings: settings,
+			settings: $settings,
 			onSelectPhoto: { photo, allPhotos in
 				// Handle photo selection
 				if let applePhoto = photo as? PhotoApple {

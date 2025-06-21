@@ -48,7 +48,7 @@ struct S3PhotoBrowserView: View {
 					// Use unified collection view
 					UnifiedPhotoCollectionViewRepresentable(
 						photoProvider: photoProvider,
-						settings: thumbnailSettings,
+						settings: $thumbnailSettings,
 						onSelectPhoto: { photo, allPhotos in
 							if let s3Photo = photo as? PhotoS3 {
 								handlePhotoTap(s3Photo)
