@@ -780,3 +780,33 @@ The application is a functional photo browser with complete S3 backup capabiliti
      - Phased implementation plan for future UnifiedPhotoBrowser
      - Clear migration path for Apple Photos support
      - Type erasure mitigation strategies documented
+
+41. **Apple Photos Library Browser (June 21)**:
+   - **PhotoKit Integration**:
+     - Created PhotoApple struct implementing PhotoItem protocol
+     - Maps PHAsset properties to common photo interface
+     - Supports thumbnail loading through PHImageManager
+     - Handles iCloud Photo Library assets with network access
+   
+   - **ApplePhotosProvider Implementation**:
+     - Full PhotoKit authorization handling
+     - Album browsing support (smart albums and user albums)
+     - Progressive photo loading with caching
+     - Capabilities: [.albums, .search, .sorting, .grouping, .preview]
+   
+   - **UI Integration**:
+     - ApplePhotosBrowserView using UnifiedPhotoCollectionViewRepresentable
+     - Album picker with system icons
+     - Inspector support for photo metadata
+     - Multi-selection and display settings
+   
+   - **Menu Structure (macOS)**:
+     - Moved to Window menu: "Apple Photos Library" (⌘⌥L)
+     - Moved to Window menu: "Cloud Browser" (⌘⌥B)
+     - File menu: "Open Folder..." (⌘O) for directory browsing
+     - Follows macOS conventions for system-wide resources
+   
+   - **Platform Differences**:
+     - macOS: Access through Window menu only
+     - iOS: Buttons on welcome screen (no menu bar)
+     - Both: Full feature parity once opened

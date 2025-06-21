@@ -1,6 +1,6 @@
 # Photolala Architecture
 
-Last Updated: June 19, 2025 (Added Inspector Panel)
+Last Updated: June 21, 2025 (Added Apple Photos Library support)
 
 ## Overview
 
@@ -20,7 +20,7 @@ Photolala is a cross-platform photo browser application built with SwiftUI, supp
 ### Models
 
 #### PhotoItem Protocol
-- Common interface for all photo types (PhotoFile, PhotoS3)
+- Common interface for all photo types (PhotoFile, PhotoS3, PhotoApple)
 - Key methods: `loadThumbnail()`, `loadImageData()`, `contextMenuItems()`
 - Properties: dimensions, dates, archive status, MD5 hash
 - Enables unified UI components to work with any photo source
@@ -55,6 +55,14 @@ Photolala is a cross-platform photo browser application built with SwiftUI, supp
 - Computed keys for S3 paths
 - Storage class awareness (Standard/Deep Archive)
 
+#### PhotoApple
+- Represents a photo from Apple Photos Library
+- Wraps PHAsset from PhotoKit framework
+- Integrates with PHCachingImageManager for thumbnails
+- Supports iCloud Photo Library assets
+- Provides metadata from Photos app (location, creation date, etc.)
+- Implements PhotoItem protocol for unified browser compatibility
+
 #### PhotoMetadata
 - EXIF and file metadata
 - Codable for plist serialization
@@ -77,8 +85,14 @@ Photolala is a cross-platform photo browser application built with SwiftUI, supp
   - Provides loading progress and status updates
   - Supports dynamic visible range updates from scroll monitoring
 - **S3PhotoProvider**: Loads photos from S3 with catalog sync support
+- **ApplePhotosProvider**: Integrates with Apple Photos Library via PhotoKit
+  - Authorization handling for photo library access
+  - Album browsing (smart albums and user collections)
+  - Thumbnail caching with PHCachingImageManager
+  - Supports iCloud Photo Library assets
 - Protocol includes: loading, refreshing, grouping, sorting capabilities
 - Observable with Combine publishers for reactive UI updates
+- PhotoProviderCapabilities for feature discovery
 
 #### PhotoManager (Singleton)
 - Dual caching: memory (NSCache) + disk

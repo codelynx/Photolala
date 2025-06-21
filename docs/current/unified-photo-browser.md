@@ -21,6 +21,7 @@ The unified photo browser architecture provides a consistent interface for brows
   - `BasePhotoProvider` - Common functionality with @MainActor for thread safety
   - `LocalPhotoProvider` - Loads photos from local directories
   - `S3PhotoProvider` - Loads photos from S3 with catalog support
+  - `ApplePhotosProvider` - Loads photos from Apple Photos Library via PhotoKit
 
 ### 3. UnifiedPhotoCollectionViewController
 - **Purpose**: Platform-agnostic collection view controller
@@ -62,7 +63,10 @@ let photoProvider = LocalPhotoProvider(directoryPath: "/path/to/photos")
 // For S3 photos
 let photoProvider = S3PhotoProvider(userId: "user123")
 
-// Both use the same UI component
+// For Apple Photos Library
+let photoProvider = ApplePhotosProvider()
+
+// All use the same UI component
 UnifiedPhotoCollectionViewRepresentable(
     photoProvider: photoProvider,
     settings: thumbnailSettings,
