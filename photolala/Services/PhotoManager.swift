@@ -110,7 +110,7 @@ class PhotoManager {
 			self.queue.async {
 				do {
 					let startTime = Date()
-					print("[PhotoManager] loadFullImage for: \(photo.filename), path: \(photo.filePath)")
+					print("[PhotoManager] loadFullImage for: \(photo.displayName), path: \(photo.filePath)")
 
 					// Check if we have it in cache
 					if let cachedImage = self.imageCache.object(forKey: photo.filePath as NSString) {
@@ -505,7 +505,7 @@ class PhotoManager {
 						_ = try await self?.thumbnail(for: photo)
 					} catch {
 						// Silently ignore prefetch errors
-						print("[PhotoManager] Prefetch thumbnail failed for \(photo.filename): \(error)")
+						print("[PhotoManager] Prefetch thumbnail failed for \(photo.displayName): \(error)")
 					}
 				}
 			}
@@ -528,7 +528,7 @@ class PhotoManager {
 						_ = try await self?.loadFullImage(for: photo)
 					} catch {
 						// Silently ignore prefetch errors
-						print("[PhotoManager] Prefetch image failed for \(photo.filename): \(error)")
+						print("[PhotoManager] Prefetch image failed for \(photo.displayName): \(error)")
 					}
 				}
 			}
@@ -556,7 +556,7 @@ class PhotoManager {
 						_ = try await self?.thumbnail(for: photo)
 					} catch {
 						// Silently ignore prefetch errors
-						print("[PhotoManager] Prefetch thumbnail failed for \(photo.filename): \(error)")
+						print("[PhotoManager] Prefetch thumbnail failed for \(photo.displayName): \(error)")
 					}
 				}
 			}
@@ -566,6 +566,66 @@ class PhotoManager {
 	// Cancel all pending operations for cleanup
 	func cancelAllPrefetches() {
 		// This would require tracking tasks, implement later if needed
+	}
+	
+	// MARK: - Cache Management
+	
+	func clearThumbnailCache() {
+		thumbnailCache.removeAllObjects()
+		print("[PhotoManager] Thumbnail cache cleared")
+	}
+	
+	func clearImageCache() {
+		imageCache.removeAllObjects()
+		print("[PhotoManager] Image cache cleared")
+	}
+	
+	func clearMetadataCache() {
+		metadataCache.removeAllObjects()
+		print("[PhotoManager] Metadata cache cleared")
+	}
+	
+	func clearAllCaches() {
+		clearThumbnailCache()
+		clearImageCache()
+		clearMetadataCache()
+		print("[PhotoManager] All caches cleared")
+	}
+	
+	// Clear disk cache (thumbnails stored on disk)
+	func clearDiskCache() {
+		do {
+			let thumbnailPath = thumbnailStoragePath
+			if FileManager.default.fileExists(atPath: thumbnailPath as String) {
+				let contents = try FileManager.default.contentsOfDirectory(atPath: thumbnailPath as String)
+				for file in contents {
+					let filePath = (thumbnailPath as NSString).appendingPathComponent(file)
+					try FileManager.default.removeItem(atPath: filePath)
+				}
+				print("[PhotoManager] Disk cache cleared: \(contents.count) files removed")
+			}
+		} catch {
+			print("[PhotoManager] Failed to clear disk cache: \(error)")
+		}
+	}
+	
+	// Get cache information for display
+	func getCacheInfo() -> String {
+		var info = ""
+		
+		// Image cache info
+		info += "  Image Cache: \(imageCache.countLimit > 0 ? "\(imageCache.countLimit) max items" : "unlimited")\n"
+		info += "  Thumbnail Cache: \(thumbnailCache.countLimit > 0 ? "\(thumbnailCache.countLimit) max items" : "unlimited")\n"
+		info += "  Metadata Cache: \(metadataCache.countLimit > 0 ? "\(metadataCache.countLimit) max items" : "unlimited")\n"
+		
+		// Cache stats
+		info += "\n  Cache Statistics:\n"
+		info += "    Image hits: \(stats.imageHits), misses: \(stats.imageMisses) (hit rate: \(String(format: "%.1f%%", stats.imageHitRate * 100)))\n"
+		info += "    Thumbnail hits: \(stats.thumbnailHits), misses: \(stats.thumbnailMisses) (hit rate: \(String(format: "%.1f%%", stats.thumbnailHitRate * 100)))\n"
+		info += "    Disk reads: \(stats.diskReads), writes: \(stats.diskWrites)\n"
+		info += "    Average load time: \(String(format: "%.3f", stats.averageLoadTime))s\n"
+		
+		return info
 	}
 
 	// MARK: - Cache Statistics
@@ -1032,7 +1092,7 @@ class PhotoManager {
 			)
 		} catch {
 			// Photo not in S3 or error - no archive info
-			print("[PhotoManager] No archive info for \(photo.filename): \(error)")
+			print("[PhotoManager] No archive info for \(photo.displayName): \(error)")
 		}
 	}
 	
@@ -1045,7 +1105,7 @@ class PhotoManager {
 					do {
 						try await self?.loadArchiveStatus(for: photo, s3Service: s3Service, userId: userId)
 					} catch {
-						print("[PhotoManager] Failed to load archive status for \(photo.filename): \(error)")
+						print("[PhotoManager] Failed to load archive status for \(photo.displayName): \(error)")
 					}
 				}
 			}

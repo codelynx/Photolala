@@ -60,7 +60,7 @@ class PhotoFile: Identifiable, Hashable {
 		guard self.fileCreationDate == nil else { return }
 
 		let startTime = Date()
-		print("[PhotoFile] Loading file date for: \(self.filename)")
+		print("[PhotoFile] Loading file date for: \(self.displayName)")
 
 		do {
 			let attributes = try FileManager.default.attributesOfItem(atPath: self.filePath)
@@ -70,12 +70,12 @@ class PhotoFile: Identifiable, Hashable {
 			let elapsed = Date().timeIntervalSince(startTime)
 			if elapsed > 0.1 {
 				print(
-					"[PhotoFile] Warning: Slow file attribute access for \(self.filename): \(String(format: "%.3f", elapsed))s"
+					"[PhotoFile] Warning: Slow file attribute access for \(self.displayName): \(String(format: "%.3f", elapsed))s"
 				)
 			}
 		} catch {
 			// Silently fail, will use current date as fallback
-			print("[PhotoFile] Failed to get file date for \(self.filename): \(error)")
+			print("[PhotoFile] Failed to get file date for \(self.displayName): \(error)")
 		}
 	}
 

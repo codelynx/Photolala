@@ -260,10 +260,42 @@ actor S3CatalogGenerator {
 			return nil
 		}
 		
-		// Decode plist
+		// Decode plist - try PhotoMetadata first (actual format)
 		do {
-			let metadata = try PropertyListDecoder().decode(PhotoMetadataInfo.self, from: data)
-			return metadata
+			let photoMetadata = try PropertyListDecoder().decode(PhotoMetadata.self, from: data)
+			
+			// Extract filename from key (format: metadata/{userId}/{md5}.plist)
+			let components = key.split(separator: "/")
+			let filename = components.last?.replacingOccurrences(of: ".plist", with: "") ?? "unknown"
+			
+			// Convert PhotoMetadata to PhotoMetadataInfo
+			// Create location if GPS data exists
+			var location: PhotoMetadataInfo.LocationInfo? = nil
+			if let lat = photoMetadata.gpsLatitude, let lon = photoMetadata.gpsLongitude {
+				location = PhotoMetadataInfo.LocationInfo(
+					latitude: lat,
+					longitude: lon,
+					altitude: nil
+				)
+			}
+			
+			return PhotoMetadataInfo(
+				fileName: filename,
+				fileSize: photoMetadata.fileSize,
+				photoDate: photoMetadata.dateTaken,
+				modificationDate: photoMetadata.fileModificationDate,
+				pixelWidth: photoMetadata.pixelWidth,
+				pixelHeight: photoMetadata.pixelHeight,
+				cameraMake: photoMetadata.cameraMake,
+				cameraModel: photoMetadata.cameraModel,
+				lensMake: nil,  // Not in PhotoMetadata
+				lensModel: nil,  // Not in PhotoMetadata
+				focalLength: nil,  // Not in PhotoMetadata
+				aperture: nil,
+				shutterSpeed: nil,
+				iso: nil,
+				location: location
+			)
 		} catch {
 			print("Failed to decode metadata: \(error)")
 			return nil

@@ -474,7 +474,7 @@ class PhotoCollectionViewController: XViewController {
 		let photo = self.photoGroups[indexPath.section].photos[indexPath.item]
 		let photoURL = photo.fileURL
 
-		print("[PhotoCollectionViewController] handleNavigation called for: \(photo.filename)")
+		print("[PhotoCollectionViewController] handleNavigation called for: \(photo.displayName)")
 
 		// Check if it's a directory
 		var isDirectory: ObjCBool = false
@@ -502,7 +502,7 @@ class PhotoCollectionViewController: XViewController {
 		guard let archiveInfo = photo.archiveInfo,
 		      !archiveInfo.storageClass.isImmediatelyAccessible else { return }
 		
-		print("[PhotoCollectionViewController] Showing retrieval dialog for archived photo: \(photo.filename)")
+		print("[PhotoCollectionViewController] Showing retrieval dialog for archived photo: \(photo.displayName)")
 		
 		// Call the handler to show retrieval dialog
 		onArchivedPhotoClick?(photo)
@@ -1708,7 +1708,7 @@ struct PhotoCollectionView: XViewControllerRepresentable {
 			if photos.count == 1 {
 				// Single photo selected - show preview
 				let photo = photos[0]
-				print("[PhotoCollectionViewController] Creating header for photo: \(photo.filename)")
+				print("[PhotoCollectionViewController] Creating header for photo: \(photo.displayName)")
 
 				// Create header view with preview and metadata
 				let headerItem = NSMenuItem()

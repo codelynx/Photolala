@@ -102,6 +102,64 @@ class S3BackupManager: ObservableObject {
 
 		print("Successfully uploaded: \(photoRef.filename)")
 	}
+	
+	func deletePhoto(_ photoRef: PhotoFile) async throws {
+		// Check authentication
+		guard let userId else {
+			throw S3BackupError.notSignedIn
+		}
+		
+		guard let s3Service else {
+			throw S3BackupError.serviceNotConfigured
+		}
+		
+		// Get MD5 hash
+		guard let md5 = photoRef.md5Hash else {
+			// Need to compute MD5 if not available
+			guard let data = try? Data(contentsOf: photoRef.fileURL) else {
+				throw S3BackupError.uploadFailed
+			}
+			let computedMd5 = data.md5Digest.hexadecimalString
+			try await s3Service.deletePhoto(md5: computedMd5, userId: userId)
+			return
+		}
+		
+		// Delete from S3
+		try await s3Service.deletePhoto(md5: md5, userId: userId)
+		print("Successfully deleted from S3: \(photoRef.filename)")
+	}
+	
+	func deletePhotos(_ photoRefs: [PhotoFile]) async throws {
+		// Check authentication
+		guard let userId else {
+			throw S3BackupError.notSignedIn
+		}
+		
+		guard let s3Service else {
+			throw S3BackupError.serviceNotConfigured
+		}
+		
+		// Collect MD5 hashes
+		var md5Hashes: [String] = []
+		
+		for photo in photoRefs {
+			if let md5 = photo.md5Hash {
+				md5Hashes.append(md5)
+			} else {
+				// Compute MD5 if not available
+				if let data = try? Data(contentsOf: photo.fileURL) {
+					let computedMd5 = data.md5Digest.hexadecimalString
+					md5Hashes.append(computedMd5)
+				}
+			}
+		}
+		
+		// Batch delete from S3
+		if !md5Hashes.isEmpty {
+			try await s3Service.deletePhotos(md5Hashes: md5Hashes, userId: userId)
+			print("Successfully deleted \(md5Hashes.count) photos from S3")
+		}
+	}
 
 	func uploadPhotos(_ photos: [PhotoFile]) async throws {
 		let total = photos.count

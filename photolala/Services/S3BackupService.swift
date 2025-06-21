@@ -336,6 +336,92 @@ class S3BackupService: ObservableObject {
 		self.backupStats.metadataSize += Int64(plistData.count)
 	}
 	
+	// MARK: - Delete Photo
+	
+	func deletePhoto(md5: String, userId: String) async throws {
+		// Delete photo
+		let photoKey = "photos/\(userId)/\(md5).dat"
+		do {
+			_ = try await client.deleteObject(input: DeleteObjectInput(
+				bucket: bucketName,
+				key: photoKey
+			))
+			print("Deleted photo: \(md5)")
+		} catch {
+			print("Failed to delete photo \(md5): \(error)")
+			throw S3BackupError.uploadFailed // Use existing error for now
+		}
+		
+		// Delete thumbnail
+		let thumbnailKey = "thumbnails/\(userId)/\(md5).dat"
+		do {
+			_ = try await client.deleteObject(input: DeleteObjectInput(
+				bucket: bucketName,
+				key: thumbnailKey
+			))
+			print("Deleted thumbnail: \(md5)")
+		} catch {
+			// Thumbnail might not exist, ignore error
+			print("Failed to delete thumbnail \(md5): \(error)")
+		}
+		
+		// Delete metadata
+		let metadataKey = "metadata/\(userId)/\(md5).plist"
+		do {
+			_ = try await client.deleteObject(input: DeleteObjectInput(
+				bucket: bucketName,
+				key: metadataKey
+			))
+			print("Deleted metadata: \(md5)")
+		} catch {
+			// Metadata might not exist, ignore error
+			print("Failed to delete metadata \(md5): \(error)")
+		}
+	}
+	
+	func deletePhotos(md5Hashes: [String], userId: String) async throws {
+		// AWS S3 supports batch delete up to 1000 objects at once
+		let maxBatchSize = 1000
+		
+		// Process in batches
+		for startIndex in stride(from: 0, to: md5Hashes.count, by: maxBatchSize) {
+			let endIndex = min(startIndex + maxBatchSize, md5Hashes.count)
+			let batch = Array(md5Hashes[startIndex..<endIndex])
+			
+			// Build delete objects for this batch
+			var deleteObjects: [S3ClientTypes.ObjectIdentifier] = []
+			
+			for md5 in batch {
+				// Add photo, thumbnail, and metadata keys
+				deleteObjects.append(S3ClientTypes.ObjectIdentifier(key: "photos/\(userId)/\(md5).dat"))
+				deleteObjects.append(S3ClientTypes.ObjectIdentifier(key: "thumbnails/\(userId)/\(md5).dat"))
+				deleteObjects.append(S3ClientTypes.ObjectIdentifier(key: "metadata/\(userId)/\(md5).plist"))
+			}
+			
+			// Perform batch delete
+			let deleteInput = DeleteObjectsInput(
+				bucket: bucketName,
+				delete: S3ClientTypes.Delete(objects: deleteObjects)
+			)
+			
+			do {
+				let result = try await client.deleteObjects(input: deleteInput)
+				if let deleted = result.deleted {
+					print("Batch deleted \(deleted.count) objects")
+				}
+				if let errors = result.errors, !errors.isEmpty {
+					print("Batch delete had \(errors.count) errors")
+					for error in errors {
+						print("  Error deleting \(error.key ?? "unknown"): \(error.message ?? "unknown error")")
+					}
+				}
+			} catch {
+				print("Failed to batch delete: \(error)")
+				throw S3BackupError.uploadFailed
+			}
+		}
+	}
+	
 	// MARK: - Download Metadata
 	
 	func downloadMetadata(md5: String, userId: String) async throws -> PhotoMetadata? {

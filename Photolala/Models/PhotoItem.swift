@@ -56,7 +56,17 @@ struct PhotoContextMenuItem {
 
 // MARK: - PhotoFile conformance
 extension PhotoFile: PhotoItem {
-	var displayName: String { filename }
+	var displayName: String {
+		if let md5 = md5Hash {
+			// Show last 5 characters of MD5 hash
+			let suffix = String(md5.suffix(5))
+			return "#\(suffix)"
+		} else if !filename.isEmpty {
+			return filename
+		} else {
+			return "???"
+		}
+	}
 	
 	var fileSize: Int64? {
 		// Get from file system or metadata

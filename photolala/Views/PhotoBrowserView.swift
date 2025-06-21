@@ -200,7 +200,7 @@ struct PhotoBrowserView: View {
 							.frame(maxWidth: 300)
 							.padding(.horizontal)
 							.padding(.vertical, 8)
-							.background(Color(NSColor.controlBackgroundColor))
+							.background(Color(XPlatform.primaryBackgroundColor))
 							.cornerRadius(8)
 							.shadow(radius: 2)
 						}
@@ -484,7 +484,7 @@ struct PhotoBrowserView: View {
 	}
 
 	private func handlePhotoSelection(_ photo: PhotoFile, _ allPhotos: [PhotoFile]) {
-		print("[PhotoBrowserView] handlePhotoSelection called for: \(photo.filename)")
+		print("[PhotoBrowserView] handlePhotoSelection called for: \(photo.displayName)")
 
 		// Store all photos for space key navigation
 		self.allPhotos = allPhotos

@@ -195,7 +195,8 @@ class PriorityThumbnailLoader: ObservableObject {
 
 extension PriorityThumbnailLoader {
 	/// Calculate visible indices from NSCollectionView visible rect
-	func visibleIndices(for collectionView: NSCollectionView, itemCount: Int) -> Range<Int> {
+	func visibleIndices(for collectionView: XCollectionView, itemCount: Int) -> Range<Int> {
+		#if os(macOS)
 		let visibleRect = collectionView.visibleRect
 		guard let layout = collectionView.collectionViewLayout as? NSCollectionViewFlowLayout else {
 			return 0..<min(50, itemCount)
@@ -218,5 +219,14 @@ extension PriorityThumbnailLoader {
 		let lastIndex = min((lastVisibleRow + 1) * itemsPerRow, itemCount)
 		
 		return firstIndex..<lastIndex
+		#else
+		// iOS implementation
+		let indexPaths = collectionView.indexPathsForVisibleItems
+		let indices = indexPaths.map { $0.item }.sorted()
+		if let first = indices.first, let last = indices.last {
+			return first..<(last + 1)
+		}
+		return 0..<min(50, itemCount)
+		#endif
 	}
 }

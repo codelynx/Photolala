@@ -88,6 +88,26 @@ struct PhotolalaCommands: Commands {
 						self.showIAPDeveloper()
 					#endif
 				}
+				
+				Divider()
+				
+				Button("Log Cache Contents") {
+					self.logCacheContents()
+				}
+				
+				Divider()
+				
+				Button("Clear All Caches") {
+					self.clearAllCaches()
+				}
+				
+				Button("Clear Local Caches") {
+					self.clearLocalCaches()
+				}
+				
+				Button("Clear Cloud Caches") {
+					self.clearCloudCaches()
+				}
 			}
 			#endif
 		}
@@ -272,6 +292,190 @@ struct PhotolalaCommands: Commands {
 			// On iOS, we need to present it differently
 			NotificationCenter.default.post(name: .showHelp, object: nil)
 		#endif
+	}
+	
+	// MARK: - Cache Management
+	
+	private func clearAllCaches() {
+		// Clear local
+		PhotoManager.shared.clearAllCaches()
+		PhotoManager.shared.clearDiskCache()
+		self.clearCatalogCache()
+		
+		// Clear cloud
+		self.clearCloudCacheDirectory()
+		
+		print("[Cache] All caches cleared")
+		self.showCacheClearedAlert(message: "All caches have been cleared")
+	}
+	
+	private func clearLocalCaches() {
+		PhotoManager.shared.clearAllCaches()
+		PhotoManager.shared.clearDiskCache()
+		self.clearCatalogCache()
+		
+		print("[Cache] Local caches cleared")
+		self.showCacheClearedAlert(message: "Local caches have been cleared")
+	}
+	
+	private func clearCloudCaches() {
+		self.clearCloudCacheDirectory()
+		
+		print("[Cache] Cloud caches cleared")
+		self.showCacheClearedAlert(message: "Cloud caches have been cleared")
+	}
+	
+	private func clearCloudCacheDirectory() {
+		let cacheURL = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first!
+			.appendingPathComponent("com.electricwoods.photolala")
+			.appendingPathComponent("cloud.s3")
+		
+		do {
+			if FileManager.default.fileExists(atPath: cacheURL.path) {
+				try FileManager.default.removeItem(at: cacheURL)
+				print("[PhotolalaCommands] Cleared cloud cache at: \(cacheURL.path)")
+			}
+		} catch {
+			print("[PhotolalaCommands] Failed to clear cloud cache: \(error)")
+		}
+	}
+	
+	private func clearCatalogCache() {
+		// Clear .photolala directories in Library/Caches/Photolala
+		let cacheURL = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first!
+			.appendingPathComponent("Photolala")
+		
+		do {
+			let contents = try FileManager.default.contentsOfDirectory(at: cacheURL, includingPropertiesForKeys: nil)
+			for item in contents {
+				if item.lastPathComponent == ".photolala" {
+					try FileManager.default.removeItem(at: item)
+					print("[PhotolalaCommands] Removed catalog cache: \(item.path)")
+				}
+			}
+		} catch {
+			print("[PhotolalaCommands] Failed to clear catalog cache: \(error)")
+		}
+	}
+	
+	private func showCacheClearedAlert(message: String) {
+		#if os(macOS)
+		DispatchQueue.main.async {
+			let alert = NSAlert()
+			alert.messageText = "Cache Cleared"
+			alert.informativeText = message
+			alert.alertStyle = .informational
+			alert.addButton(withTitle: "OK")
+			alert.runModal()
+		}
+		#endif
+	}
+	
+	private func logCacheContents() {
+		print("\n=== CACHE CONTENTS ===\n")
+		
+		// Memory Cache Info
+		print("📱 MEMORY CACHES:")
+		print(PhotoManager.shared.getCacheInfo())
+		
+		// Disk Thumbnail Cache
+		print("\n💾 DISK THUMBNAIL CACHE:")
+		let thumbnailPath = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first!
+			.appendingPathComponent("Photolala")
+			.appendingPathComponent("Thumbnails")
+		self.logDirectoryContents(at: thumbnailPath, prefix: "  ")
+		
+		// Local Catalog Cache
+		print("\n📁 LOCAL CATALOG CACHE:")
+		let catalogPath = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first!
+			.appendingPathComponent("Photolala")
+		self.logCatalogContents(at: catalogPath, prefix: "  ")
+		
+		// Cloud S3 Cache
+		print("\n☁️ CLOUD S3 CACHE:")
+		let cloudPath = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first!
+			.appendingPathComponent("com.electricwoods.photolala")
+			.appendingPathComponent("cloud.s3")
+		self.logDirectoryContents(at: cloudPath, prefix: "  ", showSize: true)
+		
+		print("\n=== END CACHE CONTENTS ===\n")
+	}
+	
+	private func logDirectoryContents(at url: URL, prefix: String = "", showSize: Bool = false) {
+		do {
+			if !FileManager.default.fileExists(atPath: url.path) {
+				print("\(prefix)Directory does not exist")
+				return
+			}
+			
+			let contents = try FileManager.default.contentsOfDirectory(at: url, 
+				includingPropertiesForKeys: showSize ? [.fileSizeKey, .isDirectoryKey] : [.isDirectoryKey], 
+				options: [.skipsHiddenFiles])
+			
+			if contents.isEmpty {
+				print("\(prefix)Empty")
+				return
+			}
+			
+			var totalSize: Int64 = 0
+			var fileCount = 0
+			var dirCount = 0
+			
+			for item in contents.sorted(by: { $0.lastPathComponent < $1.lastPathComponent }) {
+				let values = try item.resourceValues(forKeys: [.isDirectoryKey, .fileSizeKey])
+				
+				if values.isDirectory == true {
+					dirCount += 1
+					print("\(prefix)📁 \(item.lastPathComponent)/")
+				} else {
+					fileCount += 1
+					if showSize, let size = values.fileSize {
+						totalSize += Int64(size)
+						let sizeStr = ByteCountFormatter.string(fromByteCount: Int64(size), countStyle: .file)
+						print("\(prefix)📄 \(item.lastPathComponent) (\(sizeStr))")
+					} else {
+						print("\(prefix)📄 \(item.lastPathComponent)")
+					}
+				}
+			}
+			
+			print("\(prefix)Total: \(fileCount) files, \(dirCount) directories", terminator: "")
+			if showSize && totalSize > 0 {
+				let totalSizeStr = ByteCountFormatter.string(fromByteCount: totalSize, countStyle: .file)
+				print(" (\(totalSizeStr))")
+			} else {
+				print()
+			}
+			
+		} catch {
+			print("\(prefix)Error reading directory: \(error.localizedDescription)")
+		}
+	}
+	
+	private func logCatalogContents(at url: URL, prefix: String = "") {
+		do {
+			let contents = try FileManager.default.contentsOfDirectory(at: url, includingPropertiesForKeys: nil)
+			var catalogCount = 0
+			
+			for item in contents where item.lastPathComponent == ".photolala" {
+				catalogCount += 1
+				print("\(prefix)📁 \(item.deletingLastPathComponent().lastPathComponent)/.photolala")
+				
+				// Count files in catalog
+				if let catalogContents = try? FileManager.default.contentsOfDirectory(at: item, includingPropertiesForKeys: nil) {
+					print("\(prefix)  └─ \(catalogContents.count) files")
+				}
+			}
+			
+			if catalogCount == 0 {
+				print("\(prefix)No catalog directories found")
+			} else {
+				print("\(prefix)Total: \(catalogCount) catalogs")
+			}
+			
+		} catch {
+			print("\(prefix)Error reading directory: \(error.localizedDescription)")
+		}
 	}
 	
 }

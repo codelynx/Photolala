@@ -74,6 +74,7 @@ actor PhotolalaCatalogService {
 			
 			// Parse filename (handle quoted values)
 			let filename: String
+			let currentIndex = scanner.currentIndex
 			if scanner.scanCharacter() == "\"" {
 				// Quoted filename - scan until closing quote
 				var quotedValue = ""
@@ -94,7 +95,8 @@ actor PhotolalaCatalogService {
 				}
 				filename = quotedValue
 			} else {
-				// Unquoted filename
+				// Unquoted filename - need to backtrack since we consumed a character
+				scanner.currentIndex = currentIndex
 				guard let value = scanner.scanUpToCharacters(from: CharacterSet(charactersIn: ",")) else { return nil }
 				filename = value
 				_ = scanner.scanCharacter() // consume comma

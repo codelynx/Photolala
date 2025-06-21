@@ -126,7 +126,7 @@ class EnhancedLocalPhotoProvider: ObservableObject, PhotoProvider {
 	}
 	
 	/// Update visible range from collection view
-	func updateVisibleRange(for collectionView: NSCollectionView) {
+	func updateVisibleRange(for collectionView: XCollectionView) {
 		let photoFiles = photos.compactMap { $0 as? PhotoFile }
 		let visibleIndices = priorityLoader.visibleIndices(for: collectionView, itemCount: photoFiles.count)
 		priorityLoader.updateVisibleRange(photoFiles, visibleIndices: visibleIndices)
@@ -186,6 +186,7 @@ class EnhancedLocalPhotoProvider: ObservableObject, PhotoProvider {
 // MARK: - Collection View Scroll Monitoring
 
 extension EnhancedLocalPhotoProvider {
+	#if os(macOS)
 	/// Monitor scroll events to optimize loading
 	func setupScrollMonitoring(for scrollView: NSScrollView) {
 		NotificationCenter.default.publisher(for: NSScrollView.didLiveScrollNotification, object: scrollView)
@@ -203,4 +204,5 @@ extension EnhancedLocalPhotoProvider {
 			}
 			.store(in: &cancellables)
 	}
+	#endif
 }

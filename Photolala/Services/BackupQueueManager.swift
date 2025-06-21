@@ -20,6 +20,9 @@ class BackupQueueManager: ObservableObject {
 	
 	// Path to MD5 mapping for persistence
 	private var pathToMD5: [String: String] = [:] // filepath -> MD5
+	
+	// Photos to delete from S3 (batched)
+	private var photosToDelete: Set<PhotoFile> = []
 
 	// Activity timer
 	private var inactivityTimer: Timer?
@@ -39,24 +42,44 @@ class BackupQueueManager: ObservableObject {
 	// MARK: - Queue Management
 
 	func toggleStar(for photo: PhotoFile) {
-		// Check current backup status
-		let currentStatus = photo.md5Hash != nil ? backupStatus[photo.md5Hash!] : nil
-		
-		if currentStatus == .queued || currentStatus == .uploaded {
-			// Remove from backup (both queued and uploaded states)
-			removeFromQueue(photo)
+		// Check if photo is in delete queue
+		if photosToDelete.contains(photo) {
+			// Remove from delete queue (cancel deletion)
+			photosToDelete.remove(photo)
 			if let md5 = photo.md5Hash {
-				backupStatus[md5] = .none
+				backupStatus[md5] = .uploaded
 			}
+			print("[BackupQueueManager] Cancelled deletion for: \(photo.displayName)")
 		} else {
-			// Add to backup queue
-			addToQueue(photo)
+			// Check current backup status
+			let currentStatus = photo.md5Hash != nil ? backupStatus[photo.md5Hash!] : nil
+			
+			if currentStatus == .queued || currentStatus == .uploaded {
+				// Remove from backup queue if queued
+				removeFromQueue(photo)
+				
+				// Mark as none (treat as deleted immediately in UI)
+				if let md5 = photo.md5Hash {
+					backupStatus[md5] = .none
+				}
+				
+				// If photo was uploaded, add to delete queue
+				if currentStatus == .uploaded {
+					photosToDelete.insert(photo)
+					print("[BackupQueueManager] Added photo to delete queue: \(photo.displayName)")
+				}
+			} else {
+				// Add to backup queue
+				addToQueue(photo)
+			}
 		}
+		
+		saveQueueState()
 		resetInactivityTimer()
 	}
 
 	func addToQueue(_ photo: PhotoFile) {
-		print("[BackupQueueManager] Adding to queue: \(photo.filename)")
+		print("[BackupQueueManager] Adding to queue: \(photo.displayName)")
 		queuedPhotos.insert(photo)
 		// Ensure MD5 hash is computed
 		if photo.md5Hash == nil {
@@ -84,7 +107,7 @@ class BackupQueueManager: ObservableObject {
 	}
 
 	func removeFromQueue(_ photo: PhotoFile) {
-		print("[BackupQueueManager] Removing from queue: \(photo.filename)")
+		print("[BackupQueueManager] Removing from queue: \(photo.displayName)")
 		queuedPhotos.remove(photo)
 		if let md5 = photo.md5Hash, backupStatus[md5] == .queued {
 			print("[BackupQueueManager] Removing MD5 from status: \(md5)")
@@ -101,8 +124,17 @@ class BackupQueueManager: ObservableObject {
 	}
 
 	func backupState(for photo: PhotoFile) -> BackupState {
+		// If photo is in delete queue, treat as none (deleted)
+		if photosToDelete.contains(photo) {
+			return BackupState.none
+		}
+		
 		guard let md5 = photo.md5Hash else { return BackupState.none }
 		return backupStatus[md5] ?? BackupState.none
+	}
+	
+	func isPendingDeletion(_ photo: PhotoFile) -> Bool {
+		return photosToDelete.contains(photo)
 	}
 
 	// MARK: - Timer Management
@@ -110,7 +142,8 @@ class BackupQueueManager: ObservableObject {
 	private func resetInactivityTimer() {
 		inactivityTimer?.invalidate()
 
-		guard !queuedPhotos.isEmpty else { return }
+		// Start timer if we have photos to upload or delete
+		guard !queuedPhotos.isEmpty || !photosToDelete.isEmpty else { return }
 
 		inactivityTimer = Timer.scheduledTimer(
 			withTimeInterval: inactivityInterval,
@@ -134,6 +167,12 @@ class BackupQueueManager: ObservableObject {
 	}
 
 	private func performBackup() async {
+		// Handle deletions first
+		if !photosToDelete.isEmpty {
+			await performDeletions()
+		}
+		
+		// Then handle uploads
 		guard !queuedPhotos.isEmpty else { return }
 		guard !isUploading else { return }
 
@@ -154,7 +193,7 @@ class BackupQueueManager: ObservableObject {
 			}
 			BackupStatusManager.shared.updateProgress(
 				uploadedPhotos: index,
-				currentPhotoName: photo.filename
+				currentPhotoName: photo.displayName
 			)
 
 			// Perform upload
@@ -167,7 +206,7 @@ class BackupQueueManager: ObservableObject {
 				successCount += 1
 				NotificationCenter.default.post(name: NSNotification.Name("BackupQueueChanged"), object: nil)
 			} catch {
-				print("Failed to upload \(photo.filename): \(error)")
+				print("Failed to upload \(photo.displayName): \(error)")
 				if let md5 = photo.md5Hash {
 					backupStatus[md5] = .failed
 					NotificationCenter.default.post(name: NSNotification.Name("BackupQueueChanged"), object: nil)
@@ -188,8 +227,8 @@ class BackupQueueManager: ObservableObject {
 		BackupStatusManager.shared.completeUpload()
 		saveQueueState()
 
-		// Reset timer if there are still queued photos
-		if !queuedPhotos.isEmpty {
+		// Reset timer if there are still queued photos or deletions
+		if !queuedPhotos.isEmpty || !photosToDelete.isEmpty {
 			resetInactivityTimer()
 		}
 	}
@@ -197,7 +236,32 @@ class BackupQueueManager: ObservableObject {
 	private func uploadPhoto(_ photo: PhotoFile) async throws {
 		// S3BackupManager will check authentication internally
 		try await S3BackupManager.shared.uploadPhoto(photo)
-		print("Successfully uploaded \(photo.filename)")
+		print("Successfully uploaded \(photo.displayName)")
+	}
+	
+	private func performDeletions() async {
+		guard !photosToDelete.isEmpty else { return }
+		
+		print("[BackupQueueManager] Processing \(photosToDelete.count) deletions")
+		
+		let photosToDeleteArray = Array(photosToDelete)
+		
+		do {
+			// Use batch delete for efficiency
+			try await S3BackupManager.shared.deletePhotos(photosToDeleteArray)
+			
+			// Clear all photos from delete queue on success
+			photosToDelete.removeAll()
+			print("[BackupQueueManager] Successfully deleted \(photosToDeleteArray.count) photos from S3")
+			
+			// Regenerate catalog after deletions
+			await generateCatalog()
+		} catch {
+			print("[BackupQueueManager] Failed to batch delete from S3: \(error)")
+			// Keep all photos in delete queue to retry later
+		}
+		
+		saveQueueState()
 	}
 
 	private func generateCatalog() async {
@@ -229,12 +293,17 @@ class BackupQueueManager: ObservableObject {
 				pathToMD5[photo.filePath] = md5String
 			}
 		} catch {
-			print("Failed to compute MD5 for \(photo.filename): \(error)")
+			print("Failed to compute MD5 for \(photo.displayName): \(error)")
 		}
 	}
 	
 	// Public method to get backup status, computing MD5 if needed
 	func getBackupStatus(for photo: PhotoFile) async -> BackupState? {
+		// If photo is in delete queue, treat as none (deleted)
+		if photosToDelete.contains(photo) {
+			return .none
+		}
+		
 		// If MD5 already computed, return status immediately
 		if let md5 = photo.md5Hash {
 			return backupStatus[md5]
@@ -243,7 +312,11 @@ class BackupQueueManager: ObservableObject {
 		// Otherwise compute MD5 first
 		await computeMD5(for: photo)
 		
-		// Now check status
+		// Now check status (and check delete queue again after compute)
+		if photosToDelete.contains(photo) {
+			return .none
+		}
+		
 		if let md5 = photo.md5Hash {
 			return backupStatus[md5]
 		}
@@ -252,20 +325,47 @@ class BackupQueueManager: ObservableObject {
 	}
 	
 	// Match loaded photos with restored backup status
-	func matchPhotosWithBackupStatus(_ photos: [PhotoFile]) async {
+	func matchPhotosWithBackupStatus(_ photos: [PhotoFile], deleteMD5s: [String]? = nil) async {
 		print("[BackupQueueManager] Matching \(photos.count) photos with backup status")
 		print("[BackupQueueManager] Current backup status contains \(backupStatus.count) entries")
 		print("[BackupQueueManager] Path to MD5 mapping contains \(pathToMD5.count) entries")
+		print("[BackupQueueManager] Photos to delete contains \(photosToDelete.count) entries")
+		if let deleteMD5s = deleteMD5s {
+			print("[BackupQueueManager] Delete MD5s to restore: \(deleteMD5s.count)")
+		}
 		
 		var matchedCount = 0
 		var computedCount = 0
+		var restoredFromPath = 0
 		
 		for photo in photos {
 			// First check if we have a saved MD5 for this path
 			if let savedMD5 = pathToMD5[photo.filePath] {
 				photo.md5Hash = savedMD5
+				restoredFromPath += 1
+				
 				if let status = backupStatus[savedMD5] {
-					print("[BackupQueueManager] Restored from path mapping: \(photo.filename) -> \(status)")
+					print("[BackupQueueManager] Restored from path mapping: \(photo.displayName) -> \(status)")
+					matchedCount += 1
+					
+					// If it was queued, add back to queue
+					if status == .queued {
+						await MainActor.run {
+							queuedPhotos.insert(photo)
+						}
+					}
+				} else {
+					// We have MD5 from path but no backup status - this is expected for photos not starred
+					print("[BackupQueueManager] MD5 from path mapping but no backup status: \(photo.displayName)")
+				}
+				continue
+			}
+			
+			// Skip if already has MD5
+			if photo.md5Hash != nil { 
+				// Check if this already-computed photo has backup status
+				if let status = backupStatus[photo.md5Hash!] {
+					print("[BackupQueueManager] Already has MD5: \(photo.displayName) -> \(status)")
 					matchedCount += 1
 					
 					// If it was queued, add back to queue
@@ -275,16 +375,8 @@ class BackupQueueManager: ObservableObject {
 						}
 					}
 				}
-				continue
-			}
-			
-			// Skip if already has MD5
-			if photo.md5Hash != nil { 
-				// Check if this already-computed photo has backup status
-				if let status = backupStatus[photo.md5Hash!] {
-					print("[BackupQueueManager] Already has MD5: \(photo.filename) -> \(status)")
-					matchedCount += 1
-				}
+				// Also store in path mapping for future use
+				pathToMD5[photo.filePath] = photo.md5Hash!
 				continue 
 			}
 			
@@ -293,20 +385,41 @@ class BackupQueueManager: ObservableObject {
 			computedCount += 1
 			
 			// Check if this photo has backup status
-			if let md5 = photo.md5Hash, let status = backupStatus[md5] {
-				print("[BackupQueueManager] Matched \(photo.filename) (MD5: \(md5)) -> \(status)")
-				matchedCount += 1
+			if let md5 = photo.md5Hash {
+				// Always store in path mapping for future use
+				pathToMD5[photo.filePath] = md5
 				
-				// If it was queued, add back to queue
-				if status == .queued {
-					await MainActor.run {
-						queuedPhotos.insert(photo)
+				if let status = backupStatus[md5] {
+					print("[BackupQueueManager] Matched \(photo.displayName) (MD5: \(md5)) -> \(status)")
+					matchedCount += 1
+					
+					// If it was queued, add back to queue
+					if status == .queued {
+						await MainActor.run {
+							queuedPhotos.insert(photo)
+						}
 					}
 				}
 			}
 		}
 		
-		print("[BackupQueueManager] Matching complete: computed \(computedCount) MD5s, matched \(matchedCount) photos")
+		// Restore photos to delete queue if MD5s were provided
+		if let deleteMD5s = deleteMD5s, !deleteMD5s.isEmpty {
+			let deleteMD5Set = Set(deleteMD5s)
+			for photo in photos {
+				if let md5 = photo.md5Hash, deleteMD5Set.contains(md5) {
+					await MainActor.run {
+						photosToDelete.insert(photo)
+					}
+					print("[BackupQueueManager] Restored photo to delete queue: \(photo.displayName)")
+				}
+			}
+		}
+		
+		print("[BackupQueueManager] Matching complete: computed \(computedCount) MD5s, restored \(restoredFromPath) from path mapping, matched \(matchedCount) photos with backup status")
+		
+		// Save the updated path mappings
+		saveQueueState()
 		
 		// Notify UI to refresh
 		await MainActor.run {
@@ -321,12 +434,13 @@ class BackupQueueManager: ObservableObject {
 			queuedPhotos: queuedPhotos.compactMap { $0.md5Hash },
 			backupStatus: backupStatus,
 			lastActivityTime: Date(),
-			pathToMD5: pathToMD5
+			pathToMD5: pathToMD5,
+			photosToDelete: photosToDelete.compactMap { $0.md5Hash }
 		)
 
 		if let encoded = try? JSONEncoder().encode(state) {
 			UserDefaults.standard.set(encoded, forKey: queueStateKey)
-			print("[BackupQueueManager] Saved queue state with \(backupStatus.count) backup statuses and \(pathToMD5.count) path mappings")
+			print("[BackupQueueManager] Saved queue state with \(backupStatus.count) backup statuses, \(pathToMD5.count) path mappings, and \(photosToDelete.count) pending deletions")
 			// Log first few entries for debugging
 			for (index, (md5, status)) in backupStatus.enumerated().prefix(3) {
 				print("[BackupQueueManager]   \(md5): \(status)")
@@ -359,10 +473,15 @@ class BackupQueueManager: ObservableObject {
 		// cross-reference with PhotoManager
 		
 		// Store MD5s that need matching
+		var allMD5s = Array(backupStatus.keys)
+		if let deleteMD5s = state.photosToDelete {
+			allMD5s.append(contentsOf: deleteMD5s)
+		}
+		
 		NotificationCenter.default.post(
 			name: NSNotification.Name("BackupStatusRestored"), 
 			object: nil,
-			userInfo: ["md5List": Array(backupStatus.keys)]
+			userInfo: ["md5List": allMD5s, "deleteMD5s": state.photosToDelete ?? []]
 		)
 
 		// Calculate time since last activity
@@ -370,13 +489,15 @@ class BackupQueueManager: ObservableObject {
 		let remainingTime = max(0, inactivityInterval - timeSinceActivity)
 
 		// Restart timer if needed
-		if remainingTime > 0 && !state.queuedPhotos.isEmpty {
+		let hasWork = !state.queuedPhotos.isEmpty || (state.photosToDelete?.isEmpty == false)
+		
+		if remainingTime > 0 && hasWork {
 			Timer.scheduledTimer(withTimeInterval: remainingTime, repeats: false) { _ in
 				Task { @MainActor in
 					await self.performAutoBackup()
 				}
 			}
-		} else if !state.queuedPhotos.isEmpty {
+		} else if hasWork {
 			// Timer would have fired, start backup
 			Task {
 				await performAutoBackup()
@@ -392,6 +513,7 @@ private struct QueueState: Codable {
 	let backupStatus: [String: BackupState]
 	let lastActivityTime: Date
 	let pathToMD5: [String: String]? // Optional for backward compatibility
+	let photosToDelete: [String]? // MD5 hashes of photos to delete (optional for backward compatibility)
 }
 
 enum BackupError: LocalizedError {
