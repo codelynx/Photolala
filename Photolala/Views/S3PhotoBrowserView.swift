@@ -9,8 +9,14 @@ struct S3PhotoBrowserView: View {
 	@State private var showingError = false
 	@State private var errorMessage = ""
 	@State private var isRefreshing = false
+	@State private var showingInspector = false
 	@StateObject private var photoProvider: S3PhotoProvider
 	@StateObject private var identityManager = IdentityManager.shared
+	
+	// Computed property to ensure inspector gets PhotoItems
+	private var inspectorSelection: [any PhotoItem] {
+		selectedPhotos.map { $0 as any PhotoItem }
+	}
 	
 	init() {
 		// Initialize with the current user's ID or a placeholder
@@ -143,6 +149,16 @@ struct S3PhotoBrowserView: View {
 						Label("Refresh", systemImage: "arrow.clockwise")
 					}
 					.disabled(isRefreshing)
+					
+					// Inspector button
+					Button(action: {
+						showingInspector.toggle()
+					}) {
+						Label("Inspector", systemImage: "info.circle")
+					}
+					#if os(macOS)
+					.help(showingInspector ? "Hide Inspector" : "Show Inspector")
+					#endif
 				}
 			}
 			.sheet(item: $showingPhotoDetail) { photo in
@@ -157,6 +173,10 @@ struct S3PhotoBrowserView: View {
 		#if os(macOS)
 		.frame(minWidth: 600, maxWidth: .infinity, minHeight: 400, maxHeight: .infinity)
 		#endif
+		.inspector(
+			isPresented: $showingInspector,
+			selection: inspectorSelection
+		)
 	}
 	// MARK: - Actions
 	
