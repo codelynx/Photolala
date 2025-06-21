@@ -210,8 +210,17 @@ struct PhotoBrowserView: View {
 					}
 				}
 			}
-			.toolbar {
+			.photoBrowserToolbar(
+				settings: $settings,
+				showingInspector: $showingInspector,
+				isRefreshing: isRefreshing,
+				onRefresh: {
+					try? await photoProvider.refresh()
+				}
+			) {
 				ToolbarItemGroup(placement: .automatic) {
+					// Local browser-specific items before core items
+					
 					// Backup queue indicator
 					if backupQueueManager.queuedPhotos.count > 0 {
 						Button(action: {
@@ -240,54 +249,10 @@ struct PhotoBrowserView: View {
 						.help("Preview selected photos")
 						#endif
 					}
-					// Display mode toggle
-					Button(action: {
-						self.settings.displayMode = self.settings
-							.displayMode == .scaleToFit ? .scaleToFill : .scaleToFit
-					}) {
-						Image(systemName: self.settings.displayMode == .scaleToFit ? "aspectratio" : "aspectratio.fill")
-					}
-					#if os(macOS)
-					.help(self.settings.displayMode == .scaleToFit ? "Switch to Fill" : "Switch to Fit")
-					#endif
-					
-					// Item info toggle
-					Button(action: {
-						self.settings.showItemInfo.toggle()
-					}) {
-						Image(systemName: "squares.below.rectangle")
-					}
-					#if os(macOS)
-					.help(self.settings.showItemInfo ? "Hide item info" : "Show item info")
-					#endif
-
-					#if os(iOS)
-						// Size menu for iOS
-						Menu {
-							Button("S") {
-								self.settings.thumbnailOption = .small
-							}
-							Button("M") {
-								self.settings.thumbnailOption = .medium
-							}
-							Button("L") {
-								self.settings.thumbnailOption = .large
-							}
-						} label: {
-							Image(systemName: "slider.horizontal.3")
-						}
-					#else
-						// Size picker for macOS
-						Picker("Size", selection: self.$settings.thumbnailOption) {
-							Text("S").tag(ThumbnailOption.small)
-							Text("M").tag(ThumbnailOption.medium)
-							Text("L").tag(ThumbnailOption.large)
-						}
-						.pickerStyle(.segmented)
-						.help("Thumbnail size")
-					#endif
-
-					// Sort picker
+				}
+				
+				// Sort picker - separate toolbar group for placement
+				ToolbarItemGroup(placement: .automatic) {
 					#if os(iOS)
 						Menu {
 							ForEach(PhotoSortOption.allCases, id: \.self) { option in
@@ -408,33 +373,10 @@ struct PhotoBrowserView: View {
 						.frame(width: 120)
 						.help("Group photos by date")
 					#endif
-					
-					// Refresh button
-					Button(action: {
-						Task {
-							isRefreshing = true
-							defer { isRefreshing = false }
-							try? await photoProvider.refresh()
-						}
-					}) {
-						Label("Refresh", systemImage: "arrow.clockwise")
-					}
-					.disabled(isRefreshing)
-					#if os(macOS)
-					.help("Refresh folder contents")
-					#endif
-					
-					// Inspector button
-					Button(action: {
-						showingInspector.toggle()
-					}) {
-						Label("Inspector", systemImage: "info.circle")
-					}
-					#if os(macOS)
-					.help(showingInspector ? "Hide Inspector" : "Show Inspector")
-					#endif
-
-					// S3 Backup button
+				}
+				
+				// S3 Backup button - separate group
+				ToolbarItemGroup(placement: .automatic) {
 					if !self.selectedPhotos.isEmpty && FeatureFlags.isS3BackupEnabled {
 						Button(action: self.backupSelectedPhotos) {
 							Label("Backup", systemImage: "icloud.and.arrow.up")
