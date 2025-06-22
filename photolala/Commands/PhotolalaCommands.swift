@@ -10,6 +10,7 @@ import SwiftUI
 struct PhotolalaCommands: Commands {
 	#if os(macOS)
 	// Keep strong references to windows to prevent them from being deallocated
+	static var applePhotosWindow: NSWindow?
 	static var cloudBrowserWindow: NSWindow?
 	static var cacheStatisticsWindow: NSWindow?
 	static var s3BackupWindow: NSWindow?
@@ -25,10 +26,12 @@ struct PhotolalaCommands: Commands {
 			}
 			.keyboardShortcut("O", modifiers: .command)
 			
-			Button("Browse Cloud Backup") {
-				self.openS3Browser()
+			#if os(macOS)
+			Button("Open Apple Photos Library") {
+				self.openApplePhotosLibrary()
 			}
-			.keyboardShortcut("O", modifiers: [.command, .shift])
+			.keyboardShortcut("L", modifiers: [.command, .shift])
+			#endif
 
 			Divider()
 		}
@@ -128,6 +131,23 @@ struct PhotolalaCommands: Commands {
 		CommandGroup(replacing: .windowSize) {
 			// Custom window commands if needed
 		}
+		
+		// Add special browsers to Window menu
+		#if os(macOS)
+		CommandGroup(before: .windowList) {
+			Button("Apple Photos Library") {
+				self.openApplePhotosLibrary()
+			}
+			.keyboardShortcut("L", modifiers: [.command, .option])
+			
+			Button("Cloud Browser") {
+				self.openS3Browser()
+			}
+			.keyboardShortcut("B", modifiers: [.command, .option])
+			
+			Divider()
+		}
+		#endif
 
 		// Help menu - Add to existing help menu
 		CommandGroup(replacing: .help) {
@@ -157,6 +177,40 @@ struct PhotolalaCommands: Commands {
 					self.openWindow(value: url)
 				}
 			}
+		#endif
+	}
+	
+	private func openApplePhotosLibrary() {
+		#if os(macOS)
+			// Close existing window if open
+			if let existingWindow = Self.applePhotosWindow {
+				existingWindow.close()
+			}
+			
+			// Open new window with Apple Photos Library
+			let window = NSWindow(
+				contentRect: NSRect(x: 0, y: 0, width: 1200, height: 800),
+				styleMask: [.titled, .closable, .resizable, .miniaturizable],
+				backing: .buffered,
+				defer: false
+			)
+			
+			window.title = "Apple Photos Library"
+			window.center()
+			window.contentView = NSHostingView(rootView: ApplePhotosBrowserView())
+			
+			// Set minimum and maximum window sizes
+			window.minSize = NSSize(width: 800, height: 600)
+			// No maximum size - allow unlimited resizing
+			
+			window.makeKeyAndOrderFront(nil)
+			
+			// Keep window in front but not floating
+			window.level = .normal
+			window.isReleasedWhenClosed = false
+			
+			// Store reference to keep window alive
+			Self.applePhotosWindow = window
 		#endif
 	}
 	

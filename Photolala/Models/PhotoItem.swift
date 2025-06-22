@@ -31,6 +31,9 @@ protocol PhotoItem: Identifiable, Hashable {
 	// MD5 hash for deduplication
 	var md5Hash: String? { get }
 	
+	// Source of the photo
+	var source: PhotoSource { get }
+	
 	// Thumbnail support
 	func loadThumbnail() async throws -> XImage?
 	
@@ -45,6 +48,7 @@ protocol PhotoItem: Identifiable, Hashable {
 enum PhotoSource {
 	case file(PhotoFile)
 	case s3(PhotoS3)
+	case applePhotos
 }
 
 /// Context menu item abstraction
@@ -56,6 +60,8 @@ struct PhotoContextMenuItem {
 
 // MARK: - PhotoFile conformance
 extension PhotoFile: PhotoItem {
+	var source: PhotoSource { .file(self) }
+	
 	var displayName: String {
 		if let md5 = md5Hash {
 			// Show last 5 characters of MD5 hash
@@ -132,6 +138,8 @@ extension PhotoFile: PhotoItem {
 
 // MARK: - PhotoS3 conformance
 extension PhotoS3: PhotoItem {
+	var source: PhotoSource { .s3(self) }
+	
 	var displayName: String { filename }
 	
 	var fileSize: Int64? { size }

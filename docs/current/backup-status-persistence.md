@@ -12,7 +12,8 @@ The `BackupQueueManager` singleton manages backup queue and status persistence:
 
 - **backupStatus**: `[String: BackupState]` - Maps MD5 hash to backup state
 - **pathToMD5**: `[String: String]` - Maps file path to MD5 hash for persistence
-- **queuedPhotos**: `Set<PhotoFile>` - Currently queued photos
+- **queuedPhotos**: `Set<PhotoFile>` - Currently queued local photos
+- **queuedApplePhotos**: `Set<String>` - Currently queued Apple Photo IDs
 
 ### Backup States
 
@@ -42,12 +43,39 @@ enum BackupState: String, Codable {
    - Use pathToMD5 to quickly restore MD5 hashes
    - Match photos with their saved backup status
 
+## Apple Photos Support
+
+### Persistence for Apple Photos
+
+Apple Photos are handled differently from local photos:
+
+1. **Queuing**:
+   - Photo ID is stored in `queuedApplePhotos` Set
+   - MD5 hash is computed and stored in `backupStatus`
+   - Both are persisted to UserDefaults
+
+2. **Upload Process**:
+   - PHAsset is fetched by ID when backup timer fires
+   - Image data is loaded from Photos Library
+   - Temporary file is created for S3 upload
+   - After upload, photo ID is removed from queue
+
+3. **Star State**:
+   - Managed by `ApplePhotosBridge` (separate from backup queue)
+   - Stars persist across app sessions
+   - MD5 hashes are cached to avoid recomputation
+
 ## Visual Indicators
 
 ### Local Photos (PhotoFile)
 - ⭐ Yellow star: Queued or uploaded
 - ❗ Red exclamation: Failed upload
 - No icon: Not backed up
+
+### Apple Photos (PhotoApple)
+- Same visual indicators as local photos
+- Star state synced with ApplePhotosBridge
+- Backup status tracked by MD5 hash
 
 ### Cloud Photos (PhotoS3)
 - ☁️ Blue cloud: Always shown (already in cloud)
@@ -82,7 +110,8 @@ Backup state is stored in UserDefaults under the key `"BackupQueueState"` as JSO
   "pathToMD5": {
     "/path/to/photo1.jpg": "md5_hash1",
     "/path/to/photo2.jpg": "md5_hash2"
-  }
+  },
+  "queuedApplePhotos": ["photoID1", "photoID2"]
 }
 ```
 

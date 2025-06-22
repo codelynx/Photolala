@@ -35,6 +35,8 @@ class UnifiedPhotoCell: NSCollectionViewItem {
 	
 	override func loadView() {
 		self.view = NSView(frame: NSRect(x: 0, y: 0, width: 150, height: 150))
+		self.view.wantsLayer = true
+		self.view.layer?.masksToBounds = true
 		
 		// Image view
 		photoImageView = ScalableImageView()
@@ -90,8 +92,7 @@ class UnifiedPhotoCell: NSCollectionViewItem {
 		NSLayoutConstraint.activate([
 			// Image view - centered and constrained size
 			photoImageView.topAnchor.constraint(equalTo: view.topAnchor),
-			photoImageView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
-			photoImageView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+			photoImageView.centerXAnchor.constraint(equalTo: view.centerXAnchor),
 			imageViewWidthConstraint,
 			imageViewHeightConstraint,
 			
@@ -135,8 +136,10 @@ class UnifiedPhotoCell: NSCollectionViewItem {
 		currentPhoto = photo
 		
 		// Update image view constraints based on thumbnail option
-		imageViewWidthConstraint.constant = settings.thumbnailOption.size
-		imageViewHeightConstraint.constant = settings.thumbnailOption.size
+		let imageSize = settings.thumbnailOption.size
+		imageViewWidthConstraint.constant = imageSize
+		// If showing info bar, image height is thumbnail size, otherwise fill the cell
+		imageViewHeightConstraint.constant = settings.showItemInfo ? imageSize : imageSize
 		photoImageView.layer?.cornerRadius = settings.thumbnailOption.cornerRadius
 		
 		// Update info bar visibility based on showItemInfo
@@ -218,32 +221,36 @@ class UnifiedPhotoCell: NSCollectionViewItem {
 	}
 	
 	private func loadThumbnail(for photo: any PhotoItem) {
+		// Skip if we already have this photo's thumbnail loaded
+		if let current = currentPhoto,
+		   current.id == photo.id,
+		   photoImageView.image != nil {
+			// Already have the thumbnail for this photo
+			return
+		}
+		
 		// Show loading indicator
 		loadingIndicator.startAnimation(nil)
 		
-		print("[UnifiedPhotoCell] Starting thumbnail load for: \(photo.displayName)")
 		
 		thumbnailTask?.cancel()
 		thumbnailTask = Task { @MainActor in
 			do {
 				if let thumbnail = try await photo.loadThumbnail() {
 					guard !Task.isCancelled else { 
-						print("[UnifiedPhotoCell] Task cancelled for: \(photo.displayName)")
 						return 
 					}
-					print("[UnifiedPhotoCell] Thumbnail loaded successfully for: \(photo.displayName)")
 					self.photoImageView.image = thumbnail
 					self.placeholderImageView.isHidden = true // Hide placeholder when thumbnail loads
 					self.photoImageView.needsLayout = true
-					self.view.needsDisplay = true
+					self.photoImageView.needsDisplay = true
+					self.view.layoutSubtreeIfNeeded() // Force immediate layout to ensure proper clipping
 				} else {
-					print("[UnifiedPhotoCell] No thumbnail available for: \(photo.displayName)")
 					// Keep placeholder visible, it's already configured
 					self.placeholderImageView.isHidden = false
 				}
 			} catch {
 				guard !Task.isCancelled else { return }
-				print("[UnifiedPhotoCell] Error loading thumbnail for \(photo.displayName): \(error)")
 				// Show error icon in placeholder
 				if let errorIcon = NSImage(systemSymbolName: "exclamationmark.triangle", accessibilityDescription: nil) {
 					self.placeholderImageView.image = errorIcon
@@ -263,6 +270,8 @@ class UnifiedPhotoCell: NSCollectionViewItem {
 		case .scaleToFill:
 			photoImageView.scaleMode = .scaleToFill
 		}
+		// Force redraw
+		photoImageView.needsDisplay = true
 	}
 	
 	private func addArchiveBadge() {
@@ -309,6 +318,11 @@ class UnifiedPhotoCell: NSCollectionViewItem {
 		didSet {
 			updateSelectionAppearance()
 		}
+	}
+	
+	// Public method to update only the display mode without reloading
+	func updateDisplayModeOnly(_ mode: ThumbnailDisplayMode) {
+		updateDisplayMode(mode)
 	}
 }
 
@@ -505,29 +519,24 @@ class UnifiedPhotoCell: UICollectionViewCell {
 		// Show loading indicator
 		loadingIndicator.startAnimating()
 		
-		print("[UnifiedPhotoCell] Starting thumbnail load for: \(photo.displayName)")
 		
 		thumbnailTask?.cancel()
 		thumbnailTask = Task { @MainActor in
 			do {
 				if let thumbnail = try await photo.loadThumbnail() {
 					guard !Task.isCancelled else { 
-						print("[UnifiedPhotoCell] Task cancelled for: \(photo.displayName)")
 						return 
 					}
-					print("[UnifiedPhotoCell] Thumbnail loaded successfully for: \(photo.displayName)")
 					self.photoImageView.image = thumbnail
 					self.placeholderImageView.isHidden = true // Hide placeholder when thumbnail loads
 					self.setNeedsLayout()
 					self.layoutIfNeeded()
 				} else {
-					print("[UnifiedPhotoCell] No thumbnail available for: \(photo.displayName)")
 					// Keep placeholder visible, it's already configured
 					self.placeholderImageView.isHidden = false
 				}
 			} catch {
 				guard !Task.isCancelled else { return }
-				print("[UnifiedPhotoCell] Error loading thumbnail for \(photo.displayName): \(error)")
 				// Show error icon in placeholder
 				if let errorIcon = UIImage(systemName: "exclamationmark.triangle") {
 					let config = UIImage.SymbolConfiguration(hierarchicalColor: .tertiaryLabel)

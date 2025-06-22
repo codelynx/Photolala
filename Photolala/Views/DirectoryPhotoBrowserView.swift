@@ -127,7 +127,7 @@ struct DirectoryPhotoBrowserView: View {
 	private var collectionContent: some View {
 		UnifiedPhotoCollectionViewRepresentable(
 			photoProvider: photoProvider,
-			settings: settings,
+			settings: $settings,
 			onSelectPhoto: { photo, allPhotos in
 				if let photoFile = photo as? PhotoFile {
 					handlePhotoSelection(photoFile, allPhotos.compactMap { $0 as? PhotoFile })

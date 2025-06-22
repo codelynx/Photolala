@@ -11,9 +11,18 @@ struct WelcomeView: View {
 	@State private var selectedFolder: URL?
 	@State private var showingFolderPicker = false
 	@State private var navigateToPhotoBrowser = false
+	@State private var navigateToPhotoLibrary = false
 	#if os(macOS)
 		@Environment(\.openWindow) private var openWindow
 	#endif
+	
+	private var welcomeMessage: String {
+		#if os(macOS)
+			"Choose a folder to browse photos"
+		#else
+			"Choose a source to browse photos"
+		#endif
+	}
 
 	var body: some View {
 		VStack(spacing: 30) {
@@ -29,18 +38,36 @@ struct WelcomeView: View {
 			}
 
 			// Welcome message
-			Text("Choose a folder to browse photos")
+			Text(welcomeMessage)
 				.font(.headline)
 				.foregroundStyle(.secondary)
 
-			// Select folder button
+			// Source selection buttons
+			#if os(macOS)
+			// On macOS, only show folder selection - other options are in Window menu
 			Button(action: self.selectFolder) {
-				Label("Select Folder", systemImage: "folder")
+				Label("Browse Folder", systemImage: "folder")
 					.frame(minWidth: 200)
 			}
 			.controlSize(.large)
-			#if os(macOS)
-				.buttonStyle(.borderedProminent)
+			.buttonStyle(.borderedProminent)
+			#else
+			// On iOS, show both buttons since there's no menu bar
+			VStack(spacing: 12) {
+				// Select folder button
+				Button(action: self.selectFolder) {
+					Label("Browse Folder", systemImage: "folder")
+						.frame(minWidth: 200)
+				}
+				.controlSize(.large)
+				
+				// Photos Library button
+				Button(action: self.openPhotoLibrary) {
+					Label("Photos Library", systemImage: "photo.on.rectangle")
+						.frame(minWidth: 200)
+				}
+				.controlSize(.large)
+			}
 			#endif
 
 			// Selected folder display
@@ -73,6 +100,9 @@ struct WelcomeView: View {
 				if let folder = selectedFolder {
 					DirectoryPhotoBrowserView(directoryPath: folder.path as NSString)
 				}
+			}
+			.navigationDestination(isPresented: self.$navigateToPhotoLibrary) {
+				ApplePhotosBrowserView()
 			}
 		#endif
 		#if os(macOS)
@@ -113,6 +143,15 @@ struct WelcomeView: View {
 			self.openWindow(value: url)
 		#else
 			self.navigateToPhotoBrowser = true
+		#endif
+	}
+	
+	private func openPhotoLibrary() {
+		#if os(macOS)
+			// This method is not used on macOS anymore
+			// Apple Photos Library is accessed from Window menu
+		#else
+			self.navigateToPhotoLibrary = true
 		#endif
 	}
 }

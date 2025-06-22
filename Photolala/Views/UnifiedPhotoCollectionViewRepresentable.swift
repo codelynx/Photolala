@@ -11,7 +11,7 @@ import SwiftUI
 
 struct UnifiedPhotoCollectionViewRepresentable: XViewControllerRepresentable {
 	let photoProvider: any PhotoProvider
-	let settings: ThumbnailDisplaySettings
+	@Binding var settings: ThumbnailDisplaySettings
 	let onSelectPhoto: ((any PhotoItem, [any PhotoItem]) -> Void)?
 	let onSelectionChanged: (([any PhotoItem]) -> Void)?
 	

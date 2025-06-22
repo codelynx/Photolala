@@ -11,12 +11,12 @@ struct InspectorView: View {
 	let selection: [any PhotoItem]
 	@Environment(\.horizontalSizeClass) var horizontalSizeClass
 	@Environment(\.dismiss) var dismiss
-	
+
 	init(selection: [any PhotoItem]) {
 		self.selection = selection
 		print("[InspectorView] Init with \(selection.count) items")
 	}
-	
+
 	var body: some View {
 		Group {
 			if selection.isEmpty {
@@ -42,15 +42,15 @@ struct EmptySelectionView: View {
 	var body: some View {
 		VStack(spacing: 20) {
 			Spacer()
-			
+
 			Image(systemName: "photo.stack")
 				.font(.system(size: 48))
 				.foregroundColor(.secondary)
-			
+
 			Text("Select photos to view details")
 				.font(.headline)
 				.foregroundColor(.secondary)
-			
+
 			Spacer()
 		}
 		.padding()
@@ -63,26 +63,26 @@ struct SinglePhotoInspector: View {
 	let photo: any PhotoItem
 	@State private var thumbnail: XImage?
 	@State private var isLoadingMetadata = false
-	
+
 	var body: some View {
 		ScrollView {
 			VStack(alignment: .leading, spacing: 16) {
 				// Thumbnail Preview
 				ThumbnailSection(photo: photo, thumbnail: $thumbnail)
-				
+
 				Divider()
-				
+
 				// Photo Information
 				PhotoInfoSection(photo: photo)
-				
+
 				Divider()
-				
+
 				// Quick Actions
 				QuickActionsSection(photo: photo)
-				
+
 				// Metadata (collapsible)
 				MetadataSection(photo: photo)
-				
+
 				// Backup Status (if applicable)
 				if photo is PhotoS3 {
 					BackupStatusSection(photo: photo as! PhotoS3)
@@ -93,8 +93,13 @@ struct SinglePhotoInspector: View {
 		.task {
 			await loadThumbnail()
 		}
+		.onChange(of: photo.id) { _, _ in
+			Task {
+				await loadThumbnail()
+			}
+		}
 	}
-	
+
 	private func loadThumbnail() async {
 		thumbnail = try? await photo.loadThumbnail()
 	}
@@ -104,20 +109,20 @@ struct SinglePhotoInspector: View {
 
 struct MultiplePhotosInspector: View {
 	let photos: [any PhotoItem]
-	
+
 	var body: some View {
 		ScrollView {
 			VStack(alignment: .leading, spacing: 16) {
 				// Grid Preview
 				GridPreviewSection(photos: photos)
-				
+
 				Divider()
-				
+
 				// Summary Information
 				SummarySection(photos: photos)
-				
+
 				Divider()
-				
+
 				// Quick Actions
 				BulkActionsSection(photos: photos)
 			}
@@ -131,7 +136,7 @@ struct MultiplePhotosInspector: View {
 struct ThumbnailSection: View {
 	let photo: any PhotoItem
 	@Binding var thumbnail: XImage?
-	
+
 	var body: some View {
 		VStack {
 			if let thumbnail = thumbnail {
@@ -155,22 +160,64 @@ struct ThumbnailSection: View {
 
 struct PhotoInfoSection: View {
 	let photo: any PhotoItem
-	
+	@State private var fileSize: Int64?
+	@State private var isLoadingFileSize = false
+
 	var body: some View {
 		VStack(alignment: .leading, spacing: 8) {
 			Text("Information")
 				.font(.headline)
-			
-			if let size = photo.fileSize {
+
+			// For PhotoApple, use async loaded file size; for others use cached value
+			if let applePhoto = photo as? PhotoApple {
+				if let size = fileSize {
+					InfoRow(label: "Size", value: formatFileSize(size))
+				} else if isLoadingFileSize {
+					HStack {
+						Text("Size")
+							.foregroundColor(.secondary)
+						Spacer()
+						ProgressView()
+							.scaleEffect(0.7)
+					}
+					.font(.system(.body, design: .rounded))
+				}
+			} else if let size = photo.fileSize {
 				InfoRow(label: "Size", value: formatFileSize(size))
 			}
-			
+
 			if let width = photo.width, let height = photo.height {
 				InfoRow(label: "Dimensions", value: "\(width) × \(height)")
 			}
-			
+
 			if let date = photo.creationDate ?? photo.modificationDate {
 				InfoRow(label: "Date", value: date.formatted())
+			}
+		}
+		.task {
+			await loadFileSizeIfNeeded()
+		}
+		.onChange(of: photo.id) { _, _ in
+			Task {
+				await loadFileSizeIfNeeded()
+			}
+		}
+	}
+
+	private func loadFileSizeIfNeeded() async {
+		guard let applePhoto = photo as? PhotoApple else { return }
+		
+		isLoadingFileSize = true
+		do {
+			let size = try await applePhoto.loadFileSize()
+			await MainActor.run {
+				self.fileSize = size
+				self.isLoadingFileSize = false
+			}
+		} catch {
+			print("[PhotoInfoSection] Failed to load file size: \(error)")
+			await MainActor.run {
+				self.isLoadingFileSize = false
 			}
 		}
 	}
@@ -178,20 +225,22 @@ struct PhotoInfoSection: View {
 
 struct QuickActionsSection: View {
 	let photo: any PhotoItem
-	
+	@State private var applePhotoMD5: String?
+	@State private var isLoadingMD5 = false
+
 	var body: some View {
 		VStack(alignment: .leading, spacing: 8) {
 			Text("Quick Actions")
 				.font(.headline)
-			
+
 			// Star toggle for PhotoFile
 			if let photoFile = photo as? PhotoFile,
 			   !photoFile.isArchived {
-				let backupStatus = photoFile.md5Hash != nil ? 
+				let backupStatus = photoFile.md5Hash != nil ?
 					BackupQueueManager.shared.backupStatus[photoFile.md5Hash!] : nil
 				let isStarred = backupStatus == .queued || backupStatus == .uploaded
 				let isFailed = backupStatus == .failed
-				
+
 				if isFailed {
 					// Show error state with retry option
 					ActionButton(
@@ -221,6 +270,62 @@ struct QuickActionsSection: View {
 				}
 			}
 			
+			// Star toggle for Apple Photos
+			if let applePhoto = photo as? PhotoApple {
+				let backupStatus = applePhotoMD5 != nil ?
+					BackupQueueManager.shared.backupStatus[applePhotoMD5!] : nil
+				let isStarred = backupStatus == .queued || backupStatus == .uploaded
+				let isFailed = backupStatus == .failed
+				
+				if isLoadingMD5 {
+					HStack {
+						Text("Computing...")
+							.foregroundColor(.secondary)
+						Spacer()
+						ProgressView()
+							.scaleEffect(0.7)
+					}
+					.padding(.horizontal, 8)
+					.padding(.vertical, 4)
+				} else if isFailed {
+					// Show error state with retry option
+					ActionButton(
+						title: "Retry Backup",
+						systemImage: "exclamationmark.circle.fill"
+					) {
+						Task { @MainActor in
+							print("[InspectorView] Retry backup for Apple Photo: \(applePhoto.filename)")
+							// We need to create a wrapper to add to queue
+							await addApplePhotoToBackupQueue(applePhoto)
+						}
+					}
+					.foregroundColor(.red)
+				} else {
+					ActionButton(
+						title: isStarred ? "Unstar" : "Star",
+						systemImage: isStarred ? "star.fill" : "star"
+					) {
+						Task { @MainActor in
+							print("[InspectorView] Star toggle clicked for Apple Photo: \(applePhoto.filename)")
+							print("[InspectorView] Current starred state: \(isStarred)")
+							print("[InspectorView] Current backup status: \(String(describing: backupStatus))")
+							print("[InspectorView] MD5 hash: \(applePhotoMD5 ?? "nil")")
+							
+							if isStarred {
+								// Remove from queue
+								if let md5 = applePhotoMD5 {
+									BackupQueueManager.shared.removeFromQueueByHash(md5)
+								}
+							} else {
+								// Add to queue - compute MD5 if needed
+								await addApplePhotoToBackupQueue(applePhoto)
+							}
+							print("[InspectorView] Toggle completed")
+						}
+					}
+				}
+			}
+
 			if photo is PhotoFile {
 				ActionButton(title: "Show in Finder", systemImage: "folder") {
 					Task {
@@ -228,10 +333,61 @@ struct QuickActionsSection: View {
 					}
 				}
 			}
-			
+
 			ActionButton(title: "Share", systemImage: "square.and.arrow.up") {
 				// TODO: Implement share
 			}
+		}
+		.task {
+			await loadApplePhotoMD5IfNeeded()
+		}
+		.onChange(of: photo.id) { _, _ in
+			// Reset state when photo changes
+			applePhotoMD5 = nil
+			isLoadingMD5 = false
+			Task {
+				await loadApplePhotoMD5IfNeeded()
+			}
+		}
+	}
+	
+	private func loadApplePhotoMD5IfNeeded() async {
+		guard let applePhoto = photo as? PhotoApple else {
+			applePhotoMD5 = nil
+			return
+		}
+		
+		// Check if already cached in bridge
+		if let cachedMD5 = await ApplePhotosBridge.shared.getMD5(for: applePhoto.id) {
+			await MainActor.run {
+				self.applePhotoMD5 = cachedMD5
+			}
+			return
+		}
+		
+		// If user has starred/unstarred, we need to compute MD5
+		// This will be done when they actually click the star button
+	}
+	
+	private func addApplePhotoToBackupQueue(_ applePhoto: PhotoApple) async {
+		isLoadingMD5 = true
+		defer { isLoadingMD5 = false }
+		
+		do {
+			// Compute MD5 if not already cached
+			let md5: String
+			if let cachedMD5 = applePhotoMD5 {
+				md5 = cachedMD5
+			} else {
+				md5 = try await applePhoto.computeMD5Hash()
+				applePhotoMD5 = md5
+			}
+			
+			// Add to backup queue with photo ID and MD5 hash
+			print("[InspectorView] Computed MD5 for Apple Photo: \(md5)")
+			BackupQueueManager.shared.addApplePhotoToQueue(applePhoto.id, md5: md5)
+		} catch {
+			print("[InspectorView] Failed to compute MD5: \(error)")
 		}
 	}
 }
@@ -239,7 +395,7 @@ struct QuickActionsSection: View {
 struct MetadataSection: View {
 	let photo: any PhotoItem
 	@State private var isExpanded = false
-	
+
 	var body: some View {
 		DisclosureGroup(isExpanded: $isExpanded) {
 			VStack(alignment: .leading, spacing: 4) {
@@ -258,15 +414,15 @@ struct MetadataSection: View {
 
 struct BackupStatusSection: View {
 	let photo: PhotoS3
-	
+
 	var body: some View {
 		VStack(alignment: .leading, spacing: 8) {
 			Text("Backup Status")
 				.font(.headline)
-			
+
 			InfoRow(label: "Storage Class", value: photo.storageClass.displayName)
 			InfoRow(label: "Archived", value: photo.isArchived ? "Yes" : "No")
-			
+
 			if photo.isArchived {
 				// TODO: Add retrieval options
 			}
@@ -279,7 +435,7 @@ struct BackupStatusSection: View {
 struct InfoRow: View {
 	let label: String
 	let value: String
-	
+
 	var body: some View {
 		HStack {
 			Text(label)
@@ -298,7 +454,7 @@ struct ActionButton: View {
 	let systemImage: String
 	let action: () async -> Void
 	@State private var isHovered = false
-	
+
 	var body: some View {
 		Button {
 			Task {
@@ -324,7 +480,7 @@ struct ActionButton: View {
 struct GridPreviewSection: View {
 	let photos: [any PhotoItem]
 	@State private var thumbnails: [String: XImage] = [:]
-	
+
 	var body: some View {
 		VStack {
 			LazyVGrid(columns: [GridItem(.adaptive(minimum: 60))], spacing: 8) {
@@ -346,7 +502,7 @@ struct GridPreviewSection: View {
 					}
 				}
 			}
-			
+
 			if photos.count > 4 {
 				Text("+\(photos.count - 4) more")
 					.font(.caption)
@@ -355,7 +511,7 @@ struct GridPreviewSection: View {
 		}
 		.frame(maxWidth: .infinity)
 	}
-	
+
 	private func loadThumbnail(for photo: any PhotoItem) async {
 		if let thumbnail = try? await photo.loadThumbnail() {
 			await MainActor.run {
@@ -367,16 +523,16 @@ struct GridPreviewSection: View {
 
 struct SummarySection: View {
 	let photos: [any PhotoItem]
-	
+
 	var totalSize: Int64 {
 		photos.compactMap { $0.fileSize }.reduce(0, +)
 	}
-	
+
 	var body: some View {
 		VStack(alignment: .leading, spacing: 8) {
 			Text("Summary")
 				.font(.headline)
-			
+
 			InfoRow(label: "Photos", value: "\(photos.count)")
 			InfoRow(label: "Total Size", value: formatFileSize(totalSize))
 		}
@@ -385,15 +541,15 @@ struct SummarySection: View {
 
 struct BulkActionsSection: View {
 	let photos: [any PhotoItem]
-	
+
 	var localPhotos: [PhotoFile] {
 		photos.compactMap { $0 as? PhotoFile }
 	}
-	
+
 	var availablePhotos: [PhotoFile] {
 		localPhotos.filter { !$0.isArchived }
 	}
-	
+
 	var starredPhotos: [PhotoFile] {
 		availablePhotos.filter { photo in
 			guard let md5 = photo.md5Hash else { return false }
@@ -401,18 +557,18 @@ struct BulkActionsSection: View {
 			return status == .queued || status == .uploaded
 		}
 	}
-	
+
 	var body: some View {
 		VStack(alignment: .leading, spacing: 8) {
 			Text("Actions")
 				.font(.headline)
-			
+
 			// Show status icons for mixed states
 			if photos.count > 1 {
 				StatusIconsView(selection: photos)
 					.padding(.vertical, 4)
 			}
-			
+
 			// Star toggle - only show if all available photos are in same state
 			if availablePhotos.count == photos.count && !availablePhotos.isEmpty {
 				if starredPhotos.count == 0 {
@@ -442,7 +598,7 @@ struct BulkActionsSection: View {
 				}
 				// Mixed state - no button shown
 			}
-			
+
 			if !localPhotos.isEmpty {
 				ActionButton(title: "Show All in Finder", systemImage: "folder") {
 					// TODO: Implement

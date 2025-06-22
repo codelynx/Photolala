@@ -222,10 +222,17 @@ class S3PhotoProvider: BasePhotoProvider {
 				print("[S3PhotoProvider] Catalog loaded successfully")
 			} catch {
 				print("[S3PhotoProvider] Failed to load catalog: \(error)")
-				throw error
+				// If no catalog exists, continue with empty photo list
+				catalogService = nil
 			}
 			
-			s3MasterCatalog = try await syncService.loadS3MasterCatalog()
+			// Try to load master catalog (optional)
+			do {
+				s3MasterCatalog = try await syncService.loadS3MasterCatalog()
+			} catch {
+				print("[S3PhotoProvider] No master catalog found: \(error)")
+				s3MasterCatalog = nil
+			}
 		}
 		
 		// Build photo list from catalog

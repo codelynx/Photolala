@@ -1,8 +1,10 @@
 # Unified Photo Browser Architecture
 
+Last Updated: June 21, 2025 (Added Apple Photos scale fix details)
+
 ## Overview
 
-The unified photo browser architecture provides a consistent interface for browsing photos from different sources (local files, S3, etc.) using a protocol-oriented design with dependency injection.
+The unified photo browser architecture provides a consistent interface for browsing photos from different sources (local files, S3, Apple Photos Library) using a protocol-oriented design with dependency injection.
 
 ## Key Components
 
@@ -19,8 +21,9 @@ The unified photo browser architecture provides a consistent interface for brows
 - **Location**: `Services/PhotoProvider.swift`
 - **Implementations**:
   - `BasePhotoProvider` - Common functionality with @MainActor for thread safety
-  - `LocalPhotoProvider` - Loads photos from local directories
+  - `DirectoryPhotoProvider` - Loads photos from local directories with progressive loading
   - `S3PhotoProvider` - Loads photos from S3 with catalog support
+  - `ApplePhotosProvider` - Loads photos from Apple Photos Library via PhotoKit
 
 ### 3. UnifiedPhotoCollectionViewController
 - **Purpose**: Platform-agnostic collection view controller
@@ -57,12 +60,15 @@ The unified photo browser architecture provides a consistent interface for brows
 
 ```swift
 // For local photos
-let photoProvider = LocalPhotoProvider(directoryPath: "/path/to/photos")
+let photoProvider = DirectoryPhotoProvider(directoryPath: "/path/to/photos")
 
 // For S3 photos
 let photoProvider = S3PhotoProvider(userId: "user123")
 
-// Both use the same UI component
+// For Apple Photos Library
+let photoProvider = ApplePhotosProvider()
+
+// All use the same UI component
 UnifiedPhotoCollectionViewRepresentable(
     photoProvider: photoProvider,
     settings: thumbnailSettings,
@@ -81,17 +87,44 @@ UnifiedPhotoCollectionViewRepresentable(
 - **iOS**: Uses UICollectionView with UICollectionViewCell
 - **Cross-platform**: XPlatform utilities provide consistent APIs
 
+## Apple Photos Integration
+
+The Apple Photos integration demonstrates the flexibility of the unified architecture:
+
+### PhotoApple Implementation
+- Wraps PHAsset from PhotoKit framework
+- Implements PhotoItem protocol seamlessly
+- Uses PHCachingImageManager for efficient thumbnails
+- Provides Photos metadata through common interface
+
+### ApplePhotosProvider Features
+- Authorization handling with clear user communication
+- Album browsing (smart albums and user collections)
+- Automatic loading state management
+- Thread-safe with @MainActor
+
+### User Access Points
+- **macOS**: Window → Apple Photos Library (⌘⌥L)
+- **iOS**: "Photos Library" button on welcome screen
+- Opens in new window (macOS) or pushes navigation (iOS)
+
 ## Implementation Status
 
 ### ✅ Completed
 - PhotoItem protocol implementation
-- PhotoProvider implementations (Local, S3)
+- PhotoProvider implementations (Local, S3, Apple Photos)
 - UnifiedPhotoCollectionViewController
 - UnifiedPhotoCell with thumbnail loading
 - Migration of PhotoBrowserView
 - Migration of S3PhotoBrowserView
+- Apple Photos Library integration
 - Thumbnail sizing with S/M/L options
 - Basic header support for grouping
+- Album browsing for Apple Photos
+- Authorization handling for PhotoKit
+- Scale to fit/fill display modes working across all browsers
+- Proper constraint management for square thumbnails
+- Dynamic cell resizing when changing thumbnail sizes
 
 ### 🚧 In Progress
 - Header view registration and display
@@ -103,6 +136,28 @@ UnifiedPhotoCollectionViewRepresentable(
 - Enhanced selection handling
 - Keyboard navigation
 - Performance optimizations for very large collections
+- Search integration for Apple Photos
+- Live Photos support
+
+## Technical Details
+
+### Display Mode Implementation
+The unified browser supports two display modes:
+- **Scale to Fit**: Shows entire image with letterboxing/pillarboxing as needed
+- **Scale to Fill**: Crops image to fill the entire cell (default)
+
+Key components:
+- `ScalableImageView`: Custom NSImageView that implements proper scaling on macOS
+- `ThumbnailDisplaySettings`: Observable settings object with display mode
+- Settings are passed as @Binding for two-way updates
+- `updateDisplayModeOnly()` method for efficient display updates without reloading
+
+### Constraint Management
+Cells use centered image views with fixed size constraints to avoid conflicts:
+- Image view uses centerX instead of leading/trailing constraints
+- Cell view has `masksToBounds = true` for proper clipping
+- ScalableImageView always clips to bounds regardless of mode
+- Layout updates trigger full cell reconfiguration for size changes
 
 ## Future Enhancements
 
