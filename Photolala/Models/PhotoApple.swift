@@ -88,7 +88,11 @@ struct PhotoApple: PhotoItem {
 	
 	var archiveStatus: ArchiveStatus { .standard }
 	
-	var md5Hash: String? { nil } // Not available for Photos Library
+	var md5Hash: String? {
+		// This will be nil until computeMD5Hash() is called
+		// We can't make async calls in a computed property
+		nil
+	}
 	
 	var source: PhotoSource { .applePhotos }
 	
@@ -144,6 +148,22 @@ struct PhotoApple: PhotoItem {
 	}
 	
 	// MARK: - Metadata Loading
+	
+	func computeMD5Hash() async throws -> String {
+		// Check if already computed
+		if let existingHash = await ApplePhotosBridge.shared.getMD5(for: id) {
+			return existingHash
+		}
+		
+		// Load image data to compute hash
+		let data = try await loadImageData()
+		let hash = data.md5Digest.hexadecimalString
+		
+		// Store in bridge for future use
+		await ApplePhotosBridge.shared.storeMD5(hash, for: id)
+		
+		return hash
+	}
 	
 	func loadFileSize() async throws -> Int64 {
 		let cache = ApplePhotoFileSizeCache.shared

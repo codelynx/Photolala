@@ -121,6 +121,26 @@ class BackupQueueManager: ObservableObject {
 		saveQueueState()
 		NotificationCenter.default.post(name: NSNotification.Name("BackupQueueChanged"), object: nil)
 	}
+	
+	func removeFromQueueByHash(_ md5: String) {
+		print("[BackupQueueManager] Removing from queue by hash: \(md5)")
+		
+		// Find and remove any queued photos with this hash
+		let photosToRemove = queuedPhotos.filter { $0.md5Hash == md5 }
+		for photo in photosToRemove {
+			queuedPhotos.remove(photo)
+			print("[BackupQueueManager] Removed photo: \(photo.displayName)")
+		}
+		
+		// Update backup status
+		if backupStatus[md5] == .queued {
+			backupStatus[md5] = BackupState.none
+			print("[BackupQueueManager] Reset backup status for hash: \(md5)")
+		}
+		
+		saveQueueState()
+		NotificationCenter.default.post(name: NSNotification.Name("BackupQueueChanged"), object: nil)
+	}
 
 	func isQueued(_ photo: PhotoFile) -> Bool {
 		queuedPhotos.contains(photo)

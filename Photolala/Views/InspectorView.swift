@@ -225,6 +225,8 @@ struct PhotoInfoSection: View {
 
 struct QuickActionsSection: View {
 	let photo: any PhotoItem
+	@State private var applePhotoMD5: String?
+	@State private var isLoadingMD5 = false
 
 	var body: some View {
 		VStack(alignment: .leading, spacing: 8) {
@@ -267,6 +269,62 @@ struct QuickActionsSection: View {
 					}
 				}
 			}
+			
+			// Star toggle for Apple Photos
+			if let applePhoto = photo as? PhotoApple {
+				let backupStatus = applePhotoMD5 != nil ?
+					BackupQueueManager.shared.backupStatus[applePhotoMD5!] : nil
+				let isStarred = backupStatus == .queued || backupStatus == .uploaded
+				let isFailed = backupStatus == .failed
+				
+				if isLoadingMD5 {
+					HStack {
+						Text("Computing...")
+							.foregroundColor(.secondary)
+						Spacer()
+						ProgressView()
+							.scaleEffect(0.7)
+					}
+					.padding(.horizontal, 8)
+					.padding(.vertical, 4)
+				} else if isFailed {
+					// Show error state with retry option
+					ActionButton(
+						title: "Retry Backup",
+						systemImage: "exclamationmark.circle.fill"
+					) {
+						Task { @MainActor in
+							print("[InspectorView] Retry backup for Apple Photo: \(applePhoto.filename)")
+							// We need to create a wrapper to add to queue
+							await addApplePhotoToBackupQueue(applePhoto)
+						}
+					}
+					.foregroundColor(.red)
+				} else {
+					ActionButton(
+						title: isStarred ? "Unstar" : "Star",
+						systemImage: isStarred ? "star.fill" : "star"
+					) {
+						Task { @MainActor in
+							print("[InspectorView] Star toggle clicked for Apple Photo: \(applePhoto.filename)")
+							print("[InspectorView] Current starred state: \(isStarred)")
+							print("[InspectorView] Current backup status: \(String(describing: backupStatus))")
+							print("[InspectorView] MD5 hash: \(applePhotoMD5 ?? "nil")")
+							
+							if isStarred {
+								// Remove from queue
+								if let md5 = applePhotoMD5 {
+									BackupQueueManager.shared.removeFromQueueByHash(md5)
+								}
+							} else {
+								// Add to queue - compute MD5 if needed
+								await addApplePhotoToBackupQueue(applePhoto)
+							}
+							print("[InspectorView] Toggle completed")
+						}
+					}
+				}
+			}
 
 			if photo is PhotoFile {
 				ActionButton(title: "Show in Finder", systemImage: "folder") {
@@ -279,6 +337,55 @@ struct QuickActionsSection: View {
 			ActionButton(title: "Share", systemImage: "square.and.arrow.up") {
 				// TODO: Implement share
 			}
+		}
+		.task {
+			await loadApplePhotoMD5IfNeeded()
+		}
+		.onChange(of: photo.id) { _, _ in
+			Task {
+				await loadApplePhotoMD5IfNeeded()
+			}
+		}
+	}
+	
+	private func loadApplePhotoMD5IfNeeded() async {
+		guard let applePhoto = photo as? PhotoApple else {
+			applePhotoMD5 = nil
+			return
+		}
+		
+		// Check if already cached in bridge
+		if let cachedMD5 = await ApplePhotosBridge.shared.getMD5(for: applePhoto.id) {
+			await MainActor.run {
+				self.applePhotoMD5 = cachedMD5
+			}
+			return
+		}
+		
+		// If user has starred/unstarred, we need to compute MD5
+		// This will be done when they actually click the star button
+	}
+	
+	private func addApplePhotoToBackupQueue(_ applePhoto: PhotoApple) async {
+		isLoadingMD5 = true
+		defer { isLoadingMD5 = false }
+		
+		do {
+			// Compute MD5 if not already cached
+			let md5: String
+			if let cachedMD5 = applePhotoMD5 {
+				md5 = cachedMD5
+			} else {
+				md5 = try await applePhoto.computeMD5Hash()
+				applePhotoMD5 = md5
+			}
+			
+			// Create a wrapper PhotoFile-like object for BackupQueueManager
+			// For now, we'll need to extend BackupQueueManager to handle Apple Photos
+			print("[InspectorView] Computed MD5 for Apple Photo: \(md5)")
+			// TODO: Add to backup queue with Apple Photo support
+		} catch {
+			print("[InspectorView] Failed to compute MD5: \(error)")
 		}
 	}
 }
