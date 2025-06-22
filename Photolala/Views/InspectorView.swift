@@ -342,6 +342,9 @@ struct QuickActionsSection: View {
 			await loadApplePhotoMD5IfNeeded()
 		}
 		.onChange(of: photo.id) { _, _ in
+			// Reset state when photo changes
+			applePhotoMD5 = nil
+			isLoadingMD5 = false
 			Task {
 				await loadApplePhotoMD5IfNeeded()
 			}
