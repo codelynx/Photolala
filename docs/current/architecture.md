@@ -174,10 +174,15 @@ Photolala is a cross-platform photo browser application built with SwiftUI, supp
 
 #### BackupQueueManager (Singleton)
 - Manages star-based backup queue
-- Activity timer (10 min prod, 3 min debug)
+- Dual queue system:
+  - `queuedPhotos`: Local directory photos (PhotoFile)
+  - `queuedApplePhotos`: Apple Photos by ID
+- Activity timer (5 min prod, 30 sec debug)
 - Auto-backup after inactivity
 - Queue persistence across launches
 - MD5 computation on demand
+- Unified backup status tracking by MD5
+- Supports both PhotoFile and PhotoApple uploads
 - Notifications for UI updates
 
 #### BackupStatusManager (Singleton)

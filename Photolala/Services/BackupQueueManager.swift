@@ -8,6 +8,7 @@
 import Foundation
 import SwiftUI
 import CryptoKit
+import Photos
 
 @MainActor
 class BackupQueueManager: ObservableObject {
@@ -20,6 +21,9 @@ class BackupQueueManager: ObservableObject {
 	
 	// Path to MD5 mapping for persistence
 	private var pathToMD5: [String: String] = [:] // filepath -> MD5
+	
+	// Apple Photos queued by ID
+	private var queuedApplePhotos: Set<String> = [] // Apple Photo IDs
 	
 	// Photos to delete from S3 (batched)
 	private var photosToDelete: Set<PhotoFile> = []
@@ -155,6 +159,23 @@ class BackupQueueManager: ObservableObject {
 		// Start/reset the inactivity timer
 		resetInactivityTimer()
 	}
+	
+	func addApplePhotoToQueue(_ photoID: String, md5: String) {
+		print("[BackupQueueManager] Adding Apple Photo to queue: \(photoID)")
+		
+		// Add to Apple Photos queue
+		queuedApplePhotos.insert(photoID)
+		
+		// Add to backup status
+		backupStatus[md5] = .queued
+		print("[BackupQueueManager] Set backup status to queued for Apple Photo: \(photoID) with hash: \(md5)")
+		
+		saveQueueState()
+		NotificationCenter.default.post(name: NSNotification.Name("BackupQueueChanged"), object: nil)
+		
+		// Start/reset the inactivity timer
+		resetInactivityTimer()
+	}
 
 	func isQueued(_ photo: PhotoFile) -> Bool {
 		queuedPhotos.contains(photo)
@@ -180,13 +201,13 @@ class BackupQueueManager: ObservableObject {
 		inactivityTimer?.invalidate()
 
 		// Start timer if we have photos to upload or delete
-		guard !queuedPhotos.isEmpty || !photosToDelete.isEmpty else { 
+		guard !queuedPhotos.isEmpty || !photosToDelete.isEmpty || !queuedApplePhotos.isEmpty else { 
 			print("[BackupQueueManager] No photos in queue, not starting timer")
 			return 
 		}
 
 		print("[BackupQueueManager] Starting backup timer for \(Int(inactivityInterval)) seconds")
-		print("[BackupQueueManager] Queue has \(queuedPhotos.count) photos to upload, \(photosToDelete.count) to delete")
+		print("[BackupQueueManager] Queue has \(queuedPhotos.count) photos to upload, \(queuedApplePhotos.count) Apple Photos to upload, \(photosToDelete.count) to delete")
 		
 		inactivityTimer = Timer.scheduledTimer(
 			withTimeInterval: inactivityInterval,
@@ -211,15 +232,15 @@ class BackupQueueManager: ObservableObject {
 
 	private func performBackup() async {
 		print("[BackupQueueManager] Starting backup process...")
-		print("[BackupQueueManager] Photos to delete: \(photosToDelete.count), Photos to upload: \(queuedPhotos.count)")
+		print("[BackupQueueManager] Photos to delete: \(photosToDelete.count), Photos to upload: \(queuedPhotos.count), Apple Photos to upload: \(queuedApplePhotos.count)")
 		
 		// Handle deletions first
 		if !photosToDelete.isEmpty {
 			await performDeletions()
 		}
 		
-		// Then handle uploads
-		guard !queuedPhotos.isEmpty else { 
+		// Check if we have anything to upload
+		guard !queuedPhotos.isEmpty || !queuedApplePhotos.isEmpty else { 
 			print("[BackupQueueManager] No photos in queue to upload")
 			return 
 		}
@@ -228,12 +249,13 @@ class BackupQueueManager: ObservableObject {
 			return 
 		}
 
-		print("[BackupQueueManager] Starting upload of \(queuedPhotos.count) photos")
+		let totalPhotos = queuedPhotos.count + queuedApplePhotos.count
+		print("[BackupQueueManager] Starting upload of \(totalPhotos) photos")
 		isUploading = true
 		uploadProgress = 0.0
 
 		// Update status bar visibility
-		BackupStatusManager.shared.startUpload(totalPhotos: queuedPhotos.count)
+		BackupStatusManager.shared.startUpload(totalPhotos: totalPhotos)
 
 		let photosToUpload = Array(queuedPhotos)
 		var successCount = 0
@@ -267,7 +289,44 @@ class BackupQueueManager: ObservableObject {
 			}
 
 			// Update progress
-			uploadProgress = Double(index + 1) / Double(photosToUpload.count)
+			uploadProgress = Double(index + 1) / Double(totalPhotos)
+		}
+		
+		// Now handle Apple Photos
+		if !queuedApplePhotos.isEmpty {
+			print("[BackupQueueManager] Processing \(queuedApplePhotos.count) Apple Photos")
+			let applePhotosArray = Array(queuedApplePhotos)
+			
+			for (index, photoID) in applePhotosArray.enumerated() {
+				// Create PhotoApple and upload
+				do {
+					if let applePhoto = await createPhotoApple(from: photoID) {
+						// Update status
+						if let md5 = await computeApplePhotoMD5(applePhoto) {
+							backupStatus[md5] = .uploading
+							NotificationCenter.default.post(name: NSNotification.Name("BackupQueueChanged"), object: nil)
+							
+							BackupStatusManager.shared.updateProgress(
+								uploadedPhotos: photosToUpload.count + index,
+								currentPhotoName: applePhoto.filename
+							)
+							
+							// Perform upload
+							try await uploadApplePhoto(applePhoto)
+							backupStatus[md5] = .uploaded
+							queuedApplePhotos.remove(photoID)
+							successCount += 1
+							NotificationCenter.default.post(name: NSNotification.Name("BackupQueueChanged"), object: nil)
+						}
+					}
+				} catch {
+					print("Failed to upload Apple Photo \(photoID): \(error)")
+					// Keep in queue for retry
+				}
+				
+				// Update progress
+				uploadProgress = Double(photosToUpload.count + index + 1) / Double(totalPhotos)
+			}
 		}
 
 		// Generate catalog if any uploads succeeded
@@ -281,7 +340,7 @@ class BackupQueueManager: ObservableObject {
 		saveQueueState()
 
 		// Reset timer if there are still queued photos or deletions
-		if !queuedPhotos.isEmpty || !photosToDelete.isEmpty {
+		if !queuedPhotos.isEmpty || !photosToDelete.isEmpty || !queuedApplePhotos.isEmpty {
 			resetInactivityTimer()
 		}
 	}
@@ -290,6 +349,43 @@ class BackupQueueManager: ObservableObject {
 		// S3BackupManager will check authentication internally
 		try await S3BackupManager.shared.uploadPhoto(photo)
 		print("Successfully uploaded \(photo.displayName)")
+	}
+	
+	private func createPhotoApple(from photoID: String) async -> PhotoApple? {
+		// Fetch the PHAsset
+		let fetchResult = PHAsset.fetchAssets(withLocalIdentifiers: [photoID], options: nil)
+		guard let asset = fetchResult.firstObject else {
+			print("[BackupQueueManager] Could not find Apple Photo with ID: \(photoID)")
+			return nil
+		}
+		return PhotoApple(asset: asset)
+	}
+	
+	private func computeApplePhotoMD5(_ photo: PhotoApple) async -> String? {
+		do {
+			return try await photo.computeMD5Hash()
+		} catch {
+			print("[BackupQueueManager] Failed to compute MD5 for Apple Photo: \(error)")
+			return nil
+		}
+	}
+	
+	private func uploadApplePhoto(_ photo: PhotoApple) async throws {
+		// Create a temporary PhotoFile wrapper for S3BackupManager
+		// This is a workaround until S3BackupManager supports PhotoItem protocol
+		let data = try await photo.loadImageData()
+		let tempURL = FileManager.default.temporaryDirectory.appendingPathComponent(photo.filename)
+		try data.write(to: tempURL)
+		defer {
+			try? FileManager.default.removeItem(at: tempURL)
+		}
+		
+		let photoFile = PhotoFile(
+			directoryPath: tempURL.deletingLastPathComponent().path as NSString,
+			filename: tempURL.lastPathComponent
+		)
+		try await S3BackupManager.shared.uploadPhoto(photoFile)
+		print("Successfully uploaded Apple Photo: \(photo.displayName)")
 	}
 	
 	private func performDeletions() async {
@@ -488,12 +584,13 @@ class BackupQueueManager: ObservableObject {
 			backupStatus: backupStatus,
 			lastActivityTime: Date(),
 			pathToMD5: pathToMD5,
-			photosToDelete: photosToDelete.compactMap { $0.md5Hash }
+			photosToDelete: photosToDelete.compactMap { $0.md5Hash },
+			queuedApplePhotos: Array(queuedApplePhotos)
 		)
 
 		if let encoded = try? JSONEncoder().encode(state) {
 			UserDefaults.standard.set(encoded, forKey: queueStateKey)
-			print("[BackupQueueManager] Saved queue state with \(backupStatus.count) backup statuses, \(pathToMD5.count) path mappings, and \(photosToDelete.count) pending deletions")
+			print("[BackupQueueManager] Saved queue state with \(backupStatus.count) backup statuses, \(pathToMD5.count) path mappings, \(photosToDelete.count) pending deletions, and \(queuedApplePhotos.count) Apple Photos")
 			// Log first few entries for debugging
 			for (index, (md5, status)) in backupStatus.enumerated().prefix(3) {
 				print("[BackupQueueManager]   \(md5): \(status)")
@@ -520,6 +617,12 @@ class BackupQueueManager: ObservableObject {
 			pathToMD5 = savedPathToMD5
 			print("[BackupQueueManager] Restored path to MD5 mapping with \(pathToMD5.count) entries")
 		}
+		
+		// Restore queued Apple Photos
+		if let savedApplePhotos = state.queuedApplePhotos {
+			queuedApplePhotos = Set(savedApplePhotos)
+			print("[BackupQueueManager] Restored \(queuedApplePhotos.count) Apple Photos to queue")
+		}
 
 		// Note: We can't restore PhotoFile objects from just MD5
 		// This would need to be enhanced to store more info or
@@ -542,7 +645,7 @@ class BackupQueueManager: ObservableObject {
 		let remainingTime = max(0, inactivityInterval - timeSinceActivity)
 
 		// Restart timer if needed
-		let hasWork = !state.queuedPhotos.isEmpty || (state.photosToDelete?.isEmpty == false)
+		let hasWork = !state.queuedPhotos.isEmpty || (state.photosToDelete?.isEmpty == false) || !queuedApplePhotos.isEmpty
 		
 		if remainingTime > 0 && hasWork {
 			Timer.scheduledTimer(withTimeInterval: remainingTime, repeats: false) { _ in
@@ -567,6 +670,7 @@ private struct QueueState: Codable {
 	let lastActivityTime: Date
 	let pathToMD5: [String: String]? // Optional for backward compatibility
 	let photosToDelete: [String]? // MD5 hashes of photos to delete (optional for backward compatibility)
+	let queuedApplePhotos: [String]? // Apple Photo IDs (optional for backward compatibility)
 }
 
 enum BackupError: LocalizedError {

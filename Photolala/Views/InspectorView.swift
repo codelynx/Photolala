@@ -383,9 +383,9 @@ struct QuickActionsSection: View {
 				applePhotoMD5 = md5
 			}
 			
-			// Add to backup queue by MD5 hash
+			// Add to backup queue with photo ID and MD5 hash
 			print("[InspectorView] Computed MD5 for Apple Photo: \(md5)")
-			BackupQueueManager.shared.addToQueueByHash(md5)
+			BackupQueueManager.shared.addApplePhotoToQueue(applePhoto.id, md5: md5)
 		} catch {
 			print("[InspectorView] Failed to compute MD5: \(error)")
 		}

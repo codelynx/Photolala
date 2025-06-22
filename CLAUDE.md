@@ -60,6 +60,7 @@ Photolala/
   - Cloud browser for S3 storage (Window → Cloud Browser, ⌘⌥B)
   - NavigationStack for folder hierarchy navigation
   - Native collection views (NSCollectionView/UICollectionView)
+  - Star-based backup queue system (supports both local and Apple Photos)
   - Platform-specific navigation patterns
   - No welcome screen on macOS (opens directly to browser)
   - Multi-window support on macOS

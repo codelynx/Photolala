@@ -1,10 +1,10 @@
 ## 📍 PROJECT STATUS REPORT
 
-Last Updated: June 21, 2025
+Last Updated: June 22, 2025
 
-### 🚀 Current Status: Fully Functional S3 Backup & Cloud Browser
+### 🚀 Current Status: Unified Photo Browser with Apple Photos Support
 
-The application is a functional photo browser with complete S3 backup capabilities. The cloud browser now works reliably after fixing the catalog sync issue. Users can backup photos to S3 and browse them from any device.
+The application now features a unified photo browser architecture supporting local directories, Apple Photos Library, and S3 cloud storage. Users can star photos from any source for backup to S3, with full support for Apple Photos including metadata and star persistence.
 
 ### ✅ Completed Features
 
@@ -832,3 +832,27 @@ The application is a functional photo browser with complete S3 backup capabiliti
      - macOS: Access through Window menu only
      - iOS: Buttons on welcome screen (no menu bar)
      - Both: Full feature parity once opened
+
+42. **Apple Photos Star/Backup Integration (June 22)**:
+   - **Star Functionality for Apple Photos**:
+     - Implemented star toggle in Apple Photos inspector
+     - Stars persist across app sessions using ApplePhotosBridge
+     - Starred photos automatically added to backup queue
+     - Visual star indicator in photo cells
+   
+   - **Backup Queue Support**:
+     - Apple Photos can now be backed up to S3
+     - Async file size loading for accurate backup tracking
+     - MD5 hash computation for content identification
+     - Integration with existing BackupQueueManager
+   
+   - **Technical Implementation**:
+     - ApplePhotosBridge manages star state persistence
+     - Lazy loading of file sizes to maintain performance
+     - Proper handling of iCloud Photo Library assets
+     - Fixed star state reset issue when switching photos
+   
+   - **Build Status**:
+     - macOS: Building successfully
+     - iOS: Building successfully
+     - Removed incomplete PhotoAppleWrapper.swift file
