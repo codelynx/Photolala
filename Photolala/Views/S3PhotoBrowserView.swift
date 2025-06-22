@@ -10,6 +10,7 @@ struct S3PhotoBrowserView: View {
 	@State private var errorMessage = ""
 	@State private var isRefreshing = false
 	@State private var showingInspector = false
+	@State private var scrollToSelection = false
 	@StateObject private var photoProvider: S3PhotoProvider
 	@StateObject private var identityManager = IdentityManager.shared
 	
@@ -56,7 +57,8 @@ struct S3PhotoBrowserView: View {
 						},
 						onSelectionChanged: { photos in
 							self.selectedPhotos = photos.compactMap { $0 as? PhotoS3 }
-						}
+						},
+						scrollToSelection: $scrollToSelection
 					)
 					.refreshable {
 						await refreshCatalog()
@@ -116,6 +118,12 @@ struct S3PhotoBrowserView: View {
 			isPresented: $showingInspector,
 			selection: inspectorSelection
 		)
+		.onChange(of: showingInspector) { _, isShowing in
+			// If showing inspector and we have selection, scroll to it
+			if isShowing && !selectedPhotos.isEmpty {
+				scrollToSelection = true
+			}
+		}
 	}
 	// MARK: - Actions
 	

@@ -14,6 +14,7 @@ struct UnifiedPhotoCollectionViewRepresentable: XViewControllerRepresentable {
 	@Binding var settings: ThumbnailDisplaySettings
 	let onSelectPhoto: ((any PhotoItem, [any PhotoItem]) -> Void)?
 	let onSelectionChanged: (([any PhotoItem]) -> Void)?
+	@Binding var scrollToSelection: Bool
 	
 	#if os(macOS)
 	func makeNSViewController(context: Context) -> UnifiedPhotoCollectionViewController {
@@ -25,6 +26,15 @@ struct UnifiedPhotoCollectionViewRepresentable: XViewControllerRepresentable {
 	
 	func updateNSViewController(_ controller: UnifiedPhotoCollectionViewController, context: Context) {
 		controller.settings = settings
+		
+		// Handle scroll to selection
+		if scrollToSelection {
+			controller.scrollToFirstSelectedItem(animated: true)
+			// Reset the trigger
+			DispatchQueue.main.async {
+				scrollToSelection = false
+			}
+		}
 	}
 	#else
 	func makeUIViewController(context: Context) -> UnifiedPhotoCollectionViewController {
@@ -36,6 +46,15 @@ struct UnifiedPhotoCollectionViewRepresentable: XViewControllerRepresentable {
 	
 	func updateUIViewController(_ controller: UnifiedPhotoCollectionViewController, context: Context) {
 		controller.settings = settings
+		
+		// Handle scroll to selection
+		if scrollToSelection {
+			controller.scrollToFirstSelectedItem(animated: true)
+			// Reset the trigger
+			DispatchQueue.main.async {
+				scrollToSelection = false
+			}
+		}
 	}
 	#endif
 	

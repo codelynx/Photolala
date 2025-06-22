@@ -531,3 +531,49 @@ extension UnifiedPhotoCollectionViewController: UICollectionViewDelegate {
 	}
 }
 #endif
+
+// MARK: - Scroll to Selection
+
+extension UnifiedPhotoCollectionViewController {
+	/// Scrolls to ensure at least one selected item is visible
+	func scrollToFirstSelectedItem(animated: Bool = true) {
+		#if os(macOS)
+		let selectedIndexPaths = collectionView.selectionIndexPaths
+		guard let firstSelected = selectedIndexPaths.sorted().first else { return }
+		
+		// Get the frame of the selected item
+		if let itemFrame = collectionView.layoutAttributesForItem(at: firstSelected)?.frame {
+			// Calculate visible rect considering the current scroll position
+			let visibleRect = collectionView.visibleRect
+			
+			// Check if the item is already fully visible
+			if !visibleRect.contains(itemFrame) {
+				// Calculate the target scroll position to center the item if possible
+				var targetRect = itemFrame
+				
+				// Try to center the item vertically
+				let centerY = itemFrame.midY - visibleRect.height / 2
+				targetRect.origin.y = max(0, centerY)
+				targetRect.size.height = visibleRect.height
+				
+				// Ensure we don't scroll past the content bounds
+				let maxY = collectionView.collectionViewLayout?.collectionViewContentSize.height ?? 0
+				if targetRect.maxY > maxY {
+					targetRect.origin.y = max(0, maxY - targetRect.height)
+				}
+				
+				collectionView.scrollToVisible(targetRect)
+			}
+		}
+		#else
+		guard let firstSelected = collectionView.indexPathsForSelectedItems?.sorted().first else { return }
+		
+		// Use scrollToItem which handles the calculations for us
+		collectionView.scrollToItem(
+			at: firstSelected,
+			at: .centeredVertically,
+			animated: animated
+		)
+		#endif
+	}
+}

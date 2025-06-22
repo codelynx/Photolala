@@ -13,6 +13,7 @@ struct ApplePhotosBrowserView: View {
 	@State private var settings = ThumbnailDisplaySettings()
 	@State private var selection: Set<PhotoApple> = []
 	@State private var showingInspector = false
+	@State private var scrollToSelection = false
 	@State private var isLoading = false
 	@State private var errorMessage: String?
 	@State private var showingAlbumPicker = false
@@ -36,7 +37,8 @@ struct ApplePhotosBrowserView: View {
 			onSelectionChanged: { photos in
 				// Update selection
 				selection = Set(photos.compactMap { $0 as? PhotoApple })
-			}
+			},
+			scrollToSelection: $scrollToSelection
 		)
 		.navigationTitle(photoProvider.displayTitle)
 		#if os(macOS)
@@ -45,6 +47,12 @@ struct ApplePhotosBrowserView: View {
 		.inspector(isPresented: $showingInspector) {
 			InspectorView(selection: inspectorSelection)
 				.inspectorColumnWidth(min: 250, ideal: 300, max: 400)
+		}
+		.onChange(of: showingInspector) { _, isShowing in
+			// If showing inspector and we have selection, scroll to it
+			if isShowing && !selection.isEmpty {
+				scrollToSelection = true
+			}
 		}
 		.photoBrowserToolbar(
 			settings: $settings,

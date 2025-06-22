@@ -24,6 +24,7 @@ struct DirectoryPhotoBrowserView: View {
 	@State private var showingRetrievalDialog = false
 	@State private var isRefreshing = false
 	@State private var showingInspector = false
+	@State private var scrollToSelection = false
 	@StateObject private var s3BackupManager = S3BackupManager.shared
 	@StateObject private var identityManager = IdentityManager.shared
 	@StateObject private var backupQueueManager = BackupQueueManager.shared
@@ -136,7 +137,8 @@ struct DirectoryPhotoBrowserView: View {
 			onSelectionChanged: { photos in
 				self.selectedPhotos = photos.compactMap { $0 as? PhotoFile }
 				print("[PhotoBrowserView] Selection changed: \(photos.count) photos selected")
-			}
+			},
+			scrollToSelection: $scrollToSelection
 		)
 		.onAppear {
 			Task {
@@ -157,6 +159,10 @@ struct DirectoryPhotoBrowserView: View {
 			}
 			.onReceive(NotificationCenter.default.publisher(for: .toggleInspector)) { _ in
 				self.showingInspector.toggle()
+				// If showing inspector and we have selection, scroll to it
+				if self.showingInspector && !self.selectedPhotos.isEmpty {
+					self.scrollToSelection = true
+				}
 			}
 			.onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("BackupQueueChanged"))) { _ in
 				// Force refresh of collection view to update star states
