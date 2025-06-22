@@ -2,6 +2,7 @@ import CryptoKit
 import Foundation
 import SwiftUI
 import AWSS3
+import Photos
 
 @MainActor
 class S3BackupManager: ObservableObject {
@@ -101,6 +102,83 @@ class S3BackupManager: ObservableObject {
 		}
 
 		print("Successfully uploaded: \(photoRef.filename)")
+	}
+	
+	func uploadApplePhoto(_ photo: PhotoApple) async throws {
+		// Check authentication
+		guard let userId else {
+			throw S3BackupError.notSignedIn
+		}
+		
+		// Load photo data
+		let data = try await photo.loadImageData()
+		
+		// Check subscription limits
+		guard try await self.canUploadFile(size: Int64(data.count)) else {
+			throw S3BackupError.quotaExceeded
+		}
+		
+		guard let s3Service else {
+			throw S3BackupError.serviceNotConfigured
+		}
+		
+		self.isUploading = true
+		self.uploadStatus = "Uploading \(photo.filename)..."
+		
+		defer {
+			isUploading = false
+			uploadStatus = ""
+		}
+		
+		// Upload photo
+		let md5 = try await s3Service.uploadPhoto(data: data, userId: userId)
+		
+		// Generate and upload thumbnail
+		if let thumbnail = try? await photo.loadThumbnail() {
+			// Convert to data on main actor to avoid sendable warnings
+			let thumbnailData = await MainActor.run {
+				thumbnail.jpegData(compressionQuality: 0.8)
+			}
+			if let thumbnailData {
+				try await s3Service.uploadThumbnail(data: thumbnailData, md5: md5, userId: userId)
+			}
+		}
+		
+		// Extract metadata with Apple Photo ID
+		let fileSize = Int64(data.count)
+		let creationDate = photo.asset.creationDate ?? Date()
+		let modificationDate = photo.asset.modificationDate ?? Date()
+		
+		// Extract image properties
+		let resources = PHAssetResource.assetResources(for: photo.asset)
+		let filename = resources.first?.originalFilename ?? photo.filename
+		
+		// Get image dimensions
+		let width = photo.asset.pixelWidth
+		let height = photo.asset.pixelHeight
+		
+		// Extract GPS location if available
+		let location = photo.asset.location
+		let gpsLatitude = location?.coordinate.latitude
+		let gpsLongitude = location?.coordinate.longitude
+		
+		// Create PhotoMetadata with Apple Photo ID
+		let photoMetadata = PhotoMetadata(
+			dateTaken: creationDate,
+			fileModificationDate: modificationDate,
+			fileSize: fileSize,
+			pixelWidth: width,
+			pixelHeight: height,
+			cameraMake: nil, // Could extract from EXIF if needed
+			cameraModel: nil, // Could extract from EXIF if needed
+			orientation: nil,
+			gpsLatitude: gpsLatitude,
+			gpsLongitude: gpsLongitude,
+			applePhotoID: photo.asset.localIdentifier
+		)
+		try await s3Service.uploadMetadata(photoMetadata, md5: md5, userId: userId)
+		
+		print("Successfully uploaded Apple Photo: \(photo.filename) with ID: \(photo.asset.localIdentifier)")
 	}
 	
 	func deletePhoto(_ photoRef: PhotoFile) async throws {

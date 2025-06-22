@@ -18,6 +18,7 @@ class PhotoMetadata: NSObject, Codable {
 	let orientation: Int?
 	let gpsLatitude: Double?
 	let gpsLongitude: Double?
+	let applePhotoID: String? // Apple Photo localIdentifier for catalog mapping
 
 	// Computed properties
 	var displayDate: Date {
@@ -62,7 +63,8 @@ class PhotoMetadata: NSObject, Codable {
 		cameraModel: String? = nil,
 		orientation: Int? = nil,
 		gpsLatitude: Double? = nil,
-		gpsLongitude: Double? = nil
+		gpsLongitude: Double? = nil,
+		applePhotoID: String? = nil
 	) {
 		self.dateTaken = dateTaken
 		self.fileModificationDate = fileModificationDate
@@ -74,6 +76,7 @@ class PhotoMetadata: NSObject, Codable {
 		self.orientation = orientation
 		self.gpsLatitude = gpsLatitude
 		self.gpsLongitude = gpsLongitude
+		self.applePhotoID = applePhotoID
 		super.init()
 	}
 
@@ -81,6 +84,6 @@ class PhotoMetadata: NSObject, Codable {
 	enum CodingKeys: String, CodingKey {
 		case dateTaken, fileModificationDate, fileSize
 		case pixelWidth, pixelHeight, cameraMake, cameraModel
-		case orientation, gpsLatitude, gpsLongitude
+		case orientation, gpsLatitude, gpsLongitude, applePhotoID
 	}
 }

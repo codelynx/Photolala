@@ -371,20 +371,7 @@ class BackupQueueManager: ObservableObject {
 	}
 	
 	private func uploadApplePhoto(_ photo: PhotoApple) async throws {
-		// Create a temporary PhotoFile wrapper for S3BackupManager
-		// This is a workaround until S3BackupManager supports PhotoItem protocol
-		let data = try await photo.loadImageData()
-		let tempURL = FileManager.default.temporaryDirectory.appendingPathComponent(photo.filename)
-		try data.write(to: tempURL)
-		defer {
-			try? FileManager.default.removeItem(at: tempURL)
-		}
-		
-		let photoFile = PhotoFile(
-			directoryPath: tempURL.deletingLastPathComponent().path as NSString,
-			filename: tempURL.lastPathComponent
-		)
-		try await S3BackupManager.shared.uploadPhoto(photoFile)
+		try await S3BackupManager.shared.uploadApplePhoto(photo)
 		print("Successfully uploaded Apple Photo: \(photo.displayName)")
 	}
 	

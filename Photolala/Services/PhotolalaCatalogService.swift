@@ -34,25 +34,27 @@ actor PhotolalaCatalogService {
 		let modified: Date
 		let width: Int?
 		let height: Int?
+		let applePhotoID: String? // New field for v5.1
 		
-		// CSV format: md5,filename,size,photodate,modified,width,height
+		// CSV format: md5,filename,size,photodate,modified,width,height[,applePhotoID] (v5.1)
 		var csvLine: String {
 			let widthStr = width.map(String.init) ?? ""
 			let heightStr = height.map(String.init) ?? ""
 			let photodateStr = String(Int(photodate.timeIntervalSince1970))
 			let modifiedStr = String(Int(modified.timeIntervalSince1970))
+			let applePhotoIDStr = applePhotoID ?? ""
 			
 			// Escape filename if it contains commas or quotes
 			let escapedFilename = filename.contains(",") || filename.contains("\"") 
 				? "\"\(filename.replacingOccurrences(of: "\"", with: "\"\""))\"" 
 				: filename
 			
-			return "\(md5),\(escapedFilename),\(size),\(photodateStr),\(modifiedStr),\(widthStr),\(heightStr)"
+			return "\(md5),\(escapedFilename),\(size),\(photodateStr),\(modifiedStr),\(widthStr),\(heightStr),\(applePhotoIDStr)"
 		}
 		
 		// Memberwise initializer for testing
 		#if DEBUG
-		init(md5: String, filename: String, size: Int64, photodate: Date, modified: Date, width: Int?, height: Int?) {
+		init(md5: String, filename: String, size: Int64, photodate: Date, modified: Date, width: Int?, height: Int?, applePhotoID: String? = nil) {
 			self.md5 = md5
 			self.filename = filename
 			self.size = size
@@ -60,6 +62,7 @@ actor PhotolalaCatalogService {
 			self.modified = modified
 			self.width = width
 			self.height = height
+			self.applePhotoID = applePhotoID
 		}
 		#endif
 		
@@ -118,11 +121,28 @@ actor PhotolalaCatalogService {
 			// Optional width
 			let widthStr = scanner.scanUpToCharacters(from: CharacterSet(charactersIn: ",")) ?? ""
 			let width = widthStr.isEmpty ? nil : Int(widthStr)
-			_ = scanner.scanCharacter()
 			
-			// Optional height
-			let heightStr = scanner.scanUpToCharacters(from: CharacterSet(charactersIn: "\n")) ?? ""
-			let height = heightStr.isEmpty ? nil : Int(heightStr)
+			// Optional height and applePhotoID
+			let height: Int?
+			let applePhotoID: String?
+			
+			if scanner.scanCharacter() != nil { // consume comma if present
+				// Height field exists
+				let heightStr = scanner.scanUpToCharacters(from: CharacterSet(charactersIn: ",\n")) ?? ""
+				height = heightStr.isEmpty ? nil : Int(heightStr)
+				
+				// Check for optional applePhotoID (v5.1 format)
+				if scanner.scanCharacter() != nil { // consume comma if present
+					let applePhotoIDStr = scanner.scanUpToCharacters(from: CharacterSet(charactersIn: "\n")) ?? ""
+					applePhotoID = applePhotoIDStr.isEmpty ? nil : applePhotoIDStr
+				} else {
+					applePhotoID = nil
+				}
+			} else {
+				// No comma after width, so no height or applePhotoID
+				height = nil
+				applePhotoID = nil
+			}
 			
 			self.md5 = md5
 			self.filename = filename
@@ -131,6 +151,7 @@ actor PhotolalaCatalogService {
 			self.modified = Date(timeIntervalSince1970: modifiedTimestamp)
 			self.width = width
 			self.height = height
+			self.applePhotoID = applePhotoID
 		}
 	}
 	

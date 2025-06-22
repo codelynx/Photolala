@@ -69,14 +69,15 @@ actor S3CatalogGenerator {
 			let modified = photo.lastModified ?? Date()
 			let width = photoMetadata?.pixelWidth
 			let height = photoMetadata?.pixelHeight
+			let applePhotoID = photoMetadata?.applePhotoID ?? ""
 			
 			let widthStr = width.map(String.init) ?? ""
 			let heightStr = height.map(String.init) ?? ""
 			let photoDateStr = String(Int(photoDate.timeIntervalSince1970))
 			let modifiedStr = String(Int(modified.timeIntervalSince1970))
 			
-			// Create CSV line
-			let csvLine = "\(md5),\(filename),\(size),\(photoDateStr),\(modifiedStr),\(widthStr),\(heightStr)"
+			// Create CSV line (v5.1 format includes applePhotoID field)
+			let csvLine = "\(md5),\(filename),\(size),\(photoDateStr),\(modifiedStr),\(widthStr),\(heightStr),\(applePhotoID)"
 			
 			guard let entry = PhotolalaCatalogService.CatalogEntry(csvLine: csvLine) else {
 				continue
@@ -116,7 +117,7 @@ actor S3CatalogGenerator {
 		
 		// Step 7: Create manifest
 		let manifest = PhotolalaCatalogService.CatalogManifest(
-			version: "5.0",
+			version: "5.1", // Updated for Apple Photo ID support
 			directoryUUID: UUID().uuidString,
 			created: Date(),
 			modified: Date(),
@@ -137,11 +138,11 @@ actor S3CatalogGenerator {
 	func uploadCatalog(for userId: String, manifest: Data, shards: [Int: Data]) async throws {
 		print("Uploading catalog for user: \(userId)")
 		
-		// Upload manifest (v5.0 structure)
+		// Upload manifest (v5.1 structure)
 		let manifestKey = "catalogs/\(userId)/.photolala/manifest.plist"
 		try await uploadData(manifest, to: manifestKey)
 		
-		// Upload shards (v5.0 structure)
+		// Upload shards (v5.1 structure)
 		for (index, data) in shards {
 			let shardKey = "catalogs/\(userId)/.photolala/\(String(format: "%x", index)).csv"
 			try await uploadData(data, to: shardKey)
@@ -294,7 +295,8 @@ actor S3CatalogGenerator {
 				aperture: nil,
 				shutterSpeed: nil,
 				iso: nil,
-				location: location
+				location: location,
+				applePhotoID: photoMetadata.applePhotoID
 			)
 		} catch {
 			print("Failed to decode metadata: \(error)")
@@ -383,6 +385,7 @@ struct PhotoMetadataInfo: Codable {
 	let shutterSpeed: String?
 	let iso: Int?
 	let location: LocationInfo?
+	let applePhotoID: String?
 	
 	struct LocationInfo: Codable {
 		let latitude: Double

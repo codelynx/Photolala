@@ -300,4 +300,108 @@ final class PhotolalaCatalogServiceTests: XCTestCase {
 			}
 		}
 	}
+	
+	// MARK: - Backward Compatibility Tests
+	
+	func testParseV50CatalogEntry() async throws {
+		// Test parsing v5.0 format (7 fields)
+		let v50Line = "abc123def456,photo.jpg,1024000,1701234567,1701234568,4000,3000"
+		
+		guard let entry = PhotolalaCatalogService.CatalogEntry(csvLine: v50Line) else {
+			XCTFail("Failed to parse v5.0 catalog entry")
+			return
+		}
+		
+		XCTAssertEqual(entry.md5, "abc123def456")
+		XCTAssertEqual(entry.filename, "photo.jpg")
+		XCTAssertEqual(entry.size, 1024000)
+		XCTAssertEqual(entry.photodate, Date(timeIntervalSince1970: 1701234567))
+		XCTAssertEqual(entry.modified, Date(timeIntervalSince1970: 1701234568))
+		XCTAssertEqual(entry.width, 4000)
+		XCTAssertEqual(entry.height, 3000)
+		XCTAssertNil(entry.applePhotoID, "v5.0 entry should have nil applePhotoID")
+	}
+	
+	func testParseV51CatalogEntry() async throws {
+		// Test parsing v5.1 format (8 fields)
+		let v51Line = "abc123def456,photo.jpg,1024000,1701234567,1701234568,4000,3000,A1B2C3D4-E5F6-7890-ABCD-EF1234567890"
+		
+		guard let entry = PhotolalaCatalogService.CatalogEntry(csvLine: v51Line) else {
+			XCTFail("Failed to parse v5.1 catalog entry")
+			return
+		}
+		
+		XCTAssertEqual(entry.md5, "abc123def456")
+		XCTAssertEqual(entry.filename, "photo.jpg")
+		XCTAssertEqual(entry.size, 1024000)
+		XCTAssertEqual(entry.photodate, Date(timeIntervalSince1970: 1701234567))
+		XCTAssertEqual(entry.modified, Date(timeIntervalSince1970: 1701234568))
+		XCTAssertEqual(entry.width, 4000)
+		XCTAssertEqual(entry.height, 3000)
+		XCTAssertEqual(entry.applePhotoID, "A1B2C3D4-E5F6-7890-ABCD-EF1234567890")
+	}
+	
+	func testParseV51CatalogEntryWithEmptyApplePhotoID() async throws {
+		// Test parsing v5.1 format with empty applePhotoID
+		let v51Line = "abc123def456,photo.jpg,1024000,1701234567,1701234568,4000,3000,"
+		
+		guard let entry = PhotolalaCatalogService.CatalogEntry(csvLine: v51Line) else {
+			XCTFail("Failed to parse v5.1 catalog entry with empty applePhotoID")
+			return
+		}
+		
+		XCTAssertNil(entry.applePhotoID, "Empty applePhotoID should be parsed as nil")
+	}
+	
+	func testWriteV51CatalogEntry() async throws {
+		// Test writing v5.1 format
+		#if DEBUG
+		let entry = PhotolalaCatalogService.CatalogEntry(
+			md5: "abc123def456",
+			filename: "photo.jpg",
+			size: 1024000,
+			photodate: Date(timeIntervalSince1970: 1701234567),
+			modified: Date(timeIntervalSince1970: 1701234568),
+			width: 4000,
+			height: 3000,
+			applePhotoID: "A1B2C3D4-E5F6-7890-ABCD-EF1234567890"
+		)
+		#else
+		// If not in DEBUG mode, parse from CSV
+		let csvLine = "abc123def456,photo.jpg,1024000,1701234567,1701234568,4000,3000,A1B2C3D4-E5F6-7890-ABCD-EF1234567890"
+		guard let entry = PhotolalaCatalogService.CatalogEntry(csvLine: csvLine) else {
+			XCTFail("Failed to create catalog entry")
+			return
+		}
+		#endif
+		
+		let csvLine = entry.csvLine
+		XCTAssertEqual(csvLine, "abc123def456,photo.jpg,1024000,1701234567,1701234568,4000,3000,A1B2C3D4-E5F6-7890-ABCD-EF1234567890")
+	}
+	
+	func testWriteV51CatalogEntryWithoutApplePhotoID() async throws {
+		// Test writing v5.1 format without applePhotoID
+		#if DEBUG
+		let entry = PhotolalaCatalogService.CatalogEntry(
+			md5: "abc123def456",
+			filename: "photo.jpg",
+			size: 1024000,
+			photodate: Date(timeIntervalSince1970: 1701234567),
+			modified: Date(timeIntervalSince1970: 1701234568),
+			width: 4000,
+			height: 3000,
+			applePhotoID: nil
+		)
+		#else
+		// If not in DEBUG mode, parse from CSV
+		let csvLine = "abc123def456,photo.jpg,1024000,1701234567,1701234568,4000,3000,"
+		guard let entry = PhotolalaCatalogService.CatalogEntry(csvLine: csvLine) else {
+			XCTFail("Failed to create catalog entry")
+			return
+		}
+		#endif
+		
+		let csvLine = entry.csvLine
+		XCTAssertEqual(csvLine, "abc123def456,photo.jpg,1024000,1701234567,1701234568,4000,3000,")
+	}
 }
