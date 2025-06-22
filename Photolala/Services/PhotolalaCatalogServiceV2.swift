@@ -237,7 +237,8 @@ class PhotolalaCatalogServiceV2 {
 	
 	// Import from legacy CSV catalog
 	func importFromLegacyCatalog(at directoryURL: URL) async throws -> PhotoCatalog {
-		let catalog = try await loadCatalog(for: directoryURL)
+		// Call the non-protocol version explicitly
+		let catalog: PhotoCatalog = try await self.loadCatalog(for: directoryURL)
 		
 		// Load legacy catalog
 		let legacyService = PhotolalaCatalogService(catalogURL: directoryURL)
@@ -267,5 +268,70 @@ class PhotolalaCatalogServiceV2 {
 	enum CatalogError: Error {
 		case invalidMD5
 		case catalogNotFound
+	}
+}
+
+// MARK: - CatalogService Protocol Conformance
+
+extension PhotolalaCatalogServiceV2: CatalogService {
+	func loadCatalog(for directoryURL: URL) async throws -> Any {
+		// Call the non-protocol version explicitly
+		let catalog: PhotoCatalog = try await self.loadCatalog(for: directoryURL)
+		return catalog
+	}
+	
+	func findEntry(md5: String) async throws -> CatalogEntryProtocol? {
+		// Call the non-protocol version explicitly
+		let entry: CatalogPhotoEntry? = try await self.findEntry(md5: md5)
+		return entry
+	}
+	
+	func updateStarStatus(md5: String, isStarred: Bool) async throws {
+		// Call the non-protocol version explicitly
+		let entry: CatalogPhotoEntry? = try await self.findEntry(md5: md5)
+		guard let entry = entry else { return }
+		entry.isStarred = isStarred
+		try modelContext.save()
+	}
+	
+	func updateBackupStatus(md5: String, status: BackupStatus) async throws {
+		// Call the non-protocol version explicitly
+		let entry: CatalogPhotoEntry? = try await self.findEntry(md5: md5)
+		guard let entry = entry else { return }
+		entry.backupStatus = status
+		try modelContext.save()
+	}
+	
+	func getStarredEntries() async throws -> [CatalogEntryProtocol] {
+		// Query SwiftData for starred entries
+		let descriptor = FetchDescriptor<CatalogPhotoEntry>(
+			predicate: #Predicate { $0.isStarred == true }
+		)
+		return try modelContext.fetch(descriptor)
+	}
+	
+	func getCatalogStats() async throws -> CatalogStats {
+		// Implement stats for SwiftData
+		let totalDescriptor = FetchDescriptor<CatalogPhotoEntry>()
+		let total = try modelContext.fetchCount(totalDescriptor)
+		
+		let starredDescriptor = FetchDescriptor<CatalogPhotoEntry>(
+			predicate: #Predicate { entry in
+				entry.isStarred == true
+			}
+		)
+		let starred = try modelContext.fetchCount(starredDescriptor)
+		
+		// For backup status, fetch all and count manually
+		// SwiftData predicates have issues with enum comparisons
+		let allEntries = try modelContext.fetch(FetchDescriptor<CatalogPhotoEntry>())
+		let backedUp = allEntries.filter { $0.backupStatus == .uploaded }.count
+		
+		return CatalogStats(
+			totalPhotos: total,
+			starredPhotos: starred,
+			backedUpPhotos: backedUp,
+			lastModified: Date() // TODO: Track actual modification date
+		)
 	}
 }

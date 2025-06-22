@@ -27,6 +27,9 @@ class BackupQueueManager: ObservableObject {
 	
 	// Photos to delete from S3 (batched)
 	private var photosToDelete: Set<PhotoFile> = []
+	
+	// Catalog service for persistence (only SwiftData)
+	private let catalogServiceV2: PhotolalaCatalogServiceV2?
 
 	// Activity timer
 	private var inactivityTimer: Timer?
@@ -40,6 +43,13 @@ class BackupQueueManager: ObservableObject {
 	private let queueStateKey = "BackupQueueState"
 
 	private init() {
+		// Initialize catalog service only if SwiftData is enabled
+		if FeatureFlags.useSwiftDataCatalog {
+			self.catalogServiceV2 = try? PhotolalaCatalogServiceV2()
+		} else {
+			self.catalogServiceV2 = nil // CSV catalog updates handled elsewhere
+		}
+		
 		restoreQueueState()
 	}
 
@@ -75,6 +85,14 @@ class BackupQueueManager: ObservableObject {
 			} else {
 				// Add to backup queue
 				addToQueue(photo)
+			}
+		}
+		
+		// Update catalog if SwiftData is available
+		if let catalogServiceV2 = catalogServiceV2, let md5 = photo.md5Hash {
+			let isStarred = isQueued(photo) || backupStatus[md5] == .uploaded
+			Task {
+				try? await catalogServiceV2.updateStarStatus(md5: md5, isStarred: isStarred)
 			}
 		}
 		

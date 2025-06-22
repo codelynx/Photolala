@@ -32,6 +32,8 @@ class CatalogAwarePhotoLoader {
 	}
 	
 	init() {
+		// For now, always use CSV catalog in CatalogAwarePhotoLoader
+		// SwiftData integration happens at a higher level
 		self.catalogService = PhotolalaCatalogService(catalogURL: URL(fileURLWithPath: "/"))
 	}
 	
