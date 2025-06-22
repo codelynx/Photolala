@@ -9,6 +9,30 @@ import Foundation
 import Photos
 import SwiftUI
 
+// File size cache for Apple Photos
+private actor ApplePhotoFileSizeCache {
+	static let shared = ApplePhotoFileSizeCache()
+	
+	private var cache: [String: Int64] = [:]
+	private var loadingStates: [String: Bool] = [:]
+	
+	func getCachedSize(for id: String) -> Int64? {
+		return cache[id]
+	}
+	
+	func setCachedSize(_ size: Int64, for id: String) {
+		cache[id] = size
+	}
+	
+	func isLoading(id: String) -> Bool {
+		return loadingStates[id] ?? false
+	}
+	
+	func setLoading(_ loading: Bool, for id: String) {
+		loadingStates[id] = loading
+	}
+}
+
 /// Represents a photo from Apple Photos Library
 struct PhotoApple: PhotoItem {
 	let asset: PHAsset
@@ -35,8 +59,7 @@ struct PhotoApple: PhotoItem {
 	}
 	
 	var fileSize: Int64? {
-		// File size requires fetching asset resources, which is expensive
-		// Return nil for now and load on demand if needed
+		// File size must be loaded asynchronously
 		nil
 	}
 	
@@ -113,6 +136,62 @@ struct PhotoApple: PhotoItem {
 					continuation.resume(throwing: error)
 				} else if let data = data {
 					continuation.resume(returning: data)
+				} else {
+					continuation.resume(throwing: ApplePhotosError.loadFailed)
+				}
+			}
+		}
+	}
+	
+	// MARK: - Metadata Loading
+	
+	func loadFileSize() async throws -> Int64 {
+		let cache = ApplePhotoFileSizeCache.shared
+		
+		// Check if already cached
+		if let cachedSize = await cache.getCachedSize(for: id) {
+			return cachedSize
+		}
+		
+		// Prevent multiple simultaneous loads
+		guard await !cache.isLoading(id: id) else {
+			// Wait for existing load if in progress
+			var attempts = 0
+			while await cache.isLoading(id: id) && attempts < 30 {
+				try await Task.sleep(nanoseconds: 100_000_000) // 0.1 second
+				attempts += 1
+			}
+			if let size = await cache.getCachedSize(for: id) {
+				return size
+			}
+			throw ApplePhotosError.loadFailed
+		}
+		
+		await cache.setLoading(true, for: id)
+		defer {
+			Task {
+				await cache.setLoading(false, for: id)
+			}
+		}
+		
+		return try await withCheckedThrowingContinuation { continuation in
+			let options = PHImageRequestOptions()
+			options.deliveryMode = .fastFormat // Use fast format for size check
+			options.isNetworkAccessAllowed = true
+			options.isSynchronous = false
+			
+			imageManager.requestImageDataAndOrientation(
+				for: asset,
+				options: options
+			) { data, _, _, info in
+				if let error = info?[PHImageErrorKey] as? Error {
+					continuation.resume(throwing: error)
+				} else if let data = data {
+					let fileSize = Int64(data.count)
+					Task {
+						await cache.setCachedSize(fileSize, for: self.id)
+					}
+					continuation.resume(returning: fileSize)
 				} else {
 					continuation.resume(throwing: ApplePhotosError.loadFailed)
 				}

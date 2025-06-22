@@ -160,13 +160,29 @@ struct ThumbnailSection: View {
 
 struct PhotoInfoSection: View {
 	let photo: any PhotoItem
+	@State private var fileSize: Int64?
+	@State private var isLoadingFileSize = false
 
 	var body: some View {
 		VStack(alignment: .leading, spacing: 8) {
 			Text("Information")
 				.font(.headline)
 
-			if let size = photo.fileSize {
+			// For PhotoApple, use async loaded file size; for others use cached value
+			if let applePhoto = photo as? PhotoApple {
+				if let size = fileSize {
+					InfoRow(label: "Size", value: formatFileSize(size))
+				} else if isLoadingFileSize {
+					HStack {
+						Text("Size")
+							.foregroundColor(.secondary)
+						Spacer()
+						ProgressView()
+							.scaleEffect(0.7)
+					}
+					.font(.system(.body, design: .rounded))
+				}
+			} else if let size = photo.fileSize {
 				InfoRow(label: "Size", value: formatFileSize(size))
 			}
 
@@ -176,6 +192,32 @@ struct PhotoInfoSection: View {
 
 			if let date = photo.creationDate ?? photo.modificationDate {
 				InfoRow(label: "Date", value: date.formatted())
+			}
+		}
+		.task {
+			await loadFileSizeIfNeeded()
+		}
+		.onChange(of: photo.id) { _, _ in
+			Task {
+				await loadFileSizeIfNeeded()
+			}
+		}
+	}
+
+	private func loadFileSizeIfNeeded() async {
+		guard let applePhoto = photo as? PhotoApple else { return }
+		
+		isLoadingFileSize = true
+		do {
+			let size = try await applePhoto.loadFileSize()
+			await MainActor.run {
+				self.fileSize = size
+				self.isLoadingFileSize = false
+			}
+		} catch {
+			print("[PhotoInfoSection] Failed to load file size: \(error)")
+			await MainActor.run {
+				self.isLoadingFileSize = false
 			}
 		}
 	}
