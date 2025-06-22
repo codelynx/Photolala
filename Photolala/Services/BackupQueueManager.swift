@@ -141,6 +141,20 @@ class BackupQueueManager: ObservableObject {
 		saveQueueState()
 		NotificationCenter.default.post(name: NSNotification.Name("BackupQueueChanged"), object: nil)
 	}
+	
+	func addToQueueByHash(_ md5: String) {
+		print("[BackupQueueManager] Adding to queue by hash: \(md5)")
+		
+		// Add to backup status
+		backupStatus[md5] = .queued
+		print("[BackupQueueManager] Set backup status to queued for hash: \(md5)")
+		
+		saveQueueState()
+		NotificationCenter.default.post(name: NSNotification.Name("BackupQueueChanged"), object: nil)
+		
+		// Start/reset the inactivity timer
+		resetInactivityTimer()
+	}
 
 	func isQueued(_ photo: PhotoFile) -> Bool {
 		queuedPhotos.contains(photo)

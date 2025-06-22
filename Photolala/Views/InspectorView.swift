@@ -380,10 +380,9 @@ struct QuickActionsSection: View {
 				applePhotoMD5 = md5
 			}
 			
-			// Create a wrapper PhotoFile-like object for BackupQueueManager
-			// For now, we'll need to extend BackupQueueManager to handle Apple Photos
+			// Add to backup queue by MD5 hash
 			print("[InspectorView] Computed MD5 for Apple Photo: \(md5)")
-			// TODO: Add to backup queue with Apple Photo support
+			BackupQueueManager.shared.addToQueueByHash(md5)
 		} catch {
 			print("[InspectorView] Failed to compute MD5: \(error)")
 		}
