@@ -221,6 +221,14 @@ class UnifiedPhotoCell: NSCollectionViewItem {
 	}
 	
 	private func loadThumbnail(for photo: any PhotoItem) {
+		// Skip if we already have this photo's thumbnail loaded
+		if let current = currentPhoto,
+		   current.id == photo.id,
+		   photoImageView.image != nil {
+			// Already have the thumbnail for this photo
+			return
+		}
+		
 		// Show loading indicator
 		loadingIndicator.startAnimation(nil)
 		

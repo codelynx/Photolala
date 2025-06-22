@@ -30,14 +30,8 @@ struct ApplePhotosBrowserView: View {
 			photoProvider: photoProvider,
 			settings: $settings,
 			onSelectPhoto: { photo, allPhotos in
-				// Handle photo selection
-				if let applePhoto = photo as? PhotoApple {
-					if selection.contains(applePhoto) {
-						selection.remove(applePhoto)
-					} else {
-						selection.insert(applePhoto)
-					}
-				}
+				// Handle photo selection (e.g., for preview navigation)
+				// The actual selection is managed by onSelectionChanged
 			},
 			onSelectionChanged: { photos in
 				// Update selection
