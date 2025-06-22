@@ -184,6 +184,29 @@ class UnifiedPhotoCell: NSCollectionViewItem {
 					}
 				}
 			}
+		} else if let photoApple = photo as? PhotoApple {
+			// Check if Apple Photo has been backed up
+			starImageView.image = nil
+			Task {
+				// Check if MD5 is already cached
+				if let md5 = await ApplePhotosBridge.shared.getMD5(for: photoApple.id) {
+					let status = await MainActor.run {
+						BackupQueueManager.shared.backupStatus[md5]
+					}
+					await MainActor.run {
+						switch status {
+						case .queued, .uploaded:
+							starImageView.image = NSImage(systemSymbolName: "star.fill", accessibilityDescription: nil)
+							starImageView.contentTintColor = .systemYellow
+						case .failed:
+							starImageView.image = NSImage(systemSymbolName: "exclamationmark.circle.fill", accessibilityDescription: nil)
+							starImageView.contentTintColor = .systemRed
+						default:
+							starImageView.image = nil
+						}
+					}
+				}
+			}
 		} else if let photoS3 = photo as? PhotoS3 {
 			// For S3 photos, show a cloud icon to indicate they're already backed up
 			starImageView.image = NSImage(systemSymbolName: "icloud.fill", accessibilityDescription: nil)
@@ -478,6 +501,29 @@ class UnifiedPhotoCell: UICollectionViewCell {
 							default:
 								starImageView.image = nil
 							}
+						}
+					}
+				}
+			}
+		} else if let photoApple = photo as? PhotoApple {
+			// Check if Apple Photo has been backed up
+			starImageView.image = nil
+			Task {
+				// Check if MD5 is already cached
+				if let md5 = await ApplePhotosBridge.shared.getMD5(for: photoApple.id) {
+					let status = await MainActor.run {
+						BackupQueueManager.shared.backupStatus[md5]
+					}
+					await MainActor.run {
+						switch status {
+						case .queued, .uploaded:
+							starImageView.image = UIImage(systemName: "star.fill")
+							starImageView.tintColor = .systemYellow
+						case .failed:
+							starImageView.image = UIImage(systemName: "exclamationmark.circle.fill")
+							starImageView.tintColor = .systemRed
+						default:
+							starImageView.image = nil
 						}
 					}
 				}
