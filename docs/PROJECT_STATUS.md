@@ -856,3 +856,39 @@ The application now features a unified photo browser architecture supporting loc
      - macOS: Building successfully
      - iOS: Building successfully
      - Removed incomplete PhotoAppleWrapper.swift file
+
+43. **SwiftData Local Catalog Refactoring (June 22)**:
+   - **Design Phase Complete**:
+     - Comprehensive design document created
+     - 16-shard architecture (shard0-shardF) matching S3 structure
+     - S3 as master catalog with local SwiftData as cache
+     - No migration needed (product not yet released)
+   
+   - **SwiftData Models Implemented**:
+     - PhotoCatalog: Root entity with 16 individual shard properties
+     - CatalogShard: Contains entries for one shard with dirty tracking
+     - CatalogPhotoEntry: Photo metadata with backup status
+     - Proper relationships with cascade delete rules
+   
+   - **PhotolalaCatalogServiceV2 Implementation**:
+     - @MainActor service for SwiftData operations
+     - loadCatalog, upsertEntry, findEntry, deleteEntry methods
+     - CSV export functionality for S3 sync
+     - Shard-level dirty tracking for efficient updates
+   
+   - **S3 Sync Service (Stub)**:
+     - S3CatalogSyncServiceV2 created with interface
+     - Methods defined but not implemented (throws notImplemented)
+     - S3CatalogManifest structure for tracking checksums
+     - Ready for actual S3 integration
+   
+   - **Code Refactoring**:
+     - Renamed S3BackupService.PhotoEntry to S3PhotoEntry
+     - Fixed all PhotoEntry references throughout codebase
+     - SwiftDataCatalogTests created but not fully passing
+     - Compilation issues resolved
+   
+   - **Build Status**:
+     - Main app builds successfully with SwiftData models
+     - Tests have some issues with PhotolalaCatalogServiceTests
+     - SwiftData implementation ready for integration

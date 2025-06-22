@@ -10,7 +10,7 @@ struct S3BackupTestView: View {
 	@State private var selectedPhotos: [PhotosPickerItem] = []
 	@State private var uploadStatus = ""
 	@State private var isUploading = false
-	@State private var uploadedPhotos: [PhotoEntry] = []
+	@State private var uploadedPhotos: [S3PhotoEntry] = []
 	@State private var showSignInPrompt = false
 	@State private var showSubscriptionView = false
 	@State private var currentStats: S3BackupManager.BackupStats?

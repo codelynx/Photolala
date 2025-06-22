@@ -464,7 +464,7 @@ class S3BackupService: ObservableObject {
 
 	// MARK: - List User Photos
 
-	func listUserPhotos(userId: String) async throws -> [PhotoEntry] {
+	func listUserPhotos(userId: String) async throws -> [S3PhotoEntry] {
 		let prefix = "photos/\(userId)/"
 
 		let listObjectsInput = ListObjectsV2Input(
@@ -474,7 +474,7 @@ class S3BackupService: ObservableObject {
 
 		let response = try await client.listObjectsV2(input: listObjectsInput)
 
-		var photos: [PhotoEntry] = []
+		var photos: [S3PhotoEntry] = []
 
 		for object in response.contents ?? [] {
 			guard let key = object.key,
@@ -486,7 +486,7 @@ class S3BackupService: ObservableObject {
 				.replacingOccurrences(of: prefix, with: "")
 				.replacingOccurrences(of: ".dat", with: "")
 
-			photos.append(PhotoEntry(
+			photos.append(S3PhotoEntry(
 				md5: md5,
 				size: Int64(size),
 				lastModified: Date(timeIntervalSince1970: lastModified.timeIntervalSince1970),
@@ -499,7 +499,7 @@ class S3BackupService: ObservableObject {
 	
 	// MARK: - List Photos with Metadata
 	
-	func listUserPhotosWithMetadata(userId: String) async throws -> [PhotoEntry] {
+	func listUserPhotosWithMetadata(userId: String) async throws -> [S3PhotoEntry] {
 		// Get photos and metadata in parallel
 		async let photosTask = listUserPhotos(userId: userId)
 		async let metadataTask = listUserMetadata(userId: userId)
@@ -659,7 +659,7 @@ class S3BackupService: ObservableObject {
 
 // MARK: - Supporting Types
 
-struct PhotoEntry {
+struct S3PhotoEntry {
 	let md5: String
 	let size: Int64
 	let lastModified: Date
