@@ -48,9 +48,10 @@ struct IAPDeveloperView: View {
 		}
 		.padding()
 		.frame(width: 600, height: 700)
-		.sheet(isPresented: $showingReceipt) {
-			ReceiptView(receiptData: receiptData)
-		}
+		// TODO: ReceiptView was removed - implement receipt display if needed
+		// .sheet(isPresented: $showingReceipt) {
+		// 	ReceiptView(receiptData: receiptData)
+		// }
 		.onAppear {
 			Task {
 				await iapManager.loadProducts()

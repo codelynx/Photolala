@@ -301,21 +301,14 @@ struct PhotolalaCommands: Commands {
 		}
 
 		private func showS3BackupTest() {
-			let window = NSWindow(
-				contentRect: NSRect(x: 0, y: 0, width: 700, height: 800),
-				styleMask: [.titled, .closable, .resizable],
-				backing: .buffered,
-				defer: false
-			)
-
-			window.title = "S3 Backup"
-			window.center()
-			window.contentView = NSHostingView(rootView: S3BackupTestView())
-			window.makeKeyAndOrderFront(nil)
-
-			// Keep window in front but not floating
-			window.level = .normal
-			window.isReleasedWhenClosed = false
+			// TODO: S3BackupTestView was removed - implement proper S3 backup UI if needed
+			print("S3 Backup test view has been removed")
+			
+			// Temporary: Show alert instead
+			let alert = NSAlert()
+			alert.messageText = "S3 Backup Test"
+			alert.informativeText = "The S3 backup test view has been removed. This functionality needs to be reimplemented."
+			alert.runModal()
 		}
 
 		private func showSubscriptionView() {

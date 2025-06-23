@@ -9,13 +9,13 @@ This document tracks potentially dead code in the Photolala codebase that can be
 ## Quick Summary
 
 ### Confirmed Dead Code (Safe to Remove)
-1. `S3CatalogSyncService.swift` - Replaced by V2
-2. `PhotolalaCatalogServiceTests.swift` - Tests for legacy service
-3. Test files in production code (5 files)
+1. ~~Test files in production code (5 files)~~ ✅ Removed
+2. ~~`PhotolalaCatalogServiceTests.swift`~~ ✅ Removed
 
 ### Likely Dead (Needs Verification)
 1. `PhotolalaCatalogService.swift` - Keep until migration complete
-2. Various TODO comments (37 total)
+2. `S3CatalogSyncService.swift` - Blocked by S3PhotoBrowserView dependency
+3. Various TODO comments (37 total)
 
 ### Actually In Use (Keep)
 1. V2 services (PhotolalaCatalogServiceV2, S3CatalogSyncServiceV2)
@@ -44,11 +44,13 @@ This document tracks potentially dead code in the Photolala codebase that can be
 - **Action**: Keep until migration from CSV to SwiftData is complete
 
 #### S3CatalogSyncService (Original)
-- **Status**: 🔴 Confirmed Dead
+- **Status**: 🟡 Blocked by Dependencies
 - **Location**: `Photolala/Services/S3CatalogSyncService.swift`
 - **Rationale**: Replaced by S3CatalogSyncServiceV2
-- **Dependencies**: S3PhotoProvider now uses V2
-- **Action**: Can be removed
+- **Dependencies**: 
+  - S3PhotoBrowserView still uses V1 (needs migration)
+  - S3PhotoProvider correctly uses V2
+- **Action**: Migrate S3PhotoBrowserView to V2 first
 
 #### PhotolalaCatalogServiceV2 and S3CatalogSyncServiceV2
 - **Status**: 🟢 In Use
@@ -193,7 +195,14 @@ done
 ## Completed Removals
 
 ### June 22, 2025
-- (None yet)
+- ✅ `TestCatalogGenerator.swift` - Test utility in production
+- ✅ `IAPTestView.swift` - IAP test view
+- ✅ `ReceiptValidationTestView.swift` - Receipt test view
+- ✅ `ResourceTestView.swift` - Resource test view
+- ✅ `S3BackupTestView.swift` - S3 backup test view
+- ✅ `PhotolalaCatalogServiceTests.swift` - Legacy catalog tests
+- ✅ Updated `IAPDeveloperView.swift` - Removed ReceiptView reference
+- ✅ Updated `PhotolalaCommands.swift` - Replaced S3BackupTestView with alert
 
 ## Next Steps
 
