@@ -66,8 +66,8 @@ struct SignInPromptView: View {
 		}
 		.frame(width: 500, height: 600)
 		.background(Color(XPlatform.secondaryBackgroundColor))
-			.onChange(of: self.identityManager.isSignedIn) { _, isSignedIn in
-				if isSignedIn {
+			.onChange(of: self.identityManager.isSignedIn) { oldValue, newValue in
+				if newValue {
 					self.dismiss()
 				}
 			}

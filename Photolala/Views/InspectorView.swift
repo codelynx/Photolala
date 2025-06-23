@@ -93,7 +93,7 @@ struct SinglePhotoInspector: View {
 		.task {
 			await loadThumbnail()
 		}
-		.onChange(of: photo.id) { _, _ in
+		.onChange(of: photo.id) {
 			Task {
 				await loadThumbnail()
 			}
@@ -197,7 +197,7 @@ struct PhotoInfoSection: View {
 		.task {
 			await loadFileSizeIfNeeded()
 		}
-		.onChange(of: photo.id) { _, _ in
+		.onChange(of: photo.id) {
 			Task {
 				await loadFileSizeIfNeeded()
 			}
@@ -341,7 +341,7 @@ struct QuickActionsSection: View {
 		.task {
 			await loadApplePhotoMD5IfNeeded()
 		}
-		.onChange(of: photo.id) { _, _ in
+		.onChange(of: photo.id) {
 			// Reset state when photo changes
 			applePhotoMD5 = nil
 			isLoadingMD5 = false

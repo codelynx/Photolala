@@ -138,9 +138,9 @@ struct S3PhotoBrowserView: View {
 			isPresented: $showingInspector,
 			selection: inspectorSelection
 		)
-		.onChange(of: showingInspector) { _, isShowing in
+		.onChange(of: showingInspector) { oldValue, newValue in
 			// If showing inspector and we have selection, scroll to it
-			if isShowing && !selectedPhotos.isEmpty {
+			if newValue && !selectedPhotos.isEmpty {
 				scrollToSelection = true
 			}
 		}

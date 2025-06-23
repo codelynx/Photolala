@@ -189,7 +189,7 @@ struct PhotoPreviewView: View {
 		.onDisappear {
 			self.controlsTimer?.invalidate()
 		}
-		.onChange(of: self.currentIndex) { _, _ in
+		.onChange(of: self.currentIndex) {
 			self.loadCurrentImage()
 		}
 		#if os(macOS)
@@ -514,7 +514,7 @@ struct ThumbnailStrip: View {
 			}
 			.frame(height: self.thumbnailSize.height + 24)
 			.background(Color.black.opacity(0.8))
-			.onChange(of: self.currentIndex) { _ in
+			.onChange(of: self.currentIndex) {
 				withAnimation {
 					proxy.scrollTo(self.currentIndex, anchor: .center)
 				}

@@ -48,9 +48,9 @@ struct ApplePhotosBrowserView: View {
 			InspectorView(selection: inspectorSelection)
 				.inspectorColumnWidth(min: 250, ideal: 300, max: 400)
 		}
-		.onChange(of: showingInspector) { _, isShowing in
+		.onChange(of: showingInspector) { oldValue, newValue in
 			// If showing inspector and we have selection, scroll to it
-			if isShowing && !selection.isEmpty {
+			if newValue && !selection.isEmpty {
 				scrollToSelection = true
 			}
 		}
