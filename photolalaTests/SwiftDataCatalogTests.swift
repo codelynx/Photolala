@@ -39,7 +39,7 @@ final class SwiftDataCatalogTests: XCTestCase {
 	
 	func testCreateCatalog() async throws {
 		// Create catalog
-		let catalog = try await catalogService.loadCatalog(for: testDirectory)
+		let catalog = try await catalogService.loadPhotoCatalog(for: testDirectory)
 		
 		XCTAssertEqual(catalog.directoryPath, testDirectory.path)
 		XCTAssertEqual(catalog.version, "6.0")
@@ -65,7 +65,7 @@ final class SwiftDataCatalogTests: XCTestCase {
 	}
 	
 	func testShardForMD5() async throws {
-		let catalog = try await catalogService.loadCatalog(for: testDirectory)
+		let catalog = try await catalogService.loadPhotoCatalog(for: testDirectory)
 		
 		// Test each hex digit maps to correct shard
 		XCTAssertEqual(catalog.shard(for: "0abcdef")?.index, 0)
@@ -91,7 +91,7 @@ final class SwiftDataCatalogTests: XCTestCase {
 	}
 	
 	func testAddEntry() async throws {
-		let catalog = try await catalogService.loadCatalog(for: testDirectory)
+		let catalog = try await catalogService.loadPhotoCatalog(for: testDirectory)
 		
 		// Create test entry
 		let entry = CatalogPhotoEntry(
@@ -108,7 +108,7 @@ final class SwiftDataCatalogTests: XCTestCase {
 		}
 		
 		// Verify entry was added
-		let found = try await catalogService.findEntry(md5: "a1b2c3d4e5f6")
+		let found = try await catalogService.findPhotoEntry(md5: "a1b2c3d4e5f6")
 		XCTAssertNotNil(found)
 		XCTAssertEqual(found?.filename, "test.jpg")
 		XCTAssertEqual(found?.fileSize, 1024)
@@ -119,7 +119,7 @@ final class SwiftDataCatalogTests: XCTestCase {
 	}
 	
 	func testCSVExport() async throws {
-		let catalog = try await catalogService.loadCatalog(for: testDirectory)
+		let catalog = try await catalogService.loadPhotoCatalog(for: testDirectory)
 		
 		// Add multiple entries to same shard
 		let entries = [

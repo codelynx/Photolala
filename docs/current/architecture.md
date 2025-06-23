@@ -126,12 +126,21 @@ Photolala is a cross-platform photo browser application built with SwiftUI, supp
 - Cancels non-visible requests during fast scrolling
 - Integrates with PhotoManager for actual thumbnail generation
 
-#### PhotolalaCatalogService
+#### PhotolalaCatalogService (Legacy CSV)
 - Manages v5.0 offline catalogs with `.photolala/` directory structure
 - 16-way MD5-based sharding for scalability
 - CSV format: `md5,filename,size,photodate,modified,width,height`
 - Directory UUID for cache invalidation
 - Atomic updates for consistency
+
+#### PhotolalaCatalogServiceV2 (SwiftData)
+- Modern SwiftData-based catalog storage with rich metadata
+- 16 CatalogShard entities for clear sync tracking
+- Core fields sync to S3 CSV format (v5.1 with headers)
+- Extended metadata stored locally only
+- @MainActor for thread safety
+- Efficient backup status tracking by MD5
+- Methods renamed to avoid ambiguity: loadPhotoCatalog, findPhotoEntry
 
 #### S3BackupService
 - Uploads photos to S3 with Deep Archive storage
@@ -147,18 +156,28 @@ Photolala is a cross-platform photo browser application built with SwiftUI, supp
 - AWS credentials from Keychain/environment
 
 #### S3CatalogGenerator
-- Creates v5.0 catalog format with `.photolala/` structure
+- Creates v5.1 catalog format with `.photolala/` structure
 - 16-way sharding based on MD5 hash prefix (0-f)
-- CSV format: md5,filename,size,photodate,modified,width,height
+- CSV format with headers: md5,filename,size,photodate,modified,width,height,applephotoid
+- Headers use lowercase "applephotoid" for consistency
 - Uploads to `catalogs/{userId}/.photolala/` path
 - Enables browsing without ListObjects calls
 
-#### S3CatalogSyncService
+#### S3CatalogSyncService (Legacy)
 - Syncs v5.0 catalog from S3 to local cache
 - Downloads from `catalogs/{userId}/.photolala/` path
 - Manifest-based change detection with directory UUID
 - Atomic updates with temporary directory swap
 - Offline mode support
+
+#### S3CatalogSyncServiceV2 (SwiftData)
+- Actor-based thread-safe implementation
+- Syncs S3 CSV catalogs to local SwiftData storage
+- Progress reporting with status text updates
+- Handles legacy .photolala directory structure
+- Automatic CSV header detection and skipping
+- Efficient shard-level sync with checksums
+- Error handling with string-based AWS error detection
 
 #### S3DownloadService (Actor)
 - Downloads thumbnails and photos from S3

@@ -858,37 +858,70 @@ The application now features a unified photo browser architecture supporting loc
      - Removed incomplete PhotoAppleWrapper.swift file
 
 43. **SwiftData Local Catalog Refactoring (June 22)**:
-   - **Design Phase Complete**:
-     - Comprehensive design document created
-     - 16-shard architecture (shard0-shardF) matching S3 structure
-     - S3 as master catalog with local SwiftData as cache
-     - No migration needed (product not yet released)
+   - **Phase 2B & 2C Completed**:
+     - Full SwiftData catalog implementation with 16-shard architecture
+     - S3 synchronization with progress tracking
+     - UI integration with sync status display
+     - CSV format v5.1 with headers (including applephotoid)
    
-   - **SwiftData Models Implemented**:
-     - PhotoCatalog: Root entity with 16 individual shard properties
-     - CatalogShard: Contains entries for one shard with dirty tracking
-     - CatalogPhotoEntry: Photo metadata with backup status
-     - Proper relationships with cascade delete rules
+   - **SwiftData Implementation**:
+     - PhotolalaCatalogServiceV2: Thread-safe catalog management
+     - Methods renamed to avoid ambiguity (loadPhotoCatalog, findPhotoEntry)
+     - Efficient backup status tracking by MD5
+     - CSV export with headers for all shards
    
-   - **PhotolalaCatalogServiceV2 Implementation**:
-     - @MainActor service for SwiftData operations
-     - loadCatalog, upsertEntry, findEntry, deleteEntry methods
-     - CSV export functionality for S3 sync
-     - Shard-level dirty tracking for efficient updates
+   - **S3 Synchronization**:
+     - S3CatalogSyncServiceV2: Actor-based sync service
+     - Progress reporting with detailed status messages
+     - Handles legacy .photolala directory structure
+     - String-based AWS error detection (no AWSServiceError)
+     - ETag-based change detection
    
-   - **S3 Sync Service (Stub)**:
-     - S3CatalogSyncServiceV2 created with interface
-     - Methods defined but not implemented (throws notImplemented)
-     - S3CatalogManifest structure for tracking checksums
-     - Ready for actual S3 integration
+   - **UI Integration**:
+     - S3PhotoBrowserView shows sync progress overlay
+     - Real-time progress bar and status text
+     - Smooth animations during sync
+     - Error state handling
    
-   - **Code Refactoring**:
-     - Renamed S3BackupService.PhotoEntry to S3PhotoEntry
-     - Fixed all PhotoEntry references throughout codebase
-     - SwiftDataCatalogTests created but not fully passing
-     - Compilation issues resolved
+   - **Technical Improvements**:
+     - Fixed bucket name consistency (photolala-photos)
+     - Automatic CSV header detection and skipping
+     - Robust error handling without SDK dependencies
+     - SwiftData context management improvements
    
-   - **Build Status**:
-     - Main app builds successfully with SwiftData models
-     - Tests have some issues with PhotolalaCatalogServiceTests
-     - SwiftData implementation ready for integration
+   - **Documentation Created**:
+     - catalog-system-v2.md: Complete v2 architecture
+     - csv-to-swiftdata-migration.md: Migration guide
+     - Updated architecture.md with V2 services
+   
+   - **Testing Results**:
+     - Photo upload and catalog generation working
+     - Cloud browser displays synced photos correctly
+     - Sync progress UI functioning smoothly
+     - Minor SwiftData context warnings (non-blocking)
+
+44. **SwiftData Catalog Phase 2B/2C Complete (June 22 - Session 2)**:
+   - **Implemented Full S3 Synchronization**:
+     - S3CatalogSyncServiceV2 with actor-based concurrency
+     - Progress tracking with human-readable status messages
+     - Robust error handling without AWSServiceError dependency
+     - Support for legacy .photolala directory structure
+   
+   - **UI Integration Complete**:
+     - S3PhotoBrowserView shows real-time sync progress
+     - Smooth overlay animation at bottom of view
+     - Progress bar with percentage and status text
+     - Error state handling with retry capability
+   
+   - **Technical Fixes Applied**:
+     - AWS SDK error detection using string matching
+     - Method names clarified (loadPhotoCatalog, findPhotoEntry)
+     - Bucket name standardized to "photolala-photos"
+     - CSV headers always included (future-proofing)
+     - SwiftData context management improved
+   
+   - **Next Phase (2D/2E)**:
+     - Implement conflict resolution UI
+     - Add CSV to SwiftData migration
+     - Performance optimization for large catalogs
+     - Background sync scheduling

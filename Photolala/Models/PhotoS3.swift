@@ -69,6 +69,23 @@ struct PhotoS3: Identifiable, Hashable {
 		self.storageClass = s3Info.map { S3StorageClass(rawValue: $0.storageClass) ?? .standard } ?? .standard
 	}
 	
+	// Initialize from CatalogPhotoEntry (SwiftData) and S3 info
+	init(from catalogEntry: CatalogPhotoEntry,
+		 s3Info: S3MasterCatalog.PhotoInfo?,
+		 userId: String) {
+		self.md5 = catalogEntry.md5
+		self.filename = catalogEntry.filename
+		self.size = catalogEntry.fileSize
+		self.photoDate = catalogEntry.photoDate
+		self.modified = catalogEntry.fileModifiedDate
+		self.width = catalogEntry.pixelWidth
+		self.height = catalogEntry.pixelHeight
+		self.userId = userId
+		
+		self.uploadDate = s3Info?.uploadDate
+		self.storageClass = s3Info.map { S3StorageClass(rawValue: $0.storageClass) ?? .standard } ?? .standard
+	}
+	
 	// Hashable conformance
 	func hash(into hasher: inout Hasher) {
 		hasher.combine(md5)

@@ -111,6 +111,26 @@ struct S3PhotoBrowserView: View {
 				Text(errorMessage)
 			}
 		}
+		.overlay(alignment: .bottom) {
+			// Sync progress overlay
+			if let s3Provider = photoProvider as? S3PhotoProvider,
+			   s3Provider.isSyncing {
+				VStack(spacing: 8) {
+					ProgressView(value: s3Provider.syncProgress)
+						.progressViewStyle(LinearProgressViewStyle())
+					
+					Text(s3Provider.syncStatusText)
+						.font(.caption)
+						.foregroundColor(.secondary)
+				}
+				.padding()
+				.background(.regularMaterial)
+				.cornerRadius(8)
+				.shadow(radius: 4)
+				.padding()
+				.transition(.move(edge: .bottom).combined(with: .opacity))
+			}
+		}
 		#if os(macOS)
 		.frame(minWidth: 600, maxWidth: .infinity, minHeight: 400, maxHeight: .infinity)
 		#endif

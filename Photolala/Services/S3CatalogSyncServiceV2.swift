@@ -7,45 +7,95 @@
 
 import Foundation
 import CryptoKit
+import AWSS3
 
-class S3CatalogSyncServiceV2 {
+@MainActor
+class S3CatalogSyncServiceV2: ObservableObject {
 	private let catalogService: PhotolalaCatalogServiceV2
-	private let s3Service: S3BackupService
-
+	private let s3Service: S3BackupService?
+	
+	// Sync state
+	@Published var isSyncing = false
+	@Published var syncProgress: Double = 0.0
+	@Published var syncStatusText = ""
+	@Published var lastSyncDate: Date?
+	@Published var lastError: Error?
+	
+	// S3 configuration
+	private let bucketName: String
+	private var s3Client: S3Client
+	
 	init(catalogService: PhotolalaCatalogServiceV2, s3Service: S3BackupService) {
 		self.catalogService = catalogService
 		self.s3Service = s3Service
+		
+		// Get S3 configuration from backup service
+		// For now, we'll use environment variables
+		self.bucketName = ProcessInfo.processInfo.environment["S3_BUCKET_NAME"] ?? "photolala"
+		
+		// Initialize S3 client (reuse from backup service if possible)
+		do {
+			self.s3Client = try S3Client(region: ProcessInfo.processInfo.environment["AWS_DEFAULT_REGION"] ?? "us-east-1")
+		} catch {
+			fatalError("Failed to initialize S3 client: \(error)")
+		}
+	}
+	
+	// Alternative initializer that takes S3 client directly
+	init(s3Client: S3Client, userId: String) throws {
+		// Create services inline
+		self.catalogService = try PhotolalaCatalogServiceV2()
+		self.s3Service = nil  // We don't need the backup service when using direct S3 client
+		self.s3Client = s3Client
+		self.bucketName = ProcessInfo.processInfo.environment["S3_BUCKET_NAME"] ?? "photolala"
 	}
 
 	// MARK: - Public Methods
 	
 	// Sync with S3 master catalog
 	func syncWithS3(catalog: PhotoCatalog, userId: String) async throws {
-		// For now, this is a simplified implementation
-		// In production, we would need to:
-		// 1. Add public methods to S3BackupService for catalog operations
-		// 2. Or create a separate S3CatalogService with proper access
+		guard !isSyncing else { return }
 		
-		// Download S3 manifest
+		isSyncing = true
+		syncProgress = 0.0
+		syncStatusText = "Starting sync..."
+		lastError = nil
+		
+		defer {
+			isSyncing = false
+			lastSyncDate = Date()
+		}
+		
 		do {
-			let s3Manifest = try await downloadManifest(userId: userId)
+			// Download S3 manifest
+			syncStatusText = "Downloading manifest..."
+			print("[S3CatalogSync] Downloading manifest for user: \(userId)")
+			var s3Manifest = try await downloadManifest(userId: userId)
+			print("[S3CatalogSync] Downloaded manifest with \(s3Manifest.shardChecksums.count) shards")
 			
 			// Check each shard for updates
-			let allShards = await MainActor.run { catalog.allShards }
+			let allShards = catalog.allShards
+			let totalShards = Double(allShards.count)
+			var processedShards = 0.0
+			var manifestUpdated = false
 			
 			for shard in allShards {
-				// Note: shardChecksums uses hex format keys "0"-"f"
-				let shardIndex = await MainActor.run { shard.index }
-				let s3ShardChecksum = s3Manifest.shardChecksums[String(format: "%x", shardIndex)]
-				let shardChecksum = await MainActor.run { shard.s3Checksum }
-				let isModified = await MainActor.run { shard.isModified }
+				let shardIndex = shard.index
+				let shardKey = String(format: "%x", shardIndex)
+				let s3ShardChecksum = s3Manifest.shardChecksums[shardKey]
+				let localChecksum = shard.s3Checksum
+				let isModified = shard.isModified
 				
-				// Download if S3 has newer data (nil checksum means empty shard)
-				if s3ShardChecksum != shardChecksum {
+				// Download if S3 has newer data
+				if let s3Checksum = s3ShardChecksum, s3Checksum != localChecksum {
 					do {
+						syncStatusText = "Downloading shard \(shardKey.uppercased())..."
 						let shardData = try await downloadShard(userId: userId, shardIndex: shardIndex)
-						let entries = parseCSV(shardData.csv)
-						try await MainActor.run {
+						
+						// Skip empty shards
+						if !shardData.csv.isEmpty {
+							let entries = parseCSV(shardData.csv)
+							
 							try catalogService.importShardFromS3(
 								shard: shard,
 								s3Entries: entries,
@@ -54,15 +104,16 @@ class S3CatalogSyncServiceV2 {
 						}
 					} catch {
 						print("[S3CatalogSync] Failed to download shard \(shardIndex): \(error)")
+						// Continue with other shards
 					}
 				}
 				// Upload if we have local changes
 				else if isModified {
 					do {
+						syncStatusText = "Uploading shard \(shardKey.uppercased())..."
 						let csvContent = try await catalogService.exportShardToCSV(shard: shard)
-						let checksum = await MainActor.run { catalogService.calculateChecksum(csvContent) }
+						let checksum = catalogService.calculateChecksum(csvContent)
 						
-						// Note: We upload incrementally at shard level (16 sharded bodies)
 						try await uploadShard(
 							userId: userId,
 							shardIndex: shardIndex,
@@ -70,28 +121,43 @@ class S3CatalogSyncServiceV2 {
 							checksum: checksum
 						)
 						
-						await MainActor.run {
-							shard.s3Checksum = checksum
-						}
+						// Update manifest
+						s3Manifest.shardChecksums[shardKey] = checksum
+						manifestUpdated = true
 						
-						try await MainActor.run {
-							try catalogService.clearShardModifications(shards: [shard])
-						}
+						// Update local state
+						shard.s3Checksum = checksum
+						try catalogService.clearShardModifications(shards: [shard])
 					} catch {
-						// Note: Just log errors for now
 						print("[S3CatalogSync] Failed to upload shard \(shardIndex): \(error)")
+						// Continue with other shards
 					}
 				}
+				
+				processedShards += 1.0
+				syncProgress = processedShards / totalShards
 			}
 			
-			// Update manifest
-			await MainActor.run {
-				catalog.s3ManifestETag = s3Manifest.eTag
-				catalog.lastS3SyncDate = Date()
-				try? catalogService.saveContext()
+			// Upload updated manifest if needed
+			if manifestUpdated {
+				syncStatusText = "Updating manifest..."
+				s3Manifest.lastModified = Date()
+				s3Manifest.photoCount = catalog.photoCount
+				let newETag = try await uploadManifest(userId: userId, manifest: s3Manifest)
+				s3Manifest.eTag = newETag
 			}
+			
+			// Update catalog metadata
+			catalog.s3ManifestETag = s3Manifest.eTag
+			catalog.lastS3SyncDate = Date()
+			try catalogService.saveContext()
+			
+			syncStatusText = "Sync complete"
+			syncProgress = 1.0
 		} catch {
 			print("[S3CatalogSync] Failed to sync catalog: \(error)")
+			lastError = error
+			syncStatusText = "Sync failed: \(error.localizedDescription)"
 			throw error
 		}
 	}
@@ -102,39 +168,141 @@ class S3CatalogSyncServiceV2 {
 	// For now, they're stubs that throw errors
 	
 	private func uploadShard(userId: String, shardIndex: Int, csv: String, checksum: String) async throws {
-		// TODO: Implement catalog shard upload
-		// This would require adding catalog-specific methods to S3BackupService
-		// or creating a new service with appropriate access
-		throw S3CatalogError.notImplemented
+		// Use legacy format with .photolala subdirectory
+		let shardKey = "catalogs/\(userId)/.photolala/\(String(format: "%x", shardIndex)).csv"
+		let data = Data(csv.utf8)
+		
+		let putObjectInput = PutObjectInput(
+			body: .data(data),
+			bucket: bucketName,
+			contentType: "text/csv",
+			key: shardKey,
+			metadata: ["checksum": checksum]
+		)
+		
+		_ = try await s3Client.putObject(input: putObjectInput)
+		
+		syncStatusText = "Uploaded shard \(String(format: "%X", shardIndex))"
 	}
 	
 	private func downloadShard(userId: String, shardIndex: Int) async throws -> (csv: String, checksum: String) {
-		// TODO: Implement catalog shard download
-		throw S3CatalogError.notImplemented
+		// Use legacy format with .photolala subdirectory
+		let shardKey = "catalogs/\(userId)/.photolala/\(String(format: "%x", shardIndex)).csv"
+		
+		do {
+			let getObjectInput = GetObjectInput(
+				bucket: bucketName,
+				key: shardKey
+			)
+			
+			let response = try await s3Client.getObject(input: getObjectInput)
+			
+			guard let body = response.body,
+			      let data = try await body.readData() else {
+				throw S3CatalogError.downloadFailed
+			}
+			
+			let csv = String(data: data, encoding: .utf8) ?? ""
+			let checksum = response.metadata?["checksum"] ?? ""
+			
+			syncStatusText = "Downloaded shard \(String(format: "%X", shardIndex))"
+			
+			return (csv, checksum)
+		} catch {
+			// Check if it's a not found error (shard doesn't exist)
+			let errorDescription = error.localizedDescription.lowercased()
+			if errorDescription.contains("nosuchkey") || errorDescription.contains("not found") {
+				// Return empty shard - this is normal for unused shards
+				return ("", "")
+			}
+			throw error
+		}
 	}
 	
 	private func downloadManifest(userId: String) async throws -> S3CatalogManifest {
-		// TODO: Implement manifest download
-		// For now, return a default manifest
-		return S3CatalogManifest(
-			version: "6.0",
-			directoryUUID: UUID().uuidString,
-			lastModified: Date(),
-			shardChecksums: [:],
-			photoCount: 0,
-			eTag: nil
-		)
+		// Use legacy format
+		let manifestKey = "catalogs/\(userId)/.photolala/manifest.plist"
+		
+		do {
+			let getObjectInput = GetObjectInput(
+				bucket: bucketName,
+				key: manifestKey
+			)
+			
+			let response = try await s3Client.getObject(input: getObjectInput)
+			
+			guard let body = response.body,
+			      let data = try await body.readData() else {
+				throw S3CatalogError.downloadFailed
+			}
+			
+			// Parse legacy plist format
+			let plist = try PropertyListSerialization.propertyList(from: data, format: nil) as? [String: Any]
+			
+			// Convert legacy format to new format
+			let manifest = S3CatalogManifest(
+				version: plist?["version"] as? String ?? "6.0",
+				directoryUUID: UUID().uuidString,
+				lastModified: Date(),
+				shardChecksums: plist?["shardChecksums"] as? [String: String] ?? [:],
+				photoCount: plist?["photoCount"] as? Int ?? 0,
+				eTag: response.eTag
+			)
+			
+			return manifest
+		} catch {
+			// If manifest doesn't exist, create a new one
+			// Check if the error description contains NoSuchKey
+			let errorDescription = error.localizedDescription.lowercased()
+			if errorDescription.contains("nosuchkey") || errorDescription.contains("not found") {
+				return S3CatalogManifest(
+					version: "6.0",
+					directoryUUID: UUID().uuidString,
+					lastModified: Date(),
+					shardChecksums: [:],
+					photoCount: 0,
+					eTag: nil
+				)
+			}
+			throw error
+		}
 	}
 	
-	private func updateManifestChecksum(userId: String, shardIndex: Int, checksum: String) async throws {
-		// TODO: Implement manifest update
-		throw S3CatalogError.notImplemented
+	private func uploadManifest(userId: String, manifest: S3CatalogManifest) async throws -> String {
+		// Use legacy format
+		let manifestKey = "catalogs/\(userId)/.photolala/manifest.plist"
+		
+		// Convert to plist format for legacy compatibility
+		let plistDict: [String: Any] = [
+			"version": manifest.version,
+			"shardChecksums": manifest.shardChecksums,
+			"photoCount": manifest.photoCount
+		]
+		let data = try PropertyListSerialization.data(fromPropertyList: plistDict, format: .xml, options: 0)
+		
+		let putObjectInput = PutObjectInput(
+			body: .data(data),
+			bucket: bucketName,
+			contentType: "application/json",
+			key: manifestKey
+		)
+		
+		let response = try await s3Client.putObject(input: putObjectInput)
+		return response.eTag ?? ""
 	}
 	
 	// Parse CSV into catalog entries
 	private func parseCSV(_ csv: String) -> [PhotolalaCatalogService.CatalogEntry] {
 		let lines = csv.components(separatedBy: .newlines)
-		return lines.compactMap { line in
+		
+		// Skip header if present
+		let dataLines = if lines.first?.starts(with: "md5,") == true {
+			Array(lines.dropFirst())
+		} else {
+			lines
+		}
+		
+		return dataLines.compactMap { line in
 			guard !line.isEmpty else { return nil }
 			return PhotolalaCatalogService.CatalogEntry(csvLine: line)
 		}

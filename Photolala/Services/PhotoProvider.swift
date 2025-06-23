@@ -157,11 +157,19 @@ class BasePhotoProvider: PhotoProvider, ObservableObject {
 
 /// S3 photo provider
 class S3PhotoProvider: BasePhotoProvider {
-	private var catalogService: PhotolalaCatalogService?
+	private var catalogService: PhotolalaCatalogServiceV2?
 	private var s3MasterCatalog: S3MasterCatalog?
-	private var syncService: S3CatalogSyncService?
+	private var syncService: S3CatalogSyncServiceV2?
 	private let userId: String
 	private var isOfflineMode: Bool = false
+	private var cancellables = Set<AnyCancellable>()
+	
+	// Sync state exposed for UI
+	@Published var isSyncing: Bool = false
+	@Published var syncProgress: Double = 0.0
+	@Published var syncStatusText: String = ""
+	@Published var lastSyncDate: Date?
+	@Published var lastSyncError: Error?
 	
 	// MARK: - Capabilities
 	
@@ -183,8 +191,8 @@ class S3PhotoProvider: BasePhotoProvider {
 	}
 	
 	override func loadPhotos() async throws {
-		await setLoading(true)
-		defer { Task { await setLoading(false) } }
+		setLoading(true)
+		defer { setLoading(false) }
 		
 		print("[S3PhotoProvider] Loading photos for user: \(userId)")
 		
@@ -196,75 +204,80 @@ class S3PhotoProvider: BasePhotoProvider {
 							userInfo: [NSLocalizedDescriptionKey: "S3 service not configured"])
 			}
 			
-			print("[S3PhotoProvider] Creating S3CatalogSyncService with userId: \(userId)")
+			print("[S3PhotoProvider] Creating S3CatalogSyncServiceV2 with userId: \(userId)")
+			
 			do {
-				syncService = try S3CatalogSyncService(s3Client: s3Client, userId: userId)
-				print("[S3PhotoProvider] S3CatalogSyncService created successfully")
+				let service = try S3CatalogSyncServiceV2(s3Client: s3Client, userId: userId)
+				syncService = service
+				
+				// Create catalog service
+				catalogService = try PhotolalaCatalogServiceV2()
+				
+				// Observe sync service state
+				service.$isSyncing.sink { [weak self] in self?.isSyncing = $0 }.store(in: &cancellables)
+				service.$syncProgress.sink { [weak self] in self?.syncProgress = $0 }.store(in: &cancellables)
+				service.$syncStatusText.sink { [weak self] in self?.syncStatusText = $0 }.store(in: &cancellables)
+				service.$lastSyncDate.sink { [weak self] in self?.lastSyncDate = $0 }.store(in: &cancellables)
+				service.$lastError.sink { [weak self] in self?.lastSyncError = $0 }.store(in: &cancellables)
+				
+				print("[S3PhotoProvider] S3CatalogSyncServiceV2 created successfully")
 			} catch {
-				print("[S3PhotoProvider] Failed to create S3CatalogSyncService: \(error)")
+				print("[S3PhotoProvider] Failed to create services: \(error)")
 				throw error
 			}
 		}
 		
 		// Try to sync catalog (non-blocking)
-		if let syncService = syncService {
-			let synced = try await syncService.syncCatalogIfNeeded()
-			isOfflineMode = !synced
+		if let syncService = syncService, let catalogService = catalogService {
+			do {
+				// Load or create catalog for this user
+				let catalogURL = URL(fileURLWithPath: "/s3/\(userId)")
+				// Use the typed method directly
+				let catalog = try await catalogService.loadPhotoCatalog(for: catalogURL)
+				
+				// Sync with S3
+				try await syncService.syncWithS3(catalog: catalog, userId: userId)
+				isOfflineMode = false
+			} catch {
+				print("[S3PhotoProvider] Sync failed, continuing with cached data: \(error)")
+				isOfflineMode = true
+			}
 		} else {
 			isOfflineMode = true
 		}
 		
-		// Load from cached catalog
-		if let syncService = syncService {
-			print("[S3PhotoProvider] Loading cached catalog...")
-			do {
-				catalogService = try await syncService.loadCachedCatalog()
-				print("[S3PhotoProvider] Catalog loaded successfully")
-			} catch {
-				print("[S3PhotoProvider] Failed to load catalog: \(error)")
-				// If no catalog exists, continue with empty photo list
-				catalogService = nil
-			}
-			
-			// Try to load master catalog (optional)
-			do {
-				s3MasterCatalog = try await syncService.loadS3MasterCatalog()
-			} catch {
-				print("[S3PhotoProvider] No master catalog found: \(error)")
-				s3MasterCatalog = nil
-			}
-		}
-		
 		// Build photo list from catalog
-		guard let catalog = catalogService else { 
-			print("[S3PhotoProvider] No catalog available")
+		guard let catalogService = catalogService else { 
+			print("[S3PhotoProvider] No catalog service available")
 			updatePhotos([])
 			return 
 		}
 		
-		print("[S3PhotoProvider] Loading catalog entries...")
-		do {
-			let entries = try await catalog.loadAllEntries()
-			print("[S3PhotoProvider] Loaded \(entries.count) entries from catalog")
-			
-			let s3Photos = entries.map { entry in
-				PhotoS3(
-					from: entry,
-					s3Info: s3MasterCatalog?.photos[entry.md5],
-					userId: userId
-				)
-			}
-			.sorted { $0.photoDate > $1.photoDate }
-			
-			print("[S3PhotoProvider] Created \(s3Photos.count) S3 photos")
-			updatePhotos(s3Photos)
-			print("[S3PhotoProvider] Photos updated successfully")
-		} catch {
-			print("[S3PhotoProvider] Error loading catalog entries: \(error)")
-			print("[S3PhotoProvider] Error type: \(type(of: error))")
-			print("[S3PhotoProvider] Error localized: \(error.localizedDescription)")
-			throw error
+		// Load catalog for this user
+		let catalogURL = URL(fileURLWithPath: "/s3/\(userId)")
+		// Use the typed method directly
+		guard let catalog = try? await catalogService.loadPhotoCatalog(for: catalogURL) else {
+			print("[S3PhotoProvider] No catalog found for user")
+			updatePhotos([])
+			return
 		}
+		
+		print("[S3PhotoProvider] Loading catalog entries...")
+		let entries = try await catalogService.loadAllEntries(from: catalog)
+		print("[S3PhotoProvider] Loaded \(entries.count) entries from catalog")
+		
+		let s3Photos = entries.map { entry in
+			PhotoS3(
+				from: entry,
+				s3Info: s3MasterCatalog?.photos[entry.md5],
+				userId: userId
+			)
+		}
+		.sorted { $0.photoDate > $1.photoDate }
+		
+		print("[S3PhotoProvider] Created \(s3Photos.count) S3 photos")
+		updatePhotos(s3Photos)
+		print("[S3PhotoProvider] Photos updated successfully")
 	}
 	
 	override func refresh() async throws {
@@ -273,11 +286,19 @@ class S3PhotoProvider: BasePhotoProvider {
 			return 
 		}
 		
-		await setLoading(true)
-		defer { Task { await setLoading(false) } }
+		setLoading(true)
+		defer { setLoading(false) }
 		
 		do {
-			_ = try await syncService.forceSync()
+			if let catalogService = catalogService {
+				// Load or create catalog for this user
+				let catalogURL = URL(fileURLWithPath: "/s3/\(userId)")
+				// Use the typed method directly
+				let catalog = try await catalogService.loadPhotoCatalog(for: catalogURL)
+				
+				// Force sync with S3
+				try await syncService.syncWithS3(catalog: catalog, userId: userId)
+			}
 			try await loadPhotos()
 		} catch {
 			// Continue with cached data

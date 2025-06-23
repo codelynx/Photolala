@@ -105,7 +105,14 @@ actor S3CatalogGenerator {
 		var shardChecksums: [String: String] = [:]
 		
 		for (index, entries) in shards {
-			let csvContent = entries.map { $0.csvLine }.joined(separator: "\n")
+			// Always include CSV header
+			let header = "md5,filename,size,photodate,modified,width,height,applephotoid"
+			let csvLines = if entries.isEmpty {
+				[header]  // Just header for empty shards
+			} else {
+				[header] + entries.map { $0.csvLine }
+			}
+			let csvContent = csvLines.joined(separator: "\n")
 			let data = csvContent.data(using: .utf8) ?? Data()
 			shardData[index] = data
 			

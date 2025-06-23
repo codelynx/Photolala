@@ -39,45 +39,6 @@ class PhotolalaCatalogServiceV2 {
 
 	// MARK: - Public Methods
 	
-	// Create or load catalog for directory
-	func loadCatalog(for directoryURL: URL) async throws -> PhotoCatalog {
-		let directoryPath = directoryURL.path
-
-		// Check for existing catalog
-		let descriptor = FetchDescriptor<PhotoCatalog>(
-			predicate: #Predicate { $0.directoryPath == directoryPath }
-		)
-
-		if let existing = try modelContext.fetch(descriptor).first {
-			return existing
-		}
-
-		// Create new catalog with 16 shards
-		let catalog = PhotoCatalog(directoryPath: directoryPath)
-		modelContext.insert(catalog)
-		
-		// Insert all shards
-		modelContext.insert(catalog.shard0!)
-		modelContext.insert(catalog.shard1!)
-		modelContext.insert(catalog.shard2!)
-		modelContext.insert(catalog.shard3!)
-		modelContext.insert(catalog.shard4!)
-		modelContext.insert(catalog.shard5!)
-		modelContext.insert(catalog.shard6!)
-		modelContext.insert(catalog.shard7!)
-		modelContext.insert(catalog.shard8!)
-		modelContext.insert(catalog.shard9!)
-		modelContext.insert(catalog.shardA!)
-		modelContext.insert(catalog.shardB!)
-		modelContext.insert(catalog.shardC!)
-		modelContext.insert(catalog.shardD!)
-		modelContext.insert(catalog.shardE!)
-		modelContext.insert(catalog.shardF!)
-		
-		try modelContext.save()
-
-		return catalog
-	}
 	
 	// Add or update entry
 	func upsertEntry(_ entry: CatalogPhotoEntry, in catalog: PhotoCatalog) throws {
@@ -117,8 +78,8 @@ class PhotolalaCatalogServiceV2 {
 		try modelContext.save()
 	}
 	
-	// Find entry by MD5
-	func findEntry(md5: String) async throws -> CatalogPhotoEntry? {
+	// Find entry by MD5 (renamed to avoid ambiguity)
+	func findPhotoEntry(md5: String) async throws -> CatalogPhotoEntry? {
 		let descriptor = FetchDescriptor<CatalogPhotoEntry>(
 			predicate: #Predicate { $0.md5 == md5 }
 		)
@@ -146,12 +107,21 @@ class PhotolalaCatalogServiceV2 {
 	
 	// Export specific shard to CSV for S3 sync
 	func exportShardToCSV(shard: CatalogShard) async throws -> String {
+		// Always include CSV header for future-proofing
+		let header = "md5,filename,size,photodate,modified,width,height,applephotoid"
+		
 		let entries = shard.entries ?? []
+		
+		if entries.isEmpty {
+			// Return just the header for empty shards
+			return header
+		}
 		
 		let sortedEntries = entries.sorted { $0.md5 < $1.md5 }
 		let csvLines = sortedEntries.map { $0.csvLine }
 		
-		return csvLines.joined(separator: "\n")
+		// Combine header with data
+		return ([header] + csvLines).joined(separator: "\n")
 	}
 	
 	// Calculate checksum for content
@@ -181,6 +151,12 @@ class PhotolalaCatalogServiceV2 {
 	
 	// Import specific shard from S3 (S3 is master)
 	func importShardFromS3(shard: CatalogShard, s3Entries: [PhotolalaCatalogService.CatalogEntry], checksum: String) throws {
+		// Ensure shard is in our context
+		guard modelContext.model(for: shard.persistentModelID) != nil else {
+			print("[PhotolalaCatalog] Shard not in current context, skipping import")
+			return
+		}
+		
 		// Clear existing entries in this shard only
 		// Note: Star status means photo has copy in S3, so S3 catalog wins - clearing is correct
 		if let entries = shard.entries {
@@ -237,8 +213,8 @@ class PhotolalaCatalogServiceV2 {
 	
 	// Import from legacy CSV catalog
 	func importFromLegacyCatalog(at directoryURL: URL) async throws -> PhotoCatalog {
-		// Call the non-protocol version explicitly
-		let catalog: PhotoCatalog = try await self.loadCatalog(for: directoryURL)
+		// Use the typed method
+		let catalog = try await self.loadPhotoCatalog(for: directoryURL)
 		
 		// Load legacy catalog
 		let legacyService = PhotolalaCatalogService(catalogURL: directoryURL)
@@ -275,29 +251,65 @@ class PhotolalaCatalogServiceV2 {
 
 extension PhotolalaCatalogServiceV2: CatalogService {
 	func loadCatalog(for directoryURL: URL) async throws -> Any {
-		// Call the non-protocol version explicitly
-		let catalog: PhotoCatalog = try await self.loadCatalog(for: directoryURL)
+		// Call the typed version
+		return try await self.loadPhotoCatalog(for: directoryURL)
+	}
+	
+	// Renamed method to avoid ambiguity
+	func loadPhotoCatalog(for directoryURL: URL) async throws -> PhotoCatalog {
+		let directoryPath = directoryURL.path
+
+		// Check for existing catalog
+		let descriptor = FetchDescriptor<PhotoCatalog>(
+			predicate: #Predicate { $0.directoryPath == directoryPath }
+		)
+
+		if let existing = try modelContext.fetch(descriptor).first {
+			return existing
+		}
+
+		// Create new catalog with 16 shards
+		let catalog = PhotoCatalog(directoryPath: directoryPath)
+		modelContext.insert(catalog)
+		
+		// Insert all shards
+		modelContext.insert(catalog.shard0!)
+		modelContext.insert(catalog.shard1!)
+		modelContext.insert(catalog.shard2!)
+		modelContext.insert(catalog.shard3!)
+		modelContext.insert(catalog.shard4!)
+		modelContext.insert(catalog.shard5!)
+		modelContext.insert(catalog.shard6!)
+		modelContext.insert(catalog.shard7!)
+		modelContext.insert(catalog.shard8!)
+		modelContext.insert(catalog.shard9!)
+		modelContext.insert(catalog.shardA!)
+		modelContext.insert(catalog.shardB!)
+		modelContext.insert(catalog.shardC!)
+		modelContext.insert(catalog.shardD!)
+		modelContext.insert(catalog.shardE!)
+		modelContext.insert(catalog.shardF!)
+		
+		try modelContext.save()
+
 		return catalog
 	}
 	
 	func findEntry(md5: String) async throws -> CatalogEntryProtocol? {
-		// Call the non-protocol version explicitly
-		let entry: CatalogPhotoEntry? = try await self.findEntry(md5: md5)
-		return entry
+		// Call the typed version
+		return try await self.findPhotoEntry(md5: md5)
 	}
 	
 	func updateStarStatus(md5: String, isStarred: Bool) async throws {
-		// Call the non-protocol version explicitly
-		let entry: CatalogPhotoEntry? = try await self.findEntry(md5: md5)
-		guard let entry = entry else { return }
+		// Call the typed version
+		guard let entry = try await self.findPhotoEntry(md5: md5) else { return }
 		entry.isStarred = isStarred
 		try modelContext.save()
 	}
 	
 	func updateBackupStatus(md5: String, status: BackupStatus) async throws {
-		// Call the non-protocol version explicitly
-		let entry: CatalogPhotoEntry? = try await self.findEntry(md5: md5)
-		guard let entry = entry else { return }
+		// Call the typed version
+		guard let entry = try await self.findPhotoEntry(md5: md5) else { return }
 		entry.backupStatus = status
 		try modelContext.save()
 	}
