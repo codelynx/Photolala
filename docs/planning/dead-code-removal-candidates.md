@@ -123,10 +123,10 @@ This document tracks potentially dead code in the Photolala codebase that can be
 ### 5. Platform-Specific Dead Code
 
 #### tvOS Support
-- **Status**: ❓ Unknown
+- **Status**: 🔴 Confirmed Dead
 - **Location**: `Platform/tvOS/`
-- **Rationale**: Is tvOS actually supported/tested?
-- **Action**: Verify if tvOS is a supported platform
+- **Rationale**: tvOS is not in SUPPORTED_PLATFORMS in project.pbxproj
+- **Action**: Can be removed if directory exists
 
 ### 6. Commented-Out Code
 
