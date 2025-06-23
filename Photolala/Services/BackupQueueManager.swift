@@ -28,13 +28,13 @@ class BackupQueueManager: ObservableObject {
 	// Photos to delete from S3 (batched)
 	private var photosToDelete: Set<PhotoFile> = []
 	
-	// Catalog service for persistence (only SwiftData)
-	private let catalogServiceV2: PhotolalaCatalogServiceV2?
+	// Catalog service for persistence
+	private let catalogServiceV2: PhotolalaCatalogServiceV2
 
 	// Activity timer
 	private var inactivityTimer: Timer?
 	#if DEBUG
-	private let inactivityInterval: TimeInterval = 30 // 1 minutes for development
+	private let inactivityInterval: TimeInterval = 15 // 15 seconds for development
 	#else
 	private let inactivityInterval: TimeInterval = 300 // 5 minutes for production
 	#endif
@@ -43,12 +43,8 @@ class BackupQueueManager: ObservableObject {
 	private let queueStateKey = "BackupQueueState"
 
 	private init() {
-		// Initialize catalog service only if SwiftData is enabled
-		if FeatureFlags.useSwiftDataCatalog {
-			self.catalogServiceV2 = try? PhotolalaCatalogServiceV2()
-		} else {
-			self.catalogServiceV2 = nil // CSV catalog updates handled elsewhere
-		}
+		// Initialize catalog service
+		self.catalogServiceV2 = PhotolalaCatalogServiceV2.shared
 		
 		restoreQueueState()
 	}
@@ -74,7 +70,7 @@ class BackupQueueManager: ObservableObject {
 				
 				// Mark as none (treat as deleted immediately in UI)
 				if let md5 = photo.md5Hash {
-					backupStatus[md5] = .none
+					backupStatus[md5] = BackupState.none
 				}
 				
 				// If photo was uploaded, add to delete queue
@@ -88,8 +84,8 @@ class BackupQueueManager: ObservableObject {
 			}
 		}
 		
-		// Update catalog if SwiftData is available
-		if let catalogServiceV2 = catalogServiceV2, let md5 = photo.md5Hash {
+		// Update catalog
+		if let md5 = photo.md5Hash {
 			let isStarred = isQueued(photo) || backupStatus[md5] == .uploaded
 			Task {
 				try? await catalogServiceV2.updateStarStatus(md5: md5, isStarred: isStarred)
@@ -154,6 +150,26 @@ class BackupQueueManager: ObservableObject {
 			print("[BackupQueueManager] Removed photo: \(photo.displayName)")
 		}
 		
+		// Check if this is an Apple Photo and remove from Apple Photos queue
+		// We need to find the Apple Photo ID by MD5
+		Task {
+			do {
+				if let entry = try await catalogServiceV2.findPhotoEntry(md5: md5),
+				   let applePhotoID = entry.applePhotoID {
+					// Remove from Apple Photos queue
+					queuedApplePhotos.remove(applePhotoID)
+					print("[BackupQueueManager] Removed Apple Photo from queue: \(applePhotoID)")
+					
+					// Update catalog entry
+					entry.isStarred = false
+					entry.backupStatus = .notBackedUp
+					try await catalogServiceV2.save()
+				}
+			} catch {
+				print("[BackupQueueManager] Failed to update catalog for removed photo: \(error)")
+			}
+		}
+		
 		// Update backup status
 		if backupStatus[md5] == .queued {
 			backupStatus[md5] = BackupState.none
@@ -187,6 +203,39 @@ class BackupQueueManager: ObservableObject {
 		// Add to backup status
 		backupStatus[md5] = .queued
 		print("[BackupQueueManager] Set backup status to queued for Apple Photo: \(photoID) with hash: \(md5)")
+		
+		// Create or update catalog entry for Apple Photo
+		Task {
+			do {
+				// Check if entry exists
+				if let existingEntry = try await catalogServiceV2.findByApplePhotoID(photoID) {
+					// Update existing entry
+					existingEntry.isStarred = true
+					existingEntry.backupStatus = BackupStatus.queued
+					try await catalogServiceV2.save()
+				} else {
+					// Create new entry for Apple Photo
+					// We need minimal info for now, full metadata will be added during backup
+					let entry = CatalogPhotoEntry(
+						md5: md5,
+						filename: "apple_photo_\(photoID)",  // Placeholder, will be updated
+						fileSize: 0,  // Will be updated during backup
+						photoDate: Date(),  // Will be updated during backup
+						fileModifiedDate: Date()
+					)
+					entry.applePhotoID = photoID
+					entry.isStarred = true
+					entry.backupStatus = BackupStatus.queued
+					
+					// Find or create catalog for Apple Photos
+					let catalogPath = "apple-photos-library"
+					let catalog = try await catalogServiceV2.findOrCreateCatalog(directoryPath: catalogPath)
+					try catalogServiceV2.upsertEntry(entry, in: catalog)
+				}
+			} catch {
+				print("[BackupQueueManager] Failed to update catalog for Apple Photo: \(error)")
+			}
+		}
 		
 		saveQueueState()
 		NotificationCenter.default.post(name: NSNotification.Name("BackupQueueChanged"), object: nil)
@@ -334,6 +383,18 @@ class BackupQueueManager: ObservableObject {
 							backupStatus[md5] = .uploaded
 							queuedApplePhotos.remove(photoID)
 							successCount += 1
+							
+							// Update catalog entry to reflect uploaded status
+							do {
+								if let entry = try await catalogServiceV2.findByApplePhotoID(photoID) {
+									entry.backupStatus = BackupStatus.uploaded
+									try await catalogServiceV2.save()
+									print("[BackupQueueManager] Updated catalog entry for Apple Photo \(photoID) to uploaded status")
+								}
+							} catch {
+								print("[BackupQueueManager] Failed to update catalog entry: \(error)")
+							}
+							
 							NotificationCenter.default.post(name: NSNotification.Name("BackupQueueChanged"), object: nil)
 						}
 					}
@@ -455,7 +516,7 @@ class BackupQueueManager: ObservableObject {
 	func getBackupStatus(for photo: PhotoFile) async -> BackupState? {
 		// If photo is in delete queue, treat as none (deleted)
 		if photosToDelete.contains(photo) {
-			return .none
+			return BackupState.none
 		}
 		
 		// If MD5 already computed, return status immediately
@@ -468,7 +529,7 @@ class BackupQueueManager: ObservableObject {
 		
 		// Now check status (and check delete queue again after compute)
 		if photosToDelete.contains(photo) {
-			return .none
+			return BackupState.none
 		}
 		
 		if let md5 = photo.md5Hash {

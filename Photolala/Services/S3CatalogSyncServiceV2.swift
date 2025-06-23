@@ -44,7 +44,7 @@ class S3CatalogSyncServiceV2: ObservableObject {
 	// Alternative initializer that takes S3 client directly
 	init(s3Client: S3Client, userId: String) throws {
 		// Create services inline
-		self.catalogService = try PhotolalaCatalogServiceV2()
+		self.catalogService = PhotolalaCatalogServiceV2.shared
 		self.s3Service = nil  // We don't need the backup service when using direct S3 client
 		self.s3Client = s3Client
 		self.bucketName = ProcessInfo.processInfo.environment["S3_BUCKET_NAME"] ?? "photolala"

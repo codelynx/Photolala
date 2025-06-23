@@ -188,20 +188,17 @@ class UnifiedPhotoCell: NSCollectionViewItem {
 			// Check if Apple Photo has been backed up
 			starImageView.image = nil
 			Task {
-				// Check if MD5 is already cached
-				if let md5 = await ApplePhotosBridge.shared.getMD5(for: photoApple.id) {
-					let status = await MainActor.run {
-						BackupQueueManager.shared.backupStatus[md5]
-					}
+				// Query SwiftData catalog for this Apple Photo
+				let catalogService = PhotolalaCatalogServiceV2.shared
+				if let entry = try? await catalogService.findByApplePhotoID(photoApple.id) {
 					await MainActor.run {
-						switch status {
-						case .queued, .uploaded:
+						if entry.isStarred || entry.backupStatus == .uploaded {
 							starImageView.image = NSImage(systemSymbolName: "star.fill", accessibilityDescription: nil)
 							starImageView.contentTintColor = .systemYellow
-						case .failed:
+						} else if entry.backupStatus == .error {
 							starImageView.image = NSImage(systemSymbolName: "exclamationmark.circle.fill", accessibilityDescription: nil)
 							starImageView.contentTintColor = .systemRed
-						default:
+						} else {
 							starImageView.image = nil
 						}
 					}
@@ -509,25 +506,22 @@ class UnifiedPhotoCell: UICollectionViewCell {
 			// Check if Apple Photo has been backed up
 			starImageView.image = nil
 			Task {
-				// Check if MD5 is already cached
-				if let md5 = await ApplePhotosBridge.shared.getMD5(for: photoApple.id) {
-					let status = await MainActor.run {
-						BackupQueueManager.shared.backupStatus[md5]
-					}
-					await MainActor.run {
-						switch status {
-						case .queued, .uploaded:
-							starImageView.image = UIImage(systemName: "star.fill")
-							starImageView.tintColor = .systemYellow
-						case .failed:
-							starImageView.image = UIImage(systemName: "exclamationmark.circle.fill")
-							starImageView.tintColor = .systemRed
-						default:
-							starImageView.image = nil
+					// Query SwiftData catalog for this Apple Photo
+					let catalogService = PhotolalaCatalogServiceV2.shared
+					if let entry = try? await catalogService.findByApplePhotoID(photoApple.id) {
+						await MainActor.run {
+							if entry.isStarred || entry.backupStatus == .uploaded {
+								starImageView.image = UIImage(systemName: "star.fill")
+								starImageView.tintColor = .systemYellow
+							} else if entry.backupStatus == .error {
+								starImageView.image = UIImage(systemName: "exclamationmark.circle.fill")
+								starImageView.tintColor = .systemRed
+							} else {
+								starImageView.image = nil
+							}
 						}
 					}
 				}
-			}
 		} else if let photoS3 = photo as? PhotoS3 {
 			// For S3 photos, show a cloud icon to indicate they're already backed up
 			starImageView.image = UIImage(systemName: "icloud.fill")

@@ -357,10 +357,11 @@ struct QuickActionsSection: View {
 			return
 		}
 		
-		// Check if already cached in bridge
-		if let cachedMD5 = await ApplePhotosBridge.shared.getMD5(for: applePhoto.id) {
+		// Check if already in catalog
+		let catalogService = PhotolalaCatalogServiceV2.shared
+		if let entry = try? await catalogService.findByApplePhotoID(applePhoto.id) {
 			await MainActor.run {
-				self.applePhotoMD5 = cachedMD5
+				self.applePhotoMD5 = entry.md5
 			}
 			return
 		}

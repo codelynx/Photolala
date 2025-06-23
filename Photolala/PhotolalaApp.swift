@@ -62,6 +62,11 @@ struct PhotolalaApp: App {
 		// Initialize managers
 		_ = IdentityManager.shared
 		_ = S3BackupManager.shared
+		_ = BackupQueueManager.shared
+		
+		// Note: BackupQueueManager automatically restores its cached data
+		// from UserDefaults on init. Apple Photo backup status is now
+		// stored in the SwiftData catalog.
 		
 		// Print cache root directory for debugging
 		let cacheRoot = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)[0]
@@ -71,6 +76,7 @@ struct PhotolalaApp: App {
 		// Perform cache migration if needed
 		CacheManager.shared.performMigrationIfNeeded()
 	}
+	
 
 	var body: some Scene {
 		#if os(macOS)

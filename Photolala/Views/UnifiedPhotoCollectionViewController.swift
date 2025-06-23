@@ -365,6 +365,11 @@ class UnifiedPhotoCollectionViewController: XViewController {
 			selectedPhotos.remove(item)
 		} else {
 			selectedPhotos.insert(item)
+			
+			// Log starred status from SwiftData catalog (single source of truth)
+			Task {
+				await logStarredStatus(for: photo)
+			}
 		}
 		
 		updateSelectionUI()
@@ -453,6 +458,13 @@ extension UnifiedPhotoCollectionViewController: NSCollectionViewDelegate {
 		for indexPath in indexPaths {
 			if let item = dataSource.itemIdentifier(for: indexPath) {
 				selectedPhotos.insert(item)
+				
+				// Log starred status from SwiftData catalog (single source of truth)
+				if let photo = item.base as? (any PhotoItem) {
+					Task {
+						await logStarredStatus(for: photo)
+					}
+				}
 			}
 		}
 		updateSelectionDelegate()
@@ -471,6 +483,46 @@ extension UnifiedPhotoCollectionViewController: NSCollectionViewDelegate {
 	private func updateSelectionDelegate() {
 		let selected = selectedPhotos.compactMap { $0.base as? (any PhotoItem) }
 		delegate?.photoCollection(self, didUpdateSelection: selected)
+	}
+	
+	private func logStarredStatus(for photo: any PhotoItem) async {
+		let catalogService = PhotolalaCatalogServiceV2.shared
+		
+		switch photo {
+		case let photoFile as PhotoFile:
+			// For local directory photos, check by MD5
+			if let md5 = photoFile.md5Hash {
+				if let entry = try? await catalogService.findByMD5(md5) {
+					let shouldShowStar = entry.isStarred || entry.backupStatus == BackupStatus.uploaded
+					print("[Selection] Photo '\(photoFile.filename)': isStarred=\(entry.isStarred), backupStatus=\(entry.backupStatus), SHOULD SHOW STAR=\(shouldShowStar)")
+				} else {
+					print("[Selection] Photo '\(photoFile.filename)' has NO CATALOG ENTRY")
+				}
+			} else {
+				print("[Selection] Photo '\(photoFile.filename)' has no MD5 hash computed yet")
+			}
+			
+		case let photoApple as PhotoApple:
+			// For Apple Photos, check by Apple Photo ID
+			if let entry = try? await catalogService.findByApplePhotoID(photoApple.id) {
+				let shouldShowStar = entry.isStarred || entry.backupStatus == BackupStatus.uploaded
+				print("[Selection] Apple Photo '\(photoApple.filename)': isStarred=\(entry.isStarred), backupStatus=\(entry.backupStatus), SHOULD SHOW STAR=\(shouldShowStar)")
+			} else {
+				print("[Selection] Apple Photo '\(photoApple.filename)' has NO CATALOG ENTRY")
+			}
+			
+		case let photoS3 as PhotoS3:
+			// For S3 photos, check by MD5
+			if let entry = try? await catalogService.findByMD5(photoS3.md5) {
+				let shouldShowStar = entry.isStarred || entry.backupStatus == BackupStatus.uploaded
+				print("[Selection] S3 Photo '\(photoS3.filename)': isStarred=\(entry.isStarred), backupStatus=\(entry.backupStatus), SHOULD SHOW STAR=\(shouldShowStar)")
+			} else {
+				print("[Selection] S3 Photo '\(photoS3.filename)' has NO CATALOG ENTRY")
+			}
+			
+		default:
+			print("[Selection] Unknown photo type: \(type(of: photo))")
+		}
 	}
 	
 	// MARK: - Context Menu
