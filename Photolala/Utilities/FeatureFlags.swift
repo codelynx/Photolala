@@ -27,9 +27,6 @@ struct FeatureFlags {
 	/// Use sandbox IAP environment
 	static let isSandboxIAP = true
 	
-	/// Use SwiftData for local catalog storage
-	static let useSwiftDataCatalog = false
-	
 	/// Show debug information in UI
 	#if DEBUG
 	static let showDebugInfo = true

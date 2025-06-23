@@ -1,6 +1,6 @@
 # Photolala Catalog System v2 (SwiftData)
 
-Last Updated: June 22, 2025
+Last Updated: June 23, 2025
 
 ## Overview
 
@@ -83,30 +83,38 @@ s3://photolala-photos/
 
 ### PhotolalaCatalogServiceV2
 
-The new SwiftData-based catalog service:
+The SwiftData-based catalog service (singleton as of June 23, 2025):
 
 ```swift
 @MainActor
 class PhotolalaCatalogServiceV2: ObservableObject {
+    static let shared: PhotolalaCatalogServiceV2
+    
     // Core operations
     func loadPhotoCatalog(for directoryURL: URL) async throws -> PhotoCatalog
-    func upsertEntry(_ entry: PhotoEntry, in catalog: PhotoCatalog) throws
-    func findPhotoEntry(md5: String, in catalog: PhotoCatalog) -> PhotoEntry?
+    func upsertEntry(_ entry: CatalogPhotoEntry, in catalog: PhotoCatalog) throws
+    func findPhotoEntry(md5: String, in catalog: PhotoCatalog) -> CatalogPhotoEntry?
+    
+    // Query methods
+    func findByApplePhotoID(_ applePhotoID: String) async throws -> CatalogPhotoEntry?
+    func findByMD5(_ md5: String) async throws -> CatalogPhotoEntry?
     
     // S3 sync support
     func exportShardToCSV(shard: CatalogShard) async throws -> String
     func importShardFromS3(shard: CatalogShard, s3Entries: [CatalogEntry]) throws
     
-    // Backup status
-    func updateBackupStatus(for md5: String, status: BackupStatus) async
+    // Persistence
+    func save() async throws
+    func findOrCreateCatalog(directoryPath: String) async throws -> PhotoCatalog
 }
 ```
 
 Key features:
+- Singleton pattern to avoid SwiftData context issues
 - Thread-safe with @MainActor
 - Automatic shard selection based on MD5
 - CSV export includes headers
-- Efficient backup status updates
+- Support for Apple Photo ID queries
 
 ### S3CatalogSyncServiceV2
 

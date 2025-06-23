@@ -1,10 +1,10 @@
 ## 📍 PROJECT STATUS REPORT
 
-Last Updated: June 22, 2025
+Last Updated: June 23, 2025
 
-### 🚀 Current Status: Unified Photo Browser with Apple Photos Support
+### 🚀 Current Status: SwiftData Catalog Integration Complete
 
-The application now features a unified photo browser architecture supporting local directories, Apple Photos Library, and S3 cloud storage. Users can star photos from any source for backup to S3, with full support for Apple Photos including metadata and star persistence.
+The application now has a fully integrated SwiftData catalog system serving as the single source of truth for photo metadata and backup status. Apple Photos star indicators now work correctly across all views, with proper persistence and synchronization between local and S3 storage.
 
 ### ✅ Completed Features
 
@@ -925,3 +925,49 @@ The application now features a unified photo browser architecture supporting loc
      - Add CSV to SwiftData migration
      - Performance optimization for large catalogs
      - Background sync scheduling
+
+45. **SwiftData Catalog Fixes - Apple Photo Stars (June 23)**:
+   - **Fixed Apple Photo Star Indicators**:
+     - Removed ApplePhotosBridge entirely (was causing race conditions)
+     - Made PhotolalaCatalogServiceV2 a singleton to resolve context issues
+     - Added catalog entry updates after successful uploads
+     - Enhanced S3PhotoProvider to ensure catalog entries exist
+   
+   - **Simplified Architecture**:
+     - Removed useSwiftDataCatalog feature flag - always enabled now
+     - SwiftData catalog is single source of truth for all backup status
+     - No more separate caches or bridges to maintain
+     - Consistent star display logic across all photo types
+   
+   - **Enhanced Debugging**:
+     - Added selection logging showing isStarred and backupStatus
+     - Shows "SHOULD SHOW STAR" calculation for debugging
+     - Helps identify catalog vs UI refresh issues
+   
+   - **Key Fixes**:
+     - Catalog entries now created when starring Apple Photos
+     - Entries updated to "uploaded" status after successful upload
+     - S3PhotoProvider creates missing entries for discovered photos
+     - All code uses singleton catalog service (no context conflicts)
+
+46. **Immediate Star Feedback (June 23 - Session 2)**:
+   - **Fixed Thumbnail Star Updates**:
+     - Stars now appear immediately on thumbnails when starring/unstarring
+     - No need to reload collection view for changes to appear
+     - Inspector button and thumbnails stay perfectly in sync
+   
+   - **Notification System**:
+     - Added `CatalogEntryUpdated` notification for targeted updates
+     - Collection view listens for catalog changes
+     - Refreshes only affected cells, not entire collection
+   
+   - **Implementation Details**:
+     - Direct cell configuration instead of reconfigureItems (iOS compatibility)
+     - Notifications include Apple Photo ID for precise cell targeting
+     - Posts notifications on star, unstar, and upload completion
+     - Proper observer cleanup in deinit
+   
+   - **User Experience**:
+     - Instant visual feedback when starring photos
+     - Consistent state between all UI elements
+     - Better performance with targeted cell updates

@@ -150,17 +150,21 @@ struct PhotoApple: PhotoItem {
 	// MARK: - Metadata Loading
 	
 	func computeMD5Hash() async throws -> String {
-		// Check if already computed
-		if let existingHash = await ApplePhotosBridge.shared.getMD5(for: id) {
-			return existingHash
+		// Check if MD5 is already stored in catalog
+		// Create catalog service on MainActor
+		let catalogService = await MainActor.run { PhotolalaCatalogServiceV2.shared }
+		
+		// Query for the entry
+		let entry = try? await catalogService.findByApplePhotoID(id)
+		if let entry = entry {
+			return entry.md5
 		}
 		
 		// Load image data to compute hash
 		let data = try await loadImageData()
 		let hash = data.md5Digest.hexadecimalString
 		
-		// Store in bridge for future use
-		await ApplePhotosBridge.shared.storeMD5(hash, for: id)
+		// Note: MD5 will be stored in catalog when photo is backed up
 		
 		return hash
 	}

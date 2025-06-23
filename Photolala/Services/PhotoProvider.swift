@@ -211,7 +211,7 @@ class S3PhotoProvider: BasePhotoProvider {
 				syncService = service
 				
 				// Create catalog service
-				catalogService = try PhotolalaCatalogServiceV2()
+				catalogService = PhotolalaCatalogServiceV2.shared
 				
 				// Observe sync service state
 				service.$isSyncing.sink { [weak self] in self?.isSyncing = $0 }.store(in: &cancellables)
@@ -278,6 +278,59 @@ class S3PhotoProvider: BasePhotoProvider {
 		print("[S3PhotoProvider] Created \(s3Photos.count) S3 photos")
 		updatePhotos(s3Photos)
 		print("[S3PhotoProvider] Photos updated successfully")
+		
+		// Populate backup status for Apple Photos
+		await populateBackupStatusForApplePhotos()
+	}
+	
+	private func populateBackupStatusForApplePhotos() async {
+		// For S3 photos that have an Apple Photo ID, update BackupQueueManager and catalog
+		let s3Photos = photos.compactMap { $0 as? PhotoS3 }
+		
+		guard let catalogService = catalogService else { return }
+		
+		for photo in s3Photos {
+			if let applePhotoID = photo.applePhotoID, !applePhotoID.isEmpty {
+				// Update BackupQueueManager for UI display
+				await MainActor.run {
+					BackupQueueManager.shared.backupStatus[photo.md5] = .uploaded
+				}
+				
+				// Update SwiftData catalog entry
+				do {
+					if let entry = try await catalogService.findByApplePhotoID(applePhotoID) {
+						if entry.backupStatus != BackupStatus.uploaded {
+							entry.backupStatus = BackupStatus.uploaded
+							try await catalogService.save()
+							print("[S3PhotoProvider] Updated catalog entry for Apple Photo \(applePhotoID) to uploaded status")
+						}
+					} else {
+						// Create catalog entry if it doesn't exist
+						let entry = CatalogPhotoEntry(
+							md5: photo.md5,
+							filename: photo.filename,
+							fileSize: Int64(photo.size),
+							photoDate: photo.photoDate,
+							fileModifiedDate: photo.modified
+						)
+						entry.applePhotoID = applePhotoID
+						entry.backupStatus = BackupStatus.uploaded
+						
+						let catalogPath = "apple-photos-library"
+						let catalog = try await catalogService.findOrCreateCatalog(directoryPath: catalogPath)
+						try catalogService.upsertEntry(entry, in: catalog)
+						print("[S3PhotoProvider] Created catalog entry for Apple Photo \(applePhotoID) with uploaded status")
+					}
+				} catch {
+					print("[S3PhotoProvider] Failed to update catalog for Apple Photo \(applePhotoID): \(error)")
+				}
+			}
+		}
+		
+		let applePhotoCount = s3Photos.filter { $0.applePhotoID != nil }.count
+		if applePhotoCount > 0 {
+			print("[S3PhotoProvider] Populated backup status for \(applePhotoCount) Apple Photos")
+		}
 	}
 	
 	override func refresh() async throws {

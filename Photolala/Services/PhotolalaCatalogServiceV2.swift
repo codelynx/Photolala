@@ -11,10 +11,18 @@ import CryptoKit
 
 @MainActor
 class PhotolalaCatalogServiceV2 {
+	static let shared: PhotolalaCatalogServiceV2 = {
+		do {
+			return try PhotolalaCatalogServiceV2()
+		} catch {
+			fatalError("Failed to create PhotolalaCatalogServiceV2: \(error)")
+		}
+	}()
+	
 	private let modelContainer: ModelContainer
 	private let modelContext: ModelContext
 
-	init() throws {
+	private init() throws {
 		let schema = Schema([
 			PhotoCatalog.self,
 			CatalogShard.self,
@@ -39,6 +47,33 @@ class PhotolalaCatalogServiceV2 {
 
 	// MARK: - Public Methods
 	
+	// Save any pending changes
+	func save() async throws {
+		try modelContext.save()
+	}
+	
+	// Find or create catalog for a directory path
+	func findOrCreateCatalog(directoryPath: String) async throws -> PhotoCatalog {
+		let descriptor = FetchDescriptor<PhotoCatalog>(
+			predicate: #Predicate { $0.directoryPath == directoryPath }
+		)
+		
+		if let existing = try modelContext.fetch(descriptor).first {
+			return existing
+		}
+		
+		// Create new catalog
+		let catalog = PhotoCatalog(directoryPath: directoryPath)
+		modelContext.insert(catalog)
+		
+		// Insert all shards
+		for shard in catalog.allShards {
+			modelContext.insert(shard)
+		}
+		
+		try modelContext.save()
+		return catalog
+	}
 	
 	// Add or update entry
 	func upsertEntry(_ entry: CatalogPhotoEntry, in catalog: PhotoCatalog) throws {
@@ -80,6 +115,22 @@ class PhotolalaCatalogServiceV2 {
 	
 	// Find entry by MD5 (renamed to avoid ambiguity)
 	func findPhotoEntry(md5: String) async throws -> CatalogPhotoEntry? {
+		let descriptor = FetchDescriptor<CatalogPhotoEntry>(
+			predicate: #Predicate { $0.md5 == md5 }
+		)
+		return try modelContext.fetch(descriptor).first
+	}
+	
+	// Find entry by Apple Photo ID
+	func findByApplePhotoID(_ applePhotoID: String) async throws -> CatalogPhotoEntry? {
+		let descriptor = FetchDescriptor<CatalogPhotoEntry>(
+			predicate: #Predicate { $0.applePhotoID == applePhotoID }
+		)
+		return try modelContext.fetch(descriptor).first
+	}
+	
+	// Find entry by MD5
+	func findByMD5(_ md5: String) async throws -> CatalogPhotoEntry? {
 		let descriptor = FetchDescriptor<CatalogPhotoEntry>(
 			predicate: #Predicate { $0.md5 == md5 }
 		)

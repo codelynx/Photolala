@@ -11,6 +11,7 @@ struct PhotoS3: Identifiable, Hashable {
 	let modified: Date      // File modification date
 	let width: Int?
 	let height: Int?
+	let applePhotoID: String?  // Apple Photos Library ID if backed up from Photos app
 	
 	// From S3 master catalog (JSON)
 	let uploadDate: Date?
@@ -63,6 +64,7 @@ struct PhotoS3: Identifiable, Hashable {
 		self.modified = catalogEntry.modified
 		self.width = catalogEntry.width
 		self.height = catalogEntry.height
+		self.applePhotoID = catalogEntry.applePhotoID
 		self.userId = userId
 		
 		self.uploadDate = s3Info?.uploadDate
@@ -80,6 +82,7 @@ struct PhotoS3: Identifiable, Hashable {
 		self.modified = catalogEntry.fileModifiedDate
 		self.width = catalogEntry.pixelWidth
 		self.height = catalogEntry.pixelHeight
+		self.applePhotoID = catalogEntry.applePhotoID
 		self.userId = userId
 		
 		self.uploadDate = s3Info?.uploadDate

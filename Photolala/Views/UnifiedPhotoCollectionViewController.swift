@@ -46,6 +46,10 @@ class UnifiedPhotoCollectionViewController: XViewController {
 	// Selection tracking
 	private var selectedPhotos = Set<AnyHashable>()
 	
+	// Notification observers
+	private var backupStatusObserver: NSObjectProtocol?
+	private var catalogUpdateObserver: NSObjectProtocol?
+	
 	// MARK: - Initialization
 	
 	init(photoProvider: any PhotoProvider) {
@@ -55,6 +59,15 @@ class UnifiedPhotoCollectionViewController: XViewController {
 	
 	required init?(coder: NSCoder) {
 		fatalError("init(coder:) has not been implemented")
+	}
+	
+	deinit {
+		if let observer = backupStatusObserver {
+			NotificationCenter.default.removeObserver(observer)
+		}
+		if let observer = catalogUpdateObserver {
+			NotificationCenter.default.removeObserver(observer)
+		}
 	}
 	
 	// MARK: - View Lifecycle
@@ -100,6 +113,9 @@ class UnifiedPhotoCollectionViewController: XViewController {
 		
 		// Set up scroll monitoring for priority loading
 		setupScrollMonitoring()
+		
+		// Set up notification observer for backup status changes
+		setupBackupStatusObserver()
 		
 		// Load photos
 		Task {
@@ -354,6 +370,85 @@ class UnifiedPhotoCollectionViewController: XViewController {
 		#endif
 	}
 	
+	// MARK: - Backup Status Monitoring
+	
+	private func setupBackupStatusObserver() {
+		// Listen for general backup queue changes
+		backupStatusObserver = NotificationCenter.default.addObserver(
+			forName: NSNotification.Name("BackupQueueChanged"),
+			object: nil,
+			queue: .main
+		) { [weak self] _ in
+			self?.refreshVisibleCells()
+		}
+		
+		// Listen for specific catalog entry updates (for immediate star updates)
+		catalogUpdateObserver = NotificationCenter.default.addObserver(
+			forName: NSNotification.Name("CatalogEntryUpdated"),
+			object: nil,
+			queue: .main
+		) { [weak self] notification in
+			// If we have an Apple Photo ID, refresh just that cell
+			if let applePhotoID = notification.userInfo?["applePhotoID"] as? String {
+				self?.refreshCellForApplePhoto(applePhotoID)
+			} else {
+				// Otherwise refresh all visible cells
+				self?.refreshVisibleCells()
+			}
+		}
+	}
+	
+	private func refreshVisibleCells() {
+		#if os(macOS)
+		// Get visible items
+		let visibleIndexPaths = collectionView.indexPathsForVisibleItems()
+		
+		// Update each visible cell directly
+		for indexPath in visibleIndexPaths {
+			if let item = collectionView.item(at: indexPath) as? UnifiedPhotoCell,
+			   let photo = dataSource.itemIdentifier(for: indexPath)?.base as? (any PhotoItem) {
+				// Re-configure the cell with the same photo to update star status
+				item.configure(with: photo, settings: settings)
+			}
+		}
+		#else
+		// For iOS, update visible cells
+		let visibleIndexPaths = collectionView.indexPathsForVisibleItems
+		
+		for indexPath in visibleIndexPaths {
+			if let cell = collectionView.cellForItem(at: indexPath) as? UnifiedPhotoCell,
+			   let photo = dataSource.itemIdentifier(for: indexPath)?.base as? (any PhotoItem) {
+				// Re-configure the cell with the same photo to update star status
+				cell.configure(with: photo, settings: settings)
+			}
+		}
+		#endif
+	}
+	
+	private func refreshCellForApplePhoto(_ applePhotoID: String) {
+		// Find the item with this Apple Photo ID
+		let snapshot = dataSource.snapshot()
+		let allItems = snapshot.itemIdentifiers
+		
+		for (index, item) in allItems.enumerated() {
+			if let photo = item.base as? PhotoApple, photo.id == applePhotoID {
+				// Found the item, update the cell directly
+				let indexPath = IndexPath(item: index, section: 0)
+				
+				#if os(macOS)
+				if let cell = collectionView.item(at: indexPath) as? UnifiedPhotoCell {
+					cell.configure(with: photo, settings: settings)
+				}
+				#else
+				if let cell = collectionView.cellForItem(at: indexPath) as? UnifiedPhotoCell {
+					cell.configure(with: photo, settings: settings)
+				}
+				#endif
+				break
+			}
+		}
+	}
+	
 	// MARK: - Selection Handling
 	
 	private func handleItemClick(at indexPath: IndexPath) {
@@ -365,6 +460,11 @@ class UnifiedPhotoCollectionViewController: XViewController {
 			selectedPhotos.remove(item)
 		} else {
 			selectedPhotos.insert(item)
+			
+			// Log starred status from SwiftData catalog (single source of truth)
+			Task {
+				await logStarredStatus(for: photo)
+			}
 		}
 		
 		updateSelectionUI()
@@ -453,6 +553,13 @@ extension UnifiedPhotoCollectionViewController: NSCollectionViewDelegate {
 		for indexPath in indexPaths {
 			if let item = dataSource.itemIdentifier(for: indexPath) {
 				selectedPhotos.insert(item)
+				
+				// Log starred status from SwiftData catalog (single source of truth)
+				if let photo = item.base as? (any PhotoItem) {
+					Task {
+						await logStarredStatus(for: photo)
+					}
+				}
 			}
 		}
 		updateSelectionDelegate()
@@ -471,6 +578,46 @@ extension UnifiedPhotoCollectionViewController: NSCollectionViewDelegate {
 	private func updateSelectionDelegate() {
 		let selected = selectedPhotos.compactMap { $0.base as? (any PhotoItem) }
 		delegate?.photoCollection(self, didUpdateSelection: selected)
+	}
+	
+	private func logStarredStatus(for photo: any PhotoItem) async {
+		let catalogService = PhotolalaCatalogServiceV2.shared
+		
+		switch photo {
+		case let photoFile as PhotoFile:
+			// For local directory photos, check by MD5
+			if let md5 = photoFile.md5Hash {
+				if let entry = try? await catalogService.findByMD5(md5) {
+					let shouldShowStar = entry.isStarred || entry.backupStatus == BackupStatus.uploaded
+					print("[Selection] Photo '\(photoFile.filename)': isStarred=\(entry.isStarred), backupStatus=\(entry.backupStatus), SHOULD SHOW STAR=\(shouldShowStar)")
+				} else {
+					print("[Selection] Photo '\(photoFile.filename)' has NO CATALOG ENTRY")
+				}
+			} else {
+				print("[Selection] Photo '\(photoFile.filename)' has no MD5 hash computed yet")
+			}
+			
+		case let photoApple as PhotoApple:
+			// For Apple Photos, check by Apple Photo ID
+			if let entry = try? await catalogService.findByApplePhotoID(photoApple.id) {
+				let shouldShowStar = entry.isStarred || entry.backupStatus == BackupStatus.uploaded
+				print("[Selection] Apple Photo '\(photoApple.filename)': isStarred=\(entry.isStarred), backupStatus=\(entry.backupStatus), SHOULD SHOW STAR=\(shouldShowStar)")
+			} else {
+				print("[Selection] Apple Photo '\(photoApple.filename)' has NO CATALOG ENTRY")
+			}
+			
+		case let photoS3 as PhotoS3:
+			// For S3 photos, check by MD5
+			if let entry = try? await catalogService.findByMD5(photoS3.md5) {
+				let shouldShowStar = entry.isStarred || entry.backupStatus == BackupStatus.uploaded
+				print("[Selection] S3 Photo '\(photoS3.filename)': isStarred=\(entry.isStarred), backupStatus=\(entry.backupStatus), SHOULD SHOW STAR=\(shouldShowStar)")
+			} else {
+				print("[Selection] S3 Photo '\(photoS3.filename)' has NO CATALOG ENTRY")
+			}
+			
+		default:
+			print("[Selection] Unknown photo type: \(type(of: photo))")
+		}
 	}
 	
 	// MARK: - Context Menu

@@ -93,7 +93,7 @@ struct SinglePhotoInspector: View {
 		.task {
 			await loadThumbnail()
 		}
-		.onChange(of: photo.id) { _, _ in
+		.onChange(of: photo.id) {
 			Task {
 				await loadThumbnail()
 			}
@@ -197,7 +197,7 @@ struct PhotoInfoSection: View {
 		.task {
 			await loadFileSizeIfNeeded()
 		}
-		.onChange(of: photo.id) { _, _ in
+		.onChange(of: photo.id) {
 			Task {
 				await loadFileSizeIfNeeded()
 			}
@@ -341,7 +341,7 @@ struct QuickActionsSection: View {
 		.task {
 			await loadApplePhotoMD5IfNeeded()
 		}
-		.onChange(of: photo.id) { _, _ in
+		.onChange(of: photo.id) {
 			// Reset state when photo changes
 			applePhotoMD5 = nil
 			isLoadingMD5 = false
@@ -357,10 +357,11 @@ struct QuickActionsSection: View {
 			return
 		}
 		
-		// Check if already cached in bridge
-		if let cachedMD5 = await ApplePhotosBridge.shared.getMD5(for: applePhoto.id) {
+		// Check if already in catalog
+		let catalogService = PhotolalaCatalogServiceV2.shared
+		if let entry = try? await catalogService.findByApplePhotoID(applePhoto.id) {
 			await MainActor.run {
-				self.applePhotoMD5 = cachedMD5
+				self.applePhotoMD5 = entry.md5
 			}
 			return
 		}

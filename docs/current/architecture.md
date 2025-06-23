@@ -202,7 +202,9 @@ Photolala is a cross-platform photo browser application built with SwiftUI, supp
 - MD5 computation on demand
 - Unified backup status tracking by MD5
 - Supports both PhotoFile and PhotoApple uploads
-- Notifications for UI updates
+- Notifications for UI updates:
+  - `BackupQueueChanged`: General status changes
+  - `CatalogEntryUpdated`: Targeted updates with photo ID
 
 #### BackupStatusManager (Singleton)
 - Shared upload progress tracking
@@ -220,8 +222,13 @@ Photolala is a cross-platform photo browser application built with SwiftUI, supp
 
 #### Unified Photo Browser Components
 - **UnifiedPhotoCollectionViewController**: Platform-agnostic controller working with any PhotoProvider
+  - Observes notifications for real-time UI updates
+  - Implements targeted cell refresh for star status changes
+  - Direct cell configuration without full collection reload
 - **UnifiedPhotoCollectionViewRepresentable**: SwiftUI bridge for the unified controller
 - **UnifiedPhotoCell**: Collection view cell displaying any PhotoItem
+  - Queries SwiftData catalog for star status
+  - Shows stars based on isStarred OR uploaded status
 - Used by both PhotoBrowserView and S3PhotoBrowserView for consistency
 
 #### PhotoBrowserView
