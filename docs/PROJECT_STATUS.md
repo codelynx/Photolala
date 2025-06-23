@@ -971,3 +971,37 @@ The application now has a fully integrated SwiftData catalog system serving as t
      - Instant visual feedback when starring photos
      - Consistent state between all UI elements
      - Better performance with targeted cell updates
+
+47. **AWS Credential Security - Credential-Code Integration (June 23 - Session 3)**:
+   - **Problem Solved**:
+     - Removed hardcoded AWS credentials from Xcode scheme
+     - Eliminated security risk of exposed secrets in git history
+     - Fixed GitHub push protection errors blocking deployments
+   
+   - **Credential-Code Implementation**:
+     - Integrated credential-code library for secure credential management
+     - AWS credentials encrypted at build time using AES-256-GCM
+     - Decryption happens only in memory at runtime
+     - No string literals containing secrets in compiled code
+   
+   - **Credential Loading Hierarchy**:
+     1. Keychain (user's custom credentials) - highest priority
+     2. Environment variables (development)
+     3. Encrypted credentials (built-in fallback) - NEW
+   
+   - **Enhanced KeychainManager**:
+     - Added `loadAWSCredentialsWithFallback()` method
+     - Added `hasAnyAWSCredentials()` to check all credential sources
+     - Seamless fallback between credential sources
+   
+   - **Files Added/Modified**:
+     - `Photolala/Utilities/Credentials.swift` - Auto-generated encrypted credentials
+     - Updated S3BackupService with encrypted credential support
+     - Enhanced KeychainManager with fallback methods
+     - Updated S3BackupManager to use new credential detection
+   
+   - **Security Benefits**:
+     - No more secrets in source control or git history
+     - Unique encryption key for each build
+     - App works out-of-the-box with built-in credentials
+     - Users can still override with their own AWS credentials

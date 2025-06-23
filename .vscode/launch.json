@@ -1,0 +1,22 @@
+{
+	"configurations": [
+		{
+			"type": "swift",
+			"request": "launch",
+			"args": [],
+			"cwd": "${workspaceFolder:Photolala}/.credential-code-tool",
+			"name": "Debug credential-code (.credential-code-tool)",
+			"program": "${workspaceFolder:Photolala}/.credential-code-tool/.build/debug/credential-code",
+			"preLaunchTask": "swift: Build Debug credential-code (.credential-code-tool)"
+		},
+		{
+			"type": "swift",
+			"request": "launch",
+			"args": [],
+			"cwd": "${workspaceFolder:Photolala}/.credential-code-tool",
+			"name": "Release credential-code (.credential-code-tool)",
+			"program": "${workspaceFolder:Photolala}/.credential-code-tool/.build/release/credential-code",
+			"preLaunchTask": "swift: Build Release credential-code (.credential-code-tool)"
+		}
+	]
+}

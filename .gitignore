@@ -97,3 +97,7 @@ untracked/
 
 Photos/**
 xcshareddata/xcschemes/**
+
+# Credential Code
+.credential-code/
+.credential-code-tool/

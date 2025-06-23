@@ -119,4 +119,42 @@ class KeychainManager {
 			return false
 		}
 	}
+
+	// MARK: - AWS Credentials with Fallback
+	
+	/// Load AWS credentials from Keychain or fall back to encrypted credentials
+	func loadAWSCredentialsWithFallback() throws -> (accessKey: String, secretKey: String) {
+		// First try Keychain
+		do {
+			return try loadAWSCredentials()
+		} catch {
+			// Fall back to encrypted credentials
+			guard let accessKey = Credentials.decryptCached(.AWS_ACCESS_KEY_ID),
+			      let secretKey = Credentials.decryptCached(.AWS_SECRET_ACCESS_KEY),
+			      !accessKey.isEmpty, !secretKey.isEmpty
+			else {
+				throw KeychainError.noPassword
+			}
+			
+			return (accessKey, secretKey)
+		}
+	}
+	
+	/// Check if AWS credentials are available from any source
+	func hasAnyAWSCredentials() -> Bool {
+		// Check Keychain first
+		if hasAWSCredentials() {
+			return true
+		}
+		
+		// Check encrypted credentials
+		if let accessKey = Credentials.decryptCached(.AWS_ACCESS_KEY_ID),
+		   let secretKey = Credentials.decryptCached(.AWS_SECRET_ACCESS_KEY),
+		   !accessKey.isEmpty, !secretKey.isEmpty
+		{
+			return true
+		}
+		
+		return false
+	}
 }

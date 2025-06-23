@@ -35,7 +35,7 @@ class S3BackupManager: ObservableObject {
 	}
 
 	func checkConfiguration() {
-		self.isConfigured = KeychainManager.shared.hasAWSCredentials()
+		self.isConfigured = KeychainManager.shared.hasAnyAWSCredentials()
 		if self.isConfigured {
 			Task {
 				await self.initializeService()

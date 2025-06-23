@@ -132,6 +132,27 @@ If files get converted to spaces, run:
 - Xcode → Settings → Text Editing → Indentation
 - Check "Prefer indent using: Tabs"
 - Set "Tab width" and "Indent width" to 4
+
+## AWS Credential Management
+
+The project uses credential-code for secure AWS credential management:
+
+1. **Encrypted Credentials**: AWS credentials are encrypted and built into the app using credential-code
+2. **Credential Loading Priority**:
+   - Keychain (user's custom credentials)
+   - Environment variables (development)
+   - Encrypted credentials (built-in fallback)
+
+To update AWS credentials:
+```bash
+# Edit credentials
+vim .credential-code/credentials.json
+
+# Regenerate encrypted file
+.credential-code-tool/.build/release/credential-code generate --language swift
+
+# Move to project
+mv Generated/Credentials.swift Photolala/Utilities/
 ```
 
 ## Memories

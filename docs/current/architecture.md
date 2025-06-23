@@ -153,7 +153,10 @@ Photolala is a cross-platform photo browser application built with SwiftUI, supp
 - Manages S3BackupService lifecycle
 - Tracks upload progress and storage usage
 - Handles quota enforcement
-- AWS credentials from Keychain/environment
+- AWS credential loading hierarchy:
+  1. Keychain (user's custom credentials)
+  2. Environment variables (development)
+  3. Encrypted credentials via credential-code (built-in)
 
 #### S3CatalogGenerator
 - Creates v5.1 catalog format with `.photolala/` structure
@@ -377,6 +380,27 @@ Tap photo → Push PhotoPreviewView
 6. **Catalog-Based Loading**: Instant photo listing for cataloged directories
 7. **16-Way Sharding**: Scalable catalog storage for large collections
 8. **Network Directory Caching**: 5-minute cache with UUID-based invalidation
+
+## Security
+
+### AWS Credential Management
+The app uses credential-code for secure AWS credential storage:
+
+- **Encrypted at Build Time**: Credentials are encrypted using AES-256-GCM
+- **Runtime Decryption**: Decrypted only in memory when needed
+- **No String Literals**: No plain text secrets in compiled code
+- **Unique Keys**: Each build has a unique encryption key
+
+### Credential Sources (Priority Order)
+1. **Keychain**: User's custom AWS credentials (highest priority)
+2. **Environment Variables**: For development builds
+3. **Encrypted Credentials**: Built-in via credential-code
+
+### KeychainManager Security
+- Uses iOS/macOS system Keychain for secure storage
+- Implements `loadAWSCredentialsWithFallback()` for seamless fallback
+- `hasAnyAWSCredentials()` checks all credential sources
+- No credentials are logged or exposed in debug output
 
 ## Thread Safety
 

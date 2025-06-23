@@ -74,7 +74,7 @@ class S3BackupService: ObservableObject {
 		return client
 	}
 
-	// Convenience init that reads from Keychain, environment, or credentials file
+	// Convenience init that reads from Keychain, environment, or encrypted credentials
 	convenience init() async throws {
 		// First, try Keychain (production)
 		if let credentials = try? KeychainManager.shared.loadAWSCredentials() {
@@ -93,83 +93,22 @@ class S3BackupService: ObservableObject {
 			return
 		}
 
-		// Third, try the credentials file (fallback)
-		// For sandboxed apps, this will be in the container directory
-		#if os(macOS)
-			let homeDirectory = FileManager.default.homeDirectoryForCurrentUser
-		#else
-			let homeDirectory = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!
-		#endif
-		let credentialsPath = homeDirectory.appendingPathComponent(".aws/credentials").path
-		print("Looking for credentials at: \(credentialsPath)")
-
-		// Check if file exists
-		let fileManager = FileManager.default
-		guard fileManager.fileExists(atPath: credentialsPath) else {
-			print("Credentials file does not exist at: \(credentialsPath)")
-			print("For sandboxed apps, you can:")
-			print("1. Set environment variables AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY")
-			print("2. Copy your credentials to: \(credentialsPath)")
-			throw S3BackupError.credentialsNotFound
+		// Third, try encrypted credentials (built-in development fallback)
+		if let accessKey = Credentials.decryptCached(.AWS_ACCESS_KEY_ID),
+		   let secretKey = Credentials.decryptCached(.AWS_SECRET_ACCESS_KEY),
+		   !accessKey.isEmpty, !secretKey.isEmpty
+		{
+			print("Using AWS credentials from encrypted storage")
+			try await self.init(accessKey: accessKey, secretKey: secretKey)
+			return
 		}
 
-		// Try to read the file
-		let credentialsData: String
-		do {
-			credentialsData = try String(contentsOfFile: credentialsPath)
-			print("Successfully read credentials file, length: \(credentialsData.count)")
-		} catch {
-			print("Failed to read credentials file: \(error)")
-			throw S3BackupError.credentialsNotFound
-		}
-
-		var accessKey: String?
-		var secretKey: String?
-
-		// Parse the credentials file
-		let lines = credentialsData.components(separatedBy: .newlines)
-		var inDefaultSection = false
-
-		print("Parsing \(lines.count) lines from credentials file")
-
-		for (index, line) in lines.enumerated() {
-			let trimmed = line.trimmingCharacters(in: .whitespaces)
-
-			if trimmed == "[default]" {
-				print("Found [default] section at line \(index + 1)")
-				inDefaultSection = true
-			} else if trimmed.hasPrefix("[") {
-				print("Found new section at line \(index + 1): \(trimmed)")
-				inDefaultSection = false
-			} else if inDefaultSection, !trimmed.isEmpty {
-				if trimmed.hasPrefix("aws_access_key_id") {
-					let parts = trimmed.components(separatedBy: "=")
-					if parts.count >= 2 {
-						accessKey = parts.dropFirst().joined(separator: "=").trimmingCharacters(in: .whitespaces)
-						print("Found access key: \(String(repeating: "*", count: accessKey?.count ?? 0))")
-					}
-				} else if trimmed.hasPrefix("aws_secret_access_key") {
-					let parts = trimmed.components(separatedBy: "=")
-					if parts.count >= 2 {
-						secretKey = parts.dropFirst().joined(separator: "=").trimmingCharacters(in: .whitespaces)
-						print("Found secret key: \(String(repeating: "*", count: secretKey?.count ?? 0))")
-					}
-				}
-			}
-		}
-
-		guard let accessKey, !accessKey.isEmpty else {
-			print("Access key not found or empty")
-			throw S3BackupError.credentialsNotFound
-		}
-
-		guard let secretKey, !secretKey.isEmpty else {
-			print("Secret key not found or empty")
-			throw S3BackupError.credentialsNotFound
-		}
-
-		print("Credentials parsed successfully, initializing S3 client...")
-		try await self.init(accessKey: accessKey, secretKey: secretKey)
+		// No credentials found
+		print("AWS credentials not found in any source")
+		print("Please configure credentials via:")
+		print("1. Settings > AWS S3 Configuration (for custom credentials)")
+		print("2. Environment variables (for development)")
+		throw S3BackupError.credentialsNotFound
 	}
 
 	// MARK: - MD5 Calculation
