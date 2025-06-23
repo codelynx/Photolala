@@ -51,7 +51,7 @@ actor ApplePhotosBridge {
 			await saveToDisk()
 		}
 		
-		logger.debug("Stored mapping: \(photoID) -> \(md5)")
+		// logger.debug("Stored mapping: \(photoID) -> \(md5)")
 	}
 	
 	/// Check if MD5 exists for an Apple Photo ID

@@ -278,6 +278,31 @@ class S3PhotoProvider: BasePhotoProvider {
 		print("[S3PhotoProvider] Created \(s3Photos.count) S3 photos")
 		updatePhotos(s3Photos)
 		print("[S3PhotoProvider] Photos updated successfully")
+		
+		// Populate backup status for Apple Photos
+		await populateBackupStatusForApplePhotos()
+	}
+	
+	private func populateBackupStatusForApplePhotos() async {
+		// Mark all S3 photos that have an Apple Photo ID as uploaded
+		let s3Photos = photos.compactMap { $0 as? PhotoS3 }
+		
+		for photo in s3Photos {
+			if let applePhotoID = photo.applePhotoID, !applePhotoID.isEmpty {
+				// Store the mapping in ApplePhotosBridge
+				await ApplePhotosBridge.shared.storeMD5(photo.md5, for: applePhotoID)
+				
+				// Mark as uploaded in BackupQueueManager
+				await MainActor.run {
+					BackupQueueManager.shared.backupStatus[photo.md5] = .uploaded
+				}
+			}
+		}
+		
+		let applePhotoCount = s3Photos.filter { $0.applePhotoID != nil }.count
+		if applePhotoCount > 0 {
+			print("[S3PhotoProvider] Populated backup status for \(applePhotoCount) Apple Photos")
+		}
 	}
 	
 	override func refresh() async throws {
