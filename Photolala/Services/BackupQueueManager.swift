@@ -162,8 +162,17 @@ class BackupQueueManager: ObservableObject {
 					
 					// Update catalog entry
 					entry.isStarred = false
-					entry.backupStatus = .notBackedUp
+					entry.backupStatus = BackupStatus.notBackedUp
 					try await catalogServiceV2.save()
+					
+					// Post notification to update UI
+					await MainActor.run {
+						NotificationCenter.default.post(
+							name: NSNotification.Name("CatalogEntryUpdated"),
+							object: nil,
+							userInfo: ["applePhotoID": applePhotoID]
+						)
+					}
 				}
 			} catch {
 				print("[BackupQueueManager] Failed to update catalog for removed photo: \(error)")
@@ -213,6 +222,15 @@ class BackupQueueManager: ObservableObject {
 					existingEntry.isStarred = true
 					existingEntry.backupStatus = BackupStatus.queued
 					try await catalogServiceV2.save()
+					
+					// Post notification to update UI
+					await MainActor.run {
+						NotificationCenter.default.post(
+							name: NSNotification.Name("CatalogEntryUpdated"),
+							object: nil,
+							userInfo: ["applePhotoID": photoID]
+						)
+					}
 				} else {
 					// Create new entry for Apple Photo
 					// We need minimal info for now, full metadata will be added during backup
@@ -231,6 +249,15 @@ class BackupQueueManager: ObservableObject {
 					let catalogPath = "apple-photos-library"
 					let catalog = try await catalogServiceV2.findOrCreateCatalog(directoryPath: catalogPath)
 					try catalogServiceV2.upsertEntry(entry, in: catalog)
+					
+					// Post notification to update UI
+					await MainActor.run {
+						NotificationCenter.default.post(
+							name: NSNotification.Name("CatalogEntryUpdated"),
+							object: nil,
+							userInfo: ["applePhotoID": photoID]
+						)
+					}
 				}
 			} catch {
 				print("[BackupQueueManager] Failed to update catalog for Apple Photo: \(error)")
@@ -390,6 +417,15 @@ class BackupQueueManager: ObservableObject {
 									entry.backupStatus = BackupStatus.uploaded
 									try await catalogServiceV2.save()
 									print("[BackupQueueManager] Updated catalog entry for Apple Photo \(photoID) to uploaded status")
+									
+									// Post notification to update UI
+									await MainActor.run {
+										NotificationCenter.default.post(
+											name: NSNotification.Name("CatalogEntryUpdated"),
+											object: nil,
+											userInfo: ["applePhotoID": photoID]
+										)
+									}
 								}
 							} catch {
 								print("[BackupQueueManager] Failed to update catalog entry: \(error)")

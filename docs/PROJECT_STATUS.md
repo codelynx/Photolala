@@ -949,3 +949,25 @@ The application now has a fully integrated SwiftData catalog system serving as t
      - Entries updated to "uploaded" status after successful upload
      - S3PhotoProvider creates missing entries for discovered photos
      - All code uses singleton catalog service (no context conflicts)
+
+46. **Immediate Star Feedback (June 23 - Session 2)**:
+   - **Fixed Thumbnail Star Updates**:
+     - Stars now appear immediately on thumbnails when starring/unstarring
+     - No need to reload collection view for changes to appear
+     - Inspector button and thumbnails stay perfectly in sync
+   
+   - **Notification System**:
+     - Added `CatalogEntryUpdated` notification for targeted updates
+     - Collection view listens for catalog changes
+     - Refreshes only affected cells, not entire collection
+   
+   - **Implementation Details**:
+     - Direct cell configuration instead of reconfigureItems (iOS compatibility)
+     - Notifications include Apple Photo ID for precise cell targeting
+     - Posts notifications on star, unstar, and upload completion
+     - Proper observer cleanup in deinit
+   
+   - **User Experience**:
+     - Instant visual feedback when starring photos
+     - Consistent state between all UI elements
+     - Better performance with targeted cell updates
