@@ -884,7 +884,7 @@ The application now has a fully integrated SwiftData catalog system serving as t
      - Error state handling
    
    - **Technical Improvements**:
-     - Fixed bucket name consistency (photolala-photos)
+     - Fixed bucket name consistency (photolala)
      - Automatic CSV header detection and skipping
      - Robust error handling without SDK dependencies
      - SwiftData context management improvements
@@ -978,7 +978,7 @@ The application now has a fully integrated SwiftData catalog system serving as t
    - **Technical Fixes Applied**:
      - AWS SDK error detection using string matching
      - Method names clarified (loadPhotoCatalog, findPhotoEntry)
-     - Bucket name standardized to "photolala-photos"
+     - Bucket name standardized to "photolala"
      - CSV headers always included (future-proofing)
      - SwiftData context management improved
    
@@ -1067,3 +1067,17 @@ The application now has a fully integrated SwiftData catalog system serving as t
      - Unique encryption key for each build
      - App works out-of-the-box with built-in credentials
      - Users can still override with their own AWS credentials
+
+47. **Bookmark Feature Implementation (June 24)**:
+   - **Phase 1 Complete**: Local storage and UI
+   - Created PhotoBookmark model with MD5-based identification
+   - Implemented BookmarkManager singleton service
+   - Added bookmark section to InspectorView with emoji grid
+   - Display emoji badges on photo thumbnails
+   - CSV storage in sandboxed Application Support directory
+   - 12 quick emojis: ⭐ ❤️ 👍 👎 ✏️ 🗑️ 📤 🖨️ ✅ 🔴 📌 💡
+   - Works with all photo types (PhotoFile, PhotoApple, PhotoS3)
+   - Bookmarks persist across app launches
+   - Toggle behavior: tap same emoji to remove, different to change
+   - Clean CSV format with proper escaping
+   - Created test and debug scripts for verification
