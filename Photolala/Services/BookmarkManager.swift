@@ -16,9 +16,9 @@ class BookmarkManager: ObservableObject {
 	// Published properties
 	@Published private(set) var bookmarks: [String: PhotoBookmark] = [:]
 	
-	// Quick emoji set (12 emojis)
+	// Quick emoji set (11 emojis - star removed to avoid confusion with starring feature)
 	static let quickEmojis = [
-		"⭐", "❤️", "👍", "👎",  // Rating
+		"❤️", "👍", "👎",      // Rating
 		"✏️", "🗑️", "📤", "🖨️",  // Actions
 		"✅", "🔴", "📌", "💡"   // Status
 	]
@@ -45,23 +45,25 @@ class BookmarkManager: ObservableObject {
 	/// Set or remove a bookmark for a photo
 	func setBookmark(photo: any PhotoItem, emoji: String?) async {
 		guard let md5 = await getMD5(for: photo) else {
-			// Cannot bookmark photo without MD5
+			print("[BookmarkManager] Cannot bookmark photo without MD5")
 			return
 		}
 		
 		if let emoji = emoji {
-			// Validate emoji
-			guard !emoji.isEmpty && emoji.count == 1 else {
-				// Invalid emoji
+			// Validate emoji - check it's a single emoji (may have multiple unicode scalars)
+			guard !emoji.isEmpty && emoji.unicodeScalars.count <= 4 else {
+				print("[BookmarkManager] Invalid emoji: \(emoji) (scalars: \(emoji.unicodeScalars.count))")
 				return
 			}
 			
 			// Add or update bookmark
 			let bookmark = PhotoBookmark(md5: md5, emoji: emoji, modifiedDate: Date())
 			bookmarks[md5] = bookmark
+			print("[BookmarkManager] Added bookmark \(emoji) for MD5: \(md5)")
 		} else {
 			// Remove bookmark
 			bookmarks.removeValue(forKey: md5)
+			print("[BookmarkManager] Removed bookmark for MD5: \(md5)")
 		}
 		
 		// Save changes
@@ -155,21 +157,27 @@ class BookmarkManager: ObservableObject {
 		do {
 			let url = localBookmarksURL
 			try csv.write(to: url, atomically: true, encoding: .utf8)
+			print("[BookmarkManager] Saved \(bookmarks.count) bookmarks to \(url.path)")
 		} catch {
-			// Failed to save bookmarks: \(error)
+			print("[BookmarkManager] Failed to save bookmarks: \(error)")
 		}
 	}
 	
 	/// Load bookmarks from CSV file
 	private func loadFromCSV() {
-		guard FileManager.default.fileExists(atPath: localBookmarksURL.path) else {
-			// No bookmarks file found
+		let path = localBookmarksURL.path
+		print("[BookmarkManager] Looking for bookmarks at: \(path)")
+		
+		guard FileManager.default.fileExists(atPath: path) else {
+			print("[BookmarkManager] No bookmarks file found at \(path)")
 			return
 		}
 		
 		do {
 			let csv = try String(contentsOf: localBookmarksURL, encoding: .utf8)
+			print("[BookmarkManager] Read CSV content: \(csv.count) characters")
 			let lines = csv.components(separatedBy: .newlines)
+			print("[BookmarkManager] CSV has \(lines.count) lines")
 			
 			// Skip header if present
 			let dataLines = if lines.first == "md5,emoji,note,modifiedDate" {
@@ -177,19 +185,24 @@ class BookmarkManager: ObservableObject {
 			} else {
 				lines
 			}
+			print("[BookmarkManager] Processing \(dataLines.count) data lines")
 			
 			// Parse bookmarks
 			var loadedBookmarks: [String: PhotoBookmark] = [:]
 			for line in dataLines where !line.isEmpty {
+				print("[BookmarkManager] Parsing line: \(line)")
 				if let bookmark = PhotoBookmark(csvRow: line) {
 					loadedBookmarks[bookmark.md5] = bookmark
+					print("[BookmarkManager] Parsed bookmark: \(bookmark.emoji) for MD5: \(bookmark.md5)")
+				} else {
+					print("[BookmarkManager] Failed to parse line: \(line)")
 				}
 			}
 			
 			bookmarks = loadedBookmarks
-			// Loaded \(bookmarks.count) bookmarks from CSV
+			print("[BookmarkManager] Loaded \(bookmarks.count) bookmarks from CSV")
 		} catch {
-			// Failed to load bookmarks: \(error)
+			print("[BookmarkManager] Failed to load bookmarks: \(error)")
 		}
 	}
 	

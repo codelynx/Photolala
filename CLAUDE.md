@@ -66,7 +66,7 @@ Photolala/
   - Multi-window support on macOS
   - Bundle resource support (Photos folder reference)
   - Unified photo browser architecture supporting multiple sources
-  - Bookmark feature with emoji marking (⭐ ❤️ 👍 👎 ✏️ 🗑️ 📤 🖨️ ✅ 🔴 📌 💡)
+  - Bookmark feature with emoji marking (❤️ 👍 👎 ✏️ 🗑️ 📤 🖨️ ✅ 🔴 📌 💡)
   - MD5-based photo identification for bookmarks
 
 ## Navigation Architecture
