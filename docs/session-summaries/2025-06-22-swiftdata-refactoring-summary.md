@@ -61,8 +61,8 @@ if error.localizedDescription.contains("NoSuchBucket") {
 - `findEntry` → `findPhotoEntry`
 
 ### 3. Bucket Name Consistency
-**Problem**: Mismatch between services (photolala vs photolala-photos)
-**Solution**: Standardized on "photolala-photos" across all services
+**Problem**: Mismatch between services (photolala vs photolala)
+**Solution**: Standardized on "photolala" across all services
 
 ### 4. Legacy Catalog Format
 **Problem**: S3 catalogs stored in .photolala subdirectory

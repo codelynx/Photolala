@@ -17,6 +17,8 @@ Documents describing the current architecture and implementation:
 - **[current/archive-retrieval-system.md](./current/archive-retrieval-system.md)** - S3 Deep Archive photo retrieval
 - **[current/metadata-backup-system.md](./current/metadata-backup-system.md)** - Metadata backup to S3
 - **[current/catalog-system.md](./current/catalog-system.md)** - v5.0 Photolala catalog format for fast photo loading
+- **[current/metadata-system.md](./current/metadata-system.md)** - Metadata extraction, caching, and display
+- **[current/bookmark-system.md](./current/bookmark-system.md)** - Emoji bookmark feature for marking photos
 
 ### History
 Historical design documents and implementation notes:
@@ -62,4 +64,4 @@ When adding documentation:
 3. **Implementation notes** → Add to `history/implementation-notes/`
 4. **Status updates** → Update `PROJECT_STATUS.md`
 
-Last updated: June 21, 2025
+Last updated: June 24, 2025

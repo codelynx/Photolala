@@ -21,8 +21,11 @@ class UnifiedPhotoCell: NSCollectionViewItem {
 	private var photoImageView: ScalableImageView!
 	private var placeholderImageView: NSImageView!
 	private var starImageView: NSImageView!
+	private var bookmarkEmojiLabel: NSTextField!
 	private var fileSizeLabel: NSTextField!
 	private var badgeView: NSView?
+	private var bookmarkBadgeView: NSView?
+	private var bookmarkLabel: NSTextField?
 	private var loadingIndicator: NSProgressIndicator!
 	
 	// Constraints
@@ -57,6 +60,14 @@ class UnifiedPhotoCell: NSCollectionViewItem {
 		starImageView.imageScaling = .scaleProportionallyDown
 		starImageView.contentTintColor = .systemYellow
 		view.addSubview(starImageView)
+		
+		// Bookmark emoji label
+		bookmarkEmojiLabel = NSTextField(labelWithString: "")
+		bookmarkEmojiLabel.font = .systemFont(ofSize: 14)
+		bookmarkEmojiLabel.alignment = .center
+		bookmarkEmojiLabel.translatesAutoresizingMaskIntoConstraints = false
+		bookmarkEmojiLabel.isHidden = true
+		view.addSubview(bookmarkEmojiLabel)
 		
 		// File size label
 		fileSizeLabel = NSTextField(labelWithString: "")
@@ -102,10 +113,15 @@ class UnifiedPhotoCell: NSCollectionViewItem {
 			starImageView.widthAnchor.constraint(equalToConstant: 16),
 			starImageView.heightAnchor.constraint(equalToConstant: 16),
 			
+			// Bookmark emoji label - positioned after star image
+			bookmarkEmojiLabel.leadingAnchor.constraint(equalTo: starImageView.trailingAnchor, constant: 2),
+			bookmarkEmojiLabel.centerYAnchor.constraint(equalTo: starImageView.centerYAnchor),
+			bookmarkEmojiLabel.widthAnchor.constraint(equalToConstant: 20),
+			
 			// File size label - positioned at bottom of view
 			fileSizeLabel.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -4),
 			fileSizeLabel.centerYAnchor.constraint(equalTo: starImageView.centerYAnchor),
-			fileSizeLabel.leadingAnchor.constraint(greaterThanOrEqualTo: starImageView.trailingAnchor, constant: 4),
+			fileSizeLabel.leadingAnchor.constraint(greaterThanOrEqualTo: bookmarkEmojiLabel.trailingAnchor, constant: 4),
 			
 			// Loading indicator
 			loadingIndicator.centerXAnchor.constraint(equalTo: photoImageView.centerXAnchor),
@@ -125,9 +141,14 @@ class UnifiedPhotoCell: NSCollectionViewItem {
 		thumbnailTask = nil
 		photoImageView.image = nil
 		starImageView.image = nil
+		bookmarkEmojiLabel.stringValue = ""
+		bookmarkEmojiLabel.isHidden = true
 		fileSizeLabel.stringValue = ""
 		badgeView?.removeFromSuperview()
 		badgeView = nil
+		bookmarkBadgeView?.removeFromSuperview()
+		bookmarkBadgeView = nil
+		bookmarkLabel = nil
 		loadingIndicator.stopAnimation(nil)
 		placeholderImageView.isHidden = false // Show placeholder again
 	}
@@ -145,6 +166,7 @@ class UnifiedPhotoCell: NSCollectionViewItem {
 		// Update info bar visibility based on showItemInfo
 		let showInfo = settings.showItemInfo
 		starImageView.isHidden = !showInfo
+		bookmarkEmojiLabel.isHidden = !showInfo
 		fileSizeLabel.isHidden = !showInfo
 		
 		// Configure star based on backup state
@@ -231,6 +253,9 @@ class UnifiedPhotoCell: NSCollectionViewItem {
 		if photo.isArchived {
 			addArchiveBadge()
 		}
+		
+		// Load bookmark for info bar
+		loadBookmarkForInfoBar(for: photo)
 		
 		// Load thumbnail
 		loadThumbnail(for: photo)
@@ -324,6 +349,24 @@ class UnifiedPhotoCell: NSCollectionViewItem {
 		badgeView = badge
 	}
 	
+	private func loadBookmarkForInfoBar(for photo: any PhotoItem) {
+		Task {
+			let bookmark = await BookmarkManager.shared.getBookmark(for: photo)
+			await MainActor.run {
+				if let emoji = bookmark?.emoji {
+					bookmarkEmojiLabel.stringValue = emoji
+					bookmarkEmojiLabel.isHidden = false
+				} else {
+					bookmarkEmojiLabel.stringValue = ""
+					// Only hide if info bar is not shown
+					if !starImageView.isHidden {
+						bookmarkEmojiLabel.isHidden = true
+					}
+				}
+			}
+		}
+	}
+	
 	private func updateSelectionAppearance() {
 		if isSelected {
 			view.layer?.borderWidth = 3
@@ -358,6 +401,8 @@ class UnifiedPhotoCell: UICollectionViewCell {
 	private var starImageView: UIImageView!
 	private var fileSizeLabel: UILabel!
 	private var badgeView: UIView?
+	private var bookmarkBadgeView: UIView?
+	private var bookmarkLabel: UILabel?
 	private var loadingIndicator: UIActivityIndicatorView!
 	
 	// Current photo
@@ -453,6 +498,9 @@ class UnifiedPhotoCell: UICollectionViewCell {
 		fileSizeLabel.text = ""
 		badgeView?.removeFromSuperview()
 		badgeView = nil
+		bookmarkBadgeView?.removeFromSuperview()
+		bookmarkBadgeView = nil
+		bookmarkLabel = nil
 		loadingIndicator.stopAnimating()
 		contentView.layer.borderWidth = 0
 		placeholderImageView.isHidden = false // Show placeholder again
@@ -464,6 +512,7 @@ class UnifiedPhotoCell: UICollectionViewCell {
 		// Update info bar visibility based on showItemInfo
 		let showInfo = settings.showItemInfo
 		starImageView.isHidden = !showInfo
+		bookmarkEmojiLabel.isHidden = !showInfo
 		fileSizeLabel.isHidden = !showInfo
 		
 		// Configure star based on backup state
@@ -547,6 +596,9 @@ class UnifiedPhotoCell: UICollectionViewCell {
 			addArchiveBadge()
 		}
 		
+		// Load bookmark for info bar
+		loadBookmarkForInfoBar(for: photo)
+		
 		// Load thumbnail
 		loadThumbnail(for: photo)
 		
@@ -626,6 +678,50 @@ class UnifiedPhotoCell: UICollectionViewCell {
 		])
 		
 		badgeView = badge
+	}
+	
+	private func loadBookmarkBadge(for photo: any PhotoItem) {
+		Task {
+			let bookmark = await BookmarkManager.shared.getBookmark(for: photo)
+			await MainActor.run {
+				if let emoji = bookmark?.emoji {
+					addBookmarkBadge(emoji: emoji)
+				}
+			}
+		}
+	}
+	
+	private func addBookmarkBadge(emoji: String) {
+		// Remove existing bookmark badge if any
+		bookmarkBadgeView?.removeFromSuperview()
+		
+		let badge = UIView()
+		badge.backgroundColor = UIColor.black.withAlphaComponent(0.6)
+		badge.layer.cornerRadius = 10
+		badge.translatesAutoresizingMaskIntoConstraints = false
+		
+		let label = UILabel()
+		label.text = emoji
+		label.font = .systemFont(ofSize: 20)
+		label.textAlignment = .center
+		label.translatesAutoresizingMaskIntoConstraints = false
+		
+		badge.addSubview(label)
+		contentView.addSubview(badge)
+		
+		NSLayoutConstraint.activate([
+			// Position in top-right corner of the image view
+			badge.topAnchor.constraint(equalTo: photoImageView.topAnchor, constant: 4),
+			badge.trailingAnchor.constraint(equalTo: photoImageView.trailingAnchor, constant: -4),
+			badge.widthAnchor.constraint(equalToConstant: 32),
+			badge.heightAnchor.constraint(equalToConstant: 32),
+			
+			label.centerXAnchor.constraint(equalTo: badge.centerXAnchor),
+			label.centerYAnchor.constraint(equalTo: badge.centerYAnchor)
+		])
+		
+		bookmarkBadgeView = badge
+		bookmarkLabel = label
 	}
 	
 	override var isSelected: Bool {

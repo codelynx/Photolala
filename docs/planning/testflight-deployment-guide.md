@@ -19,7 +19,7 @@ This guide covers deploying Photolala to TestFlight for testing In-App Purchase 
    - **Platform**: iOS
    - **Name**: Photolala
    - **Primary Language**: English (U.S.)
-   - **Bundle ID**: com.electricwoods.Photolala
+   - **Bundle ID**: com.electricwoods.photolala
    - **SKU**: PHOTOLALA001
 
 ### 1.2 Configure In-App Purchases

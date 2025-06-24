@@ -15,7 +15,7 @@ Implemented credential-code library to encrypt AWS credentials at build time and
 ## Changes Made
 
 ### 1. Removed Hardcoded Credentials
-- **File**: `Photolala.xcodeproj/xcshareddata/xcschemes/photolala.xcscheme`
+- **File**: `Photolala.xcodeproj/xcshareddata/xcschemes/Photolala.xcscheme`
 - Removed environment variables containing AWS credentials
 
 ### 2. Set Up Credential-Code

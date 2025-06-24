@@ -35,7 +35,7 @@ Created feature flags to disable S3 features:
 
 3. **Verify Bundle ID**:
    ```
-   com.electricwoods.Photolala
+   com.electricwoods.photolala
    ```
 
 4. **Add New Files to Project**:

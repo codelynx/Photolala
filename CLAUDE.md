@@ -12,19 +12,19 @@ Build commands for different platforms:
 
 ```bash
 # Build for macOS
-xcodebuild -scheme photolala -destination 'platform=macOS' build
+xcodebuild -scheme Photolala -destination 'platform=macOS' build
 
 # Build for iOS Simulator
-xcodebuild -scheme photolala -destination 'platform=iOS Simulator,name=iPhone 16 Pro' build
+xcodebuild -scheme Photolala -destination 'platform=iOS Simulator,name=iPhone 16 Pro' build
 
 # Build for tvOS Simulator  
-xcodebuild -scheme photolala -destination 'platform=tvOS Simulator,name=Apple TV' build
+xcodebuild -scheme Photolala -destination 'platform=tvOS Simulator,name=Apple TV' build
 
 # Clean build
-xcodebuild -scheme photolala clean
+xcodebuild -scheme Photolala clean
 
 # Run tests
-xcodebuild -scheme photolala test
+xcodebuild -scheme Photolala test
 ```
 
 ## Project Structure
@@ -32,10 +32,10 @@ xcodebuild -scheme photolala test
 ```
 Photolala/
 ├── Photolala/              # Main app target
-│   ├── Models/            # Data models (PhotoReference, Directory)
+│   ├── Models/            # Data models (PhotoReference, Directory, PhotoBookmark)
 │   ├── Views/             # SwiftUI views
 │   ├── ViewModels/        # Observable view models
-│   ├── Services/          # Business logic
+│   ├── Services/          # Business logic (PhotoManager, BookmarkManager)
 │   ├── Utilities/         # Helper utilities (XPlatform, BundlePhotosHelper)
 │   ├── Commands/          # Menu commands (PhotolalaCommands)
 │   └── PhotolalaApp.swift # App entry point
@@ -50,7 +50,7 @@ Photolala/
 ## Development Notes
 
 - Development Team ID: 2P97EM4L4N
-- Bundle ID: com.electricwoods.Photolala
+- Bundle ID: com.electricwoods.photolala
 - Supported platforms: macOS 14.0+, iOS 18.5+, tvOS 18.0+
 - Architecture: SwiftUI (no SwiftData for core functionality)
 - Key features implemented:
@@ -66,6 +66,8 @@ Photolala/
   - Multi-window support on macOS
   - Bundle resource support (Photos folder reference)
   - Unified photo browser architecture supporting multiple sources
+  - Bookmark feature with emoji marking (❤️ 👍 👎 ✏️ 🗑️ 📤 🖨️ ✅ 🔴 📌 💡)
+  - MD5-based photo identification for bookmarks
 
 ## Navigation Architecture
 

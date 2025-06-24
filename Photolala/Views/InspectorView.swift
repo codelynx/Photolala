@@ -80,6 +80,9 @@ struct SinglePhotoInspector: View {
 				// Quick Actions
 				QuickActionsSection(photo: photo)
 
+				// Bookmark Section
+				BookmarkSection(photo: photo)
+
 				// Metadata (collapsible)
 				MetadataSection(photo: photo)
 
@@ -708,10 +711,129 @@ private func showInFinder(_ photo: any PhotoItem) async {
 	#endif
 }
 
-// TODO: Implement star functionality when available
-// private func toggleStar(_ file: PhotoFile) async {
-// 	// TODO: Implement star toggle
-// }
+// MARK: - Bookmark Section
+
+struct BookmarkSection: View {
+	let photo: any PhotoItem
+	@State private var currentBookmark: PhotoBookmark?
+	@State private var isLoading = false
+
+	var body: some View {
+		VStack(alignment: .leading, spacing: 8) {
+			Text("Bookmark")
+				.font(.headline)
+
+			// Current bookmark status
+			HStack {
+				Text("Current")
+					.foregroundColor(.secondary)
+				Spacer()
+				if isLoading {
+					ProgressView()
+						.scaleEffect(0.7)
+				} else if let emoji = currentBookmark?.emoji {
+					Text(emoji)
+						.font(.title2)
+				} else {
+					Text("None")
+						.foregroundColor(.secondary)
+				}
+			}
+			.font(.system(.body, design: .rounded))
+
+			Divider()
+				.padding(.vertical, 4)
+
+			// Emoji grid
+			LazyVGrid(columns: [GridItem(.adaptive(minimum: 44))], spacing: 8) {
+				ForEach(BookmarkManager.quickEmojis, id: \.self) { emoji in
+					EmojiButton(
+						emoji: emoji,
+						isSelected: currentBookmark?.emoji == emoji,
+						action: {
+							Task {
+								await setBookmark(emoji: emoji)
+							}
+						}
+					)
+				}
+			}
+
+			// Clear button
+			if currentBookmark != nil {
+				Button("Clear") {
+					Task {
+						await setBookmark(emoji: nil)
+					}
+				}
+				.buttonStyle(.plain)
+				.foregroundColor(.red)
+				.padding(.top, 4)
+			}
+		}
+		.task {
+			await loadBookmark()
+		}
+		.onChange(of: photo.id) {
+			Task {
+				await loadBookmark()
+			}
+		}
+	}
+
+	private func loadBookmark() async {
+		isLoading = true
+		currentBookmark = await BookmarkManager.shared.getBookmark(for: photo)
+		isLoading = false
+	}
+
+	private func setBookmark(emoji: String?) async {
+		if let emoji = emoji, currentBookmark?.emoji == emoji {
+			// Tapping same emoji removes it
+			await BookmarkManager.shared.setBookmark(photo: photo, emoji: nil)
+		} else {
+			// Set new emoji or clear
+			await BookmarkManager.shared.setBookmark(photo: photo, emoji: emoji)
+		}
+		await loadBookmark()
+	}
+}
+
+struct EmojiButton: View {
+	let emoji: String
+	let isSelected: Bool
+	let action: () -> Void
+	@State private var isHovered = false
+
+	var body: some View {
+		Button(action: action) {
+			Text(emoji)
+				.font(.title2)
+				.frame(width: 44, height: 44)
+				.background(
+					RoundedRectangle(cornerRadius: 8)
+						.fill(
+							isSelected ? Color.accentColor.opacity(0.3) :
+							isHovered ? Color.secondary.opacity(0.1) :
+							Color.clear
+						)
+				)
+				.overlay(
+					RoundedRectangle(cornerRadius: 8)
+						.stroke(
+							isSelected ? Color.accentColor :
+							isHovered ? Color.secondary.opacity(0.3) :
+							Color.clear,
+							lineWidth: 2
+						)
+				)
+		}
+		.buttonStyle(.plain)
+		.onHover { hovering in
+			isHovered = hovering
+		}
+	}
+}
 
 // MARK: - Preview
 

@@ -47,7 +47,7 @@ Quick checklist to verify before uploading to TestFlight.
 ### Build Settings
 - [ ] Set version number (e.g., 1.0.0)
 - [ ] Set build number (start with 1)
-- [ ] Verify bundle ID: com.electricwoods.Photolala
+- [ ] Verify bundle ID: com.electricwoods.photolala
 - [ ] Team ID: 2P97EM4L4N
 
 ### Capabilities to Enable
