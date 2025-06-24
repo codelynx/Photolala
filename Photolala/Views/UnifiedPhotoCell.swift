@@ -23,6 +23,8 @@ class UnifiedPhotoCell: NSCollectionViewItem {
 	private var starImageView: NSImageView!
 	private var fileSizeLabel: NSTextField!
 	private var badgeView: NSView?
+	private var bookmarkBadgeView: NSView?
+	private var bookmarkLabel: NSTextField?
 	private var loadingIndicator: NSProgressIndicator!
 	
 	// Constraints
@@ -128,6 +130,9 @@ class UnifiedPhotoCell: NSCollectionViewItem {
 		fileSizeLabel.stringValue = ""
 		badgeView?.removeFromSuperview()
 		badgeView = nil
+		bookmarkBadgeView?.removeFromSuperview()
+		bookmarkBadgeView = nil
+		bookmarkLabel = nil
 		loadingIndicator.stopAnimation(nil)
 		placeholderImageView.isHidden = false // Show placeholder again
 	}
@@ -232,6 +237,9 @@ class UnifiedPhotoCell: NSCollectionViewItem {
 			addArchiveBadge()
 		}
 		
+		// Load bookmark badge
+		loadBookmarkBadge(for: photo)
+		
 		// Load thumbnail
 		loadThumbnail(for: photo)
 		
@@ -324,6 +332,50 @@ class UnifiedPhotoCell: NSCollectionViewItem {
 		badgeView = badge
 	}
 	
+	private func loadBookmarkBadge(for photo: any PhotoItem) {
+		Task {
+			let bookmark = await BookmarkManager.shared.getBookmark(for: photo)
+			await MainActor.run {
+				if let emoji = bookmark?.emoji {
+					addBookmarkBadge(emoji: emoji)
+				}
+			}
+		}
+	}
+	
+	private func addBookmarkBadge(emoji: String) {
+		// Remove existing bookmark badge if any
+		bookmarkBadgeView?.removeFromSuperview()
+		
+		let badge = NSView()
+		badge.wantsLayer = true
+		badge.layer?.backgroundColor = NSColor.black.withAlphaComponent(0.6).cgColor
+		badge.layer?.cornerRadius = 10
+		badge.translatesAutoresizingMaskIntoConstraints = false
+		
+		let label = NSTextField(labelWithString: emoji)
+		label.font = .systemFont(ofSize: 16)
+		label.alignment = .center
+		label.translatesAutoresizingMaskIntoConstraints = false
+		
+		badge.addSubview(label)
+		view.addSubview(badge)
+		
+		NSLayoutConstraint.activate([
+			// Position in top-right corner of the image view
+			badge.topAnchor.constraint(equalTo: photoImageView.topAnchor, constant: 4),
+			badge.trailingAnchor.constraint(equalTo: photoImageView.trailingAnchor, constant: -4),
+			badge.widthAnchor.constraint(equalToConstant: 28),
+			badge.heightAnchor.constraint(equalToConstant: 28),
+			
+			label.centerXAnchor.constraint(equalTo: badge.centerXAnchor),
+			label.centerYAnchor.constraint(equalTo: badge.centerYAnchor)
+		])
+		
+		bookmarkBadgeView = badge
+		bookmarkLabel = label
+	}
+	
 	private func updateSelectionAppearance() {
 		if isSelected {
 			view.layer?.borderWidth = 3
@@ -358,6 +410,8 @@ class UnifiedPhotoCell: UICollectionViewCell {
 	private var starImageView: UIImageView!
 	private var fileSizeLabel: UILabel!
 	private var badgeView: UIView?
+	private var bookmarkBadgeView: UIView?
+	private var bookmarkLabel: UILabel?
 	private var loadingIndicator: UIActivityIndicatorView!
 	
 	// Current photo
@@ -453,6 +507,9 @@ class UnifiedPhotoCell: UICollectionViewCell {
 		fileSizeLabel.text = ""
 		badgeView?.removeFromSuperview()
 		badgeView = nil
+		bookmarkBadgeView?.removeFromSuperview()
+		bookmarkBadgeView = nil
+		bookmarkLabel = nil
 		loadingIndicator.stopAnimating()
 		contentView.layer.borderWidth = 0
 		placeholderImageView.isHidden = false // Show placeholder again
@@ -547,6 +604,9 @@ class UnifiedPhotoCell: UICollectionViewCell {
 			addArchiveBadge()
 		}
 		
+		// Load bookmark badge
+		loadBookmarkBadge(for: photo)
+		
 		// Load thumbnail
 		loadThumbnail(for: photo)
 		
@@ -626,6 +686,50 @@ class UnifiedPhotoCell: UICollectionViewCell {
 		])
 		
 		badgeView = badge
+	}
+	
+	private func loadBookmarkBadge(for photo: any PhotoItem) {
+		Task {
+			let bookmark = await BookmarkManager.shared.getBookmark(for: photo)
+			await MainActor.run {
+				if let emoji = bookmark?.emoji {
+					addBookmarkBadge(emoji: emoji)
+				}
+			}
+		}
+	}
+	
+	private func addBookmarkBadge(emoji: String) {
+		// Remove existing bookmark badge if any
+		bookmarkBadgeView?.removeFromSuperview()
+		
+		let badge = UIView()
+		badge.backgroundColor = UIColor.black.withAlphaComponent(0.6)
+		badge.layer.cornerRadius = 10
+		badge.translatesAutoresizingMaskIntoConstraints = false
+		
+		let label = UILabel()
+		label.text = emoji
+		label.font = .systemFont(ofSize: 20)
+		label.textAlignment = .center
+		label.translatesAutoresizingMaskIntoConstraints = false
+		
+		badge.addSubview(label)
+		contentView.addSubview(badge)
+		
+		NSLayoutConstraint.activate([
+			// Position in top-right corner of the image view
+			badge.topAnchor.constraint(equalTo: photoImageView.topAnchor, constant: 4),
+			badge.trailingAnchor.constraint(equalTo: photoImageView.trailingAnchor, constant: -4),
+			badge.widthAnchor.constraint(equalToConstant: 32),
+			badge.heightAnchor.constraint(equalToConstant: 32),
+			
+			label.centerXAnchor.constraint(equalTo: badge.centerXAnchor),
+			label.centerYAnchor.constraint(equalTo: badge.centerYAnchor)
+		])
+		
+		bookmarkBadgeView = badge
+		bookmarkLabel = label
 	}
 	
 	override var isSelected: Bool {
