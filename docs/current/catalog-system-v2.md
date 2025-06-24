@@ -49,7 +49,7 @@ Application Support/com.electricwoods.photolala/
 └── Photolala.sqlite
 
 # S3 Structure
-s3://photolala-photos/
+s3://photolala/
 └── catalogs/
     └── {userId}/
         └── .photolala/
