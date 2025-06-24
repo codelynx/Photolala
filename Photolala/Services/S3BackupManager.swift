@@ -133,8 +133,8 @@ class S3BackupManager: ObservableObject {
 		// Upload photo
 		let md5 = try await s3Service.uploadPhoto(data: data, userId: userId)
 		
-		// Generate and upload thumbnail
-		if let thumbnail = try? await photo.loadThumbnail() {
+		// Generate and upload thumbnail (using cached version if available)
+		if let thumbnail = try? await PhotoManager.shared.thumbnail(for: photo) {
 			// Convert to data on main actor to avoid sendable warnings
 			let thumbnailData = await MainActor.run {
 				thumbnail.jpegData(compressionQuality: 0.8)
@@ -144,38 +144,8 @@ class S3BackupManager: ObservableObject {
 			}
 		}
 		
-		// Extract metadata with Apple Photo ID
-		let fileSize = Int64(data.count)
-		let creationDate = photo.asset.creationDate ?? Date()
-		let modificationDate = photo.asset.modificationDate ?? Date()
-		
-		// Extract image properties
-		let resources = PHAssetResource.assetResources(for: photo.asset)
-		let filename = resources.first?.originalFilename ?? photo.filename
-		
-		// Get image dimensions
-		let width = photo.asset.pixelWidth
-		let height = photo.asset.pixelHeight
-		
-		// Extract GPS location if available
-		let location = photo.asset.location
-		let gpsLatitude = location?.coordinate.latitude
-		let gpsLongitude = location?.coordinate.longitude
-		
-		// Create PhotoMetadata with Apple Photo ID
-		let photoMetadata = PhotoMetadata(
-			dateTaken: creationDate,
-			fileModificationDate: modificationDate,
-			fileSize: fileSize,
-			pixelWidth: width,
-			pixelHeight: height,
-			cameraMake: nil, // Could extract from EXIF if needed
-			cameraModel: nil, // Could extract from EXIF if needed
-			orientation: nil,
-			gpsLatitude: gpsLatitude,
-			gpsLongitude: gpsLongitude,
-			applePhotoID: photo.asset.localIdentifier
-		)
+		// Extract and upload metadata (using cached version if available)
+		let photoMetadata = try await PhotoManager.shared.metadata(for: photo)
 		try await s3Service.uploadMetadata(photoMetadata, md5: md5, userId: userId)
 		
 		print("Successfully uploaded Apple Photo: \(photo.filename) with ID: \(photo.asset.localIdentifier)")

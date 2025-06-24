@@ -897,6 +897,68 @@ The application now has a fully integrated SwiftData catalog system serving as t
    - **Testing Results**:
      - Photo upload and catalog generation working
      - Cloud browser displays synced photos correctly
+
+44. **Unified Metadata Display in Inspector (June 23)**:
+   - **Two-Path Metadata Retrieval**:
+     - Created UnifiedMetadataLoader service for centralized metadata access
+     - Primary path: SwiftData catalog (for starred/cataloged photos)
+     - Fallback path: Cache directory plist files
+     - Supports all photo types: PhotoFile, PhotoApple, PhotoS3
+   
+   - **Inspector Metadata Display**:
+     - Replaced placeholder "EXIF data will be shown here" with actual metadata
+     - Shows camera make/model, date taken, GPS coordinates
+     - Extended EXIF data: aperture, shutter speed, ISO, focal length
+     - Loading states with progress indicators
+     - Proper formatting for all metadata fields
+   
+   - **Technical Implementation**:
+     - UnifiedMetadataLoader checks SwiftData CatalogPhotoEntry first
+     - Falls back to PhotoManager cache for non-cataloged photos
+     - ExtendedPhotoMetadata struct for EXIF display formatting
+     - Async loading with proper error handling
+   
+   - **Build Status**:
+     - macOS: Building and running successfully
+     - All metadata extraction during thumbnail generation verified
+     - Metadata caching alongside thumbnails working correctly
+
+45. **Apple Photos Dual-Path Caching System (June 23 - Session 2)**:
+   - **Dual-Path Architecture**:
+     - Fast path: Photo ID-based caching for responsive browsing
+     - Backup path: MD5-based caching for starred/backup items
+     - Persistent photo ID → MD5 mapping
+     - Gradual mapping building over time
+   
+   - **ApplePhotosMetadataCache Service**:
+     - Manages photo ID → MD5 mappings
+     - Fast metadata creation from PHAsset for browsing
+     - Comprehensive metadata extraction for backups
+     - Optional background pre-processing
+     - Persistent storage of mappings
+   
+   - **PhotoManager Enhancements**:
+     - `thumbnailForBrowsing()`: Uses photo ID cache (512x512 from Photos framework)
+     - `processApplePhoto()`: Comprehensive processing for backup
+       - Loads original data once
+       - Computes MD5 hash
+       - Generates proper thumbnail (256x256-512x512)
+       - Extracts full EXIF metadata
+       - Caches everything with MD5 key
+     - Full EXIF extraction from image data (camera info, GPS, orientation)
+   
+   - **S3 Backup Integration**:
+     - Uses comprehensive processing when starring photos
+     - Thumbnails generated from original data
+     - Metadata extracted from original data
+     - Both cached locally with MD5 key before upload
+     - Consistent with local file handling
+   
+   - **Performance Benefits**:
+     - Responsive browsing (no original data loading)
+     - Reuses cached data when available
+     - Gradual performance improvement as mapping builds
+     - Optional background processing for frequently accessed photos
      - Sync progress UI functioning smoothly
      - Minor SwiftData context warnings (non-blocking)
 

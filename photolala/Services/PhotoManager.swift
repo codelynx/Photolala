@@ -7,6 +7,8 @@
 import CryptoKit
 import Foundation
 import SwiftUI
+import Photos
+import ImageIO
 
 class PhotoManager {
 
@@ -964,6 +966,224 @@ class PhotoManager {
 		}
 
 		return metadata
+	}
+
+	// MARK: - Apple Photos Support
+	
+	// Fast path for browsing - uses photo ID based cache
+	func thumbnailForBrowsing(for applePhoto: PhotoApple) async throws -> XThumbnail? {
+		let identifier = Identifier.applePhotoLibrary(applePhoto.id)
+		
+		// Check memory cache first
+		if let cached = thumbnailCache.object(forKey: identifier.string as NSString) {
+			self.stats.thumbnailHits += 1
+			return cached
+		}
+		
+		// Check disk cache
+		let thumbnailURL = self.thumbnailURL(for: identifier)
+		if FileManager.default.fileExists(atPath: thumbnailURL.path) {
+			if let data = try? Data(contentsOf: thumbnailURL),
+			   let thumbnail = XImage(data: data) {
+				self.thumbnailCache.setObject(thumbnail, forKey: identifier.string as NSString)
+				self.stats.diskReads += 1
+				return thumbnail
+			}
+		}
+		
+		self.stats.thumbnailMisses += 1
+		
+		// Generate thumbnail from Apple Photos (512x512 from Photos framework)
+		guard let thumbnail = try await applePhoto.loadThumbnail() else {
+			return nil
+		}
+		
+		// Save to disk cache with photo ID
+		let jpegData = await MainActor.run {
+			thumbnail.jpegData(compressionQuality: 0.8)
+		}
+		if let jpegData {
+			try? jpegData.write(to: thumbnailURL)
+			self.stats.diskWrites += 1
+		}
+		
+		// Cache in memory
+		self.thumbnailCache.setObject(thumbnail, forKey: identifier.string as NSString)
+		
+		return thumbnail
+	}
+	
+	// Process Apple Photo comprehensively for backup - load data once, extract everything
+	func processApplePhoto(_ photo: PhotoApple) async throws -> (data: Data, md5: String, thumbnail: XThumbnail, metadata: PhotoMetadata) {
+		// Load original photo data once
+		let photoData = try await photo.loadImageData()
+		
+		// Compute MD5 from the data
+		let md5Digest = self.md5Digest(of: photoData)
+		let md5String = md5Digest.data.hexadecimalString
+		let identifier = Identifier.md5(md5Digest)
+		
+		// Generate proper thumbnail from original data (256x256-512x512)
+		let thumbnail: XThumbnail
+		if let cached = try? self.thumbnail(for: identifier) {
+			thumbnail = cached
+		} else {
+			// Generate and cache thumbnail with MD5 key
+			guard let newThumbnail = try self.prepareThumbnail(from: photoData) else {
+				throw NSError(domain: "PhotoManager", code: 4, userInfo: [NSLocalizedDescriptionKey: "Failed to generate thumbnail"])
+			}
+			thumbnail = newThumbnail
+		}
+		
+		// Extract metadata from original data and cache it with MD5 key
+		let metadata: PhotoMetadata
+		let metadataURL = self.cacheURL(for: identifier, type: .metadata)
+		
+		// Check if metadata already cached
+		if FileManager.default.fileExists(atPath: metadataURL.path),
+		   let data = try? Data(contentsOf: metadataURL),
+		   let cached = try? PropertyListDecoder().decode(PhotoMetadata.self, from: data) {
+			metadata = cached
+		} else {
+			// Extract metadata from the image data
+			metadata = try self.extractMetadataFromImageData(photoData, photo: photo)
+			
+			// Cache metadata to disk with MD5 key
+			let encoder = PropertyListEncoder()
+			if let metadataData = try? encoder.encode(metadata) {
+				try? metadataData.write(to: metadataURL)
+				self.stats.diskWrites += 1
+			}
+		}
+		
+		return (photoData, md5String, thumbnail, metadata)
+	}
+	
+	// Helper to extract metadata from image data
+	private func extractMetadataFromImageData(_ photoData: Data, photo: PhotoApple) throws -> PhotoMetadata {
+		// First get basic info from PHAsset
+		let fileSize = Int64(photoData.count)
+		let creationDate = photo.asset.creationDate ?? Date()
+		let modificationDate = photo.asset.modificationDate ?? Date()
+		
+		// Extract EXIF data from the image
+		var extractedMetadata: PhotoMetadata?
+		if let imageSource = CGImageSourceCreateWithData(photoData as CFData, nil),
+		   let properties = CGImageSourceCopyPropertiesAtIndex(imageSource, 0, nil) as? [String: Any] {
+			
+			// Extract EXIF date if available
+			var dateTaken = creationDate
+			if let exif = properties[kCGImagePropertyExifDictionary as String] as? [String: Any],
+			   let dateString = exif[kCGImagePropertyExifDateTimeOriginal as String] as? String {
+				dateTaken = self.parseEXIFDate(dateString) ?? creationDate
+			}
+			
+			// Get dimensions from properties (more accurate than PHAsset)
+			let pixelWidth = properties[kCGImagePropertyPixelWidth as String] as? Int ?? photo.asset.pixelWidth
+			let pixelHeight = properties[kCGImagePropertyPixelHeight as String] as? Int ?? photo.asset.pixelHeight
+			let orientation = properties[kCGImagePropertyOrientation as String] as? Int
+			
+			// Camera info from TIFF
+			var cameraMake: String?
+			var cameraModel: String?
+			if let tiff = properties[kCGImagePropertyTIFFDictionary as String] as? [String: Any] {
+				cameraMake = tiff[kCGImagePropertyTIFFMake as String] as? String
+				cameraModel = tiff[kCGImagePropertyTIFFModel as String] as? String
+			}
+			
+			// GPS from EXIF or PHAsset
+			var gpsLatitude = photo.asset.location?.coordinate.latitude
+			var gpsLongitude = photo.asset.location?.coordinate.longitude
+			
+			// Try to get GPS from EXIF if not in PHAsset
+			if gpsLatitude == nil, let gps = properties[kCGImagePropertyGPSDictionary as String] as? [String: Any] {
+				if let lat = gps[kCGImagePropertyGPSLatitude as String] as? Double,
+				   let latRef = gps[kCGImagePropertyGPSLatitudeRef as String] as? String {
+					gpsLatitude = latRef == "S" ? -lat : lat
+				}
+				if let lon = gps[kCGImagePropertyGPSLongitude as String] as? Double,
+				   let lonRef = gps[kCGImagePropertyGPSLongitudeRef as String] as? String {
+					gpsLongitude = lonRef == "W" ? -lon : lon
+				}
+			}
+			
+			extractedMetadata = PhotoMetadata(
+				dateTaken: dateTaken,
+				fileModificationDate: modificationDate,
+				fileSize: fileSize,
+				pixelWidth: pixelWidth,
+				pixelHeight: pixelHeight,
+				cameraMake: cameraMake,
+				cameraModel: cameraModel,
+				orientation: orientation,
+				gpsLatitude: gpsLatitude,
+				gpsLongitude: gpsLongitude,
+				applePhotoID: photo.id
+			)
+		}
+		
+		// Fall back to basic metadata if EXIF extraction failed
+		return extractedMetadata ?? PhotoMetadata(
+			dateTaken: creationDate,
+			fileModificationDate: modificationDate,
+			fileSize: fileSize,
+			pixelWidth: photo.asset.pixelWidth,
+			pixelHeight: photo.asset.pixelHeight,
+			cameraMake: nil,
+			cameraModel: nil,
+			orientation: nil,
+			gpsLatitude: photo.asset.location?.coordinate.latitude,
+			gpsLongitude: photo.asset.location?.coordinate.longitude,
+			applePhotoID: photo.id
+		)
+	}
+	
+	// Get metadata by MD5 (for when we have the mapping)
+	func getMetadataByMD5(_ md5: String) async throws -> PhotoMetadata? {
+		guard let digest = Insecure.MD5Digest(rawBytes: Data(hexadecimalString: md5)!) else {
+			return nil
+		}
+		
+		let identifier = Identifier.md5(digest)
+		let metadataURL = self.cacheURL(for: identifier, type: .metadata)
+		
+		if FileManager.default.fileExists(atPath: metadataURL.path),
+		   let data = try? Data(contentsOf: metadataURL),
+		   let metadata = try? PropertyListDecoder().decode(PhotoMetadata.self, from: data) {
+			return metadata
+		}
+		
+		return nil
+	}
+	
+	// Convenience methods for S3BackupManager
+	func thumbnail(for applePhoto: PhotoApple) async throws -> XThumbnail? {
+		// When backing up, we want the MD5-based thumbnail
+		// Check if we have cached MD5
+		if let md5 = await ApplePhotosMetadataCache.shared.getCachedMD5(applePhoto.id),
+		   let digest = Insecure.MD5Digest(rawBytes: Data(hexadecimalString: md5)!) {
+			let identifier = Identifier.md5(digest)
+			if let cached = try? self.thumbnail(for: identifier) {
+				return cached
+			}
+		}
+		
+		// Otherwise, process the photo completely
+		let result = try await processApplePhoto(applePhoto)
+		return result.thumbnail
+	}
+	
+	func metadata(for applePhoto: PhotoApple) async throws -> PhotoMetadata {
+		// When backing up, we want the MD5-based metadata
+		// Check if we have cached MD5
+		if let md5 = await ApplePhotosMetadataCache.shared.getCachedMD5(applePhoto.id),
+		   let metadata = try await getMetadataByMD5(md5) {
+			return metadata
+		}
+		
+		// Otherwise, process the photo completely
+		let result = try await processApplePhoto(applePhoto)
+		return result.metadata
 	}
 
 	// MARK: - Photo Grouping

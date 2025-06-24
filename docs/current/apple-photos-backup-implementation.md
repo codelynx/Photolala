@@ -2,7 +2,7 @@
 
 ## Overview
 
-This document describes the implementation of Apple Photos backup functionality in Photolala, enabling users to backup photos from their Apple Photos Library to S3 storage.
+This document describes the implementation of Apple Photos backup functionality in Photolala, enabling users to backup photos from their Apple Photos Library to S3 storage. The system uses a dual-path caching approach to balance responsive browsing with comprehensive backup handling.
 
 ## Problem Statement
 
@@ -58,9 +58,13 @@ The upload process for Apple Photos follows this flow:
 4. Timer starts (30 seconds in DEBUG mode)
 5. When timer fires:
    - Fetch PHAsset using the stored ID
-   - Load image data from Photos Library
-   - Create temporary file for S3 upload
-   - Upload using existing S3BackupManager
+   - Process photo comprehensively via `PhotoManager.processApplePhoto()`:
+     - Load original image data once
+     - Compute MD5 hash
+     - Generate proper thumbnail (256x256-512x512)
+     - Extract full EXIF metadata
+     - Cache everything locally with MD5 key
+   - Upload photo, thumbnail, and metadata to S3
    - Update status to `.uploaded`
    - Remove from queue
 
@@ -91,22 +95,24 @@ The `InspectorView` was updated to use the new queue method:
 BackupQueueManager.shared.addApplePhotoToQueue(applePhoto.id, md5: md5)
 ```
 
-### Temporary File Handling
+### Dual-Path Caching System
 
-Since `S3BackupManager` expects `PhotoFile` objects, we create temporary files:
+Apple Photos use a sophisticated dual-path caching approach:
 
-```swift
-let data = try await photo.loadImageData()
-let tempURL = FileManager.default.temporaryDirectory
-    .appendingPathComponent(photo.filename)
-try data.write(to: tempURL)
-defer { try? FileManager.default.removeItem(at: tempURL) }
+**Browsing Path (Fast)**:
+- Uses Apple Photo ID as cache key
+- Leverages Photos framework for 512x512 thumbnails
+- No original data loading
+- Instant display for responsive UX
 
-let photoFile = PhotoFile(
-    directoryPath: tempURL.deletingLastPathComponent().path as NSString,
-    filename: tempURL.lastPathComponent
-)
-```
+**Backup Path (Comprehensive)**:
+- Uses MD5 hash as cache key
+- Loads original data once for all operations
+- Generates proper thumbnails
+- Extracts full EXIF metadata
+- Consistent with local file handling
+
+The system is managed by `ApplePhotosMetadataCache` which maintains a persistent photo ID → MD5 mapping.
 
 ### Progress Tracking
 
@@ -145,6 +151,8 @@ To test Apple Photos backup:
 ## Performance Considerations
 
 - Photos are fetched on-demand to minimize memory usage
-- MD5 computation is cached in `ApplePhotosBridge`
-- Temporary files are cleaned up immediately after upload
+- Dual-path caching optimizes for both browsing and backup scenarios
+- MD5 computation is cached persistently to avoid recomputation
+- Full metadata extraction happens only once during backup
 - Progress updates are batched to reduce UI updates
+- Photo ID → MD5 mapping builds gradually over time

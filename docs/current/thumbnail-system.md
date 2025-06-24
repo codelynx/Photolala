@@ -86,12 +86,29 @@ Each option includes:
 - Displays truncated filename with secondary label color
 - Toggleable via toolbar button
 
+## Apple Photos Thumbnail Handling
+
+Photolala uses a dual-path approach for Apple Photos thumbnails:
+
+1. **Browsing Mode** (Fast Path)
+   - Uses Photos framework's requestImage API
+   - 512x512 thumbnails for responsive display
+   - Cached by Apple Photo ID
+   - No original data loading required
+
+2. **Backup Mode** (Comprehensive Path)
+   - Loads original photo data
+   - Generates proper 256x256-512x512 thumbnails
+   - Extracts full metadata simultaneously
+   - Cached by MD5 hash for consistency
+
 ## Performance Optimizations
 
 1. **Lazy Generation**: Thumbnails created on first request
 2. **Async Loading**: Non-blocking thumbnail generation
 3. **Priority Queue**: UI requests prioritized (QoS .userInitiated)
 4. **Reuse**: Content-based keys prevent regeneration
+5. **Dual-Path Caching**: Optimized paths for different use cases
 
 ## Usage in Collection Views
 

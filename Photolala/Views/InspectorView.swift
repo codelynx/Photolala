@@ -396,19 +396,100 @@ struct QuickActionsSection: View {
 struct MetadataSection: View {
 	let photo: any PhotoItem
 	@State private var isExpanded = false
+	@State private var metadata: PhotoMetadata?
+	@State private var extendedMetadata: ExtendedPhotoMetadata?
+	@State private var isLoading = false
 
 	var body: some View {
 		DisclosureGroup(isExpanded: $isExpanded) {
-			VStack(alignment: .leading, spacing: 4) {
-				// TODO: Load and display EXIF data
-				Text("EXIF data will be shown here")
+			if isLoading {
+				HStack {
+					ProgressView()
+						.scaleEffect(0.8)
+					Text("Loading metadata...")
+						.font(.caption)
+						.foregroundColor(.secondary)
+				}
+				.padding(.top, 8)
+			} else if let metadata = metadata {
+				VStack(alignment: .leading, spacing: 6) {
+					// Camera info
+					if let cameraInfo = metadata.cameraInfo {
+						InfoRow(label: "Camera", value: cameraInfo)
+					}
+					
+					// Date taken
+					if let dateTaken = metadata.dateTaken {
+						InfoRow(label: "Date Taken", value: dateTaken.formatted(date: .abbreviated, time: .shortened))
+					}
+					
+					// GPS Location
+					if let lat = metadata.gpsLatitude, let lon = metadata.gpsLongitude {
+						InfoRow(label: "Location", value: String(format: "%.4f, %.4f", lat, lon))
+					}
+					
+					// Extended EXIF data if available
+					if let extended = extendedMetadata {
+						Group {
+							if let aperture = extended.apertureDisplay {
+								InfoRow(label: "Aperture", value: aperture)
+							}
+							if let shutter = extended.exposureDisplay {
+								InfoRow(label: "Shutter Speed", value: shutter)
+							}
+							if let iso = extended.isoDisplay {
+								InfoRow(label: "ISO", value: iso)
+							}
+							if let focal = extended.focalLengthDisplay {
+								InfoRow(label: "Focal Length", value: focal)
+							}
+						}
+					}
+					
+					// Orientation
+					if let orientation = metadata.orientation, orientation != 1 {
+						InfoRow(label: "Orientation", value: "Rotated (\(orientation))")
+					}
+				}
+				.padding(.top, 8)
+			} else {
+				Text("No metadata available")
 					.font(.caption)
 					.foregroundColor(.secondary)
+					.padding(.top, 8)
 			}
-			.padding(.top, 8)
 		} label: {
 			Text("Metadata")
 				.font(.headline)
+		}
+		.task {
+			await loadMetadata()
+		}
+		.onChange(of: photo.id) {
+			Task {
+				await loadMetadata()
+			}
+		}
+	}
+	
+	private func loadMetadata() async {
+		isLoading = true
+		
+		// Load base metadata
+		let baseMetadata = await UnifiedMetadataLoader.shared.loadMetadata(for: photo)
+		
+		// Load extended metadata if available
+		let extended: ExtendedPhotoMetadata?
+		if let baseMetadata = baseMetadata {
+			extended = await UnifiedMetadataLoader.shared.loadExtendedMetadata(for: photo, baseMetadata: baseMetadata)
+		} else {
+			extended = nil
+		}
+		
+		await MainActor.run {
+			self.metadata = baseMetadata
+			self.extendedMetadata = extended
+			self.isLoading = false
 		}
 	}
 }
