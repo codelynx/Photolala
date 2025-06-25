@@ -187,11 +187,10 @@ struct WelcomeView: View {
 			func documentPicker(_ controller: UIDocumentPickerViewController, didPickDocumentsAt urls: [URL]) {
 				if let url = urls.first {
 					self.parent.selectedFolder = url
-					// Access the folder with security scope
-					if url.startAccessingSecurityScopedResource() {
-						// Keep access for later use
-						url.stopAccessingSecurityScopedResource()
-					}
+					// Start accessing the security-scoped resource
+					// Note: We should NOT stop access here - the DirectoryPhotoBrowserView
+					// needs to maintain access while browsing the folder
+					_ = url.startAccessingSecurityScopedResource()
 					self.parent.onSelectFolder(url)
 				}
 				self.parent.dismiss()

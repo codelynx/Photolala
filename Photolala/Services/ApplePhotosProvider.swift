@@ -52,7 +52,7 @@ class ApplePhotosProvider: BasePhotoProvider {
 		}
 	}
 	
-	private func checkAndRequestAuthorization() async {
+	func checkAndRequestAuthorization() async {
 		let status = PHPhotoLibrary.authorizationStatus(for: .readWrite)
 		
 		switch status {

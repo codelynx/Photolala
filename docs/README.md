@@ -18,7 +18,7 @@ Documents describing the current architecture and implementation:
 - **[current/metadata-backup-system.md](./current/metadata-backup-system.md)** - Metadata backup to S3
 - **[current/catalog-system.md](./current/catalog-system.md)** - v5.0 Photolala catalog format for fast photo loading
 - **[current/metadata-system.md](./current/metadata-system.md)** - Metadata extraction, caching, and display
-- **[current/bookmark-system.md](./current/bookmark-system.md)** - Emoji bookmark feature for marking photos
+- **[current/tag-system.md](./current/tag-system.md)** - Color tag system with iCloud sync
 - **[current/thumbnail-cache-system.md](./current/thumbnail-cache-system.md)** - Three-tier thumbnail cache optimization
 
 ### History
@@ -36,6 +36,7 @@ Historical design documents and implementation notes:
   - `implementation-phase1-details.md` - Phase 1 implementation
   - `photo-preview-implementation.md` - Preview feature implementation
   - `navigation-architecture.md` - Original navigation design
+  - `photo-id-system-implementation.md` - Universal photo ID and tag sync implementation
 
 ### Planning
 Future features and enhancements:
@@ -44,6 +45,7 @@ Future features and enhancements:
 - **[planning/sort-by-date-feature.md](./planning/sort-by-date-feature.md)** - Sort by date feature design (implemented)
 - **[planning/enhanced-preview-features.md](./planning/enhanced-preview-features.md)** - Enhanced preview with thumbnail strip
 - **[planning/thumbnail-strip-design.md](./planning/thumbnail-strip-design.md)** - Thumbnail strip design for preview
+- **[planning/ios-security-scoped-resources.md](./planning/ios-security-scoped-resources.md)** - iOS folder access fix needed before release
 
 ## About This Structure
 

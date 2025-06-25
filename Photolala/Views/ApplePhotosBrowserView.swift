@@ -98,13 +98,27 @@ struct ApplePhotosBrowserView: View {
 	// MARK: - Private Methods
 	
 	private func loadInitialData() async {
-		// Check authorization
+		isLoading = true
+		
+		// First ensure authorization has been requested
+		await photoProvider.checkAndRequestAuthorization()
+		
+		// Now check authorization
 		guard ApplePhotosProvider.isAuthorized() else {
-			errorMessage = "Photo Library access is required. Please grant access in Settings."
+			isLoading = false
+			let status = ApplePhotosProvider.authorizationStatus()
+			switch status {
+			case .denied:
+				errorMessage = "Photo Library access was denied. Please grant access in Settings > Privacy & Security > Photos."
+			case .restricted:
+				errorMessage = "Photo Library access is restricted on this device."
+			case .notDetermined:
+				errorMessage = "Photo Library access has not been determined. Please restart the app."
+			default:
+				errorMessage = "Photo Library access is required. Please grant access in Settings."
+			}
 			return
 		}
-		
-		isLoading = true
 		
 		do {
 			// Load albums

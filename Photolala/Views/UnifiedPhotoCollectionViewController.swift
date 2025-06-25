@@ -462,9 +462,9 @@ class UnifiedPhotoCollectionViewController: XViewController {
 			selectedPhotos.insert(item)
 			
 			// Log starred status from SwiftData catalog (single source of truth)
-			Task {
-				await logStarredStatus(for: photo)
-			}
+			// Task {
+			// 	await logStarredStatus(for: photo)
+			// }
 		}
 		
 		updateSelectionUI()
@@ -763,7 +763,7 @@ extension UnifiedPhotoCollectionViewController {
 		Task {
 			for indexPath in selectedIndexPaths {
 				if let photo = photoAtIndexPath(indexPath) {
-					await BookmarkManager.shared.toggleFlag(flag, for: photo)
+					await TagManager.shared.toggleFlag(flag, for: photo)
 				}
 			}
 			
@@ -779,7 +779,7 @@ extension UnifiedPhotoCollectionViewController {
 		Task {
 			for indexPath in selectedIndexPaths {
 				if let photo = photoAtIndexPath(indexPath) {
-					await BookmarkManager.shared.clearFlags(for: photo)
+					await TagManager.shared.clearFlags(for: photo)
 				}
 			}
 			

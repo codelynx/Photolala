@@ -80,8 +80,8 @@ struct SinglePhotoInspector: View {
 				// Quick Actions
 				QuickActionsSection(photo: photo)
 
-				// Bookmark Section
-				BookmarkSection(photo: photo)
+				// Tag Section
+				TagSection(photo: photo)
 
 				// Metadata (collapsible)
 				MetadataSection(photo: photo)
@@ -711,19 +711,19 @@ private func showInFinder(_ photo: any PhotoItem) async {
 	#endif
 }
 
-// MARK: - Bookmark Section
+// MARK: - Tag Section
 
-struct BookmarkSection: View {
+struct TagSection: View {
 	let photo: any PhotoItem
-	@State private var currentBookmark: PhotoBookmark?
+	@State private var currentTag: PhotoTag?
 	@State private var isLoading = false
 
 	var body: some View {
 		VStack(alignment: .leading, spacing: 8) {
-			Text("Bookmark")
+			Text("Tag")
 				.font(.headline)
 
-			// Current bookmark status
+			// Current tag status
 			HStack {
 				Text("Current")
 					.foregroundColor(.secondary)
@@ -731,9 +731,9 @@ struct BookmarkSection: View {
 				if isLoading {
 					ProgressView()
 						.scaleEffect(0.7)
-				} else if let bookmark = currentBookmark {
+				} else if let tag = currentTag {
 					// TODO: Update for color flags
-					Text("Flags: \(bookmark.flags.count)")
+					Text("Flags: \(tag.flags.count)")
 						.font(.caption)
 				} else {
 					Text("None")
@@ -753,28 +753,27 @@ struct BookmarkSection: View {
 							await toggleFlag(flag)
 						}
 					}) {
+						let isActive = currentTag?.flags.contains(flag) == true
 						flag.flagView
 							.font(.system(size: 14))
 							.frame(width: 28, height: 28)
 							.background(
 								RoundedRectangle(cornerRadius: 6)
-									.fill(currentBookmark?.flags.contains(flag) == true ? 
-										  Color.accentColor.opacity(0.2) : Color.clear)
+									.fill(isActive ? Color.accentColor.opacity(0.2) : Color.clear)
 							)
 							.overlay(
 								RoundedRectangle(cornerRadius: 6)
-									.stroke(currentBookmark?.flags.contains(flag) == true ? 
-											Color.accentColor.opacity(0.5) : Color.clear, lineWidth: 1)
+									.stroke(isActive ? Color.accentColor.opacity(0.5) : Color.clear, lineWidth: 1)
 							)
 					}
 					.buttonStyle(.plain)
-					.help("Flag: \(flag.rawValue.capitalized) (\(flag.keyboardShortcut))")
+					.help("Flag: \(String(describing: flag).capitalized) (\(flag.keyboardShortcut))")
 				}
 				
 				Spacer()
 				
 				// Clear button
-				if currentBookmark != nil && !currentBookmark!.flags.isEmpty {
+				if currentTag != nil && !currentTag!.flags.isEmpty {
 					Button(action: {
 						Task {
 							await clearAllFlags()
@@ -791,29 +790,29 @@ struct BookmarkSection: View {
 			.frame(maxWidth: .infinity)
 		}
 		.task {
-			await loadBookmark()
+			await loadTag()
 		}
 		.onChange(of: photo.id) {
 			Task {
-				await loadBookmark()
+				await loadTag()
 			}
 		}
 	}
 
-	private func loadBookmark() async {
+	private func loadTag() async {
 		isLoading = true
-		currentBookmark = await BookmarkManager.shared.getBookmark(for: photo)
+		currentTag = await TagManager.shared.getTag(for: photo)
 		isLoading = false
 	}
 
 	private func toggleFlag(_ flag: ColorFlag) async {
-		await BookmarkManager.shared.toggleFlag(flag, for: photo)
-		await loadBookmark()
+		await TagManager.shared.toggleFlag(flag, for: photo)
+		await loadTag()
 	}
 	
 	private func clearAllFlags() async {
-		await BookmarkManager.shared.clearFlags(for: photo)
-		await loadBookmark()
+		await TagManager.shared.clearFlags(for: photo)
+		await loadTag()
 	}
 }
 

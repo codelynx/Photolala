@@ -24,8 +24,8 @@ class UnifiedPhotoCell: NSCollectionViewItem {
 	private var flagContainerView: NSStackView!
 	private var fileSizeLabel: NSTextField!
 	private var badgeView: NSView?
-	private var bookmarkBadgeView: NSView?
-	private var bookmarkLabel: NSTextField?
+	private var tagBadgeView: NSView?
+	private var tagLabel: NSTextField?
 	private var loadingIndicator: NSProgressIndicator!
 	
 	// Constraints
@@ -35,7 +35,7 @@ class UnifiedPhotoCell: NSCollectionViewItem {
 	// Current photo
 	private var currentPhoto: (any PhotoItem)?
 	private var thumbnailTask: Task<Void, Never>?
-	private var bookmarkObserver: NSObjectProtocol?
+	private var tagObserver: NSObjectProtocol?
 	
 	override func loadView() {
 		self.view = NSView(frame: NSRect(x: 0, y: 0, width: 150, height: 150))
@@ -134,21 +134,21 @@ class UnifiedPhotoCell: NSCollectionViewItem {
 			placeholderImageView.heightAnchor.constraint(equalTo: photoImageView.heightAnchor, multiplier: 0.5)
 		])
 		
-		// Set up bookmark change observer
-		bookmarkObserver = NotificationCenter.default.addObserver(
-			forName: BookmarkManager.bookmarksChangedNotification,
+		// Set up tag change observer
+		tagObserver = NotificationCenter.default.addObserver(
+			forName: TagManager.tagsChangedNotification,
 			object: nil,
 			queue: .main
 		) { [weak self] _ in
-			// Reload bookmark when any bookmark changes
+			// Reload tag when any tag changes
 			if let photo = self?.currentPhoto {
-				self?.loadBookmarkForInfoBar(for: photo)
+				self?.loadTagForInfoBar(for: photo)
 			}
 		}
 	}
 	
 	deinit {
-		if let observer = bookmarkObserver {
+		if let observer = tagObserver {
 			NotificationCenter.default.removeObserver(observer)
 		}
 	}
@@ -163,9 +163,9 @@ class UnifiedPhotoCell: NSCollectionViewItem {
 		fileSizeLabel.stringValue = ""
 		badgeView?.removeFromSuperview()
 		badgeView = nil
-		bookmarkBadgeView?.removeFromSuperview()
-		bookmarkBadgeView = nil
-		bookmarkLabel = nil
+		tagBadgeView?.removeFromSuperview()
+		tagBadgeView = nil
+		tagLabel = nil
 		loadingIndicator.stopAnimation(nil)
 		placeholderImageView.isHidden = false // Show placeholder again
 	}
@@ -271,8 +271,8 @@ class UnifiedPhotoCell: NSCollectionViewItem {
 			addArchiveBadge()
 		}
 		
-		// Load bookmark for info bar
-		loadBookmarkForInfoBar(for: photo)
+		// Load tag for info bar
+		loadTagForInfoBar(for: photo)
 		
 		// Load thumbnail
 		loadThumbnail(for: photo)
@@ -366,14 +366,14 @@ class UnifiedPhotoCell: NSCollectionViewItem {
 		badgeView = badge
 	}
 	
-	private func loadBookmarkForInfoBar(for photo: any PhotoItem) {
+	private func loadTagForInfoBar(for photo: any PhotoItem) {
 		Task {
-			let bookmark = await BookmarkManager.shared.getBookmark(for: photo)
+			let tag = await TagManager.shared.getTag(for: photo)
 			await MainActor.run {
 				// Clear existing flags
 				flagContainerView.arrangedSubviews.forEach { $0.removeFromSuperview() }
 				
-				if let flags = bookmark?.sortedFlags, !flags.isEmpty {
+				if let flags = tag?.sortedFlags, !flags.isEmpty {
 					// Add flag views
 					for flag in flags {
 						let flagImageView = NSImageView()
@@ -430,23 +430,29 @@ class UnifiedPhotoCell: UICollectionViewCell {
 	private var flagContainerView: UIStackView!
 	private var fileSizeLabel: UILabel!
 	private var badgeView: UIView?
-	private var bookmarkBadgeView: UIView?
-	private var bookmarkLabel: UILabel?
 	private var loadingIndicator: UIActivityIndicatorView!
 	
 	// Current photo
 	private var currentPhoto: (any PhotoItem)?
 	private var thumbnailTask: Task<Void, Never>?
-	private var bookmarkObserver: NSObjectProtocol?
+	private var tagObserver: NSObjectProtocol?
 	
 	override init(frame: CGRect) {
 		super.init(frame: frame)
 		setupViews()
+		setupTagObserver()
 	}
 	
 	required init?(coder: NSCoder) {
 		super.init(coder: coder)
 		setupViews()
+		setupTagObserver()
+	}
+	
+	deinit {
+		if let observer = tagObserver {
+			NotificationCenter.default.removeObserver(observer)
+		}
 	}
 	
 	private func setupViews() {
@@ -465,6 +471,14 @@ class UnifiedPhotoCell: UICollectionViewCell {
 		starImageView.contentMode = .scaleAspectFit
 		starImageView.tintColor = .systemYellow
 		contentView.addSubview(starImageView)
+		
+		// Flag container view
+		flagContainerView = UIStackView()
+		flagContainerView.axis = .horizontal
+		flagContainerView.spacing = 2
+		flagContainerView.alignment = .center
+		flagContainerView.translatesAutoresizingMaskIntoConstraints = false
+		contentView.addSubview(flagContainerView)
 		
 		// File size label
 		fileSizeLabel = UILabel()
@@ -503,10 +517,14 @@ class UnifiedPhotoCell: UICollectionViewCell {
 			starImageView.widthAnchor.constraint(equalToConstant: 16),
 			starImageView.heightAnchor.constraint(equalToConstant: 16),
 			
+			// Flag container - positioned after star image
+			flagContainerView.leadingAnchor.constraint(equalTo: starImageView.trailingAnchor, constant: 2),
+			flagContainerView.centerYAnchor.constraint(equalTo: starImageView.centerYAnchor),
+			flagContainerView.trailingAnchor.constraint(lessThanOrEqualTo: fileSizeLabel.leadingAnchor, constant: -4),
+			
 			// File size label - positioned at bottom of contentView
 			fileSizeLabel.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -4),
 			fileSizeLabel.centerYAnchor.constraint(equalTo: starImageView.centerYAnchor),
-			fileSizeLabel.leadingAnchor.constraint(greaterThanOrEqualTo: starImageView.trailingAnchor, constant: 4),
 			
 			loadingIndicator.centerXAnchor.constraint(equalTo: photoImageView.centerXAnchor),
 			loadingIndicator.centerYAnchor.constraint(equalTo: photoImageView.centerYAnchor),
@@ -519,18 +537,30 @@ class UnifiedPhotoCell: UICollectionViewCell {
 		])
 	}
 	
+	private func setupTagObserver() {
+		// Set up tag change observer
+		tagObserver = NotificationCenter.default.addObserver(
+			forName: TagManager.tagsChangedNotification,
+			object: nil,
+			queue: .main
+		) { [weak self] _ in
+			// Reload tag when any tag changes
+			if let photo = self?.currentPhoto {
+				self?.loadTagForInfoBar(for: photo)
+			}
+		}
+	}
+	
 	override func prepareForReuse() {
 		super.prepareForReuse()
 		thumbnailTask?.cancel()
 		thumbnailTask = nil
 		photoImageView.image = nil
 		starImageView.image = nil
+		flagContainerView.arrangedSubviews.forEach { $0.removeFromSuperview() }
 		fileSizeLabel.text = ""
 		badgeView?.removeFromSuperview()
 		badgeView = nil
-		bookmarkBadgeView?.removeFromSuperview()
-		bookmarkBadgeView = nil
-		bookmarkLabel = nil
 		loadingIndicator.stopAnimating()
 		contentView.layer.borderWidth = 0
 		placeholderImageView.isHidden = false // Show placeholder again
@@ -626,8 +656,8 @@ class UnifiedPhotoCell: UICollectionViewCell {
 			addArchiveBadge()
 		}
 		
-		// Load bookmark for info bar
-		loadBookmarkForInfoBar(for: photo)
+		// Load tag for info bar
+		loadTagForInfoBar(for: photo)
 		
 		// Load thumbnail
 		loadThumbnail(for: photo)
@@ -710,48 +740,33 @@ class UnifiedPhotoCell: UICollectionViewCell {
 		badgeView = badge
 	}
 	
-	private func loadBookmarkBadge(for photo: any PhotoItem) {
+	private func loadTagForInfoBar(for photo: any PhotoItem) {
 		Task {
-			let bookmark = await BookmarkManager.shared.getBookmark(for: photo)
+			let tag = await TagManager.shared.getTag(for: photo)
 			await MainActor.run {
-				if let emoji = bookmark?.emoji {
-					addBookmarkBadge(emoji: emoji)
+				// Clear existing flags
+				flagContainerView.arrangedSubviews.forEach { $0.removeFromSuperview() }
+				
+				if let flags = tag?.sortedFlags, !flags.isEmpty {
+					// Add flag views
+					for flag in flags {
+						let flagImageView = UIImageView()
+						flagImageView.image = UIImage(systemName: "flag.fill")
+						flagImageView.tintColor = flag.uiColor
+						flagImageView.contentMode = .scaleAspectFit
+						flagImageView.translatesAutoresizingMaskIntoConstraints = false
+						
+						// Set size constraints
+						NSLayoutConstraint.activate([
+							flagImageView.widthAnchor.constraint(equalToConstant: 12),
+							flagImageView.heightAnchor.constraint(equalToConstant: 12)
+						])
+						
+						flagContainerView.addArrangedSubview(flagImageView)
+					}
 				}
 			}
 		}
-	}
-	
-	private func addBookmarkBadge(emoji: String) {
-		// Remove existing bookmark badge if any
-		bookmarkBadgeView?.removeFromSuperview()
-		
-		let badge = UIView()
-		badge.backgroundColor = UIColor.black.withAlphaComponent(0.6)
-		badge.layer.cornerRadius = 10
-		badge.translatesAutoresizingMaskIntoConstraints = false
-		
-		let label = UILabel()
-		label.text = emoji
-		label.font = .systemFont(ofSize: 20)
-		label.textAlignment = .center
-		label.translatesAutoresizingMaskIntoConstraints = false
-		
-		badge.addSubview(label)
-		contentView.addSubview(badge)
-		
-		NSLayoutConstraint.activate([
-			// Position in top-right corner of the image view
-			badge.topAnchor.constraint(equalTo: photoImageView.topAnchor, constant: 4),
-			badge.trailingAnchor.constraint(equalTo: photoImageView.trailingAnchor, constant: -4),
-			badge.widthAnchor.constraint(equalToConstant: 32),
-			badge.heightAnchor.constraint(equalToConstant: 32),
-			
-			label.centerXAnchor.constraint(equalTo: badge.centerXAnchor),
-			label.centerYAnchor.constraint(equalTo: badge.centerYAnchor)
-		])
-		
-		bookmarkBadgeView = badge
-		bookmarkLabel = label
 	}
 	
 	override var isSelected: Bool {

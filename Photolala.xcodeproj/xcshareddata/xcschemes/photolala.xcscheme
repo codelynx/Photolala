@@ -80,8 +80,6 @@
             isEnabled = "NO">
          </CommandLineArgument>
       </CommandLineArguments>
-      <EnvironmentVariables>
-      </EnvironmentVariables>
       <StoreKitConfigurationFileReference
          identifier = "../../Photolala/PhotolalaProducts.storekit">
       </StoreKitConfigurationFileReference>

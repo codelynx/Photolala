@@ -1,10 +1,10 @@
 ## 📍 PROJECT STATUS REPORT
 
-Last Updated: June 23, 2025
+Last Updated: June 25, 2025
 
-### 🚀 Current Status: SwiftData Catalog Integration Complete
+### 🚀 Current Status: Tag System with iCloud Sync Complete
 
-The application now has a fully integrated SwiftData catalog system serving as the single source of truth for photo metadata and backup status. Apple Photos star indicators now work correctly across all views, with proper persistence and synchronization between local and S3 storage.
+The application now has a comprehensive tag system (formerly bookmarks) with full iCloud Documents synchronization support. Photos can be tagged with color flags (1-7) that sync across devices using a master + delta file pattern. The system supports all photo types with universal identification using MD5 hashes and iCloud photo identifiers.
 
 ### ✅ Completed Features
 
@@ -136,6 +136,9 @@ The application now has a fully integrated SwiftData catalog system serving as t
 4. ~~No photo detail view implementation~~ ✅ Fixed with PhotoPreviewView
 5. No error handling for invalid image files
 6. Swift 6 Sendable warnings for NSImage/UIImage
+7. iCloud sync requires manual triggering (no automatic periodic merge)
+8. No UI for managing iCloud sync operations yet
+9. **iOS: Security-scoped resources not properly released** (see docs/planning/ios-security-scoped-resources.md)
 
 ### 🎯 Next Steps
 
@@ -189,8 +192,8 @@ The application now has a fully integrated SwiftData catalog system serving as t
 ### 💻 Build Status
 
 - ✅ macOS: Building successfully (with Sendable warnings)
-- ✅ iOS: Building successfully
-- ✅ tvOS: Building successfully
+- ✅ iOS: Building successfully (fixed photo access and tag UI)
+- ✅ tvOS: Unable to test (no simulators available)
 
 ### 📝 Recent Sessions
 
@@ -761,11 +764,13 @@ The application now has a fully integrated SwiftData catalog system serving as t
 
 ### 🎯 Next Priority Items
 
-1. Implement bulk operations for multi-selection
-2. Add search/filter functionality
-3. Implement S3 download/restore features
-4. Add progress indication for long operations
-5. Create onboarding flow for new users
+1. Add UI controls for iCloud tag sync operations
+2. Implement automatic periodic merge for tag sync
+3. Add tag-based filtering and search
+4. Implement bulk tag operations for multi-selection
+5. Create tag management view (view all tagged photos)
+6. Add progress indication for long operations
+7. Create onboarding flow for new users
 
 ### 📱 Platform Status
 
@@ -1111,3 +1116,49 @@ The application now has a fully integrated SwiftData catalog system serving as t
      - Near-instant thumbnail display for previously viewed directories
      - Significantly reduced CPU usage
      - Better user experience with faster browsing
+
+49. **Tag System with iCloud Sync (June 25-26)**:
+   - **Complete Terminology Migration**:
+     - Renamed from "bookmarks" to "tags" throughout codebase
+     - BookmarkManager → TagManager
+     - PhotoBookmark → PhotoTag
+     - Updated all UI text and references
+   
+   - **Photo ID System Implementation**:
+     - Universal identification across devices
+     - `icl#` prefix for iCloud Photos (using localIdentifier)
+     - `md5#` prefix for all others (local files, S3)
+     - `apl#` fallback for Apple Photos when MD5 fails
+     - MD5 cache with SwiftData for performance
+   
+   - **Color Tag System**:
+     - Migrated from emoji strings to numeric values (1-7)
+     - ColorFlag enum with Int rawValue
+     - Keyboard shortcuts 1-7 for quick tagging
+     - Visual representation with colored flag icons
+     - Multiple tags per photo supported
+   
+   - **CSV Export/Import**:
+     - exportToCSV() - generates CSV format
+     - importFromCSV() - parses and imports tags
+     - Format: `photoID,tags,timestamp`
+     - Example: `icl#SUNSET-123,1:4:5,1704067600`
+   
+   - **iCloud Documents Sync**:
+     - Master + delta file pattern to avoid conflicts
+     - Each device writes to `tags-delta-{deviceID}.csv`
+     - Master file `tags.csv` contains merged state
+     - TagSyncManager handles all sync operations
+     - Automatic delta operations on tag changes
+   
+   - **Sync Methods**:
+     - `exportToICloudMaster()` - Initial export to iCloud
+     - `syncFromICloud()` - Pull tags from master
+     - `triggerICloudMerge()` - Merge all delta files
+     - No conflicts during normal operation
+   
+   - **Cross-Platform Support**:
+     - Works on macOS, iOS, and iPadOS
+     - Fixed iOS-specific UI issues
+     - Proper authorization flow for photo access
+     - Added missing NSPhotoLibraryAddUsageDescription

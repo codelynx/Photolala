@@ -8,14 +8,14 @@
 import Foundation
 import SwiftUI
 
-enum ColorFlag: String, Codable, CaseIterable {
-	case red = "red"
-	case orange = "orange"
-	case yellow = "yellow"
-	case green = "green"
-	case blue = "blue"
-	case purple = "purple"
-	case gray = "gray"
+enum ColorFlag: Int, Codable, CaseIterable {
+	case red = 1
+	case orange = 2
+	case yellow = 3
+	case green = 4
+	case blue = 5
+	case purple = 6
+	case gray = 7
 	
 	var color: Color {
 		switch self {
