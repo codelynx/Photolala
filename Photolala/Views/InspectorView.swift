@@ -745,8 +745,8 @@ struct BookmarkSection: View {
 			Divider()
 				.padding(.vertical, 4)
 
-			// Flag grid - TODO: Update for color flags
-			LazyVGrid(columns: [GridItem(.adaptive(minimum: 44))], spacing: 8) {
+			// Compact flag buttons in horizontal stack
+			HStack(spacing: 4) {
 				ForEach(ColorFlag.allCases, id: \.self) { flag in
 					Button(action: {
 						Task {
@@ -754,29 +754,41 @@ struct BookmarkSection: View {
 						}
 					}) {
 						flag.flagView
-							.font(.system(size: 20))
-							.frame(width: 44, height: 44)
+							.font(.system(size: 14))
+							.frame(width: 28, height: 28)
 							.background(
-								RoundedRectangle(cornerRadius: 8)
+								RoundedRectangle(cornerRadius: 6)
 									.fill(currentBookmark?.flags.contains(flag) == true ? 
 										  Color.accentColor.opacity(0.2) : Color.clear)
 							)
+							.overlay(
+								RoundedRectangle(cornerRadius: 6)
+									.stroke(currentBookmark?.flags.contains(flag) == true ? 
+											Color.accentColor.opacity(0.5) : Color.clear, lineWidth: 1)
+							)
 					}
 					.buttonStyle(.plain)
+					.help("Flag: \(flag.rawValue.capitalized) (\(flag.keyboardShortcut))")
 				}
-			}
-
-			// Clear button
-			if currentBookmark != nil {
-				Button("Clear") {
-					Task {
-						await clearAllFlags()
+				
+				Spacer()
+				
+				// Clear button
+				if currentBookmark != nil && !currentBookmark!.flags.isEmpty {
+					Button(action: {
+						Task {
+							await clearAllFlags()
+						}
+					}) {
+						Image(systemName: "xmark.circle.fill")
+							.foregroundColor(.secondary)
+							.font(.system(size: 16))
 					}
+					.buttonStyle(.plain)
+					.help("Clear all flags (0)")
 				}
-				.buttonStyle(.plain)
-				.foregroundColor(.red)
-				.padding(.top, 4)
 			}
+			.frame(maxWidth: .infinity)
 		}
 		.task {
 			await loadBookmark()

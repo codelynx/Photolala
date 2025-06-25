@@ -35,6 +35,7 @@ class UnifiedPhotoCell: NSCollectionViewItem {
 	// Current photo
 	private var currentPhoto: (any PhotoItem)?
 	private var thumbnailTask: Task<Void, Never>?
+	private var bookmarkObserver: NSObjectProtocol?
 	
 	override func loadView() {
 		self.view = NSView(frame: NSRect(x: 0, y: 0, width: 150, height: 150))
@@ -132,6 +133,24 @@ class UnifiedPhotoCell: NSCollectionViewItem {
 			placeholderImageView.widthAnchor.constraint(equalTo: photoImageView.widthAnchor, multiplier: 0.5),
 			placeholderImageView.heightAnchor.constraint(equalTo: photoImageView.heightAnchor, multiplier: 0.5)
 		])
+		
+		// Set up bookmark change observer
+		bookmarkObserver = NotificationCenter.default.addObserver(
+			forName: BookmarkManager.bookmarksChangedNotification,
+			object: nil,
+			queue: .main
+		) { [weak self] _ in
+			// Reload bookmark when any bookmark changes
+			if let photo = self?.currentPhoto {
+				self?.loadBookmarkForInfoBar(for: photo)
+			}
+		}
+	}
+	
+	deinit {
+		if let observer = bookmarkObserver {
+			NotificationCenter.default.removeObserver(observer)
+		}
 	}
 	
 	override func prepareForReuse() {
@@ -418,6 +437,7 @@ class UnifiedPhotoCell: UICollectionViewCell {
 	// Current photo
 	private var currentPhoto: (any PhotoItem)?
 	private var thumbnailTask: Task<Void, Never>?
+	private var bookmarkObserver: NSObjectProtocol?
 	
 	override init(frame: CGRect) {
 		super.init(frame: frame)

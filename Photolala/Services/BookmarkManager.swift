@@ -13,6 +13,9 @@ import SwiftUI
 class BookmarkManager: ObservableObject {
 	static let shared = BookmarkManager()
 	
+	// Notification name
+	static let bookmarksChangedNotification = Notification.Name("BookmarksChanged")
+	
 	// Published properties
 	@Published private(set) var bookmarks: [String: PhotoBookmark] = [:]
 	
@@ -63,6 +66,13 @@ class BookmarkManager: ObservableObject {
 		}
 		
 		saveBookmarks()
+		
+		// Post notification for UI updates
+		NotificationCenter.default.post(
+			name: Self.bookmarksChangedNotification,
+			object: nil,
+			userInfo: ["photoIdentifier": identifier]
+		)
 	}
 	
 	/// Clear all flags for a photo
@@ -70,6 +80,13 @@ class BookmarkManager: ObservableObject {
 		guard let identifier = await getIdentifier(for: photo) else { return }
 		bookmarks.removeValue(forKey: identifier)
 		saveBookmarks()
+		
+		// Post notification for UI updates
+		NotificationCenter.default.post(
+			name: Self.bookmarksChangedNotification,
+			object: nil,
+			userInfo: ["photoIdentifier": identifier]
+		)
 	}
 	
 	/// Get bookmark for a photo
