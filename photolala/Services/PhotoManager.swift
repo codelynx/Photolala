@@ -346,6 +346,7 @@ class PhotoManager {
 		}
 	}
 
+	@MainActor
 	private func syncThumbnail(for photoRep: PhotoFile) throws -> XThumbnail? {
 		let startTime = Date()
 
@@ -364,15 +365,62 @@ class PhotoManager {
 		self.stats.thumbnailMisses += 1
 		print("[PhotoManager] ❌ THUMBNAIL CACHE MISS - \(photoRep.filename)")
 
-		// Load image data for MD5
-		let md5StartTime = Date()
-		let imageData = try Data(contentsOf: photoRep.fileURL)
-		let md5Time = Date().timeIntervalSince(md5StartTime)
-		print(
-			"[PhotoManager] 📊 MD5 computation - Read \(imageData.count / 1_024)KB in \(String(format: "%.3f", md5Time))s"
-		)
-
-		let identifier = Identifier.md5(self.md5Digest(of: imageData))
+		// Try to get MD5 from metadata cache first
+		let attributes = try FileManager.default.attributesOfItem(atPath: photoRep.filePath)
+		let fileSize = attributes[.size] as? Int64 ?? 0
+		let modificationDate = attributes[.modificationDate] as? Date ?? Date()
+		
+		var imageData: Data?
+		let identifier: Identifier
+		
+		if let cachedMD5 = ThumbnailMetadataCache.shared.getCachedMD5(
+			for: photoRep.filePath,
+			fileSize: fileSize,
+			modificationDate: modificationDate
+		) {
+			// Use cached MD5 - convert hex string back to MD5Digest
+			if let md5Data = Data(hexadecimalString: cachedMD5),
+			   let md5Digest = Insecure.MD5Digest(rawBytes: md5Data) {
+				identifier = Identifier.md5(md5Digest)
+				print("[PhotoManager] ✅ MD5 from metadata cache - \(photoRep.filename)")
+			} else {
+				// Fallback to computing MD5
+				let data = try Data(contentsOf: photoRep.fileURL)
+				imageData = data
+				let md5Hash = self.md5Digest(of: data)
+				identifier = Identifier.md5(md5Hash)
+				
+				// Store in metadata cache
+				let md5String = md5Hash.map { String(format: "%02x", $0) }.joined()
+				ThumbnailMetadataCache.shared.setMetadata(
+					filePath: photoRep.filePath,
+					md5Hash: md5String,
+					fileSize: fileSize,
+					modificationDate: modificationDate
+				)
+			}
+		} else {
+			// Load image data for MD5
+			let md5StartTime = Date()
+			let data = try Data(contentsOf: photoRep.fileURL)
+			imageData = data
+			let md5Time = Date().timeIntervalSince(md5StartTime)
+			print(
+				"[PhotoManager] 📊 MD5 computation - Read \(data.count / 1_024)KB in \(String(format: "%.3f", md5Time))s"
+			)
+			
+			let md5Hash = self.md5Digest(of: data)
+			identifier = Identifier.md5(md5Hash)
+			
+			// Store in metadata cache for future use
+			let md5String = md5Hash.map { String(format: "%02x", $0) }.joined()
+			ThumbnailMetadataCache.shared.setMetadata(
+				filePath: photoRep.filePath,
+				md5Hash: md5String,
+				fileSize: fileSize,
+				modificationDate: modificationDate
+			)
+		}
 
 		// Check disk cache
 		if self.hasThumbnail(for: identifier) {
@@ -394,7 +442,13 @@ class PhotoManager {
 		// Generate new thumbnail
 		print("[PhotoManager] 🔨 GENERATING NEW THUMBNAIL - \(photoRep.filename)")
 		let generateStartTime = Date()
-		let thumbnail = try prepareThumbnail(from: imageData)
+		
+		// Load image data if we haven't already
+		if imageData == nil {
+			imageData = try Data(contentsOf: photoRep.fileURL)
+		}
+		
+		let thumbnail = try prepareThumbnail(from: imageData!)
 		let generateTime = Date().timeIntervalSince(generateStartTime)
 		self.stats.diskWrites += 1
 
@@ -466,7 +520,7 @@ class PhotoManager {
 		self.imageCache.totalCostLimit = Int(memoryBudget)
 
 		// Thumbnail cache: assume 100KB per thumbnail
-		let averageThumbnailSize: UInt64 = 100 * 1_024
+		let _ /*averageThumbnailSize*/: UInt64 = 100 * 1_024
 		self.thumbnailCache.countLimit = 1_000
 		self.thumbnailCache.totalCostLimit = 100 * 1_024 * 1_024 // 100MB max
 

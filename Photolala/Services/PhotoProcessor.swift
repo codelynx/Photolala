@@ -26,27 +26,82 @@ class PhotoProcessor {
 	static func processPhoto(_ photo: PhotoFile) async throws -> ProcessedData {
 		let startTime = Date()
 		
-		// Single file read
-		let data = try Data(contentsOf: photo.fileURL)
-		print("[PhotoProcessor] Read \(data.count / 1024)KB from \(photo.filename)")
+		// Check if we have a valid cached MD5
+		let attributes = try FileManager.default.attributesOfItem(atPath: photo.filePath)
+		let fileSize = attributes[.size] as? Int64 ?? 0
+		let modificationDate = attributes[.modificationDate] as? Date ?? Date()
 		
-		// Process everything in parallel
-		async let thumbnail = generateThumbnail(from: data, filename: photo.filename)
-		async let md5 = computeMD5(from: data)
-		async let metadata = extractMetadata(from: data, url: photo.fileURL)
+		let md5Result: String
+		let needsFullRead: Bool
 		
-		// Wait for all operations
-		let (thumbnailResult, md5Result, metadataResult) = try await (thumbnail, md5, metadata)
+		if let cachedMD5 = ThumbnailMetadataCache.shared.getCachedMD5(
+			for: photo.filePath,
+			fileSize: fileSize,
+			modificationDate: modificationDate
+		) {
+			// We have a valid cached MD5
+			md5Result = cachedMD5
+			needsFullRead = false
+			print("[PhotoProcessor] Using cached MD5 for \(photo.filename)")
+		} else {
+			// Need to read file and compute MD5
+			needsFullRead = true
+			md5Result = ""  // Will be computed below
+		}
 		
-		let elapsed = Date().timeIntervalSince(startTime)
-		print("[PhotoProcessor] Processed \(photo.filename) in \(String(format: "%.3f", elapsed))s")
-		
-		return ProcessedData(
-			thumbnail: thumbnailResult.image,
-			md5: md5Result,
-			metadata: metadataResult,
-			thumbnailData: thumbnailResult.data
-		)
+		// If we don't need full read, just generate thumbnail from file
+		if !needsFullRead {
+			// Just read for thumbnail generation
+			let data = try Data(contentsOf: photo.fileURL)
+			print("[PhotoProcessor] Read \(data.count / 1024)KB from \(photo.filename) for thumbnail")
+			
+			// Process everything needed
+			async let thumbnail = generateThumbnail(from: data, filename: photo.filename)
+			async let metadata = extractMetadata(from: data, url: photo.fileURL)
+			
+			// Wait for operations
+			let (thumbnailResult, metadataResult) = try await (thumbnail, metadata)
+			
+			let elapsed = Date().timeIntervalSince(startTime)
+			print("[PhotoProcessor] Processed \(photo.filename) in \(String(format: "%.3f", elapsed))s (cached MD5)")
+			
+			return ProcessedData(
+				thumbnail: thumbnailResult.image,
+				md5: md5Result,
+				metadata: metadataResult,
+				thumbnailData: thumbnailResult.data
+			)
+		} else {
+			// Full processing - read once for all operations
+			let data = try Data(contentsOf: photo.fileURL)
+			print("[PhotoProcessor] Read \(data.count / 1024)KB from \(photo.filename)")
+			
+			// Process everything in parallel
+			async let thumbnail = generateThumbnail(from: data, filename: photo.filename)
+			async let md5 = computeMD5(from: data)
+			async let metadata = extractMetadata(from: data, url: photo.fileURL)
+			
+			// Wait for all operations
+			let (thumbnailResult, computedMD5, metadataResult) = try await (thumbnail, md5, metadata)
+			
+			// Store MD5 in metadata cache
+			ThumbnailMetadataCache.shared.setMetadata(
+				filePath: photo.filePath,
+				md5Hash: computedMD5,
+				fileSize: fileSize,
+				modificationDate: modificationDate
+			)
+			
+			let elapsed = Date().timeIntervalSince(startTime)
+			print("[PhotoProcessor] Processed \(photo.filename) in \(String(format: "%.3f", elapsed))s")
+			
+			return ProcessedData(
+				thumbnail: thumbnailResult.image,
+				md5: computedMD5,
+				metadata: metadataResult,
+				thumbnailData: thumbnailResult.data
+			)
+		}
 	}
 	
 	// MARK: - Private Processing Methods
