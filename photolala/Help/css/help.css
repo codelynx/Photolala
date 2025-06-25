@@ -1,0 +1,265 @@
+/* Photolala Help Stylesheet */
+
+:root {
+    --system-font: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+    --monospace-font: "SF Mono", Monaco, "Cascadia Code", "Roboto Mono", monospace;
+    
+    /* Light mode colors */
+    --bg-color: #ffffff;
+    --text-color: #000000;
+    --secondary-text: #666666;
+    --link-color: #007aff;
+    --border-color: #e5e5e5;
+    --code-bg: #f5f5f5;
+    --nav-bg: #f8f8f8;
+    --shadow: rgba(0, 0, 0, 0.1);
+}
+
+/* Dark mode support */
+@media (prefers-color-scheme: dark) {
+    :root {
+        --bg-color: #1c1c1e;
+        --text-color: #ffffff;
+        --secondary-text: #999999;
+        --link-color: #0a84ff;
+        --border-color: #38383a;
+        --code-bg: #2c2c2e;
+        --nav-bg: #2c2c2e;
+        --shadow: rgba(0, 0, 0, 0.3);
+    }
+}
+
+/* Base styles */
+* {
+    box-sizing: border-box;
+}
+
+body {
+    font-family: var(--system-font);
+    font-size: 15px;
+    line-height: 1.6;
+    color: var(--text-color);
+    background-color: var(--bg-color);
+    margin: 0;
+    padding: 0;
+    -webkit-text-size-adjust: 100%;
+}
+
+/* Container */
+.help-container {
+    max-width: 800px;
+    margin: 0 auto;
+    padding: 20px;
+}
+
+/* Breadcrumb navigation */
+.breadcrumb {
+    font-size: 13px;
+    color: var(--secondary-text);
+    margin-bottom: 20px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.breadcrumb a {
+    color: var(--link-color);
+    text-decoration: none;
+}
+
+.breadcrumb a:hover {
+    text-decoration: underline;
+}
+
+/* Typography */
+h1 {
+    font-size: 28px;
+    font-weight: 600;
+    margin: 0 0 20px 0;
+    line-height: 1.2;
+}
+
+h2 {
+    font-size: 22px;
+    font-weight: 600;
+    margin: 30px 0 15px 0;
+}
+
+h3 {
+    font-size: 18px;
+    font-weight: 600;
+    margin: 25px 0 10px 0;
+}
+
+p {
+    margin: 0 0 15px 0;
+}
+
+/* Links */
+a {
+    color: var(--link-color);
+    text-decoration: none;
+}
+
+a:hover {
+    text-decoration: underline;
+}
+
+/* Lists */
+ul, ol {
+    margin: 0 0 15px 0;
+    padding-left: 30px;
+}
+
+li {
+    margin-bottom: 5px;
+}
+
+/* Code */
+code {
+    font-family: var(--monospace-font);
+    font-size: 13px;
+    background-color: var(--code-bg);
+    padding: 2px 6px;
+    border-radius: 4px;
+}
+
+pre {
+    background-color: var(--code-bg);
+    padding: 15px;
+    border-radius: 6px;
+    overflow-x: auto;
+    margin: 0 0 15px 0;
+}
+
+pre code {
+    background: none;
+    padding: 0;
+}
+
+/* Tables */
+table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 0 0 20px 0;
+}
+
+th, td {
+    text-align: left;
+    padding: 8px 12px;
+    border-bottom: 1px solid var(--border-color);
+}
+
+th {
+    font-weight: 600;
+    background-color: var(--nav-bg);
+}
+
+/* Images */
+img {
+    max-width: 100%;
+    height: auto;
+    border-radius: 6px;
+    box-shadow: 0 2px 8px var(--shadow);
+    margin: 15px 0;
+}
+
+/* Note boxes */
+.note {
+    background-color: var(--nav-bg);
+    border-left: 4px solid var(--link-color);
+    padding: 15px;
+    margin: 20px 0;
+    border-radius: 4px;
+}
+
+.note-title {
+    font-weight: 600;
+    margin-bottom: 5px;
+}
+
+/* Related topics */
+.related {
+    margin-top: 40px;
+    padding-top: 20px;
+    border-top: 1px solid var(--border-color);
+}
+
+.related h3 {
+    font-size: 16px;
+    margin-bottom: 10px;
+}
+
+.related ul {
+    list-style: none;
+    padding: 0;
+}
+
+.related li {
+    margin-bottom: 8px;
+}
+
+/* Platform-specific styles */
+.platform-note {
+    display: inline-block;
+    font-size: 12px;
+    padding: 2px 8px;
+    background-color: var(--code-bg);
+    border-radius: 4px;
+    margin-left: 8px;
+}
+
+/* Keyboard shortcuts */
+.keyboard-shortcut {
+    display: inline-block;
+    font-family: var(--monospace-font);
+    font-size: 12px;
+    padding: 3px 8px;
+    background-color: var(--code-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    box-shadow: 0 1px 2px var(--shadow);
+}
+
+/* Search highlight */
+.search-highlight {
+    background-color: yellow;
+    color: black;
+    padding: 1px 2px;
+    border-radius: 2px;
+}
+
+/* Responsive design */
+@media (max-width: 600px) {
+    .help-container {
+        padding: 15px;
+    }
+    
+    h1 {
+        font-size: 24px;
+    }
+    
+    h2 {
+        font-size: 20px;
+    }
+    
+    body {
+        font-size: 14px;
+    }
+}
+
+/* Print styles */
+@media print {
+    body {
+        background: white;
+        color: black;
+    }
+    
+    .breadcrumb, .related {
+        display: none;
+    }
+    
+    a {
+        color: black;
+        text-decoration: underline;
+    }
+}

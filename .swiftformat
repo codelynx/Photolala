@@ -1,0 +1,31 @@
+# SwiftFormat configuration
+# Use tabs for indentation
+--indent tab
+--tabwidth 4
+
+# Disable rules that might conflict with tab usage
+--disable blankLinesAtStartOfScope
+--disable blankLinesAtEndOfScope
+
+# Keep existing formatting where possible
+--stripunusedargs closure-only
+--self insert
+--importgrouping testable-bottom
+
+# Wrap collections
+--wrapcollections before-first
+--wraparguments before-first
+--wrapparameters before-first
+
+# Other formatting preferences
+--decimalgrouping 3,4
+--octalgrouping 4,8
+--binarygrouping 4,8
+--hexgrouping 4,8
+--fractiongrouping disabled
+--exponentgrouping disabled
+--patternlet hoist
+--commas always
+--trimwhitespace always
+--semicolons never
+--maxwidth 120

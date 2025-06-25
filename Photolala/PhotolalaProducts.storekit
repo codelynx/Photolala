@@ -1,0 +1,181 @@
+{
+  "identifier" : "E5D8C341",
+  "nonRenewingSubscriptions" : [
+
+  ],
+  "products" : [
+
+  ],
+  "settings" : {
+    "_applicationInternalID" : "2P97EM4L4N.com.electricwoods.photolala",
+    "_developerTeamID" : "2P97EM4L4N",
+    "_failTransactionsEnabled" : false,
+    "_lastSynchronizedDate" : 743437200.00,
+    "_locale" : "en_US",
+    "_storefront" : "USA",
+    "_storeKitErrors" : [
+      {
+        "current" : null,
+        "enabled" : false,
+        "name" : "Load Products"
+      },
+      {
+        "current" : null,
+        "enabled" : false,
+        "name" : "Purchase"
+      },
+      {
+        "current" : null,
+        "enabled" : false,
+        "name" : "Verification"
+      },
+      {
+        "current" : null,
+        "enabled" : false,
+        "name" : "App Store Sync"
+      },
+      {
+        "current" : null,
+        "enabled" : false,
+        "name" : "Subscription Status"
+      },
+      {
+        "current" : null,
+        "enabled" : false,
+        "name" : "App Transaction"
+      },
+      {
+        "current" : null,
+        "enabled" : false,
+        "name" : "Manage Subscriptions Sheet"
+      },
+      {
+        "current" : null,
+        "enabled" : false,
+        "name" : "Refund Request Sheet"
+      }
+    ]
+  },
+  "subscriptionGroups" : [
+    {
+      "id" : "F8A9C2B1",
+      "localizations" : [
+
+      ],
+      "name" : "Photolala Backup",
+      "subscriptions" : [
+        {
+          "adHocOffers" : [
+
+          ],
+          "codeOffers" : [
+
+          ],
+          "displayPrice" : "0.99",
+          "familyShareable" : false,
+          "groupNumber" : 1,
+          "internalID" : "8F7E3A1B",
+          "introductoryOffer" : {
+            "displayPrice" : "0",
+            "internalID" : "B3F8E7A1",
+            "numberOfPeriods" : 1,
+            "paymentMode" : "free",
+            "subscriptionPeriod" : "P1M",
+            "type" : "introductory"
+          },
+          "localizations" : [
+            {
+              "description" : "500GB storage - Store 100,000 photos",
+              "displayName" : "Starter Plan",
+              "locale" : "en_US"
+            }
+          ],
+          "productID" : "com.electricwoods.photolala.starter",
+          "recurringSubscriptionPeriod" : "P1M",
+          "referenceName" : "Starter Monthly",
+          "subscriptionGroupID" : "F8A9C2B1",
+          "type" : "RecurringSubscription"
+        },
+        {
+          "adHocOffers" : [
+
+          ],
+          "codeOffers" : [
+
+          ],
+          "displayPrice" : "1.99",
+          "familyShareable" : false,
+          "groupNumber" : 2,
+          "internalID" : "9A8F7E3B",
+          "introductoryOffer" : null,
+          "localizations" : [
+            {
+              "description" : "1TB storage - Store 200,000 photos",
+              "displayName" : "Essential Plan",
+              "locale" : "en_US"
+            }
+          ],
+          "productID" : "com.electricwoods.photolala.essential",
+          "recurringSubscriptionPeriod" : "P1M",
+          "referenceName" : "Essential Monthly",
+          "subscriptionGroupID" : "F8A9C2B1",
+          "type" : "RecurringSubscription"
+        },
+        {
+          "adHocOffers" : [
+
+          ],
+          "codeOffers" : [
+
+          ],
+          "displayPrice" : "2.99",
+          "familyShareable" : false,
+          "groupNumber" : 3,
+          "internalID" : "A7B9E8F3",
+          "introductoryOffer" : null,
+          "localizations" : [
+            {
+              "description" : "1.5TB storage - Store 300,000 photos",
+              "displayName" : "Plus Plan",
+              "locale" : "en_US"
+            }
+          ],
+          "productID" : "com.electricwoods.photolala.plus",
+          "recurringSubscriptionPeriod" : "P1M",
+          "referenceName" : "Plus Monthly",
+          "subscriptionGroupID" : "F8A9C2B1",
+          "type" : "RecurringSubscription"
+        },
+        {
+          "adHocOffers" : [
+
+          ],
+          "codeOffers" : [
+
+          ],
+          "displayPrice" : "5.99",
+          "familyShareable" : true,
+          "groupNumber" : 4,
+          "internalID" : "B8E7F9A3",
+          "introductoryOffer" : null,
+          "localizations" : [
+            {
+              "description" : "1.5TB shareable with up to 5 family members",
+              "displayName" : "Family Plan",
+              "locale" : "en_US"
+            }
+          ],
+          "productID" : "com.electricwoods.photolala.family",
+          "recurringSubscriptionPeriod" : "P1M",
+          "referenceName" : "Family Monthly",
+          "subscriptionGroupID" : "F8A9C2B1",
+          "type" : "RecurringSubscription"
+        }
+      ]
+    }
+  ],
+  "version" : {
+    "major" : 3,
+    "minor" : 0
+  }
+}

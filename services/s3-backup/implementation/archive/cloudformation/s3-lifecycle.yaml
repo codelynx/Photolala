@@ -1,0 +1,129 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'S3 Lifecycle Configuration for Photolala Backup Service'
+
+Parameters:
+  BucketName:
+    Type: String
+    Default: photolala
+    Description: Name of the S3 bucket for Photolala
+
+Resources:
+  PhotolalaBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Ref BucketName
+      LifecycleConfiguration:
+        Rules:
+          # Rule 1: Archive user photos after 6 months
+          - Id: archive-user-photos
+            Status: Enabled
+            Prefix: users/
+            Transitions:
+              - StorageClass: DEEP_ARCHIVE
+                TransitionInDays: 180
+            # Tag-based filtering for photos only
+            TagFilters:
+              - Key: Type
+                Value: photo
+
+          # Rule 2: Intelligent tiering for thumbnails
+          - Id: optimize-thumbnails
+            Status: Enabled
+            Prefix: thumbnails/
+            Transitions:
+              - StorageClass: INTELLIGENT_TIERING
+                TransitionInDays: 0
+
+          # Rule 3: Cleanup incomplete multipart uploads
+          - Id: cleanup-incomplete-uploads
+            Status: Enabled
+            AbortIncompleteMultipartUpload:
+              DaysAfterInitiation: 7
+
+      # Bucket versioning (optional but recommended)
+      VersioningConfiguration:
+        Status: Suspended
+
+      # Server-side encryption
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+
+      # Block public access
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+
+      # Intelligent-Tiering configuration for thumbnails
+      IntelligentTieringConfigurations:
+        - Id: thumbnail-tiering
+          Prefix: thumbnails/
+          Status: Enabled
+          Tierings:
+            - AccessTier: ARCHIVE_ACCESS
+              Days: 90
+            - AccessTier: DEEP_ARCHIVE_ACCESS
+              Days: 180
+
+      # Object lock configuration (if needed for compliance)
+      # ObjectLockEnabled: false
+      # ObjectLockConfiguration:
+      #   ObjectLockEnabled: Enabled
+      #   Rule:
+      #     DefaultRetention:
+      #       Mode: COMPLIANCE
+      #       Days: 180
+
+  # S3 Bucket Policy
+  PhotolalaBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref PhotolalaBucket
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          # Deny unencrypted uploads
+          - Sid: DenyUnencryptedObjectUploads
+            Effect: Deny
+            Principal: '*'
+            Action: s3:PutObject
+            Resource: !Sub '${PhotolalaBucket.Arn}/*'
+            Condition:
+              StringNotEquals:
+                s3:x-amz-server-side-encryption: AES256
+
+          # Require secure transport
+          - Sid: RequireSecureTransport
+            Effect: Deny
+            Principal: '*'
+            Action: s3:*
+            Resource:
+              - !GetAtt PhotolalaBucket.Arn
+              - !Sub '${PhotolalaBucket.Arn}/*'
+            Condition:
+              Bool:
+                aws:SecureTransport: false
+
+Outputs:
+  BucketName:
+    Description: Name of the created S3 bucket
+    Value: !Ref PhotolalaBucket
+    Export:
+      Name: !Sub '${AWS::StackName}-BucketName'
+
+  BucketArn:
+    Description: ARN of the created S3 bucket
+    Value: !GetAtt PhotolalaBucket.Arn
+    Export:
+      Name: !Sub '${AWS::StackName}-BucketArn'
+
+  LifecycleRules:
+    Description: Lifecycle rules configured for the bucket
+    Value: |
+      - Photos: Archive to Deep Archive after 180 days
+      - Thumbnails: Immediate Intelligent-Tiering
+      - Metadata: Remains in Standard storage
+      - Incomplete uploads: Cleaned up after 7 days
