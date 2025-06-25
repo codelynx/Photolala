@@ -16,15 +16,8 @@ class BookmarkManager: ObservableObject {
 	// Published properties
 	@Published private(set) var bookmarks: [String: PhotoBookmark] = [:]
 	
-	// Quick emoji set (11 emojis - star removed to avoid confusion with starring feature)
-	static let quickEmojis = [
-		"❤️", "👍", "👎",      // Rating
-		"✏️", "🗑️", "📤", "🖨️",  // Actions
-		"✅", "🔴", "📌", "💡"   // Status
-	]
-	
 	// File paths
-	private var localBookmarksURL: URL {
+	private var bookmarksURL: URL {
 		let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
 		let photolalaDir = appSupport.appendingPathComponent("Photolala")
 		
@@ -33,189 +26,158 @@ class BookmarkManager: ObservableObject {
 			try? FileManager.default.createDirectory(at: photolalaDir, withIntermediateDirectories: true, attributes: nil)
 		}
 		
-		return photolalaDir.appendingPathComponent("bookmarks.csv")
+		return photolalaDir.appendingPathComponent("bookmarks.json")
 	}
 	
 	private init() {
-		loadFromCSV()
+		loadBookmarks()
 	}
 	
 	// MARK: - Core API
 	
-	/// Set or remove a bookmark for a photo
-	func setBookmark(photo: any PhotoItem, emoji: String?) async {
-		guard let md5 = await getMD5(for: photo) else {
-			print("[BookmarkManager] Cannot bookmark photo without MD5")
+	/// Toggle a specific flag for a photo
+	func toggleFlag(_ flag: ColorFlag, for photo: any PhotoItem) async {
+		guard let identifier = await getIdentifier(for: photo) else {
+			print("[BookmarkManager] Cannot get identifier for photo")
 			return
 		}
 		
-		if let emoji = emoji {
-			// Validate emoji - check it's a single emoji (may have multiple unicode scalars)
-			guard !emoji.isEmpty && emoji.unicodeScalars.count <= 4 else {
-				print("[BookmarkManager] Invalid emoji: \(emoji) (scalars: \(emoji.unicodeScalars.count))")
-				return
+		if var bookmark = bookmarks[identifier] {
+			// Toggle the flag
+			if bookmark.flags.contains(flag) {
+				bookmark.flags.remove(flag)
+			} else {
+				bookmark.flags.insert(flag)
 			}
 			
-			// Add or update bookmark
-			let bookmark = PhotoBookmark(md5: md5, emoji: emoji, modifiedDate: Date())
-			bookmarks[md5] = bookmark
-			print("[BookmarkManager] Added bookmark \(emoji) for MD5: \(md5)")
+			// Remove bookmark if no flags remain
+			if bookmark.isEmpty {
+				bookmarks.removeValue(forKey: identifier)
+			} else {
+				bookmarks[identifier] = bookmark
+			}
 		} else {
-			// Remove bookmark
-			bookmarks.removeValue(forKey: md5)
-			print("[BookmarkManager] Removed bookmark for MD5: \(md5)")
+			// Create new bookmark with the flag
+			let bookmark = PhotoBookmark(photoIdentifier: identifier, flags: [flag])
+			bookmarks[identifier] = bookmark
 		}
 		
-		// Save changes
-		saveToCSV()
+		saveBookmarks()
+	}
+	
+	/// Clear all flags for a photo
+	func clearFlags(for photo: any PhotoItem) async {
+		guard let identifier = await getIdentifier(for: photo) else { return }
+		bookmarks.removeValue(forKey: identifier)
+		saveBookmarks()
 	}
 	
 	/// Get bookmark for a photo
 	func getBookmark(for photo: any PhotoItem) async -> PhotoBookmark? {
-		guard let md5 = await getMD5(for: photo) else { return nil }
-		return bookmarks[md5]
+		guard let identifier = await getIdentifier(for: photo) else { return nil }
+		return bookmarks[identifier]
 	}
 	
-	/// Check if photo is bookmarked
-	func isBookmarked(_ photo: any PhotoItem) async -> Bool {
-		guard let md5 = await getMD5(for: photo) else { return false }
-		return bookmarks[md5] != nil
+	/// Check if photo has any flags
+	func hasFlags(_ photo: any PhotoItem) async -> Bool {
+		guard let identifier = await getIdentifier(for: photo) else { return false }
+		return bookmarks[identifier] != nil
 	}
 	
-	/// Get total bookmark count
-	func bookmarksCount() -> Int {
-		bookmarks.count
+	/// Check if photo has a specific flag
+	func hasFlag(_ flag: ColorFlag, for photo: any PhotoItem) async -> Bool {
+		guard let identifier = await getIdentifier(for: photo) else { return false }
+		return bookmarks[identifier]?.flags.contains(flag) ?? false
 	}
 	
-	/// Get all MD5s for photos with a specific emoji
-	func photosByEmoji(_ emoji: String) -> [String] {
+	/// Get all photos with a specific flag
+	func photosWithFlag(_ flag: ColorFlag) -> [String] {
 		bookmarks.values
-			.filter { $0.emoji == emoji }
-			.map { $0.md5 }
+			.filter { $0.flags.contains(flag) }
+			.map { $0.photoIdentifier }
 			.sorted()
 	}
 	
-	/// Get count of bookmarks by emoji
-	func countByEmoji() -> [String: Int] {
-		var counts: [String: Int] = [:]
+	/// Get count of bookmarks by flag
+	func countByFlag() -> [ColorFlag: Int] {
+		var counts: [ColorFlag: Int] = [:]
 		for bookmark in bookmarks.values {
-			counts[bookmark.emoji, default: 0] += 1
+			for flag in bookmark.flags {
+				counts[flag, default: 0] += 1
+			}
 		}
 		return counts
 	}
 	
+	/// Get total number of bookmarked photos
+	func bookmarkedPhotoCount() -> Int {
+		bookmarks.count
+	}
+	
 	// MARK: - Private Methods
 	
-	/// Get MD5 hash for a photo
-	private func getMD5(for photo: any PhotoItem) async -> String? {
-		// For directory photos, use PhotoManager's MD5
+	/// Get identifier for a photo
+	private func getIdentifier(for photo: any PhotoItem) async -> String? {
+		// For directory photos, use MD5-based identifier
 		if let photoFile = photo as? PhotoFile {
 			// Try to get from cache first
 			if let md5 = photoFile.md5Hash {
-				return md5
+				return "md5#\(md5)"
 			}
 			
 			// Generate if needed
 			let url = URL(fileURLWithPath: photoFile.filePath)
 			guard let data = try? Data(contentsOf: url) else { return nil }
 			let digest = Insecure.MD5.hash(data: data)
-			return digest.map { String(format: "%02x", $0) }.joined()
+			let md5 = digest.map { String(format: "%02x", $0) }.joined()
+			return "md5#\(md5)"
 		}
 		
-		// For Apple Photos, use cached MD5 or generate
+		// For Apple Photos, use Apple Photo Library identifier
 		if let applePhoto = photo as? PhotoApple {
-			do {
-				let (data, md5, _, _) = try await PhotoManager.shared.processApplePhoto(applePhoto)
-				return md5
-			} catch {
-				// Failed to get MD5 for Apple Photo
-				return nil
-			}
+			return "apl#\(applePhoto.id)"
 		}
 		
-		// For S3 photos, use the MD5 from metadata
+		// For S3 photos, use MD5-based identifier
 		if let s3Photo = photo as? PhotoS3 {
-			return s3Photo.md5
+			return "md5#\(s3Photo.md5)"
 		}
 		
 		return nil
 	}
 	
-	// MARK: - CSV Persistence
+	// MARK: - Persistence
 	
-	/// Save bookmarks to CSV file
-	private func saveToCSV() {
-		var csv = "md5,emoji,note,modifiedDate\n"
-		
-		// Sort by MD5 for consistent output
-		for bookmark in bookmarks.values.sorted(by: { $0.md5 < $1.md5 }) {
-			let note = escapeCSVField(bookmark.note)
-			let timestamp = Int(bookmark.modifiedDate.timeIntervalSince1970)
-			csv += "\(bookmark.md5),\(bookmark.emoji),\(note),\(timestamp)\n"
-		}
-		
+	/// Save bookmarks to JSON file
+	private func saveBookmarks() {
 		do {
-			let url = localBookmarksURL
-			try csv.write(to: url, atomically: true, encoding: .utf8)
-			print("[BookmarkManager] Saved \(bookmarks.count) bookmarks to \(url.path)")
+			let encoder = JSONEncoder()
+			encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+			let data = try encoder.encode(Array(bookmarks.values))
+			try data.write(to: bookmarksURL)
+			print("[BookmarkManager] Saved \(bookmarks.count) bookmarks")
 		} catch {
 			print("[BookmarkManager] Failed to save bookmarks: \(error)")
 		}
 	}
 	
-	/// Load bookmarks from CSV file
-	private func loadFromCSV() {
-		let path = localBookmarksURL.path
-		print("[BookmarkManager] Looking for bookmarks at: \(path)")
-		
-		guard FileManager.default.fileExists(atPath: path) else {
-			print("[BookmarkManager] No bookmarks file found at \(path)")
+	/// Load bookmarks from JSON file
+	private func loadBookmarks() {
+		guard FileManager.default.fileExists(atPath: bookmarksURL.path) else {
+			print("[BookmarkManager] No bookmarks file found")
 			return
 		}
 		
 		do {
-			let csv = try String(contentsOf: localBookmarksURL, encoding: .utf8)
-			print("[BookmarkManager] Read CSV content: \(csv.count) characters")
-			let lines = csv.components(separatedBy: .newlines)
-			print("[BookmarkManager] CSV has \(lines.count) lines")
+			let data = try Data(contentsOf: bookmarksURL)
+			let decoder = JSONDecoder()
+			let bookmarkArray = try decoder.decode([PhotoBookmark].self, from: data)
 			
-			// Skip header if present
-			let dataLines = if lines.first == "md5,emoji,note,modifiedDate" {
-				Array(lines.dropFirst())
-			} else {
-				lines
-			}
-			print("[BookmarkManager] Processing \(dataLines.count) data lines")
-			
-			// Parse bookmarks
-			var loadedBookmarks: [String: PhotoBookmark] = [:]
-			for line in dataLines where !line.isEmpty {
-				print("[BookmarkManager] Parsing line: \(line)")
-				if let bookmark = PhotoBookmark(csvRow: line) {
-					loadedBookmarks[bookmark.md5] = bookmark
-					print("[BookmarkManager] Parsed bookmark: \(bookmark.emoji) for MD5: \(bookmark.md5)")
-				} else {
-					print("[BookmarkManager] Failed to parse line: \(line)")
-				}
-			}
-			
-			bookmarks = loadedBookmarks
-			print("[BookmarkManager] Loaded \(bookmarks.count) bookmarks from CSV")
+			// Convert array to dictionary
+			bookmarks = Dictionary(uniqueKeysWithValues: bookmarkArray.map { ($0.photoIdentifier, $0) })
+			print("[BookmarkManager] Loaded \(bookmarks.count) bookmarks")
 		} catch {
 			print("[BookmarkManager] Failed to load bookmarks: \(error)")
 		}
-	}
-	
-	/// Escape CSV field if needed
-	private func escapeCSVField(_ field: String?) -> String {
-		guard let field = field else { return "" }
-		
-		// If field contains comma, newline, or quotes, wrap in quotes and escape quotes
-		if field.contains(",") || field.contains("\n") || field.contains("\"") {
-			let escaped = field.replacingOccurrences(of: "\"", with: "\"\"")
-			return "\"\(escaped)\""
-		}
-		
-		return field
 	}
 }

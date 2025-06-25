@@ -7,50 +7,30 @@
 
 import Foundation
 
-/// Represents a bookmark (emoji) associated with a photo
-struct PhotoBookmark: Equatable, Codable {
-	/// Photo content hash (MD5)
-	let md5: String
+/// Represents color flags associated with a photo
+struct PhotoBookmark: Equatable, Codable, Identifiable {
+	/// Photo identifier (e.g., "md5#abc123" or "apl#xyz789")
+	let photoIdentifier: String
 	
-	/// Single emoji character
-	var emoji: String
+	/// Set of color flags
+	var flags: Set<ColorFlag>
 	
-	/// Optional note for future use
-	var note: String?
-	
-	/// Last modification date for sync conflict resolution
-	let modifiedDate: Date
+	/// Computed property for Identifiable
+	var id: String { photoIdentifier }
 	
 	/// Create a new bookmark
-	init(md5: String, emoji: String, note: String? = nil, modifiedDate: Date = Date()) {
-		self.md5 = md5
-		self.emoji = emoji
-		self.note = note
-		self.modifiedDate = modifiedDate
+	init(photoIdentifier: String, flags: Set<ColorFlag> = []) {
+		self.photoIdentifier = photoIdentifier
+		self.flags = flags
 	}
 	
-	/// Create from CSV row
-	init?(csvRow: String) {
-		// Use components(separatedBy:) instead of split to preserve empty fields
-		let components = csvRow.components(separatedBy: ",")
-		guard components.count >= 4 else { 
-			print("[PhotoBookmark] CSV row has insufficient components: \(components.count)")
-			return nil 
-		}
-		
-		self.md5 = components[0]
-		self.emoji = components[1]
-		
-		// Handle empty note field
-		let noteField = components[2]
-		self.note = noteField.isEmpty ? nil : noteField
-		
-		// Parse Unix timestamp
-		guard let timestamp = Double(components[3]) else { 
-			print("[PhotoBookmark] Failed to parse timestamp: \(components[3])")
-			return nil 
-		}
-		self.modifiedDate = Date(timeIntervalSince1970: timestamp)
+	/// Check if bookmark has any flags
+	var isEmpty: Bool {
+		flags.isEmpty
 	}
 	
+	/// Get sorted array of flags for display
+	var sortedFlags: [ColorFlag] {
+		Array(flags).sorted
+	}
 }

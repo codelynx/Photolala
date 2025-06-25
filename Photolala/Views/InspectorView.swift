@@ -731,9 +731,10 @@ struct BookmarkSection: View {
 				if isLoading {
 					ProgressView()
 						.scaleEffect(0.7)
-				} else if let emoji = currentBookmark?.emoji {
-					Text(emoji)
-						.font(.title2)
+				} else if let bookmark = currentBookmark {
+					// TODO: Update for color flags
+					Text("Flags: \(bookmark.flags.count)")
+						.font(.caption)
 				} else {
 					Text("None")
 						.foregroundColor(.secondary)
@@ -744,18 +745,24 @@ struct BookmarkSection: View {
 			Divider()
 				.padding(.vertical, 4)
 
-			// Emoji grid
+			// Flag grid - TODO: Update for color flags
 			LazyVGrid(columns: [GridItem(.adaptive(minimum: 44))], spacing: 8) {
-				ForEach(BookmarkManager.quickEmojis, id: \.self) { emoji in
-					EmojiButton(
-						emoji: emoji,
-						isSelected: currentBookmark?.emoji == emoji,
-						action: {
-							Task {
-								await setBookmark(emoji: emoji)
-							}
+				ForEach(ColorFlag.allCases, id: \.self) { flag in
+					Button(action: {
+						Task {
+							await toggleFlag(flag)
 						}
-					)
+					}) {
+						flag.flagView
+							.font(.system(size: 20))
+							.frame(width: 44, height: 44)
+							.background(
+								RoundedRectangle(cornerRadius: 8)
+									.fill(currentBookmark?.flags.contains(flag) == true ? 
+										  Color.accentColor.opacity(0.2) : Color.clear)
+							)
+					}
+					.buttonStyle(.plain)
 				}
 			}
 
@@ -763,7 +770,7 @@ struct BookmarkSection: View {
 			if currentBookmark != nil {
 				Button("Clear") {
 					Task {
-						await setBookmark(emoji: nil)
+						await clearAllFlags()
 					}
 				}
 				.buttonStyle(.plain)
@@ -787,14 +794,13 @@ struct BookmarkSection: View {
 		isLoading = false
 	}
 
-	private func setBookmark(emoji: String?) async {
-		if let emoji = emoji, currentBookmark?.emoji == emoji {
-			// Tapping same emoji removes it
-			await BookmarkManager.shared.setBookmark(photo: photo, emoji: nil)
-		} else {
-			// Set new emoji or clear
-			await BookmarkManager.shared.setBookmark(photo: photo, emoji: emoji)
-		}
+	private func toggleFlag(_ flag: ColorFlag) async {
+		await BookmarkManager.shared.toggleFlag(flag, for: photo)
+		await loadBookmark()
+	}
+	
+	private func clearAllFlags() async {
+		await BookmarkManager.shared.clearFlags(for: photo)
 		await loadBookmark()
 	}
 }

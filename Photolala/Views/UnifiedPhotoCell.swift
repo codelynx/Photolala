@@ -21,7 +21,7 @@ class UnifiedPhotoCell: NSCollectionViewItem {
 	private var photoImageView: ScalableImageView!
 	private var placeholderImageView: NSImageView!
 	private var starImageView: NSImageView!
-	private var bookmarkEmojiLabel: NSTextField!
+	private var flagContainerView: NSStackView!
 	private var fileSizeLabel: NSTextField!
 	private var badgeView: NSView?
 	private var bookmarkBadgeView: NSView?
@@ -61,13 +61,13 @@ class UnifiedPhotoCell: NSCollectionViewItem {
 		starImageView.contentTintColor = .systemYellow
 		view.addSubview(starImageView)
 		
-		// Bookmark emoji label
-		bookmarkEmojiLabel = NSTextField(labelWithString: "")
-		bookmarkEmojiLabel.font = .systemFont(ofSize: 14)
-		bookmarkEmojiLabel.alignment = .center
-		bookmarkEmojiLabel.translatesAutoresizingMaskIntoConstraints = false
-		bookmarkEmojiLabel.isHidden = true
-		view.addSubview(bookmarkEmojiLabel)
+		// Flag container view
+		flagContainerView = NSStackView()
+		flagContainerView.orientation = .horizontal
+		flagContainerView.spacing = 2
+		flagContainerView.alignment = .centerY
+		flagContainerView.translatesAutoresizingMaskIntoConstraints = false
+		view.addSubview(flagContainerView)
 		
 		// File size label
 		fileSizeLabel = NSTextField(labelWithString: "")
@@ -113,15 +113,14 @@ class UnifiedPhotoCell: NSCollectionViewItem {
 			starImageView.widthAnchor.constraint(equalToConstant: 16),
 			starImageView.heightAnchor.constraint(equalToConstant: 16),
 			
-			// Bookmark emoji label - positioned after star image
-			bookmarkEmojiLabel.leadingAnchor.constraint(equalTo: starImageView.trailingAnchor, constant: 2),
-			bookmarkEmojiLabel.centerYAnchor.constraint(equalTo: starImageView.centerYAnchor),
-			bookmarkEmojiLabel.widthAnchor.constraint(equalToConstant: 20),
+			// Flag container - positioned after star image
+			flagContainerView.leadingAnchor.constraint(equalTo: starImageView.trailingAnchor, constant: 2),
+			flagContainerView.centerYAnchor.constraint(equalTo: starImageView.centerYAnchor),
+			flagContainerView.trailingAnchor.constraint(lessThanOrEqualTo: fileSizeLabel.leadingAnchor, constant: -4),
 			
 			// File size label - positioned at bottom of view
 			fileSizeLabel.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -4),
 			fileSizeLabel.centerYAnchor.constraint(equalTo: starImageView.centerYAnchor),
-			fileSizeLabel.leadingAnchor.constraint(greaterThanOrEqualTo: bookmarkEmojiLabel.trailingAnchor, constant: 4),
 			
 			// Loading indicator
 			loadingIndicator.centerXAnchor.constraint(equalTo: photoImageView.centerXAnchor),
@@ -141,8 +140,7 @@ class UnifiedPhotoCell: NSCollectionViewItem {
 		thumbnailTask = nil
 		photoImageView.image = nil
 		starImageView.image = nil
-		bookmarkEmojiLabel.stringValue = ""
-		bookmarkEmojiLabel.isHidden = true
+		flagContainerView.arrangedSubviews.forEach { $0.removeFromSuperview() }
 		fileSizeLabel.stringValue = ""
 		badgeView?.removeFromSuperview()
 		badgeView = nil
@@ -166,7 +164,7 @@ class UnifiedPhotoCell: NSCollectionViewItem {
 		// Update info bar visibility based on showItemInfo
 		let showInfo = settings.showItemInfo
 		starImageView.isHidden = !showInfo
-		bookmarkEmojiLabel.isHidden = !showInfo
+		flagContainerView.isHidden = !showInfo
 		fileSizeLabel.isHidden = !showInfo
 		
 		// Configure star based on backup state
@@ -353,14 +351,25 @@ class UnifiedPhotoCell: NSCollectionViewItem {
 		Task {
 			let bookmark = await BookmarkManager.shared.getBookmark(for: photo)
 			await MainActor.run {
-				if let emoji = bookmark?.emoji {
-					bookmarkEmojiLabel.stringValue = emoji
-					bookmarkEmojiLabel.isHidden = false
-				} else {
-					bookmarkEmojiLabel.stringValue = ""
-					// Only hide if info bar is not shown
-					if !starImageView.isHidden {
-						bookmarkEmojiLabel.isHidden = true
+				// Clear existing flags
+				flagContainerView.arrangedSubviews.forEach { $0.removeFromSuperview() }
+				
+				if let flags = bookmark?.sortedFlags, !flags.isEmpty {
+					// Add flag views
+					for flag in flags {
+						let flagImageView = NSImageView()
+						flagImageView.image = NSImage(systemSymbolName: "flag.fill", accessibilityDescription: nil)
+						flagImageView.contentTintColor = NSColor(flag.color)
+						flagImageView.imageScaling = .scaleProportionallyDown
+						flagImageView.translatesAutoresizingMaskIntoConstraints = false
+						
+						// Set size constraints
+						NSLayoutConstraint.activate([
+							flagImageView.widthAnchor.constraint(equalToConstant: 12),
+							flagImageView.heightAnchor.constraint(equalToConstant: 12)
+						])
+						
+						flagContainerView.addArrangedSubview(flagImageView)
 					}
 				}
 			}
@@ -399,6 +408,7 @@ class UnifiedPhotoCell: UICollectionViewCell {
 	private var photoImageView: UIImageView!
 	private var placeholderImageView: UIImageView!
 	private var starImageView: UIImageView!
+	private var flagContainerView: UIStackView!
 	private var fileSizeLabel: UILabel!
 	private var badgeView: UIView?
 	private var bookmarkBadgeView: UIView?
@@ -512,7 +522,7 @@ class UnifiedPhotoCell: UICollectionViewCell {
 		// Update info bar visibility based on showItemInfo
 		let showInfo = settings.showItemInfo
 		starImageView.isHidden = !showInfo
-		bookmarkEmojiLabel.isHidden = !showInfo
+		flagContainerView.isHidden = !showInfo
 		fileSizeLabel.isHidden = !showInfo
 		
 		// Configure star based on backup state

@@ -723,4 +723,92 @@ extension UnifiedPhotoCollectionViewController {
 		)
 		#endif
 	}
+	
+	// MARK: - Keyboard Shortcuts
+	
+	#if os(macOS)
+	override func keyDown(with event: NSEvent) {
+		// Check for number keys 1-7 for color flags
+		if let characters = event.charactersIgnoringModifiers,
+		   characters.count == 1,
+		   let char = characters.first,
+		   char >= "1" && char <= "7" {
+			let flagIndex = Int(String(char))! - 1
+			if flagIndex < ColorFlag.allCases.count {
+				let flag = ColorFlag.allCases[flagIndex]
+				toggleFlagForSelection(flag)
+				return
+			}
+		}
+		
+		// Check for 0 to clear all flags
+		if event.charactersIgnoringModifiers == "0" {
+			clearAllFlagsForSelection()
+			return
+		}
+		
+		// Check for S to toggle star
+		if event.charactersIgnoringModifiers?.lowercased() == "s" {
+			toggleStarForSelection()
+			return
+		}
+		
+		super.keyDown(with: event)
+	}
+	
+	private func toggleFlagForSelection(_ flag: ColorFlag) {
+		let selectedIndexPaths = collectionView.selectionIndexPaths
+		guard !selectedIndexPaths.isEmpty else { return }
+		
+		Task {
+			for indexPath in selectedIndexPaths {
+				if let photo = photoAtIndexPath(indexPath) {
+					await BookmarkManager.shared.toggleFlag(flag, for: photo)
+				}
+			}
+			
+			// Update visible cells
+			updateVisibleCells()
+		}
+	}
+	
+	private func clearAllFlagsForSelection() {
+		let selectedIndexPaths = collectionView.selectionIndexPaths
+		guard !selectedIndexPaths.isEmpty else { return }
+		
+		Task {
+			for indexPath in selectedIndexPaths {
+				if let photo = photoAtIndexPath(indexPath) {
+					await BookmarkManager.shared.clearFlags(for: photo)
+				}
+			}
+			
+			// Update visible cells
+			updateVisibleCells()
+		}
+	}
+	
+	private func toggleStarForSelection() {
+		let selectedIndexPaths = collectionView.selectionIndexPaths
+		guard !selectedIndexPaths.isEmpty else { return }
+		
+		for indexPath in selectedIndexPaths {
+			if let photo = photoAtIndexPath(indexPath) {
+				Task { @MainActor in
+					if let photoFile = photo as? PhotoFile {
+						BackupQueueManager.shared.toggleStar(for: photoFile)
+					} else if let photoApple = photo as? PhotoApple {
+						// Handle Apple Photos star toggling
+						// TODO: Implement Apple Photos star toggling when catalog service supports it
+					}
+				}
+			}
+		}
+	}
+	
+	private func photoAtIndexPath(_ indexPath: IndexPath) -> (any PhotoItem)? {
+		guard let itemIdentifier = dataSource.itemIdentifier(for: indexPath) else { return nil }
+		return photoProvider.photos.first { ($0 as AnyObject) === (itemIdentifier as AnyObject) }
+	}
+	#endif
 }
