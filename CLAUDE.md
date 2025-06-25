@@ -53,6 +53,7 @@ Photolala/
 - Bundle ID: com.electricwoods.photolala
 - Supported platforms: macOS 14.0+, iOS 18.5+, tvOS 18.0+
 - Architecture: SwiftUI (no SwiftData for core functionality)
+- **App Status**: Pre-release (no migration needed for breaking changes)
 - Key features implemented:
   - Window-per-folder architecture (each window shows one folder)
   - Menu-driven folder selection on macOS (⌘O)
