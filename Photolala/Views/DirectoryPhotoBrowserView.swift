@@ -89,7 +89,7 @@ struct DirectoryPhotoBrowserView: View {
 				// Backup status bar
 				BackupStatusBar()
 			}
-			.inspector(
+			.photoInspector(
 				isPresented: $showingInspector,
 				selection: inspectorSelection
 			)
@@ -121,6 +121,10 @@ struct DirectoryPhotoBrowserView: View {
 				.onReceive(NotificationCenter.default.publisher(for: .showHelp)) { _ in
 					self.showingHelp = true
 				}
+				.photoInspector(
+					isPresented: $showingInspector,
+					selection: inspectorSelection
+				)
 		#endif
 	}
 

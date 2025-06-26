@@ -496,6 +496,10 @@ class UnifiedPhotoCollectionViewController: XViewController {
 		#else
 		// iOS handles selection differently
 		#endif
+		
+		// Notify delegate of selection change
+		let selectedPhotoItems = selectedPhotos.compactMap { $0.base as? (any PhotoItem) }
+		delegate?.photoCollection(self, didUpdateSelection: selectedPhotoItems)
 	}
 	
 	// MARK: - Private Methods
@@ -655,7 +659,19 @@ extension UnifiedPhotoCollectionViewController: NSCollectionViewDelegate {
 #else
 extension UnifiedPhotoCollectionViewController: UICollectionViewDelegate {
 	func collectionView(_ collectionView: UICollectionView, didSelectItemAt indexPath: IndexPath) {
-		handleItemClick(at: indexPath)
+		// For iOS with multi-selection enabled, update our selection tracking
+		if let item = dataSource.itemIdentifier(for: indexPath) {
+			selectedPhotos.insert(item)
+			updateSelectionUI()
+		}
+	}
+	
+	func collectionView(_ collectionView: UICollectionView, didDeselectItemAt indexPath: IndexPath) {
+		// Handle deselection
+		if let item = dataSource.itemIdentifier(for: indexPath) {
+			selectedPhotos.remove(item)
+			updateSelectionUI()
+		}
 	}
 	
 	// Scroll monitoring for iOS

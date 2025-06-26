@@ -134,7 +134,7 @@ struct S3PhotoBrowserView: View {
 		#if os(macOS)
 		.frame(minWidth: 600, maxWidth: .infinity, minHeight: 400, maxHeight: .infinity)
 		#endif
-		.inspector(
+		.photoInspector(
 			isPresented: $showingInspector,
 			selection: inspectorSelection
 		)

@@ -44,10 +44,10 @@ struct ApplePhotosBrowserView: View {
 		#if os(macOS)
 		.navigationSubtitle(photoProvider.displaySubtitle)
 		#endif
-		.inspector(isPresented: $showingInspector) {
-			InspectorView(selection: inspectorSelection)
-				.inspectorColumnWidth(min: 250, ideal: 300, max: 400)
-		}
+		.photoInspector(
+			isPresented: $showingInspector,
+			selection: inspectorSelection
+		)
 		.onChange(of: showingInspector) { oldValue, newValue in
 			// If showing inspector and we have selection, scroll to it
 			if newValue && !selection.isEmpty {

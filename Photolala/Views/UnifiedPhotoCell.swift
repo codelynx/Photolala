@@ -432,6 +432,9 @@ class UnifiedPhotoCell: UICollectionViewCell {
 	private var badgeView: UIView?
 	private var loadingIndicator: UIActivityIndicatorView!
 	
+	// Constraints
+	private var photoImageViewBottomConstraint: NSLayoutConstraint!
+	
 	// Current photo
 	private var currentPhoto: (any PhotoItem)?
 	private var thumbnailTask: Task<Void, Never>?
@@ -504,12 +507,15 @@ class UnifiedPhotoCell: UICollectionViewCell {
 		loadingIndicator.translatesAutoresizingMaskIntoConstraints = false
 		contentView.addSubview(loadingIndicator)
 		
+		// Create bottom constraint separately so we can update it
+		photoImageViewBottomConstraint = photoImageView.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -24)
+		
 		// Constraints
 		NSLayoutConstraint.activate([
 			photoImageView.topAnchor.constraint(equalTo: contentView.topAnchor),
 			photoImageView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor),
 			photoImageView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor),
-			photoImageView.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -24),
+			photoImageViewBottomConstraint,
 			
 			// Star image view - positioned at bottom of contentView
 			starImageView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 4),
@@ -574,6 +580,9 @@ class UnifiedPhotoCell: UICollectionViewCell {
 		starImageView.isHidden = !showInfo
 		flagContainerView.isHidden = !showInfo
 		fileSizeLabel.isHidden = !showInfo
+		
+		// Adjust photo image view bottom constraint
+		photoImageViewBottomConstraint.constant = showInfo ? -24 : 0
 		
 		// Configure star based on backup state
 		if let photoFile = photo as? PhotoFile {
