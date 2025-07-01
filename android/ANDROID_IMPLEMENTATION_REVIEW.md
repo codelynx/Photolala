@@ -58,15 +58,19 @@ This document provides a comprehensive review of the Android implementation comp
 3. **AndroidKeystoreManager** - Secure storage using Android Keystore
 4. **PlayBillingService** - Google Play billing integration
 
+[KY] credential code for kotlin? not enough
+
 ## 3. UI/Navigation Differences
 
 ### Navigation Patterns
-- **Apple**: 
+- **Apple**:
   - macOS: Window-per-folder with NavigationStack
   - iOS: Single NavigationStack with welcome screen
-- **Android**: 
+- **Android**:
   - No navigation implementation yet
   - Should use Navigation Compose with bottom nav or drawer
+
+[KY] not confident, i prefer navigation
 
 ### Missing UI Components
 1. Photo browser views
@@ -81,6 +85,8 @@ This document provides a comprehensive review of the Android implementation comp
 - Apple: Mix of @State, @StateObject, ObservableObject
 - Android: No ViewModels implemented yet
 
+[KY] any alternative
+
 ## 4. Dependency Injection Differences
 
 ### Apple Approach
@@ -93,11 +99,15 @@ This document provides a comprehensive review of the Android implementation comp
 - Provides: Database, DataStore, Coroutine Dispatchers
 - Missing: Service layer bindings, repository pattern
 
+[KY] what is Hilt
+
 ### Recommendations
 1. Implement repository pattern for data access
 2. Create service interfaces with Hilt bindings
 3. Use constructor injection for testability
 4. Add ViewModel factory providers
+
+[KY] plese split complex task to managable small task and phases
 
 ## 5. Data Flow and State Management
 
@@ -112,6 +122,8 @@ This document provides a comprehensive review of the Android implementation comp
 2. No StateFlow/LiveData usage
 3. No repository pattern
 4. Missing data mapping between layers
+
+[KY] split large task into small task, make POC if needed
 
 ### Required Android Components
 1. ViewModels with StateFlow for UI state
@@ -135,12 +147,16 @@ This document provides a comprehensive review of the Android implementation comp
 4. No memory management
 5. No background loading strategy
 
+[KY] do not implement all in once, step by step, pls
+
 ### Performance Considerations
 1. Need lazy loading for large photo collections
 2. Implement paging with Paging 3 library
 3. Use Coil's built-in caching with custom configuration
 4. Implement thumbnail generation service
 5. Add WorkManager for background operations
+
+[KY] aiming 100K+ photo to browse smoothly (ideally)
 
 ## 7. Error Handling Patterns
 
@@ -156,6 +172,8 @@ This document provides a comprehensive review of the Android implementation comp
 3. No user feedback mechanism
 4. Missing network error handling
 5. No retry mechanisms
+
+[KY] POC if necessray
 
 ### Recommendations
 1. Create sealed classes for domain errors
@@ -205,12 +223,16 @@ This document provides a comprehensive review of the Android implementation comp
 - Dependencies properly declared
 - Missing: ProGuard rules, build variants, signing configs
 
+[KY] ask me whenever we run into decision making issues
+
 ### Build Configuration Gaps
 1. No release build configuration
 2. No signing configuration
 3. No build flavors (dev/prod)
 4. No version management strategy
 5. No CI/CD pipeline
+
+[KY] buildminimux feature set first
 
 ## 10. Security and Permissions
 
@@ -234,6 +256,8 @@ This document provides a comprehensive review of the Android implementation comp
 3. No certificate pinning
 4. No obfuscation rules
 5. No security best practices
+
+[KY] work POC if ne
 
 ### Security Recommendations
 1. Implement runtime permission flow
@@ -368,7 +392,7 @@ Given the current state and the comprehensive feature set in the Apple implement
 
 ### Next Immediate Steps
 1. Implement PhotoManager service
-2. Create MediaStore integration  
+2. Create MediaStore integration
 3. Build basic photo grid UI
 4. Add navigation structure
 5. Create first ViewModel
