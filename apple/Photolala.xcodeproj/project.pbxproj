@@ -35,11 +35,6 @@
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
-		CC4542872DFEEDAB005EB0D6 /* Artworks */ = {
-			isa = PBXFileSystemSynchronizedRootGroup;
-			path = Artworks;
-			sourceTree = "<group>";
-		};
 		CC72EFD32DF6C68D00E1C25A /* Photolala */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			path = Photolala;
@@ -87,7 +82,6 @@
 		CC72EFC62DF6C4D600E1C25A = {
 			isa = PBXGroup;
 			children = (
-				CC4542872DFEEDAB005EB0D6 /* Artworks */,
 				CC72EFD32DF6C68D00E1C25A /* Photolala */,
 				CC72EFE42DF6C68F00E1C25A /* PhotolalaTests */,
 				CC72EFEE2DF6C68F00E1C25A /* PhotolalaUITests */,

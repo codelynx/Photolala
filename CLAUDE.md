@@ -4,11 +4,13 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Photolala is a cross-platform photo browser application similar to Adobe Bridge, supporting macOS, iOS, and tvOS. It uses a window-per-folder architecture where each window displays photos from a single folder. The app provides efficient browsing of large photo collections with thumbnail generation, metadata management, and multi-selection capabilities.
+Photolala is a cross-platform photo browser application similar to Adobe Bridge, supporting macOS, iOS, tvOS, and Android. It uses a window-per-folder architecture where each window displays photos from a single folder. The app provides efficient browsing of large photo collections with thumbnail generation, metadata management, and multi-selection capabilities.
 
 ## Build Commands
 
 Build commands for different platforms:
+
+### Apple Platforms
 
 ```bash
 # Build for macOS
@@ -31,6 +33,29 @@ cd apple/
 xcodebuild -scheme Photolala -destination 'platform=macOS' build
 ```
 
+### Android Platform
+
+```bash
+# Build debug APK
+cd android && ./gradlew assembleDebug
+
+# Build release APK
+cd android && ./gradlew assembleRelease
+
+# Install on connected device/emulator
+cd android && ./gradlew installDebug
+
+# Run tests
+cd android && ./gradlew test
+
+# Clean build
+cd android && ./gradlew clean
+
+# Or navigate first:
+cd android/
+./gradlew assembleDebug
+```
+
 ## Project Structure
 
 ```
@@ -46,7 +71,7 @@ Photolala/
 │   ├── photolalaTests/    # Unit tests
 │   ├── photolalaUITests/  # UI tests
 │   └── Photolala.xcodeproj
-├── android/               # Android platform code (planned)
+├── android/               # Android platform code
 ├── shared/                # Shared resources
 │   ├── TestPhotos/        # Sample photos
 │   ├── icons/             # App icons for all platforms
@@ -63,8 +88,8 @@ Photolala/
 
 - Development Team ID: 2P97EM4L4N
 - Bundle ID: com.electricwoods.photolala
-- Supported platforms: macOS 14.0+, iOS 18.5+, tvOS 18.0+
-- Architecture: SwiftUI (no SwiftData for core functionality)
+- Supported platforms: macOS 14.0+, iOS 18.5+, tvOS 18.0+, Android 13+
+- Architecture: SwiftUI (Apple), Jetpack Compose (Android)
 - **App Status**: Pre-release (no migration needed for breaking changes)
 - Key features implemented:
   - Window-per-folder architecture (each window shows one folder)
@@ -95,6 +120,12 @@ Photolala/
 ### iOS/iPadOS
 - Welcome screen for initial folder selection
 - Single NavigationStack for all navigation
+- Touch-optimized interactions
+
+### Android
+- Welcome screen for initial folder selection
+- Jetpack Navigation for navigation flow
+- Material3 design system
 - Touch-optimized interactions
 
 ## Documentation Structure

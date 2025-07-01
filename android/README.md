@@ -7,12 +7,16 @@ This directory contains the Photolala implementation for Android.
 ```
 android/
 ├── app/                    # Main application module
-├── core/                   # Core business logic and shared code
-├── features/               # Feature modules
+│   ├── src/main/          # Main source set
+│   │   ├── java/          # Kotlin source files
+│   │   └── res/           # Resources (layouts, strings, etc.)
+│   └── build.gradle.kts   # App module build configuration
 ├── gradle/                 # Gradle wrapper and configuration
 ├── build.gradle.kts        # Root build configuration
 └── settings.gradle.kts     # Project settings
 ```
+
+Note: The project currently uses a single-module structure. Multi-module architecture (core/, features/) may be added in future iterations.
 
 ## Building
 
@@ -44,14 +48,14 @@ android/
 
 ## Requirements
 
-- Android Studio Hedgehog (2023.1.1) or newer
+- Android Studio Ladybug (2024.2.1) or newer
 - JDK 17
-- Android SDK 34
-- Kotlin 1.9.0+
+- Android SDK 36
+- Kotlin 2.0.21
 
 ## Device Requirements
 
-- Minimum SDK: 24 (Android 7.0)
-- Target SDK: 34 (Android 14)
+- Minimum SDK: 33 (Android 13)
+- Target SDK: 36 (Android 14+)
 
 See the main project README for more information.
