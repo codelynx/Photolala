@@ -11,6 +11,9 @@ Photolala is a cross-platform photo browser application similar to Adobe Bridge,
 Build commands for different platforms:
 
 ```bash
+# Navigate to Apple directory
+cd apple/
+
 # Build for macOS
 xcodebuild -scheme Photolala -destination 'platform=macOS' build
 
@@ -31,20 +34,28 @@ xcodebuild -scheme Photolala test
 
 ```
 Photolala/
-├── Photolala/              # Main app target
-│   ├── Models/            # Data models (PhotoReference, Directory, PhotoBookmark)
-│   ├── Views/             # SwiftUI views
-│   ├── ViewModels/        # Observable view models
-│   ├── Services/          # Business logic (PhotoManager, BookmarkManager)
-│   ├── Utilities/         # Helper utilities (XPlatform, BundlePhotosHelper)
-│   ├── Commands/          # Menu commands (PhotolalaCommands)
-│   └── PhotolalaApp.swift # App entry point
-├── PhotolalaTests/        # Unit tests
-├── PhotolalaUITests/      # UI tests
-├── Photos/                # Sample photos (folder reference)
-├── docs/                  # Design documents and implementation notes
+├── apple/                  # Apple platform code (iOS/macOS/tvOS)
+│   ├── Photolala/         # Main app target
+│   │   ├── Models/        # Data models
+│   │   ├── Views/         # SwiftUI views
+│   │   ├── Services/      # Business logic
+│   │   ├── Utilities/     # Helper utilities
+│   │   ├── Commands/      # Menu commands
+│   │   └── PhotolalaApp.swift
+│   ├── photolalaTests/    # Unit tests
+│   ├── photolalaUITests/  # UI tests
+│   └── Photolala.xcodeproj
+├── android/               # Android platform code (planned)
+├── shared/                # Shared resources
+│   ├── TestPhotos/        # Sample photos
+│   ├── icons/             # App icons for all platforms
+│   └── assets/            # Other shared assets
+├── docs/                  # Documentation
 ├── scripts/               # Utility scripts
-└── .swiftformat          # Swift formatting rules
+│   ├── apple/             # Apple-specific scripts
+│   ├── android/           # Android-specific scripts
+│   └── common/            # Cross-platform scripts
+└── services/              # Backend services
 ```
 
 ## Development Notes
