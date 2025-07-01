@@ -6,6 +6,9 @@ import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.preferencesDataStore
 import androidx.room.Room
 import com.electricwoods.photolala.data.local.PhotolalaDatabase
+import com.electricwoods.photolala.services.MediaStoreService
+import com.electricwoods.photolala.services.MediaStoreServiceImpl
+import dagger.Binds
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -52,6 +55,17 @@ object AppModule {
 	@Provides
 	@DefaultDispatcher
 	fun provideDefaultDispatcher(): CoroutineDispatcher = Dispatchers.Default
+}
+
+// Service bindings module
+@Module
+@InstallIn(SingletonComponent::class)
+abstract class ServiceModule {
+	
+	@Binds
+	abstract fun bindMediaStoreService(
+		mediaStoreServiceImpl: MediaStoreServiceImpl
+	): MediaStoreService
 }
 
 // Qualifiers for different dispatchers
