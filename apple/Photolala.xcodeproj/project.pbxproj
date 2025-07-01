@@ -34,16 +34,6 @@
 		CC72EFEB2DF6C68F00E1C25A /* PhotolalaUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = PhotolalaUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
-/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
-		CC7A45282E06BF26002C0BD0 /* Exceptions for "Photolala" folder in "Photolala" target */ = {
-			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
-			membershipExceptions = (
-				Views/PhotoCollectionViewController.swift,
-			);
-			target = CC72EFD02DF6C68D00E1C25A /* Photolala */;
-		};
-/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
-
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		CC4542872DFEEDAB005EB0D6 /* Artworks */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
@@ -52,12 +42,6 @@
 		};
 		CC72EFD32DF6C68D00E1C25A /* Photolala */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
-			exceptions = (
-				CC7A45282E06BF26002C0BD0 /* Exceptions for "Photolala" folder in "Photolala" target */,
-			);
-			explicitFolders = (
-				Help,
-			);
 			path = Photolala;
 			sourceTree = "<group>";
 		};
@@ -389,8 +373,8 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = Photolala;
 				INFOPLIST_KEY_LSApplicationCategoryType = NSApplicationSupportsRestorableState;
-				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "Photolala needs access to your photo library to browse and display your photos.";
 				INFOPLIST_KEY_NSPhotoLibraryAddUsageDescription = "Photolala needs permission to save photos to your photo library.";
+				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "Photolala needs access to your photo library to browse and display your photos.";
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphonesimulator*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents[sdk=iphoneos*]" = YES;
@@ -483,8 +467,8 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = Photolala;
 				INFOPLIST_KEY_LSApplicationCategoryType = NSApplicationSupportsRestorableState;
-				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "Photolala needs access to your photo library to browse and display your photos.";
 				INFOPLIST_KEY_NSPhotoLibraryAddUsageDescription = "Photolala needs permission to save photos to your photo library.";
+				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "Photolala needs access to your photo library to browse and display your photos.";
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphonesimulator*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents[sdk=iphoneos*]" = YES;
