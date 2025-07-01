@@ -9,16 +9,19 @@ This document defines the Minimum Viable Product (MVP) scope for Photolala Andro
 1. **Prove Technical Feasibility**: Demonstrate smooth performance with large photo libraries
 2. **Validate User Experience**: Confirm the UI/UX meets user expectations
 3. **Establish Architecture**: Build a solid foundation for future development
-4. **Market Entry**: Release a useful product quickly to gather feedback
+4. **Market Entry**: Release a revenue-generating product to match iOS functionality
+5. **Build Trust**: Use Google Play Billing for trusted payment processing
 
 ## MVP Timeline
 
-**Target: 6-8 weeks from project start**
+**Target: 10-12 weeks from project start**
 
 - Week 1-2: Project setup and core infrastructure
 - Week 3-4: Photo browsing implementation
-- Week 5-6: Photo viewer and polish
-- Week 7-8: Testing, bug fixes, and release prep
+- Week 5-6: Photo viewer and selection
+- Week 7-8: Google Play Billing integration
+- Week 9-10: S3 backup functionality
+- Week 11-12: Testing, bug fixes, and release prep
 
 ## Core Features (MVP)
 
@@ -55,18 +58,39 @@ This document defines the Minimum Viable Product (MVP) scope for Photolala Andro
 - Basic animations and transitions
 - Loading states and empty states
 
+### 6. Google Play Billing ✅
+- Subscription tiers matching iOS
+- Trusted payment processing
+- In-app purchase flow
+- Receipt validation
+- Subscription management
+
+### 7. S3 Backup Service ✅
+- Photo upload to S3
+- Progress tracking
+- Background uploads
+- Bandwidth management
+- Storage quota display
+
+### 8. Account Management ✅
+- Sign in/Sign up flow
+- Account settings
+- Subscription status
+- Storage usage display
+- Backup status
+
 ## Features NOT in MVP
 
 ### Phase 2 Features (Post-MVP)
-- ❌ S3/Cloud integration
 - ❌ Bookmark system
 - ❌ Advanced search/filters
 - ❌ Photo editing
-- ❌ Backup functionality
 - ❌ Tags system
 - ❌ Inspector panel
-- ❌ Settings screen
+- ❌ Advanced settings
 - ❌ Multi-window support
+- ❌ Web payment option (discount)
+- ❌ Family sharing
 
 ### Future Considerations
 - ❌ Google Photos integration
@@ -85,23 +109,39 @@ This document defines the Minimum Viable Product (MVP) scope for Photolala Andro
 ✅ Coroutines and Flow
 ✅ Navigation Compose
 ✅ Coil for image loading
-❌ Room database (not needed for MVP)
-❌ WorkManager (not needed for MVP)
+✅ Room database (for user data)
+✅ WorkManager (for background uploads)
+✅ Google Play Billing library
+✅ AWS SDK for S3
+✅ DataStore (for preferences)
 ```
 
 ### Permissions (MVP)
 ```
 ✅ READ_EXTERNAL_STORAGE / READ_MEDIA_IMAGES
-❌ INTERNET (not needed for MVP)
-❌ WRITE_EXTERNAL_STORAGE (share only)
+✅ INTERNET (for S3 uploads and billing)
+✅ ACCESS_NETWORK_STATE (check connectivity)
+✅ BILLING (Google Play Billing)
+✅ FOREGROUND_SERVICE (upload progress)
+❌ WRITE_EXTERNAL_STORAGE (not needed)
 ```
+
+## Subscription Tiers (Same as iOS)
+
+| Tier | Price | Storage | Features |
+|------|-------|---------|----------|
+| Free | $0 | 5 GB | Basic backup |
+| Basic | $2.99/mo | 100 GB | Full backup |
+| Standard | $9.99/mo | 1 TB | Full backup |
+| Pro | $39.99/mo | 5 TB | Full backup |
+| Family | $69.99/mo | 10 TB | 5 accounts |
 
 ## UI Screens (MVP)
 
 ### 1. Main Screen
 ```
 ┌─────────────────────────┐
-│    Photolala     [⋮]    │  <- App bar
+│ Photolala  [☁️] [👤] [⋮] │  <- App bar with sync/account
 ├─────────────────────────┤
 │ ┌─────┐ ┌─────┐ ┌─────┐│
 │ │     │ │     │ │     ││  <- Photo grid
@@ -112,7 +152,8 @@ This document defines the Minimum Viable Product (MVP) scope for Photolala Andro
 │ │ 📷  │ │ 📷  │ │ 📷  ││
 │ └─────┘ └─────┘ └─────┘│
 ├─────────────────────────┤
-│  [📁 Albums] [🖼️ Photos] │  <- Bottom nav
+│ [📁] [🖼️] [☁️] [⚙️]      │  <- Bottom nav
+│Albums Photos Backup Settings
 └─────────────────────────┘
 ```
 
@@ -148,6 +189,52 @@ This document defines the Minimum Viable Product (MVP) scope for Photolala Andro
 └─────────────────────────┘
 ```
 
+### 4. Account Screen
+```
+┌─────────────────────────┐
+│ ← Account               │
+├─────────────────────────┤
+│ 👤 user@email.com       │
+│                         │
+│ Subscription: Standard  │
+│ 1 TB Storage           │
+│ Renews: Nov 15, 2024   │
+│                         │
+│ [Manage Subscription]   │
+│                         │
+│ Storage Used:          │
+│ ████████░░ 423 GB / 1 TB│
+│                         │
+│ [Sign Out]             │
+└─────────────────────────┘
+```
+
+### 5. Subscription Screen
+```
+┌─────────────────────────┐
+│ ← Choose Your Plan      │
+├─────────────────────────┤
+│ ┌─────────────────────┐ │
+│ │ Free                │ │
+│ │ 5 GB • $0           │ │
+│ └─────────────────────┘ │
+│ ┌─────────────────────┐ │
+│ │ Basic               │ │
+│ │ 100 GB • $2.99/mo   │ │
+│ └─────────────────────┘ │
+│ ┌─────────────────────┐ │
+│ │ Standard ✓          │ │
+│ │ 1 TB • $9.99/mo     │ │
+│ └─────────────────────┘ │
+│ ┌─────────────────────┐ │
+│ │ Pro                 │ │
+│ │ 5 TB • $39.99/mo    │ │
+│ └─────────────────────┘ │
+│                         │
+│ [Continue]              │
+└─────────────────────────┘
+```
+
 ## Quality Requirements (MVP)
 
 ### Performance
@@ -175,23 +262,36 @@ This document defines the Minimum Viable Product (MVP) scope for Photolala Andro
 2. Set up Compose and Hilt
 3. Implement MediaStore access
 4. Basic photo grid with Coil
+5. Set up AWS SDK
 
 ### Week 3-4: Core Features  
 1. Album/folder navigation
 2. Photo viewer screen
 3. Selection mode
-4. Share functionality
+4. Account management UI
 
-### Week 5-6: Polish
-1. Animations and transitions
-2. Dark mode
-3. Tablet layouts
-4. Performance optimization
+### Week 5-6: Authentication & Storage
+1. User authentication system
+2. Account creation/login
+3. Secure credential storage
+4. Basic settings screen
 
-### Week 7-8: Release
-1. Bug fixes
-2. Play Store assets
-3. Release build
+### Week 7-8: Google Play Billing
+1. Set up Play Console
+2. Create subscription products
+3. Implement billing flow
+4. Receipt validation
+
+### Week 9-10: S3 Backup
+1. Photo upload service
+2. Background upload with WorkManager
+3. Progress tracking
+4. Bandwidth management
+
+### Week 11-12: Polish & Release
+1. Bug fixes and testing
+2. Performance optimization
+3. Play Store assets
 4. Submit for review
 
 ## Success Metrics
@@ -200,13 +300,22 @@ This document defines the Minimum Viable Product (MVP) scope for Photolala Andro
 - ✅ Loads 10,000+ photos without crash
 - ✅ Maintains 60 FPS while scrolling
 - ✅ Works on Android 7.0+
-- ✅ APK size < 15MB
+- ✅ APK size < 30MB
+- ✅ Successful S3 uploads
+- ✅ Background uploads work reliably
 
 ### User Metrics
 - ✅ Can browse all device photos
-- ✅ Can view photos full screen
-- ✅ Can share photos
+- ✅ Can purchase subscription
+- ✅ Can backup photos to cloud
+- ✅ Can manage account
 - ✅ Feels fast and responsive
+
+### Business Metrics
+- ✅ Payment processing works
+- ✅ Subscription management functional
+- ✅ Feature parity with iOS
+- ✅ Ready for revenue generation
 
 ## Risk Mitigation
 
@@ -251,4 +360,11 @@ This document defines the Minimum Viable Product (MVP) scope for Photolala Andro
 
 ## Conclusion
 
-This MVP scope delivers a focused, high-quality photo browsing experience that can be released quickly. It establishes the technical foundation and UI patterns while validating the core user experience. Future features can be added incrementally based on user feedback and priorities.
+This MVP scope delivers a complete, revenue-generating Android app that matches iOS functionality. Key achievements:
+
+1. **Feature Parity**: Same features as iOS (browse, backup, pay)
+2. **Revenue Ready**: Google Play Billing from day one
+3. **Trust Building**: Using Google's payment system
+4. **Solid Foundation**: Clean architecture for future growth
+
+The 12-week timeline is realistic and allows for proper implementation of payment and backup features. This positions Photolala as a serious cross-platform service, not just a photo viewer.

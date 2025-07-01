@@ -7,7 +7,7 @@ This guide provides step-by-step instructions for setting up the Photolala Andro
 ## Prerequisites
 
 ### Required Software
-- **Android Studio**: Hedgehog (2023.1.1) or newer
+- **Android Studio**: Hedgehog (2023.1.1) or newer (Narwhal 2025.1.1 works great!)
 - **JDK**: Version 17 (comes with Android Studio)
 - **Git**: For version control
 - **OS**: macOS, Windows, or Linux
