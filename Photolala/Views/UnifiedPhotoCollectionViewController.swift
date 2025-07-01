@@ -46,6 +46,9 @@ class UnifiedPhotoCollectionViewController: XViewController {
 	// Selection tracking
 	private var selectedPhotos = Set<AnyHashable>()
 	
+	// Grouping
+	private var photoGroups: [(title: String, photos: [any PhotoItem])] = []
+	
 	// Notification observers
 	private var backupStatusObserver: NSObjectProtocol?
 	private var catalogUpdateObserver: NSObjectProtocol?
@@ -142,11 +145,12 @@ class UnifiedPhotoCollectionViewController: XViewController {
 		)
 		
 		// Configure headers if grouping is enabled
-		if settings.groupingOption != .none {
-			layout.headerReferenceSize = NSSize(width: 0, height: 40)
-		} else {
-			layout.headerReferenceSize = NSSize.zero
-		}
+		// TODO: Implement grouping properly
+		// if settings.groupingOption != .none {
+		// 	layout.headerReferenceSize = NSSize(width: 0, height: 40)
+		// } else {
+		// 	layout.headerReferenceSize = NSSize.zero
+		// }
 		
 		return layout
 		#else
@@ -179,18 +183,19 @@ class UnifiedPhotoCollectionViewController: XViewController {
 		)
 		
 		// Configure headers if grouping is enabled
-		if settings.groupingOption != .none {
-			let headerSize = NSCollectionLayoutSize(
-				widthDimension: .fractionalWidth(1.0),
-				heightDimension: .absolute(40)
-			)
-			let header = NSCollectionLayoutBoundarySupplementaryItem(
-				layoutSize: headerSize,
-				elementKind: UICollectionView.elementKindSectionHeader,
-				alignment: .top
-			)
-			section.boundarySupplementaryItems = [header]
-		}
+		// TODO: Implement grouping properly
+		// if settings.groupingOption != .none {
+		// 	let headerSize = NSCollectionLayoutSize(
+		// 		widthDimension: .fractionalWidth(1.0),
+		// 		heightDimension: .absolute(40)
+		// 	)
+		// 	let header = NSCollectionLayoutBoundarySupplementaryItem(
+		// 		layoutSize: headerSize,
+		// 		elementKind: UICollectionView.elementKindSectionHeader,
+		// 		alignment: .top
+		// 	)
+		// 	section.boundarySupplementaryItems = [header]
+		// }
 		
 		return UICollectionViewCompositionalLayout(section: section)
 		#endif
@@ -213,11 +218,12 @@ class UnifiedPhotoCollectionViewController: XViewController {
 			)
 			
 			// Configure headers if grouping is enabled
-			if settings.groupingOption != .none {
-				layout.headerReferenceSize = NSSize(width: 0, height: 40)
-			} else {
-				layout.headerReferenceSize = NSSize.zero
-			}
+			// TODO: Implement grouping properly
+			// if settings.groupingOption != .none {
+			// 	layout.headerReferenceSize = NSSize(width: 0, height: 40)
+			// } else {
+			// 	layout.headerReferenceSize = NSSize.zero
+			// }
 			
 			layout.invalidateLayout()
 		}
@@ -232,6 +238,12 @@ class UnifiedPhotoCollectionViewController: XViewController {
 		// Register cell
 		#if os(macOS)
 		collectionView.register(UnifiedPhotoCell.self, forItemWithIdentifier: UnifiedPhotoCell.identifier)
+		// TODO: Register header view when grouping is implemented
+		// collectionView.register(
+		// 	PhotoGroupHeaderItem.self,
+		// 	forSupplementaryViewOfKind: NSCollectionView.elementKindSectionHeader,
+		// 	withIdentifier: NSUserInterfaceItemIdentifier("PhotoGroupHeader")
+		// )
 		
 		dataSource = NSCollectionViewDiffableDataSource<Int, AnyHashable>(
 			collectionView: collectionView
@@ -247,8 +259,30 @@ class UnifiedPhotoCollectionViewController: XViewController {
 			
 			return cell
 		}
+		
+		// TODO: Configure supplementary view provider when grouping is implemented
+		// dataSource.supplementaryViewProvider = { [weak self] collectionView, kind, indexPath in
+		// 	let header = collectionView.makeSupplementaryView(
+		// 		ofKind: kind,
+		// 		withIdentifier: NSUserInterfaceItemIdentifier("PhotoGroupHeader"),
+		// 		for: indexPath
+		// 	) as! PhotoGroupHeaderItem
+		// 	
+		// 	// Get section title
+		// 	if let sectionTitle = self?.getSectionTitle(for: indexPath.section) {
+		// 		header.headerView?.configure(with: sectionTitle)
+		// 	}
+		// 	
+		// 	return header
+		// }
 		#else
 		collectionView.register(UnifiedPhotoCell.self, forCellWithReuseIdentifier: UnifiedPhotoCell.identifier)
+		// TODO: Register header view when grouping is implemented
+		// collectionView.register(
+		// 	PhotoGroupHeaderView.self,
+		// 	forSupplementaryViewOfKind: UICollectionView.elementKindSectionHeader,
+		// 	withReuseIdentifier: PhotoGroupHeaderView.reuseIdentifier
+		// )
 		
 		dataSource = UICollectionViewDiffableDataSource<Int, AnyHashable>(
 			collectionView: collectionView
@@ -264,7 +298,31 @@ class UnifiedPhotoCollectionViewController: XViewController {
 			
 			return cell
 		}
+		
+		// TODO: Configure supplementary view provider when grouping is implemented
+		// dataSource.supplementaryViewProvider = { [weak self] collectionView, kind, indexPath in
+		// 	guard kind == UICollectionView.elementKindSectionHeader else { return nil }
+		// 	
+		// 	let header = collectionView.dequeueReusableSupplementaryView(
+		// 		ofKind: kind,
+		// 		withReuseIdentifier: PhotoGroupHeaderView.reuseIdentifier,
+		// 		for: indexPath
+		// 	) as! PhotoGroupHeaderView
+		// 	
+		// 	// Get section title
+		// 	if let sectionTitle = self?.getSectionTitle(for: indexPath.section) {
+		// 		header.configure(with: sectionTitle)
+		// 	}
+		// 	
+		// 	return header
+		// }
 		#endif
+	}
+	
+	private func getSectionTitle(for section: Int) -> String? {
+		guard settings.groupingOption != .none,
+		      section < photoGroups.count else { return nil }
+		return photoGroups[section].title
 	}
 	
 	// MARK: - Photo Provider Binding
@@ -289,33 +347,15 @@ class UnifiedPhotoCollectionViewController: XViewController {
 	}
 	
 	private func updatePhotos(_ photos: [any PhotoItem]) {
-		// Get current snapshot
-		var snapshot = dataSource.snapshot()
+		// Create new snapshot
+		var snapshot = NSDiffableDataSourceSnapshot<Int, AnyHashable>()
 		
-		// If no sections exist, create one
-		if snapshot.numberOfSections == 0 {
-			snapshot.appendSections([0])
-		}
-		
-		// Convert photos to AnyHashable
-		let newHashablePhotos = photos.map { AnyHashable($0) }
-		let newPhotosSet = Set(newHashablePhotos)
-		
-		// Get current items
-		let currentItems = snapshot.itemIdentifiers
-		let currentItemsSet = Set(currentItems)
-		
-		// Find items to remove (in current but not in new)
-		let itemsToRemove = currentItems.filter { !newPhotosSet.contains($0) }
-		if !itemsToRemove.isEmpty {
-			snapshot.deleteItems(itemsToRemove)
-		}
-		
-		// Find items to add (in new but not in current)
-		let itemsToAdd = newHashablePhotos.filter { !currentItemsSet.contains($0) }
-		if !itemsToAdd.isEmpty {
-			snapshot.appendItems(itemsToAdd, toSection: 0)
-		}
+		// For now, always use single section mode to prevent crashes
+		// TODO: Implement proper grouping support
+		photoGroups = [("", photos)]
+		snapshot.appendSections([0])
+		let hashablePhotos = photos.map { AnyHashable($0) }
+		snapshot.appendItems(hashablePhotos, toSection: 0)
 		
 		#if os(macOS)
 		dataSource.apply(snapshot, animatingDifferences: true)
@@ -324,8 +364,54 @@ class UnifiedPhotoCollectionViewController: XViewController {
 		#endif
 		
 		// Update selection to remove any photos that no longer exist
-		selectedPhotos = selectedPhotos.intersection(newPhotosSet)
+		let allPhotosSet = Set(photos.map { AnyHashable($0) })
+		selectedPhotos = selectedPhotos.intersection(allPhotosSet)
 		updateSelectionUI()
+	}
+	
+	private func groupPhotos(_ photos: [any PhotoItem], by option: PhotoGroupingOption) -> [(title: String, photos: [any PhotoItem])] {
+		guard option != .none else {
+			return [("", photos)]
+		}
+		
+		let formatter = DateFormatter()
+		formatter.dateFormat = option.dateFormat
+		
+		// Sort photos by date
+		let sortedPhotos = photos.sorted { photo1, photo2 in
+			let date1 = photo1.creationDate ?? Date.distantPast
+			let date2 = photo2.creationDate ?? Date.distantPast
+			return date1 > date2
+		}
+		
+		// Group by date component
+		var groups: [(title: String, photos: [any PhotoItem])] = []
+		var currentGroupTitle = ""
+		var currentGroupPhotos: [any PhotoItem] = []
+		
+		for photo in sortedPhotos {
+			let photoDate = photo.creationDate ?? Date.distantPast
+			let groupTitle = formatter.string(from: photoDate)
+			
+			if groupTitle != currentGroupTitle {
+				// Save previous group if not empty
+				if !currentGroupPhotos.isEmpty {
+					groups.append((title: currentGroupTitle, photos: currentGroupPhotos))
+				}
+				// Start new group
+				currentGroupTitle = groupTitle
+				currentGroupPhotos = [photo]
+			} else {
+				currentGroupPhotos.append(photo)
+			}
+		}
+		
+		// Don't forget the last group
+		if !currentGroupPhotos.isEmpty {
+			groups.append((title: currentGroupTitle, photos: currentGroupPhotos))
+		}
+		
+		return groups
 	}
 	
 	// MARK: - Scroll Monitoring for Priority Loading
