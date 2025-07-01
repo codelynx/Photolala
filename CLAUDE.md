@@ -11,23 +11,24 @@ Photolala is a cross-platform photo browser application similar to Adobe Bridge,
 Build commands for different platforms:
 
 ```bash
-# Navigate to Apple directory
-cd apple/
-
 # Build for macOS
-xcodebuild -scheme Photolala -destination 'platform=macOS' build
+cd apple && xcodebuild -scheme Photolala -destination 'platform=macOS' build
 
 # Build for iOS Simulator
-xcodebuild -scheme Photolala -destination 'platform=iOS Simulator,name=iPhone 16 Pro' build
+cd apple && xcodebuild -scheme Photolala -destination 'platform=iOS Simulator,name=iPhone 16 Pro' build
 
 # Build for tvOS Simulator  
-xcodebuild -scheme Photolala -destination 'platform=tvOS Simulator,name=Apple TV' build
+cd apple && xcodebuild -scheme Photolala -destination 'platform=tvOS Simulator,name=Apple TV' build
 
 # Clean build
-xcodebuild -scheme Photolala clean
+cd apple && xcodebuild -scheme Photolala clean
 
 # Run tests
-xcodebuild -scheme Photolala test
+cd apple && xcodebuild -scheme Photolala test
+
+# Or navigate first:
+cd apple/
+xcodebuild -scheme Photolala -destination 'platform=macOS' build
 ```
 
 ## Project Structure

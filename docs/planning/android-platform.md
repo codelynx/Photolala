@@ -112,25 +112,26 @@ docs/
 
 ## Implementation Phases
 
-### Phase 1: Foundation (Weeks 1-2)
+### Phase 1: Foundation (Weeks 1-3)
 - Set up Android project structure
 - Implement basic navigation
 - Create photo grid UI with Compose
 - Local photo access with MediaStore
-
-### Phase 2: Core Features (Weeks 3-4)
 - Photo detail view
-- Multi-selection support
-- Sorting and filtering
-- Basic metadata display
 
-### Phase 3: Advanced Features (Weeks 5-6)
+### Phase 2: Account & Payments (Weeks 4-6)
+- User authentication system
+- Account management UI
+- Google Play Billing integration
+- Subscription management
+
+### Phase 3: Cloud Features (Weeks 7-9)
 - AWS S3 integration
-- Bookmark system
-- Search functionality
-- Settings screen
+- Photo backup service
+- Background uploads with WorkManager
+- Progress tracking
 
-### Phase 4: Polish (Week 7)
+### Phase 4: Polish & Release (Weeks 10-12)
 - Performance optimization
 - UI polish and animations
 - Testing and bug fixes
