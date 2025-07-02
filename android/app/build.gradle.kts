@@ -80,6 +80,9 @@ dependencies {
 	// Coil
 	implementation(libs.coil.compose)
 	
+	// Zoomable for photo viewer
+	implementation(libs.compose.zoomable)
+	
 	// DataStore
 	implementation(libs.androidx.datastore.preferences)
 	

@@ -2,6 +2,8 @@
 
 Based on KY's review notes, here's a simplified, phased approach to Android development.
 
+**Updated July 2, 2025**: Phase 1 and Phase 2 are now COMPLETE! ✅
+
 ## Key Principles from Review
 - **Step by step** - Don't implement everything at once
 - **Small tasks** - Break complex features into manageable pieces  
@@ -10,55 +12,55 @@ Based on KY's review notes, here's a simplified, phased approach to Android deve
 - **Minimum features first** - Build core functionality before extras
 - **Ask for decisions** - Consult when facing architectural choices
 
-## Phase 1: Basic Photo Browsing (Week 1-2)
+## Phase 1: Basic Photo Browsing ✅ COMPLETE
 
 ### 1.1 MediaStore Integration (Small Steps)
 ```
-[ ] Create MediaStoreService interface
-[ ] Implement basic photo query (just IDs and URIs)
-[ ] Add pagination support (load 100 at a time)
-[ ] Create simple test to verify it works
+[x] Create MediaStoreService interface
+[x] Implement basic photo query (just IDs and URIs)
+[x] Add pagination support (load 100 at a time)
+[x] Create simple test to verify it works
 ```
 
 ### 1.2 Simple Photo Grid UI
 ```
-[ ] Create PhotoGridScreen composable
-[ ] Use LazyVerticalGrid with fixed 3 columns
-[ ] Display gray placeholders initially
-[ ] Add pull-to-refresh
+[x] Create PhotoGridScreen composable
+[x] Use LazyVerticalGrid with fixed 3 columns
+[x] Display gray placeholders initially
+[x] Add refresh button (instead of pull-to-refresh)
 ```
 
 ### 1.3 Thumbnail Loading with Coil
 ```
-[ ] Configure Coil with memory/disk cache
-[ ] Create PhotoThumbnail composable
-[ ] Load thumbnails using MediaStore URI
-[ ] Show loading indicator
+[x] Configure Coil with memory/disk cache
+[x] Create PhotoThumbnail composable
+[x] Load thumbnails using MediaStore URI
+[x] Show loading indicator
 ```
 
 ### 1.4 Basic Navigation
 ```
-[ ] Add Navigation Compose dependency (already added)
-[ ] Create NavHost with 2 screens: Welcome, PhotoGrid
-[ ] Simple "Browse Photos" button on Welcome
-[ ] Back button handling
+[x] Add Navigation Compose dependency (already added)
+[x] Create NavHost with 2 screens: Welcome, PhotoGrid
+[x] Simple "Browse Photos" button on Welcome
+[x] Back button handling
 ```
 
-## Phase 2: Photo Viewer (Week 3)
+## Phase 2: Photo Viewer ✅ COMPLETE
 
 ### 2.1 Full Screen Photo View
 ```
-[ ] Create PhotoViewerScreen
-[ ] Implement pinch-to-zoom
-[ ] Add swipe between photos
-[ ] Show basic info (filename, size)
+[x] Create PhotoViewerScreen
+[x] Implement pinch-to-zoom (using zoomable library)
+[x] Add swipe between photos (HorizontalPager)
+[x] Show basic info (filename, size, dimensions, date)
 ```
 
 ### 2.2 Navigation Integration
 ```
-[ ] Navigate from grid to viewer on tap
-[ ] Pass photo list and selected index
-[ ] Implement shared element transition
+[x] Navigate from grid to viewer on tap
+[x] Pass photo list and selected index
+[x] Basic transition (no shared element yet)
 ```
 
 ## Phase 3: Services Layer (Week 4)
@@ -71,6 +73,12 @@ Based on KY's review notes, here's a simplified, phased approach to Android deve
 [ ] Memory management for 100K+ photos
 ```
 
+### iOS/macOS Feature Parity Goals:
+- Dynamic grid columns (not just fixed 3)
+- Multiple thumbnail sizes (S/M/L)
+- Info bar overlay on thumbnails
+- Star badges for backup status
+
 ### 3.2 Repository Pattern
 ```
 [ ] Create PhotoRepository interface
@@ -81,12 +89,14 @@ Based on KY's review notes, here's a simplified, phased approach to Android deve
 
 ## Phase 4: Selection & Operations (Week 5)
 
-### 4.1 Selection Mode
+### 4.1 Selection Mode (Match iOS)
 ```
 [ ] Long-press to start selection
-[ ] Tap to select/deselect
+[ ] Tap to select/deselect with visual feedback (3px border)
 [ ] Show selection count
 [ ] Exit selection mode
+[ ] Keyboard shortcuts (1-7 for colors, S for star)
+[ ] Selection persistence across navigation
 ```
 
 ### 4.2 Basic Operations
@@ -177,12 +187,35 @@ Based on KY's review notes, here's a simplified, phased approach to Android deve
    - Different API endpoints?
    - Debug features?
 
+## iOS/macOS Design Patterns to Follow
+
+### Grid View Features (from UnifiedPhotoCollectionViewController):
+1. **Thumbnail Sizes**: Small (64px), Medium (128px), Large (256px)
+2. **Selection Visual**: 3px blue border when selected
+3. **Metadata Bar**: 24px height showing file size and flags
+4. **Star Badge**: Backup status indicator
+5. **Color Flags**: 7 color options for tagging
+6. **Display Modes**: Scale to Fit vs Scale to Fill
+7. **Context Menus**: Right-click/long-press actions
+
+### Viewer Features (from PhotoPreviewView):
+1. **Zoom Range**: 0.5x to 5.0x with spring animation
+2. **Double-tap**: Toggle between 1x and 2x zoom
+3. **Navigation**: Swipe, tap zones, keyboard arrows
+4. **Auto-hide Controls**: 30-second timer
+5. **Thumbnail Strip**: Horizontal scrolling preview
+6. **Metadata HUD**: Floating info overlay
+
+### Performance Patterns:
+1. **Prefetching**: Load adjacent items
+2. **Priority Loading**: Based on visibility
+3. **Cell Reuse**: Efficient recycling
+4. **Cancellation**: Stop loads on scroll
+
 ## Next Immediate Action
 
-Start with **Phase 1.1 - MediaStore Integration**:
-1. Create MediaStoreService.kt interface
-2. Implement getPhotos() returning Flow<List<PhotoMediaStore>>
-3. Test with simple unit test
-4. Move to next task
+~~Start with **Phase 1.1 - MediaStore Integration**~~ ✅ COMPLETE!
+
+Next: **Phase 3.1 - PhotoManager Service** with iOS/macOS feature parity in mind.
 
 This approach ensures we build incrementally, test each piece, and don't get overwhelmed by the full scope.
