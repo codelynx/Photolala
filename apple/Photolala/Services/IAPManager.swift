@@ -204,7 +204,10 @@ class IAPManager: ObservableObject {
 		// Update user's subscription
 		let subscription = Subscription(
 			tier: productID.tier,
-			expiresAt: transaction.expirationDate ?? Date.distantFuture,
+			startDate: transaction.purchaseDate ?? Date(),
+			expiryDate: transaction.expirationDate ?? Date.distantFuture,
+			storageLimit: productID.tier.storageLimit,
+			storageUsed: 0,
 			originalTransactionId: String(transaction.originalID)
 		)
 
@@ -350,12 +353,18 @@ extension IdentityManager {
 		guard var user = currentUser else { return }
 
 		user.subscription = subscription
-		currentUser = user
-
+		user.lastUpdated = Date()
+		
 		// Save to Keychain
 		do {
-			let userData = try JSONEncoder().encode(user)
-			try KeychainManager.shared.save(userData, for: "com.electricwoods.photolala.user")
+			let encoder = JSONEncoder()
+			encoder.dateEncodingStrategy = .iso8601
+			let userData = try encoder.encode(user)
+			try KeychainManager.shared.save(userData, for: keychainKey)
+			
+			await MainActor.run {
+				self.currentUser = user
+			}
 		} catch {
 			print("Failed to save updated user: \(error)")
 		}

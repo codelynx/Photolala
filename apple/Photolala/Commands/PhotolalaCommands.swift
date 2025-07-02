@@ -234,7 +234,8 @@ struct PhotolalaCommands: Commands {
 				
 				window.title = "Sign In Required"
 				window.center()
-				window.contentView = NSHostingView(rootView: SignInPromptView())
+				window.contentView = NSHostingView(rootView: AuthenticationChoiceView()
+					.environmentObject(IdentityManager.shared))
 				window.makeKeyAndOrderFront(nil)
 				return
 			}

@@ -99,7 +99,7 @@ struct SubscriptionView: View {
 						Text("Renews")
 							.font(.caption)
 							.foregroundColor(.secondary)
-						Text(user.subscription!.expiresAt, style: .date)
+						Text(user.subscription!.expiryDate, style: .date)
 							.font(.caption)
 							.fontWeight(.medium)
 					}

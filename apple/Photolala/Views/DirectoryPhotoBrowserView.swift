@@ -68,7 +68,8 @@ struct DirectoryPhotoBrowserView: View {
 					return .handled
 				}
 				.sheet(isPresented: self.$showingSignInPrompt) {
-					SignInPromptView()
+					AuthenticationChoiceView()
+						.environmentObject(identityManager)
 				}
 				.sheet(isPresented: self.$showingUpgradePrompt) {
 					SubscriptionView()

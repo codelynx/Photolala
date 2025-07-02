@@ -86,7 +86,7 @@ struct IAPDeveloperView: View {
 								HStack {
 									Text("Expires:")
 									Spacer()
-									Text(subscription.expiresAt, style: .date)
+									Text(subscription.expiryDate, style: .date)
 										.foregroundColor(.secondary)
 								}
 							}
@@ -343,7 +343,7 @@ struct IAPDeveloperView: View {
 			print("Email: \(user.email ?? "Unknown")")
 			if let sub = user.subscription {
 				print("Subscription: \(sub.displayName)")
-				print("Expires: \(sub.expiresAt)")
+				print("Expires: \(sub.expiryDate)")
 			}
 		} else {
 			print("No user signed in")

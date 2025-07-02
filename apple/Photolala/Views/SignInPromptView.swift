@@ -209,7 +209,7 @@ struct SubscriptionTierRow: View {
 
 			Spacer()
 
-			Text(self.tier.monthlyPrice)
+			Text(self.tier.price)
 				.font(.title3)
 				.fontWeight(.semibold)
 		}

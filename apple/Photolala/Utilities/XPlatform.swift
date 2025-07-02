@@ -116,9 +116,17 @@ struct XPlatform {
 	static let primaryBackgroundColor = NSColor.controlBackgroundColor
 	static let secondaryBackgroundColor = NSColor.windowBackgroundColor
 	static let tertiaryBackgroundColor = NSColor.controlBackgroundColor
+	
+	static var systemBackgroundColor: Color {
+		Color(NSColor.windowBackgroundColor)
+	}
 	#else
 	static let primaryBackgroundColor = UIColor.systemBackground
 	static let secondaryBackgroundColor = UIColor.systemBackground
 	static let tertiaryBackgroundColor = UIColor.secondarySystemBackground
+	
+	static var systemBackgroundColor: Color {
+		Color(UIColor.systemBackground)
+	}
 	#endif
 }
