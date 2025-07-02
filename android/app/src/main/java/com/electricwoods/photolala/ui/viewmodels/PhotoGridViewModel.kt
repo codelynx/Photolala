@@ -23,6 +23,16 @@ class PhotoGridViewModel @Inject constructor(
 	private val _error = MutableStateFlow<String?>(null)
 	val error: StateFlow<String?> = _error.asStateFlow()
 	
+	// Selection state
+	private val _selectedPhotos = MutableStateFlow<Set<String>>(emptySet())
+	val selectedPhotos: StateFlow<Set<String>> = _selectedPhotos.asStateFlow()
+	
+	private val _isSelectionMode = MutableStateFlow(false)
+	val isSelectionMode: StateFlow<Boolean> = _isSelectionMode.asStateFlow()
+	
+	val selectionCount: StateFlow<Int> = _selectedPhotos.map { it.size }
+		.stateIn(viewModelScope, SharingStarted.Lazily, 0)
+	
 	// Pagination
 	private var currentOffset = 0
 	private val pageSize = 100
@@ -93,5 +103,53 @@ class PhotoGridViewModel @Inject constructor(
 	
 	fun refreshPhotos() {
 		loadPhotos()
+	}
+	
+	// Selection methods
+	fun toggleSelection(photoId: String) {
+		_selectedPhotos.update { current ->
+			if (current.contains(photoId)) {
+				current - photoId
+			} else {
+				current + photoId
+			}
+		}
+		
+		// Start selection mode if we're selecting the first photo
+		if (_selectedPhotos.value.size == 1 && !_isSelectionMode.value) {
+			_isSelectionMode.value = true
+		}
+		
+		// Exit selection mode if we've deselected all photos
+		if (_selectedPhotos.value.isEmpty() && _isSelectionMode.value) {
+			_isSelectionMode.value = false
+		}
+	}
+	
+	fun startSelectionMode(initialPhotoId: String? = null) {
+		_isSelectionMode.value = true
+		if (initialPhotoId != null) {
+			_selectedPhotos.value = setOf(initialPhotoId)
+		}
+	}
+	
+	fun exitSelectionMode() {
+		_isSelectionMode.value = false
+		_selectedPhotos.value = emptySet()
+	}
+	
+	fun clearSelection() {
+		_selectedPhotos.value = emptySet()
+	}
+	
+	fun selectAll() {
+		_selectedPhotos.value = _photos.value.map { it.id }.toSet()
+		if (_selectedPhotos.value.isNotEmpty()) {
+			_isSelectionMode.value = true
+		}
+	}
+	
+	fun isPhotoSelected(photoId: String): Boolean {
+		return _selectedPhotos.value.contains(photoId)
 	}
 }

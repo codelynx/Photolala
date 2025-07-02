@@ -391,16 +391,16 @@ Framework Layer (Room, Network, MediaStore)
 - ✅ Error states and loading indicators
 - ✅ Image caching with Coil
 
-### Estimated Effort (Updated)
-With Phase 1 & 2 complete (~2 days of work), the remaining effort estimate:
+### Estimated Effort (Updated July 2)
+With Phase 1, 2, and partial Phase 4 complete (~3 days of work), the remaining effort estimate:
 - Phase 3: Services Layer (1 week)
-- Phase 4: Selection & Operations (1 week)
+- Phase 4: Selection & Operations (2 days remaining - batch operations, keyboard shortcuts)
 - Phase 5: S3/Cloud Integration (2 weeks)
 - Phase 6: Backup Features (2 weeks)
 - Phase 7: Advanced Features (2 weeks)
 - Testing & Polish (2 weeks)
 
-**Total remaining: ~8-10 weeks** to reach feature parity with Apple implementation.
+**Total remaining: ~7-8 weeks** to reach feature parity with Apple implementation.
 
 ### Critical Success Factors
 1. Systematic implementation following the priority list
@@ -423,15 +423,55 @@ With Phase 1 & 2 complete (~2 days of work), the remaining effort estimate:
 4. Add album/folder browsing
 5. Implement basic search/filter
 
-## 16. Architecture Comparison with iOS/macOS (July 2, 2025)
+## 16. Architecture Comparison with iOS/macOS (Updated July 2, 2025)
+
+### Photo Grid Selection Implementation Comparison
+
+**Selection Behavior Differences:**
+
+| Feature | Android | iOS/macOS |
+|---------|---------|-----------|
+| **Selection Mode** | Explicit mode (tap to enter) | Always active (no mode) |
+| **Enter Selection** | First tap on photo | Always available |
+| **Toggle Selection** | Tap in selection mode | Click/tap anytime |
+| **Exit Selection** | Auto or manual close | N/A - always active |
+| **Preview Photo** | Long-press | Single tap/click |
+| **Multi-select** | After entering mode | Always enabled |
+
+**Visual Feedback Comparison:**
+
+| Element | Android | iOS/macOS |
+|---------|---------|-----------|
+| **Selected Border** | ✅ 3dp blue border | ✅ 3px blue border |
+| **Background** | ✅ 12% tinted overlay | ❌ None |
+| **Check Mark** | ❌ Removed (cleaner UX) | ❌ None |
+| **Corner Radius** | ✅ 8dp rounded | ✅ 8pt rounded |
+| **Info Overlays** | ❌ Not implemented | ✅ Stars, flags, file size |
+
+**Interaction Pattern Comparison:**
+
+| Action | Android | iOS/macOS |
+|--------|---------|-----------|
+| **Tap/Click** | Toggle selection | Open preview |
+| **Long-press** | Open preview | Not used |
+| **Keyboard 1-7** | ❌ Not implemented | Toggle color flags |
+| **Keyboard S** | ❌ Not implemented | Toggle star |
+| **Space bar** | ❌ Not implemented | Open preview |
+| **Right-click** | N/A | Context menu |
 
 ### Photo Grid Implementation Gaps
 
 **iOS/macOS Features Not Yet in Android:**
-1. **Multi-Selection System**
-   - Visual feedback (3px blue border)
-   - Keyboard shortcuts (1-7 for colors, S for star)
-   - Selection persistence across navigation
+1. **Multi-Selection System** ✅ Core Complete (July 2)
+   - ✅ Visual feedback (3px border + background tint)
+   - ✅ Tap to select interaction pattern
+   - ✅ Long-press to preview
+   - ✅ Selection toolbar with counter
+   - ✅ Select all functionality
+   - ✅ Auto-exit when all deselected
+   - ⏳ Keyboard shortcuts (1-7 for colors, S for star)
+   - ⏳ Selection persistence across navigation
+   - ⏳ Batch operations (share, delete)
 
 2. **Dynamic Grid Layout**
    - Configurable column count (based on width)
@@ -506,3 +546,38 @@ To achieve iOS/macOS parity, prioritize:
 8. **Context menus** via long-press
 
 This review should be updated weekly as implementation progresses to track completion and identify any new gaps or challenges.
+
+### UX Design Decisions (July 2, 2025)
+
+**Multi-Selection Visual Feedback:**
+- Initially implemented with check mark overlay (similar to Google Photos)
+- User feedback: "I don't like check button, in terms of UX"
+- **Decision**: Match iOS/macOS cleaner approach with only 3px blue border
+- Added subtle background tint (12% opacity) for better visibility on Android
+- Result: Cleaner, less cluttered selection UI that matches iOS aesthetic
+
+**Interaction Pattern for Selection:**
+- Initially: Long-press to enter selection mode (Google Photos style)
+- User suggestion: "How about tap to select/unselect, long press to preview?"
+- **Decision**: Implemented file manager style interaction
+  - **Tap**: Toggle selection (enters selection mode if needed)
+  - **Long-press**: Preview photo in full screen
+- Benefits: More intuitive for file management, faster selection workflow
+- Auto-exits selection mode when all items are deselected
+
+**UI Chrome Differences:**
+
+| UI Element | Android | iOS/macOS |
+|------------|---------|-----------|
+| **Selection Top Bar** | ✅ Contextual (appears in selection mode) | ❌ No selection-specific bar |
+| **Selection Counter** | ✅ "N selected" in top bar | ❌ No counter shown |
+| **Close Button** | ✅ Exit selection mode | ❌ N/A |
+| **Select All** | ✅ In selection toolbar | ❌ Via menu/keyboard |
+| **Share Button** | ✅ In selection toolbar | ✅ In main toolbar |
+| **Backup Indicator** | ❌ Not implemented | ✅ Star count badge |
+| **Sort/Group Options** | ✅ In normal mode only | ✅ Always visible |
+
+**Design Philosophy:**
+- **Android**: Modal approach with clear state transitions (normal mode ↔ selection mode)
+- **iOS/macOS**: Non-modal approach where selection is always available alongside preview
+- Both achieve clean visual design but with different interaction models suited to their platforms
