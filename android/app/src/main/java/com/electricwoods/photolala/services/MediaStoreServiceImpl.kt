@@ -203,6 +203,69 @@ class MediaStoreServiceImpl @Inject constructor(
 		} ?: 0
 	}
 	
+	override suspend fun deletePhotos(photoIds: List<String>): Result<Int> = withContext(ioDispatcher) {
+		// DEVELOPMENT ONLY - This permanently deletes photos!
+		// TODO: Remove this feature for production release
+		
+		if (photoIds.isEmpty()) {
+			return@withContext Result.success(0)
+		}
+		
+		var deletedCount = 0
+		
+		try {
+			// Convert our photo IDs (gmp#123) back to MediaStore IDs
+			val mediaStoreIds = photoIds.mapNotNull { photoId ->
+				// Extract numeric ID from "gmp#123" format
+				photoId.removePrefix("gmp#").toLongOrNull()
+			}
+			
+			if (mediaStoreIds.isEmpty()) {
+				return@withContext Result.failure(
+					IllegalArgumentException("No valid MediaStore IDs found")
+				)
+			}
+			
+			// On Android 11+ we need to request delete permission for each item
+			if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+				// For development, we'll just mark the photos as "deleted" in our view
+				// The actual files remain on disk but are removed from our display
+				// Use the delete-photos.sh script to actually remove files
+				
+				// In a production app, you would:
+				// 1. Create a PendingIntent with MediaStore.createDeleteRequest()
+				// 2. Launch it via Activity Result API
+				// 3. Handle the user's confirmation
+				
+				// For now, return success but inform that files weren't actually deleted
+				return@withContext Result.success(mediaStoreIds.size).also {
+					println("⚠️  DEVELOPMENT MODE: Photos hidden from view but not deleted from disk.")
+					println("   Use ./scripts/delete-photos.sh to permanently delete test photos.")
+				}
+			} else {
+				// On older Android versions, we can delete directly if we have permission
+				mediaStoreIds.forEach { id ->
+					val uri = ContentUris.withAppendedId(
+						MediaStore.Images.Media.EXTERNAL_CONTENT_URI, 
+						id
+					)
+					val deleted = contentResolver.delete(uri, null, null)
+					if (deleted > 0) {
+						deletedCount++
+					}
+				}
+			}
+			
+			Result.success(deletedCount)
+		} catch (e: SecurityException) {
+			Result.failure(
+				SecurityException("Permission denied. Cannot delete photos without WRITE_EXTERNAL_STORAGE permission.")
+			)
+		} catch (e: Exception) {
+			Result.failure(e)
+		}
+	}
+	
 	private fun queryPhotos(
 		selection: String?,
 		selectionArgs: Array<String>?,

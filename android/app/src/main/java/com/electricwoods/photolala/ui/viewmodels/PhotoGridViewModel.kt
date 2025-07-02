@@ -167,4 +167,51 @@ class PhotoGridViewModel @Inject constructor(
 	fun isPhotoSelected(photoId: String): Boolean {
 		return _selectedPhotos.value.contains(photoId)
 	}
+	
+	fun getSelectedPhotoUris(): List<android.net.Uri> {
+		val selectedIds = _selectedPhotos.value
+		return _photos.value
+			.filter { photo -> selectedIds.contains(photo.id) }
+			.map { it.uri }
+	}
+	
+	// DEVELOPMENT ONLY - Delete selected photos
+	fun deleteSelectedPhotos() {
+		viewModelScope.launch {
+			val selectedIds = _selectedPhotos.value.toList()
+			if (selectedIds.isEmpty()) return@launch
+			
+			// Show loading or processing state
+			_isLoading.value = true
+			
+			try {
+				val result = mediaStoreService.deletePhotos(selectedIds)
+				
+				result.fold(
+					onSuccess = { deletedCount ->
+						// Remove deleted photos from our list
+						_photos.value = _photos.value.filterNot { photo ->
+							selectedIds.contains(photo.id)
+						}
+						
+						// Clear selection
+						clearSelection()
+						exitSelectionMode()
+						
+						// Show success message (in a real app, use a snackbar)
+						println("Successfully deleted $deletedCount photos")
+					},
+					onFailure = { error ->
+						// Handle error
+						_error.value = error.message ?: "Failed to delete photos"
+						println("Delete error: ${error.message}")
+					}
+				)
+			} catch (e: Exception) {
+				_error.value = "Failed to delete photos: ${e.message}"
+			} finally {
+				_isLoading.value = false
+			}
+		}
+	}
 }

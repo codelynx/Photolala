@@ -18,6 +18,7 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.SelectAll
 import androidx.compose.material.icons.filled.Share
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -26,6 +27,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.painter.ColorPainter
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import android.content.Intent
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -50,6 +52,7 @@ fun PhotoGridScreen(
 	val selectedPhotos by viewModel.selectedPhotos.collectAsState()
 	val selectionCount by viewModel.selectionCount.collectAsState()
 	val areAllPhotosSelected by viewModel.areAllPhotosSelected.collectAsState()
+	val context = LocalContext.current
 	
 	// Load photos on first composition
 	LaunchedEffect(Unit) {
@@ -65,7 +68,16 @@ fun PhotoGridScreen(
 					areAllSelected = areAllPhotosSelected,
 					onClose = { viewModel.exitSelectionMode() },
 					onToggleSelectAll = { viewModel.toggleSelectAll() },
-					onShare = { /* TODO: Implement share */ }
+					onShare = {
+						val selectedUris = viewModel.getSelectedPhotoUris()
+						if (selectedUris.isNotEmpty()) {
+							sharePhotos(context, selectedUris)
+						}
+					},
+					onDelete = {
+						// DEVELOPMENT ONLY
+						viewModel.deleteSelectedPhotos()
+					}
 				)
 			} else {
 				TopAppBar(
@@ -259,7 +271,8 @@ private fun SelectionTopBar(
 	areAllSelected: Boolean,
 	onClose: () -> Unit,
 	onToggleSelectAll: () -> Unit,
-	onShare: () -> Unit
+	onShare: () -> Unit,
+	onDelete: () -> Unit
 ) {
 	TopAppBar(
 		title = { Text("$selectionCount selected") },
@@ -291,6 +304,14 @@ private fun SelectionTopBar(
 					Icon(
 						imageVector = Icons.Default.Share,
 						contentDescription = "Share selected"
+					)
+				}
+				// DEVELOPMENT ONLY - Delete button
+				IconButton(onClick = onDelete) {
+					Icon(
+						imageVector = Icons.Default.Delete,
+						contentDescription = "Delete selected",
+						tint = MaterialTheme.colorScheme.error
 					)
 				}
 			}
@@ -382,5 +403,39 @@ private fun ErrorContent(
 fun PhotoGridScreenPreview() {
 	MaterialTheme {
 		PhotoGridScreen()
+	}
+}
+
+// Share helper function
+private fun sharePhotos(context: android.content.Context, uris: List<android.net.Uri>) {
+	val intent = if (uris.size == 1) {
+		// Single photo share
+		Intent(Intent.ACTION_SEND).apply {
+			type = "image/*"
+			putExtra(Intent.EXTRA_STREAM, uris.first())
+			addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+		}
+	} else {
+		// Multiple photos share
+		Intent(Intent.ACTION_SEND_MULTIPLE).apply {
+			type = "image/*"
+			putParcelableArrayListExtra(Intent.EXTRA_STREAM, ArrayList(uris))
+			addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+		}
+	}
+	
+	// Create chooser
+	val chooser = Intent.createChooser(intent, "Share ${uris.size} photo${if (uris.size > 1) "s" else ""}")
+	
+	// Start the share activity
+	try {
+		context.startActivity(chooser)
+	} catch (e: Exception) {
+		// Handle case where no apps can handle the share intent
+		android.widget.Toast.makeText(
+			context,
+			"No apps available to share photos",
+			android.widget.Toast.LENGTH_SHORT
+		).show()
 	}
 }

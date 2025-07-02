@@ -276,17 +276,19 @@ This document provides a comprehensive review of the Android implementation comp
 
 | Feature | Apple | Android |
 |---------|-------|---------|
-| Local photo browsing | ✅ Complete | ❌ Not started |
+| Local photo browsing | ✅ Complete | ✅ Complete |
 | Cloud photo browsing | ✅ Complete | ❌ Not started |
 | Photo backup to S3 | ✅ Complete | ❌ Not started |
-| Thumbnail generation | ✅ Complete | ❌ Not started |
-| Selection management | ✅ Complete | ❌ Not started |
+| Thumbnail generation | ✅ Complete | ✅ Via Coil |
+| Selection management | ✅ Complete | ✅ Complete |
 | Search and filtering | ✅ Complete | ❌ Not started |
 | Tag management | ✅ Complete | ❌ Not started |
 | User authentication | ✅ Complete | ❌ Not started |
 | In-app purchases | ✅ Complete | ❌ Not started |
 | Background sync | ✅ Complete | ❌ Not started |
 | Offline support | ✅ Complete | ❌ Not started |
+| Share functionality | ✅ Complete | ✅ Complete |
+| Delete operation | ❌ Non-destructive | ⚠️ Dev-only |
 
 ## 12. Critical Implementation Priorities
 
@@ -366,6 +368,8 @@ Framework Layer (Room, Network, MediaStore)
 3. **No error handling** - ✅ RESOLVED: Error states with retry
 4. **No tests** - ⚠️ Basic tests added, more needed
 5. **No state management** - ✅ RESOLVED: ViewModels with StateFlow
+6. **No selection system** - ✅ RESOLVED: Full multi-selection implemented
+7. **No batch operations** - ✅ RESOLVED: Share and delete implemented
 
 ### Medium Risk Areas (Updated July 2)
 1. Permission handling complexity - ✅ RESOLVED: Android 13+ handled
@@ -382,7 +386,7 @@ Framework Layer (Room, Network, MediaStore)
 
 ## 15. Conclusion
 
-**Updated July 2, 2025**: The Android implementation has made significant progress. Phase 1 (Basic Photo Browsing) and Phase 2 (Photo Viewer) are complete. The app now has:
+**Updated July 2, 2025**: The Android implementation has made significant progress. Phase 1 (Basic Photo Browsing), Phase 2 (Photo Viewer), and Phase 4.1 (Selection with Operations) are complete. The app now has:
 - ✅ Local photo browsing with MediaStore
 - ✅ Photo grid with lazy loading and pagination
 - ✅ Full-screen photo viewer with pinch-to-zoom
@@ -390,6 +394,12 @@ Framework Layer (Room, Network, MediaStore)
 - ✅ Permission handling for Android 13+
 - ✅ Error states and loading indicators
 - ✅ Image caching with Coil
+- ✅ Multi-selection with visual feedback
+- ✅ Tap to select, long-press to preview
+- ✅ Selection toolbar with counter
+- ✅ Select all/deselect all toggle
+- ✅ Share selected photos functionality
+- ✅ Delete photos (development only)
 
 ### Estimated Effort (Updated July 2)
 With Phase 1, 2, and Phase 4.1 (Selection) complete (~3 days of work), the remaining effort estimate:
@@ -417,11 +427,13 @@ With Phase 1, 2, and Phase 4.1 (Selection) complete (~3 days of work), the remai
 5. ~~Create first ViewModel~~ ✅
 
 ### New Next Steps:
-1. Implement multi-selection in grid
-2. Add star/bookmark functionality
-3. Create PhotoRepository with Room
-4. Add album/folder browsing
-5. Implement basic search/filter
+1. ~~Implement multi-selection in grid~~ ✅
+2. ~~Add share functionality~~ ✅
+3. ~~Add delete operation (dev only)~~ ✅
+4. Add star/bookmark functionality
+5. Create PhotoRepository with Room
+6. Add album/folder browsing
+7. Implement basic search/filter
 
 ## 16. Architecture Comparison with iOS/macOS (Updated July 2, 2025)
 
@@ -474,7 +486,7 @@ With Phase 1, 2, and Phase 4.1 (Selection) complete (~3 days of work), the remai
 ### Photo Grid Implementation Gaps
 
 **iOS/macOS Features Not Yet in Android:**
-1. **Multi-Selection System** ✅ Core Complete (July 2)
+1. **Multi-Selection System** ✅ Complete (July 2)
    - ✅ Visual feedback (3px border + background tint)
    - ✅ Tap to select interaction pattern
    - ✅ Long-press to preview
@@ -482,9 +494,9 @@ With Phase 1, 2, and Phase 4.1 (Selection) complete (~3 days of work), the remai
    - ✅ Select all/Deselect all toggle button
    - ✅ Auto-exit when all deselected
    - ✅ Selection mode persistence after deselect all
+   - ✅ Batch operations (share, delete)
    - ⏳ Keyboard shortcuts (1-7 for colors, S for star)
    - ⏳ Selection persistence across navigation
-   - ⏳ Batch operations (share, delete)
 
 2. **Dynamic Grid Layout**
    - Configurable column count (based on width)
@@ -595,6 +607,35 @@ This review should be updated weekly as implementation progresses to track compl
 - **iOS/macOS**: Non-modal approach where selection is always available alongside preview
 - Both achieve clean visual design but with different interaction models suited to their platforms
 
+### Share Functionality Comparison (July 2, 2025)
+
+| Feature | Android | iOS/macOS |
+|---------|---------|-----------|
+| **Share Button Location** | ✅ Selection toolbar | ✅ Main toolbar (always visible) |
+| **Single Photo Share** | ✅ ACTION_SEND intent | ✅ UIActivityViewController/NSSharingService |
+| **Multi Photo Share** | ✅ ACTION_SEND_MULTIPLE | ✅ Same API, multiple items |
+| **Share Visibility** | ✅ Only when selected | ✅ Always visible (disabled if none selected) |
+| **Permission Handling** | ✅ FLAG_GRANT_READ_URI_PERMISSION | ✅ Automatic with system APIs |
+| **Error Handling** | ✅ Toast for no apps | ✅ System handles gracefully |
+| **Share Types** | ✅ image/* MIME type | ✅ Automatic type detection |
+
+### Delete Functionality Comparison (July 2, 2025)
+
+| Feature | Android | iOS/macOS |
+|---------|---------|-----------|
+| **Delete Implementation** | ⚠️ Dev-only (hidden from view) | ❌ Not implemented (non-destructive) |
+| **Android 11+ Restrictions** | ✅ Handled gracefully | N/A |
+| **Visual Indicator** | ✅ Red delete icon in toolbar | N/A |
+| **Confirmation Dialog** | ❌ Direct delete (dev mode) | N/A |
+| **Actual File Deletion** | Via helper script | N/A |
+| **Production Behavior** | Will be removed | N/A |
+
+**Key Differences:**
+- Android implementation includes development-only delete feature for testing
+- iOS/macOS version is strictly non-destructive as per design requirements
+- Android requires workaround for scoped storage restrictions
+- Helper script provided for actual file cleanup during development
+
 **Select All/Deselect All Toggle (July 2, 2025):**
 - User suggestion: "I like select all, but if all selected I like deselect all, is it popular?"
 - **Decision**: Implemented toggle pattern (common in Google Photos, Gmail, Files)
@@ -610,3 +651,26 @@ This review should be updated weekly as implementation progresses to track compl
 - Fixed image loading issue: Android robot placeholders
   - Root cause: Missing READ_MEDIA_IMAGES permission
   - Solution: Grant permissions via ADB or UI flow
+
+### Implementation Progress (July 2, 2025 - Session 2)
+
+**Share Functionality Added:**
+- Implemented `getSelectedPhotoUris()` in PhotoGridViewModel
+- Created `sharePhotos()` helper function supporting single/multiple photos
+- Added share button to selection toolbar (visible when photos selected)
+- Proper permission handling with FLAG_GRANT_READ_URI_PERMISSION
+- Error handling with toast for no available apps
+
+**Delete Functionality Added (Development Only):**
+- Added `deletePhotos()` to MediaStoreService interface with dev warning
+- Implemented graceful handling of Android 11+ scoped storage restrictions
+- Photos removed from view but not disk (due to Android 11+ limitations)
+- Created `delete-photos.sh` helper script for actual file deletion
+- Added red delete button to selection toolbar
+- Clear marking as development-only feature to be removed for production
+
+**Key Implementation Decisions:**
+- Share uses native Android share sheet for consistency
+- Delete is non-destructive on Android 11+ (view-only removal)
+- Both operations work on selected photos only
+- Clear visual feedback with appropriate icons and colors

@@ -75,6 +75,14 @@ interface MediaStoreService {
 	 * @return Total number of photos accessible
 	 */
 	suspend fun getTotalPhotoCount(): Int
+	
+	/**
+	 * Delete photos from MediaStore
+	 * WARNING: DEVELOPMENT ONLY - This permanently deletes photos!
+	 * @param photoIds List of photo IDs to delete (format: "gmp#123")
+	 * @return Result with number of photos deleted or error
+	 */
+	suspend fun deletePhotos(photoIds: List<String>): Result<Int>
 }
 
 /**
