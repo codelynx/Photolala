@@ -38,7 +38,57 @@ struct AuthenticationChoiceView: View {
 			
 			// Authentication Options
 			VStack(spacing: 24) {
-				if !showingProviders {
+				// Show sign out option if already signed in
+				if identityManager.isSignedIn {
+					VStack(spacing: 20) {
+						// User info and sign out
+						VStack(spacing: 16) {
+							Image(systemName: "person.circle.fill")
+								.font(.system(size: 60))
+								.foregroundColor(.accentColor)
+							
+							if let user = identityManager.currentUser {
+								Text("Signed in as")
+									.font(.subheadline)
+									.foregroundColor(.secondary)
+								
+								Text(user.displayName)
+									.font(.headline)
+									.foregroundColor(.primary)
+							}
+							
+							Button(action: {
+								identityManager.signOut()
+								// Don't dismiss - let user see the sign in options
+							}) {
+								HStack {
+									Image(systemName: "rectangle.portrait.and.arrow.right")
+										.font(.callout)
+									Text("Sign Out")
+										.font(.callout)
+								}
+								.foregroundColor(.red)
+							}
+							.buttonStyle(.plain)
+						}
+						
+						Divider()
+							.frame(maxWidth: 200)
+						
+						// Continue button
+						Button(action: {
+							dismiss()
+						}) {
+							Text("Continue to Photos")
+								.font(.headline)
+								.foregroundColor(.white)
+								.frame(maxWidth: .infinity)
+								.frame(height: 50)
+								.background(Color.accentColor)
+								.cornerRadius(10)
+						}
+					}
+				} else if !showingProviders {
 					// Initial buttons
 					VStack(spacing: 12) {
 						Text("Already have an account?")
@@ -159,16 +209,18 @@ struct AuthenticationChoiceView: View {
 					}
 				}
 				
-				// Browse Locally Option
-				Button(action: {
-					dismiss()
-				}) {
-					Text("Browse Locally Only")
-						.font(.callout)
-						.foregroundColor(.secondary)
-						.underline()
+				// Browse Locally Option - only show when not signed in
+				if !identityManager.isSignedIn {
+					Button(action: {
+						dismiss()
+					}) {
+						Text("Browse Locally Only")
+							.font(.callout)
+							.foregroundColor(.secondary)
+							.underline()
+					}
+					.padding(.top, 8)
 				}
-				.padding(.top, 8)
 				
 				#if targetEnvironment(simulator) && DEBUG
 				// Simulator testing option
@@ -216,6 +268,14 @@ struct AuthenticationChoiceView: View {
 	}
 	
 	private func handleError(_ error: Error) {
+		// Don't show error for user cancellation
+		if error is CancellationError {
+			withAnimation(.easeInOut(duration: 0.3)) {
+				showingProviders = false
+			}
+			return
+		}
+		
 		errorMessage = error.localizedDescription
 		showError = true
 		withAnimation(.easeInOut(duration: 0.3)) {

@@ -229,6 +229,36 @@ class S3BackupService: ObservableObject {
 
 		return md5
 	}
+	
+	// MARK: - Generic Upload/Download
+	
+	func uploadData(_ data: Data, to key: String) async throws {
+		let putObjectInput = PutObjectInput(
+			body: .data(data),
+			bucket: bucketName,
+			contentType: "text/plain",
+			key: key,
+			storageClass: .standard
+		)
+		
+		_ = try await self.client.putObject(input: putObjectInput)
+		print("Uploaded data to: \(key)")
+	}
+	
+	func downloadData(from key: String) async throws -> Data {
+		let getObjectInput = GetObjectInput(
+			bucket: bucketName,
+			key: key
+		)
+		
+		let response = try await self.client.getObject(input: getObjectInput)
+		
+		guard let body = response.body else {
+			throw S3BackupError.downloadFailed
+		}
+		
+		return try await body.readData() ?? Data()
+	}
 
 	// MARK: - Upload Thumbnail
 
@@ -616,6 +646,7 @@ enum RestoreStatus {
 enum S3BackupError: Error, LocalizedError {
 	case credentialsNotFound
 	case uploadFailed
+	case downloadFailed
 	case photoNotFound
 	case batchRestoreFailed(errors: [Error])
 	case notConfigured
@@ -627,6 +658,8 @@ enum S3BackupError: Error, LocalizedError {
 			"AWS credentials not found. Please configure your AWS credentials in Settings."
 		case .uploadFailed:
 			"Failed to upload file to S3"
+		case .downloadFailed:
+			"Failed to download file from S3"
 		case .photoNotFound:
 			"Photo not found in S3"
 		case .batchRestoreFailed(let errors):

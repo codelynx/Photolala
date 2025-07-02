@@ -9,9 +9,9 @@ struct PhotolalaUser: Codable {
 	let primaryProviderID: String      // ID from primary provider
 	
 	// User information
-	let email: String?                 // Primary email (may be masked)
-	let fullName: String?
-	let photoURL: String?              // Profile photo URL
+	var email: String?                 // Primary email (may be masked)
+	var fullName: String?
+	var photoURL: String?              // Profile photo URL
 	let createdAt: Date
 	var lastUpdated: Date
 	

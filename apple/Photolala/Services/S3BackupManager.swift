@@ -284,6 +284,29 @@ class S3BackupManager: ObservableObject {
 		self.storageLimit = 0
 	}
 	
+	// MARK: - Identity Management
+	
+	func createFolder(at path: String) async throws {
+		guard let s3Service else {
+			throw S3BackupError.serviceNotConfigured
+		}
+		
+		// S3 doesn't need explicit folder creation, but we'll create a placeholder
+		// to ensure the directory structure exists
+		let folderKey = path.hasSuffix("/") ? path : path + "/"
+		let placeholderKey = folderKey + ".keep"
+		
+		try await s3Service.uploadData(Data(), to: placeholderKey)
+	}
+	
+	func uploadData(_ data: Data, to path: String) async throws {
+		guard let s3Service else {
+			throw S3BackupError.serviceNotConfigured
+		}
+		
+		try await s3Service.uploadData(data, to: path)
+	}
+	
 	/// Get the S3 client for catalog generation
 	func getS3Client() async -> S3Client? {
 		// Ensure we're configured

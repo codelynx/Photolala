@@ -41,6 +41,18 @@ extension IdentityManager {
 		case (.signIn, let user?):
 			// Sign in successful - user exists
 			var updatedUser = user
+			
+			// Update user info from fresh JWT data
+			if let email = credential.email {
+				updatedUser.email = email
+			}
+			if let fullName = credential.fullName {
+				updatedUser.fullName = fullName
+			}
+			if let photoURL = credential.photoURL {
+				updatedUser.photoURL = photoURL
+			}
+			
 			updatedUser.lastUpdated = Date()
 			try await saveUser(updatedUser)
 			
@@ -171,10 +183,26 @@ extension IdentityManager {
 	// MARK: - User Management
 	
 	private func findUserByProviderID(provider: AuthProvider, providerID: String) async throws -> PhotolalaUser? {
-		// For now, we'll check locally. In the future, this would query a backend
-		guard let userData = try? KeychainManager.shared.load(key: keychainKey),
-		      let user = try? JSONDecoder().decode(PhotolalaUser.self, from: userData) else {
-			// Try legacy model
+		// First, check local cache
+		if let userData = try? KeychainManager.shared.load(key: keychainKey),
+		   let user = try? JSONDecoder().decode(PhotolalaUser.self, from: userData) {
+			// Check if this provider matches
+			if user.primaryProvider == provider && user.primaryProviderID == providerID {
+				return user
+			}
+			
+			// Check linked providers
+			for linked in user.linkedProviders {
+				if linked.provider == provider && linked.providerID == providerID {
+					return user
+				}
+			}
+		}
+		
+		// If not found locally, check S3 identity mapping
+		let s3Manager = S3BackupManager.shared
+		guard let s3Service = s3Manager.s3Service else {
+			// Try legacy model if S3 not available
 			if let legacyUser = try? loadLegacyUser() {
 				// Migrate to new model
 				let migratedUser = PhotolalaUser(legacy: legacyUser)
@@ -184,19 +212,38 @@ extension IdentityManager {
 			return nil
 		}
 		
-		// Check if this provider matches
-		if user.primaryProvider == provider && user.primaryProviderID == providerID {
-			return user
-		}
+		// Look up UUID from identity mapping
+		let identityKey = "\(provider.rawValue):\(providerID)"
+		let identityPath = "identities/\(identityKey)"
 		
-		// Check linked providers
-		for linked in user.linkedProviders {
-			if linked.provider == provider && linked.providerID == providerID {
-				return user
+		do {
+			let uuidData = try await s3Service.downloadData(from: identityPath)
+			guard let serviceUserID = String(data: uuidData, encoding: .utf8) else {
+				return nil
 			}
+			
+			// Found identity mapping! Create a basic user object
+			// In the future, we'll load full user data from S3
+			print("Found identity mapping: \(identityPath) -> \(serviceUserID)")
+			
+			// Reconstruct user from available data
+			let reconstructedUser = PhotolalaUser(
+				serviceUserID: serviceUserID,
+				provider: provider,
+				providerID: providerID,
+				email: nil, // Will be updated from JWT
+				fullName: nil, // Will be updated from JWT
+				photoURL: nil,
+				subscription: Subscription.freeTrial() // Default subscription
+			)
+			
+			// Note: The actual email/name will be updated after successful authentication
+			// This is just enough to indicate the account exists
+			return reconstructedUser
+		} catch {
+			print("No identity mapping found for \(identityPath)")
+			return nil
 		}
-		
-		return nil
 	}
 	
 	private func loadLegacyUser() throws -> LegacyPhotolalaUser? {
@@ -215,13 +262,23 @@ extension IdentityManager {
 	}
 	
 	private func createS3UserFolders(for user: PhotolalaUser) async throws {
-		// This will be implemented to create the S3 folder structure
-		// For now, we'll just log
 		print("Creating S3 folders for user: \(user.serviceUserID)")
 		
-		// TODO: Implement S3 folder creation
-		// let s3Manager = S3BackupManager.shared
-		// try await s3Manager.createUserFolders(serviceUserID: user.serviceUserID)
+		let s3Manager = S3BackupManager.shared
+		
+		// Create user directory
+		let userPath = "users/\(user.serviceUserID)/"
+		try await s3Manager.createFolder(at: userPath)
+		
+		// Create provider ID mapping in /identities/
+		let identityKey = "\(user.primaryProvider.rawValue):\(user.primaryProviderID)"
+		let identityPath = "identities/\(identityKey)"
+		
+		// Store the UUID as content of the identity file
+		let uuidData = user.serviceUserID.data(using: .utf8)!
+		try await s3Manager.uploadData(uuidData, to: identityPath)
+		
+		print("Created identity mapping: \(identityPath) -> \(user.serviceUserID)")
 	}
 	
 	// MARK: - Utility Methods (moved to be accessible)

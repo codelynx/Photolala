@@ -92,13 +92,24 @@ struct WelcomeView: View {
 						.foregroundStyle(.secondary)
 				}
 			} else {
-				// Show signed in status
-				HStack {
-					Image(systemName: "checkmark.circle.fill")
-						.foregroundColor(.green)
-					Text("Signed in as \(identityManager.currentUser?.displayName ?? "User")")
-						.font(.caption)
-						.foregroundStyle(.secondary)
+				// Show signed in status with sign out option
+				VStack(spacing: 8) {
+					HStack {
+						Image(systemName: "checkmark.circle.fill")
+							.foregroundColor(.green)
+						Text("Signed in as \(identityManager.currentUser?.displayName ?? "User")")
+							.font(.caption)
+							.foregroundStyle(.secondary)
+					}
+					
+					Button(action: {
+						identityManager.signOut()
+					}) {
+						Text("Sign Out")
+							.font(.caption)
+							.foregroundColor(.red)
+							.underline()
+					}
 				}
 			}
 

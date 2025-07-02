@@ -135,7 +135,14 @@ extension IdentityManager: ASAuthorizationControllerDelegate {
 	}
 
 	func authorizationController(controller: ASAuthorizationController, didCompleteWithError error: Error) {
-		self.authContinuation?.resume(throwing: error)
+		// Check if user cancelled
+		if let authError = error as? ASAuthorizationError,
+		   authError.code == .canceled {
+			// User cancelled - don't show error, just cancel silently
+			self.authContinuation?.resume(throwing: CancellationError())
+		} else {
+			self.authContinuation?.resume(throwing: error)
+		}
 		self.authContinuation = nil
 	}
 }
