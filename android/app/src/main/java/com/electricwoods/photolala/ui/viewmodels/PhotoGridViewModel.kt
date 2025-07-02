@@ -2,20 +2,26 @@ package com.electricwoods.photolala.ui.viewmodels
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.electricwoods.photolala.data.PreferencesManager
 import com.electricwoods.photolala.models.ColorFlag
 import com.electricwoods.photolala.models.PhotoMediaStore
 import com.electricwoods.photolala.repositories.PhotoTagRepository
 import com.electricwoods.photolala.services.MediaStoreService
+import com.electricwoods.photolala.utils.DeviceUtils
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
 import javax.inject.Inject
+import android.content.Context
+import dagger.hilt.android.qualifiers.ApplicationContext
 
 @HiltViewModel
 class PhotoGridViewModel @Inject constructor(
+	@ApplicationContext private val context: Context,
 	private val mediaStoreService: MediaStoreService,
-	private val photoTagRepository: PhotoTagRepository
+	private val photoTagRepository: PhotoTagRepository,
+	private val preferencesManager: PreferencesManager
 ) : ViewModel() {
 	
 	private val _photos = MutableStateFlow<List<PhotoMediaStore>>(emptyList())
@@ -47,6 +53,22 @@ class PhotoGridViewModel @Inject constructor(
 	// Tag state - maps photoId to set of color flags
 	private val _photoTags = MutableStateFlow<Map<String, Set<ColorFlag>>>(emptyMap())
 	val photoTags: StateFlow<Map<String, Set<ColorFlag>>> = _photoTags.asStateFlow()
+	
+	// Grid preferences from DataStore
+	val thumbnailSize: StateFlow<Int> = preferencesManager.gridThumbnailSize
+		.stateIn(
+			scope = viewModelScope,
+			started = SharingStarted.WhileSubscribed(5_000),
+			initialValue = PreferencesManager.DEFAULT_THUMBNAIL_SIZE
+		)
+	
+	val gridScaleMode: StateFlow<String> = preferencesManager.gridScaleMode
+		.stateIn(
+			scope = viewModelScope,
+			started = SharingStarted.WhileSubscribed(5_000),
+			initialValue = PreferencesManager.DEFAULT_GRID_SCALE_MODE
+		)
+	
 	
 	init {
 		// Load tags for photos when they are loaded
@@ -283,4 +305,18 @@ class PhotoGridViewModel @Inject constructor(
 	fun hasAnyTag(photoId: String): Boolean {
 		return _photoTags.value.containsKey(photoId) && _photoTags.value[photoId]!!.isNotEmpty()
 	}
+	
+	// Preference update methods
+	fun updateThumbnailSize(size: Int) {
+		viewModelScope.launch {
+			preferencesManager.setGridThumbnailSize(size)
+		}
+	}
+	
+	fun updateGridScaleMode(mode: String) {
+		viewModelScope.launch {
+			preferencesManager.setGridScaleMode(mode)
+		}
+	}
+	
 }

@@ -20,6 +20,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.electricwoods.photolala.models.PhotoMediaStore
+import com.electricwoods.photolala.ui.components.ViewOptionsMenu
 import com.electricwoods.photolala.ui.viewmodels.PhotoViewerViewModel
 import net.engawapg.lib.zoomable.rememberZoomState
 import net.engawapg.lib.zoomable.zoomable
@@ -34,6 +35,7 @@ fun PhotoViewerScreen(
 	val photos by viewModel.photos.collectAsState()
 	val currentPhoto by viewModel.currentPhoto.collectAsState()
 	val showInfo by viewModel.showInfo.collectAsState()
+	val scaleMode by viewModel.scaleMode.collectAsState()
 	
 	val pagerState = rememberPagerState(
 		initialPage = initialIndex,
@@ -70,6 +72,10 @@ fun PhotoViewerScreen(
 							contentDescription = "Photo Info"
 						)
 					}
+					ViewOptionsMenu(
+						currentScaleMode = scaleMode,
+						onScaleModeChange = { viewModel.toggleScaleMode() }
+					)
 				},
 				colors = TopAppBarDefaults.topAppBarColors(
 					containerColor = Color.Black.copy(alpha = 0.7f),
@@ -93,6 +99,7 @@ fun PhotoViewerScreen(
 			) { page ->
 				PhotoPage(
 					photo = photos.getOrNull(page),
+					scaleMode = scaleMode,
 					modifier = Modifier.fillMaxSize()
 				)
 			}
@@ -133,6 +140,7 @@ fun PhotoViewerScreen(
 @Composable
 private fun PhotoPage(
 	photo: PhotoMediaStore?,
+	scaleMode: String,
 	modifier: Modifier = Modifier
 ) {
 	if (photo == null) {
@@ -153,7 +161,7 @@ private fun PhotoPage(
 			.crossfade(true)
 			.build(),
 		contentDescription = photo.filename,
-		contentScale = ContentScale.Fit,
+		contentScale = if (scaleMode == "fill") ContentScale.Crop else ContentScale.Fit,
 		modifier = modifier
 			.fillMaxSize()
 			.zoomable(zoomState)

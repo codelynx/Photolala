@@ -27,6 +27,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.input.key.*
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.painter.ColorPainter
@@ -45,6 +46,8 @@ import com.electricwoods.photolala.models.PhotoMediaStore
 import com.electricwoods.photolala.models.ColorFlag
 import com.electricwoods.photolala.ui.viewmodels.PhotoGridViewModel
 import com.electricwoods.photolala.ui.components.TagSelectionDialog
+import com.electricwoods.photolala.ui.components.GridViewOptionsMenu
+import com.electricwoods.photolala.utils.DeviceUtils
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
@@ -61,6 +64,8 @@ fun PhotoGridScreen(
 	val selectionCount by viewModel.selectionCount.collectAsState()
 	val areAllPhotosSelected by viewModel.areAllPhotosSelected.collectAsState()
 	val photoTags by viewModel.photoTags.collectAsState()
+	val thumbnailSize by viewModel.thumbnailSize.collectAsState()
+	val gridScaleMode by viewModel.gridScaleMode.collectAsState()
 	val context = LocalContext.current
 	
 	// Tag selection dialog state
@@ -167,6 +172,12 @@ fun PhotoGridScreen(
 								contentDescription = "Refresh"
 							)
 						}
+						GridViewOptionsMenu(
+							currentThumbnailSize = thumbnailSize,
+							currentScaleMode = gridScaleMode,
+							onThumbnailSizeChange = viewModel::updateThumbnailSize,
+							onScaleModeChange = viewModel::updateGridScaleMode
+						)
 					}
 				)
 			}
@@ -196,6 +207,8 @@ fun PhotoGridScreen(
 						isSelectionMode = isSelectionMode,
 						selectedPhotos = selectedPhotos,
 						photoTags = photoTags,
+						thumbnailSize = thumbnailSize,
+						scaleMode = gridScaleMode,
 						onPhotoClick = { photo, index ->
 							// Tap always toggles selection
 							if (!isSelectionMode) {
@@ -263,10 +276,20 @@ private fun PhotoGrid(
 	isSelectionMode: Boolean,
 	selectedPhotos: Set<String>,
 	photoTags: Map<String, Set<com.electricwoods.photolala.models.ColorFlag>>,
+	thumbnailSize: Int,
+	scaleMode: String,
 	onPhotoClick: (PhotoMediaStore, Int) -> Unit,
 	onPhotoLongClick: (PhotoMediaStore) -> Unit,
 	onLoadMore: () -> Unit
 ) {
+	val context = LocalContext.current
+	val configuration = LocalConfiguration.current
+	
+	// Calculate optimal column count based on screen width and thumbnail size
+	val columnCount = remember(configuration.screenWidthDp, thumbnailSize) {
+		DeviceUtils.calculateOptimalColumns(context, thumbnailSize)
+	}
+	
 	val gridState = rememberLazyGridState()
 	
 	// Detect when we need to load more photos
@@ -286,7 +309,7 @@ private fun PhotoGrid(
 	}
 	
 	LazyVerticalGrid(
-		columns = GridCells.Fixed(3),
+		columns = GridCells.Fixed(columnCount),
 		state = gridState,
 		contentPadding = PaddingValues(2.dp),
 		horizontalArrangement = Arrangement.spacedBy(2.dp),
@@ -302,6 +325,8 @@ private fun PhotoGrid(
 				isSelected = selectedPhotos.contains(photo.id),
 				isSelectionMode = isSelectionMode,
 				tags = photoTags[photo.id] ?: emptySet(),
+				thumbnailSize = thumbnailSize,
+				scaleMode = scaleMode,
 				onClick = { onPhotoClick(photo, photos.indexOf(photo)) },
 				onLongClick = { onPhotoLongClick(photo) }
 			)
@@ -316,6 +341,8 @@ private fun PhotoThumbnail(
 	isSelected: Boolean,
 	isSelectionMode: Boolean,
 	tags: Set<com.electricwoods.photolala.models.ColorFlag>,
+	thumbnailSize: Int,
+	scaleMode: String,
 	onClick: () -> Unit,
 	onLongClick: () -> Unit
 ) {
@@ -350,7 +377,7 @@ private fun PhotoThumbnail(
 			model = ImageRequest.Builder(LocalContext.current)
 				.data(photo.uri)
 				.crossfade(true)
-				.size(400) // Larger thumbnail size
+				.size(thumbnailSize)
 				.listener(
 					onStart = {
 						// Log when loading starts
@@ -363,7 +390,7 @@ private fun PhotoThumbnail(
 				)
 				.build(),
 			contentDescription = photo.filename,
-			contentScale = ContentScale.Crop,
+			contentScale = if (scaleMode == "fit") ContentScale.Fit else ContentScale.Crop,
 			modifier = Modifier.fillMaxSize(),
 			placeholder = ColorPainter(Color.LightGray),
 			error = ColorPainter(Color.Red.copy(alpha = 0.3f))
