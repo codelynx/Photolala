@@ -41,8 +41,13 @@ object AppModule {
 			context,
 			PhotolalaDatabase::class.java,
 			"photolala_database"
-		).build()
+		)
+			.fallbackToDestructiveMigration() // For development only
+			.build()
 	}
+	
+	@Provides
+	fun provideTagDao(database: PhotolalaDatabase) = database.tagDao()
 
 	@Provides
 	@IoDispatcher

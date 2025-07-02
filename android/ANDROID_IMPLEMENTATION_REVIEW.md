@@ -282,13 +282,15 @@ This document provides a comprehensive review of the Android implementation comp
 | Thumbnail generation | ✅ Complete | ✅ Via Coil |
 | Selection management | ✅ Complete | ✅ Complete |
 | Search and filtering | ✅ Complete | ❌ Not started |
-| Tag management | ✅ Complete | ❌ Not started |
+| Tag management | ✅ Complete | ✅ Basic impl |
 | User authentication | ✅ Complete | ❌ Not started |
 | In-app purchases | ✅ Complete | ❌ Not started |
 | Background sync | ✅ Complete | ❌ Not started |
 | Offline support | ✅ Complete | ❌ Not started |
 | Share functionality | ✅ Complete | ✅ Complete |
 | Delete operation | ❌ Non-destructive | ⚠️ Dev-only |
+| Color flag tags | ✅ Complete | ✅ Basic impl |
+| Tag sync (iCloud) | ✅ Complete | ❌ Not started |
 
 ## 12. Critical Implementation Priorities
 
@@ -370,6 +372,7 @@ Framework Layer (Room, Network, MediaStore)
 5. **No state management** - ✅ RESOLVED: ViewModels with StateFlow
 6. **No selection system** - ✅ RESOLVED: Full multi-selection implemented
 7. **No batch operations** - ✅ RESOLVED: Share and delete implemented
+8. **No tag system** - ✅ RESOLVED: ColorFlag tags implemented
 
 ### Medium Risk Areas (Updated July 2)
 1. Permission handling complexity - ✅ RESOLVED: Android 13+ handled
@@ -386,7 +389,7 @@ Framework Layer (Room, Network, MediaStore)
 
 ## 15. Conclusion
 
-**Updated July 2, 2025**: The Android implementation has made significant progress. Phase 1 (Basic Photo Browsing), Phase 2 (Photo Viewer), and Phase 4.1 (Selection with Operations) are complete. The app now has:
+**Updated July 2, 2025**: The Android implementation has made significant progress. Phase 1 (Basic Photo Browsing), Phase 2 (Photo Viewer), Phase 4.1 (Selection with Operations), and Phase 4.2 (Tag System) are complete. The app now has:
 - ✅ Local photo browsing with MediaStore
 - ✅ Photo grid with lazy loading and pagination
 - ✅ Full-screen photo viewer with pinch-to-zoom
@@ -400,6 +403,9 @@ Framework Layer (Room, Network, MediaStore)
 - ✅ Select all/deselect all toggle
 - ✅ Share selected photos functionality
 - ✅ Delete photos (development only)
+- ✅ Color flag tag system (matching iOS)
+- ✅ Multiple tags per photo support
+- ✅ Tag persistence in Room database
 
 ### Estimated Effort (Updated July 2)
 With Phase 1, 2, and Phase 4.1 (Selection) complete (~3 days of work), the remaining effort estimate:
@@ -430,10 +436,13 @@ With Phase 1, 2, and Phase 4.1 (Selection) complete (~3 days of work), the remai
 1. ~~Implement multi-selection in grid~~ ✅
 2. ~~Add share functionality~~ ✅
 3. ~~Add delete operation (dev only)~~ ✅
-4. Add star/bookmark functionality
-5. Create PhotoRepository with Room
-6. Add album/folder browsing
-7. Implement basic search/filter
+4. ~~Implement tag system (ColorFlag)~~ ✅
+5. Add tag selection UI (dialog/bottom sheet)
+6. Implement keyboard shortcuts (1-7 for tags)
+7. Create PhotoRepository with Room
+8. Add album/folder browsing
+9. Implement basic search/filter
+10. Add tag filtering capabilities
 
 ## 16. Architecture Comparison with iOS/macOS (Updated July 2, 2025)
 
@@ -561,14 +570,15 @@ With Phase 1, 2, and Phase 4.1 (Selection) complete (~3 days of work), the remai
 ### Priority Implementation Tasks
 
 To achieve iOS/macOS parity, prioritize:
-1. **Multi-selection** with visual feedback
-2. **Dynamic grid layout** with size options
-3. **Star/backup status** indicators
-4. **Photo metadata** overlay in grid
-5. **Keyboard navigation** for Chrome OS/tablets
-6. **Advanced zoom gestures** (double-tap, constraints)
-7. **Thumbnail strip** in viewer
-8. **Context menus** via long-press
+1. ~~**Multi-selection** with visual feedback~~ ✅
+2. **Tag selection UI** (dialog/bottom sheet for choosing colors)
+3. **Keyboard shortcuts** (1-7 for tag colors)
+4. **Dynamic grid layout** with size options
+5. **Star/backup status** indicators (separate from tags)
+6. **Photo metadata** overlay in grid
+7. **Advanced zoom gestures** (double-tap, constraints)
+8. **Thumbnail strip** in viewer
+9. **Tag filtering** (show photos with specific tags)
 
 This review should be updated weekly as implementation progresses to track completion and identify any new gaps or challenges.
 
@@ -636,6 +646,28 @@ This review should be updated weekly as implementation progresses to track compl
 - Android requires workaround for scoped storage restrictions
 - Helper script provided for actual file cleanup during development
 
+### Tag System Comparison (July 2, 2025)
+
+| Feature | Android | iOS/macOS |
+|---------|---------|-----------|
+| **System Name** | ✅ Tags (ColorFlag) | ✅ Tags (ColorFlag) |
+| **Color Options** | ✅ 7 colors (1-7) | ✅ 7 colors (1-7) |
+| **Multiple Tags** | ✅ Set<ColorFlag> per photo | ✅ Set<ColorFlag> per photo |
+| **UI Display** | ✅ Colored flag icons | ✅ Colored flag icons |
+| **Display Position** | ✅ Bottom-left corner | ✅ Bottom-left corner |
+| **Keyboard Shortcuts** | ❌ Not implemented | ✅ Keys 1-7 toggle flags |
+| **Toolbar Button** | ✅ Flag icon | ❌ Via inspector panel |
+| **Tag Selection UI** | ⚠️ Only red flag (TODO) | ✅ Grid in inspector |
+| **Persistence** | ✅ Room database | ✅ JSON + iCloud sync |
+| **Sync Support** | ❌ Local only | ✅ iCloud Documents |
+
+**Implementation Notes:**
+- Android correctly uses "tags" terminology (not "bookmarks")
+- ColorFlag enum matches iOS exactly (red=1 through gray=7)
+- UI placement of flags matches iOS (bottom-left of thumbnails)
+- Main missing features: keyboard shortcuts and tag selection UI
+- Android uses Room for local storage vs iOS's JSON + iCloud approach
+
 **Select All/Deselect All Toggle (July 2, 2025):**
 - User suggestion: "I like select all, but if all selected I like deselect all, is it popular?"
 - **Decision**: Implemented toggle pattern (common in Google Photos, Gmail, Files)
@@ -674,3 +706,26 @@ This review should be updated weekly as implementation progresses to track compl
 - Delete is non-destructive on Android 11+ (view-only removal)
 - Both operations work on selected photos only
 - Clear visual feedback with appropriate icons and colors
+
+### Tag System Implementation (July 2, 2025 - Session 3)
+
+**Migration from Bookmark/Emoji to Tag/ColorFlag System:**
+- Discovered iOS/macOS had migrated from bookmark system to tag system
+- Android initially implemented bookmark system with 12 emojis
+- Migrated to match current iOS implementation using ColorFlag (1-7)
+- No database migration needed as app is pre-release
+
+**Tag System Features:**
+- Replaced single emoji per photo with multiple color flags per photo
+- Implemented `PhotoTagRepository` for tag operations
+- Added tag methods to PhotoGridViewModel
+- UI shows colored flag icons instead of emoji overlays
+- Flag colors: red=1, orange=2, yellow=3, green=4, blue=5, purple=6, gray=7
+- Tags displayed in bottom-left corner of thumbnails
+- Flag button in toolbar (replaced star button)
+
+**Architecture Alignment:**
+- Android already had ColorFlag enum, TagEntity, and TagDao
+- Now using same tag structure as iOS (photos can have multiple tags)
+- Database version bumped to 3, bookmark tables removed
+- Tag persistence matches iOS implementation

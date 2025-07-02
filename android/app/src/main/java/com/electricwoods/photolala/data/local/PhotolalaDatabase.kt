@@ -13,7 +13,7 @@ import com.electricwoods.photolala.data.local.entities.TagEntity
 		PhotoEntity::class,
 		TagEntity::class
 	],
-	version = 1,
+	version = 3,
 	exportSchema = false
 )
 @TypeConverters(Converters::class)

@@ -19,6 +19,7 @@ import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.SelectAll
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Flag
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -31,6 +32,7 @@ import android.content.Intent
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
@@ -52,6 +54,7 @@ fun PhotoGridScreen(
 	val selectedPhotos by viewModel.selectedPhotos.collectAsState()
 	val selectionCount by viewModel.selectionCount.collectAsState()
 	val areAllPhotosSelected by viewModel.areAllPhotosSelected.collectAsState()
+	val photoTags by viewModel.photoTags.collectAsState()
 	val context = LocalContext.current
 	
 	// Load photos on first composition
@@ -77,6 +80,11 @@ fun PhotoGridScreen(
 					onDelete = {
 						// DEVELOPMENT ONLY
 						viewModel.deleteSelectedPhotos()
+					},
+					onTag = {
+						// For now, toggle red flag (ColorFlag 1)
+						// TODO: Show tag selection dialog
+						viewModel.toggleTagForSelected(com.electricwoods.photolala.models.ColorFlag.fromValue(1)!!)
 					}
 				)
 			} else {
@@ -120,6 +128,7 @@ fun PhotoGridScreen(
 						photos = photos,
 						isSelectionMode = isSelectionMode,
 						selectedPhotos = selectedPhotos,
+						photoTags = photoTags,
 						onPhotoClick = { photo, index ->
 							// Tap always toggles selection
 							if (!isSelectionMode) {
@@ -158,6 +167,7 @@ private fun PhotoGrid(
 	photos: List<PhotoMediaStore>,
 	isSelectionMode: Boolean,
 	selectedPhotos: Set<String>,
+	photoTags: Map<String, Set<com.electricwoods.photolala.models.ColorFlag>>,
 	onPhotoClick: (PhotoMediaStore, Int) -> Unit,
 	onPhotoLongClick: (PhotoMediaStore) -> Unit,
 	onLoadMore: () -> Unit
@@ -196,6 +206,7 @@ private fun PhotoGrid(
 				photo = photo,
 				isSelected = selectedPhotos.contains(photo.id),
 				isSelectionMode = isSelectionMode,
+				tags = photoTags[photo.id] ?: emptySet(),
 				onClick = { onPhotoClick(photo, photos.indexOf(photo)) },
 				onLongClick = { onPhotoLongClick(photo) }
 			)
@@ -209,6 +220,7 @@ private fun PhotoThumbnail(
 	photo: PhotoMediaStore,
 	isSelected: Boolean,
 	isSelectionMode: Boolean,
+	tags: Set<com.electricwoods.photolala.models.ColorFlag>,
 	onClick: () -> Unit,
 	onLongClick: () -> Unit
 ) {
@@ -261,6 +273,34 @@ private fun PhotoThumbnail(
 			placeholder = ColorPainter(Color.LightGray),
 			error = ColorPainter(Color.Red.copy(alpha = 0.3f))
 		)
+		
+		// Tag flags overlay
+		if (tags.isNotEmpty()) {
+			Row(
+				modifier = Modifier
+					.align(Alignment.BottomStart)
+					.padding(4.dp),
+				horizontalArrangement = Arrangement.spacedBy(2.dp)
+			) {
+				tags.sortedBy { it.value }.forEach { colorFlag ->
+					Icon(
+						imageVector = Icons.Default.Flag,
+						contentDescription = "Tag ${colorFlag.value}",
+						modifier = Modifier.size(16.dp),
+						tint = when (colorFlag.value) {
+							1 -> Color.Red
+							2 -> Color(0xFFFFA500) // Orange
+							3 -> Color.Yellow
+							4 -> Color.Green
+							5 -> Color.Blue
+							6 -> Color(0xFF800080) // Purple
+							7 -> Color.Gray
+							else -> Color.Gray
+						}
+					)
+				}
+			}
+		}
 	}
 }
 
@@ -272,7 +312,8 @@ private fun SelectionTopBar(
 	onClose: () -> Unit,
 	onToggleSelectAll: () -> Unit,
 	onShare: () -> Unit,
-	onDelete: () -> Unit
+	onDelete: () -> Unit,
+	onTag: () -> Unit
 ) {
 	TopAppBar(
 		title = { Text("$selectionCount selected") },
@@ -300,6 +341,13 @@ private fun SelectionTopBar(
 				)
 			}
 			if (selectionCount > 0) {
+				IconButton(onClick = onTag) {
+					Icon(
+						imageVector = Icons.Default.Flag,
+						contentDescription = "Tag selected",
+						tint = MaterialTheme.colorScheme.tertiary
+					)
+				}
 				IconButton(onClick = onShare) {
 					Icon(
 						imageVector = Icons.Default.Share,

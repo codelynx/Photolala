@@ -2,7 +2,9 @@ package com.electricwoods.photolala.ui.viewmodels
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.electricwoods.photolala.models.ColorFlag
 import com.electricwoods.photolala.models.PhotoMediaStore
+import com.electricwoods.photolala.repositories.PhotoTagRepository
 import com.electricwoods.photolala.services.MediaStoreService
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
@@ -12,7 +14,8 @@ import javax.inject.Inject
 
 @HiltViewModel
 class PhotoGridViewModel @Inject constructor(
-	private val mediaStoreService: MediaStoreService
+	private val mediaStoreService: MediaStoreService,
+	private val photoTagRepository: PhotoTagRepository
 ) : ViewModel() {
 	
 	private val _photos = MutableStateFlow<List<PhotoMediaStore>>(emptyList())
@@ -40,6 +43,21 @@ class PhotoGridViewModel @Inject constructor(
 	) { photos, selected ->
 		photos.isNotEmpty() && photos.size == selected.size
 	}.stateIn(viewModelScope, SharingStarted.Lazily, false)
+	
+	// Tag state - maps photoId to set of color flags
+	private val _photoTags = MutableStateFlow<Map<String, Set<ColorFlag>>>(emptyMap())
+	val photoTags: StateFlow<Map<String, Set<ColorFlag>>> = _photoTags.asStateFlow()
+	
+	init {
+		// Load tags for photos when they are loaded
+		viewModelScope.launch {
+			_photos.collect { photoList ->
+				if (photoList.isNotEmpty()) {
+					loadTagsForPhotos(photoList.map { it.id })
+				}
+			}
+		}
+	}
 	
 	// Pagination
 	private var currentOffset = 0
@@ -213,5 +231,56 @@ class PhotoGridViewModel @Inject constructor(
 				_isLoading.value = false
 			}
 		}
+	}
+	
+	// Tag methods
+	private suspend fun loadTagsForPhotos(photoIds: List<String>) {
+		val tags = photoTagRepository.getTagsForPhotos(photoIds)
+		_photoTags.value = tags
+	}
+	
+	fun toggleTag(photoId: String, colorFlag: ColorFlag) {
+		viewModelScope.launch {
+			photoTagRepository.toggleTag(photoId, colorFlag)
+			// Reload tags for this photo
+			val currentTags = _photoTags.value.toMutableMap()
+			val updatedTags = photoTagRepository.getTagsForPhotos(listOf(photoId))
+			if (updatedTags.containsKey(photoId)) {
+				currentTags[photoId] = updatedTags[photoId]!!
+			} else {
+				currentTags.remove(photoId)
+			}
+			_photoTags.value = currentTags
+		}
+	}
+	
+	fun toggleTagForSelected(colorFlag: ColorFlag) {
+		viewModelScope.launch {
+			val selectedIds = _selectedPhotos.value.toList()
+			if (selectedIds.isNotEmpty()) {
+				photoTagRepository.toggleTagsForPhotos(selectedIds, colorFlag)
+				// Reload tags for selected photos
+				loadTagsForPhotos(_photos.value.map { it.id })
+			}
+		}
+	}
+	
+	fun removeAllTagsForSelected() {
+		viewModelScope.launch {
+			val selectedIds = _selectedPhotos.value.toList()
+			selectedIds.forEach { photoId ->
+				photoTagRepository.removeAllTags(photoId)
+			}
+			// Reload tags
+			loadTagsForPhotos(_photos.value.map { it.id })
+		}
+	}
+	
+	fun getPhotoTags(photoId: String): Set<ColorFlag> {
+		return _photoTags.value[photoId] ?: emptySet()
+	}
+	
+	fun hasAnyTag(photoId: String): Boolean {
+		return _photoTags.value.containsKey(photoId) && _photoTags.value[photoId]!!.isNotEmpty()
 	}
 }
