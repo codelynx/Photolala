@@ -6,6 +6,7 @@ import com.electricwoods.photolala.models.PhotoMediaStore
 import com.electricwoods.photolala.services.MediaStoreService
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
@@ -32,6 +33,13 @@ class PhotoGridViewModel @Inject constructor(
 	
 	val selectionCount: StateFlow<Int> = _selectedPhotos.map { it.size }
 		.stateIn(viewModelScope, SharingStarted.Lazily, 0)
+	
+	val areAllPhotosSelected: StateFlow<Boolean> = combine(
+		_photos,
+		_selectedPhotos
+	) { photos, selected ->
+		photos.isNotEmpty() && photos.size == selected.size
+	}.stateIn(viewModelScope, SharingStarted.Lazily, false)
 	
 	// Pagination
 	private var currentOffset = 0
@@ -142,10 +150,17 @@ class PhotoGridViewModel @Inject constructor(
 		_selectedPhotos.value = emptySet()
 	}
 	
-	fun selectAll() {
-		_selectedPhotos.value = _photos.value.map { it.id }.toSet()
-		if (_selectedPhotos.value.isNotEmpty()) {
-			_isSelectionMode.value = true
+	fun toggleSelectAll() {
+		if (areAllPhotosSelected.value) {
+			// All selected, so deselect all
+			clearSelection()
+			// Keep selection mode active - user can continue selecting
+		} else {
+			// Not all selected, so select all
+			_selectedPhotos.value = _photos.value.map { it.id }.toSet()
+			if (_selectedPhotos.value.isNotEmpty()) {
+				_isSelectionMode.value = true
+			}
 		}
 	}
 	

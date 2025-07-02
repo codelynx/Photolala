@@ -13,6 +13,7 @@ import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.CheckBoxOutlineBlank
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.SelectAll
@@ -47,6 +48,7 @@ fun PhotoGridScreen(
 	val isSelectionMode by viewModel.isSelectionMode.collectAsState()
 	val selectedPhotos by viewModel.selectedPhotos.collectAsState()
 	val selectionCount by viewModel.selectionCount.collectAsState()
+	val areAllPhotosSelected by viewModel.areAllPhotosSelected.collectAsState()
 	
 	// Load photos on first composition
 	LaunchedEffect(Unit) {
@@ -59,8 +61,9 @@ fun PhotoGridScreen(
 			if (isSelectionMode) {
 				SelectionTopBar(
 					selectionCount = selectionCount,
+					areAllSelected = areAllPhotosSelected,
 					onClose = { viewModel.exitSelectionMode() },
-					onSelectAll = { viewModel.selectAll() },
+					onToggleSelectAll = { viewModel.toggleSelectAll() },
 					onShare = { /* TODO: Implement share */ }
 				)
 			} else {
@@ -242,8 +245,9 @@ private fun PhotoThumbnail(
 @Composable
 private fun SelectionTopBar(
 	selectionCount: Int,
+	areAllSelected: Boolean,
 	onClose: () -> Unit,
-	onSelectAll: () -> Unit,
+	onToggleSelectAll: () -> Unit,
 	onShare: () -> Unit
 ) {
 	TopAppBar(
@@ -257,10 +261,18 @@ private fun SelectionTopBar(
 			}
 		},
 		actions = {
-			IconButton(onClick = onSelectAll) {
+			IconButton(onClick = onToggleSelectAll) {
 				Icon(
-					imageVector = Icons.Default.SelectAll,
-					contentDescription = "Select all"
+					imageVector = if (areAllSelected) {
+						Icons.Default.CheckBoxOutlineBlank
+					} else {
+						Icons.Default.SelectAll
+					},
+					contentDescription = if (areAllSelected) {
+						"Deselect all"
+					} else {
+						"Select all"
+					}
 				)
 			}
 			if (selectionCount > 0) {

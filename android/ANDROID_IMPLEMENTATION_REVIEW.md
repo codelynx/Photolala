@@ -459,6 +459,18 @@ With Phase 1, 2, and partial Phase 4 complete (~3 days of work), the remaining e
 | **Space bar** | ❌ Not implemented | Open preview |
 | **Right-click** | N/A | Context menu |
 
+**Select All Implementation Comparison:**
+
+| Feature | Android | iOS/macOS |
+|---------|---------|-----------|
+| **UI Element** | Toggle button in toolbar | Menu items (⌘A / ⌘D) |
+| **Behavior** | Single toggle (Select ↔ Deselect) | Separate actions |
+| **Icon Feedback** | ✅ Changes icon based on state | ❌ Static menu items |
+| **Selection Count** | ✅ Shows "X selected" | ❌ No count display |
+| **After Deselect All** | Stays in selection mode | N/A (no mode) |
+| **Keyboard Shortcut** | ❌ Not implemented | ✅ ⌘A / ⌘D |
+| **Discoverability** | ✅ Always visible in toolbar | Via Edit menu |
+
 ### Photo Grid Implementation Gaps
 
 **iOS/macOS Features Not Yet in Android:**
@@ -467,8 +479,9 @@ With Phase 1, 2, and partial Phase 4 complete (~3 days of work), the remaining e
    - ✅ Tap to select interaction pattern
    - ✅ Long-press to preview
    - ✅ Selection toolbar with counter
-   - ✅ Select all functionality
+   - ✅ Select all/Deselect all toggle button
    - ✅ Auto-exit when all deselected
+   - ✅ Selection mode persistence after deselect all
    - ⏳ Keyboard shortcuts (1-7 for colors, S for star)
    - ⏳ Selection persistence across navigation
    - ⏳ Batch operations (share, delete)
@@ -581,3 +594,11 @@ This review should be updated weekly as implementation progresses to track compl
 - **Android**: Modal approach with clear state transitions (normal mode ↔ selection mode)
 - **iOS/macOS**: Non-modal approach where selection is always available alongside preview
 - Both achieve clean visual design but with different interaction models suited to their platforms
+
+**Select All/Deselect All Toggle (July 2, 2025):**
+- User suggestion: "I like select all, but if all selected I like deselect all, is it popular?"
+- **Decision**: Implemented toggle pattern (common in Google Photos, Gmail, Files)
+- Single button changes function based on state
+- Icon changes: SelectAll ↔ CheckBoxOutlineBlank
+- Maintains selection mode after deselecting all for continued selection
+- More touch-friendly than separate menu items

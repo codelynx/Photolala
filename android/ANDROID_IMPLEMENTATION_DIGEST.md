@@ -89,13 +89,15 @@ Based on KY's review notes, here's a simplified, phased approach to Android deve
 
 ## Phase 4: Selection & Operations (Week 5)
 
-### 4.1 Selection Mode ✅ Partially Complete
+### 4.1 Selection Mode ✅ Core Complete
 ```
 [x] Tap to select/deselect (enters selection mode automatically)
 [x] Long-press to preview photo
 [x] Visual feedback (3px border + subtle background tint)
 [x] Show selection count in toolbar
+[x] Select all/Deselect all toggle button
 [x] Exit selection mode (manual or auto when all deselected)
+[x] Selection mode persists after deselect all
 [ ] Keyboard shortcuts (1-7 for colors, S for star)
 [ ] Selection persistence across navigation
 ```
