@@ -8,84 +8,94 @@ import SwiftUI
 extension IdentityManager {
 	// MARK: - Public Authentication Methods
 	
-	/// Sign in with an existing account
-	func signIn(with provider: AuthProvider) async throws -> PhotolalaUser {
+	/*
+	 Authentication Flow:
+	 1. Both "Sign In" and "Create Account" use the SAME authentication process
+	 2. User authenticates with Apple/Google and we receive a JWT
+	 3. We check if a Photolala user exists with the provider's user ID
+	 4. Based on user intent and existence:
+	    - Sign In + User Exists = Success, return user
+	    - Sign In + No User = Error "No account found"
+	    - Create Account + User Exists = Error "Account already exists"
+	    - Create Account + No User = Success, create new user with UUID
+	 */
+	
+	/// Unified authentication flow - handles both sign in and account creation
+	private func authenticateAndProcess(with provider: AuthProvider, intent: AuthIntent) async throws -> PhotolalaUser {
 		isLoading = true
 		errorMessage = nil
 		
 		defer { isLoading = false }
 		
-		// Step 1: Authenticate with provider
+		// Step 1: Always authenticate with provider first (same for signin/signup)
 		let credential = try await authenticate(with: provider)
 		
-		// Step 2: Look up existing user
-		guard let existingUser = try await findUserByProviderID(
+		// Step 2: Check if user exists with this provider ID
+		let existingUser = try await findUserByProviderID(
 			provider: credential.provider,
 			providerID: credential.providerID
-		) else {
-			// No account found with this provider
+		)
+		
+		// Step 3: Handle based on intent and existence
+		switch (intent, existingUser) {
+		case (.signIn, let user?):
+			// Sign in successful - user exists
+			var updatedUser = user
+			updatedUser.lastUpdated = Date()
+			try await saveUser(updatedUser)
+			
+			await MainActor.run {
+				self.currentUser = updatedUser
+				self.isSignedIn = true
+			}
+			return updatedUser
+			
+		case (.signIn, nil):
+			// Sign in failed - no account exists
 			throw AuthError.noAccountFound(provider: provider)
+			
+		case (.createAccount, let user?):
+			// Create account failed - user already exists
+			throw AuthError.accountAlreadyExists(provider: provider)
+			
+		case (.createAccount, nil):
+			// Create account successful - create new user
+			let serviceUserID = UUID().uuidString.lowercased()
+			
+			let newUser = PhotolalaUser(
+				serviceUserID: serviceUserID,
+				provider: provider,
+				providerID: credential.providerID,
+				email: credential.email,
+				fullName: credential.fullName,
+				photoURL: credential.photoURL,
+				subscription: Subscription.freeTrial()
+			)
+			
+			try await saveUser(newUser)
+			try await createS3UserFolders(for: newUser)
+			
+			await MainActor.run {
+				self.currentUser = newUser
+				self.isSignedIn = true
+			}
+			return newUser
 		}
-		
-		// Step 3: Update last seen and save
-		var updatedUser = existingUser
-		updatedUser.lastUpdated = Date()
-		try await saveUser(updatedUser)
-		
-		// Step 4: Update app state
-		await MainActor.run {
-			self.currentUser = updatedUser
-			self.isSignedIn = true
-		}
-		
-		return updatedUser
+	}
+	
+	/// Sign in with an existing account
+	func signIn(with provider: AuthProvider) async throws -> PhotolalaUser {
+		try await authenticateAndProcess(with: provider, intent: .signIn)
 	}
 	
 	/// Create a new account
 	func createAccount(with provider: AuthProvider) async throws -> PhotolalaUser {
-		isLoading = true
-		errorMessage = nil
-		
-		defer { isLoading = false }
-		
-		// Step 1: Authenticate with provider
-		let credential = try await authenticate(with: provider)
-		
-		// Step 2: Check if already exists
-		if let _ = try await findUserByProviderID(
-			provider: credential.provider,
-			providerID: credential.providerID
-		) {
-			throw AuthError.accountAlreadyExists(provider: provider)
-		}
-		
-		// Step 3: Generate new serviceUserID (UUID for S3)
-		let serviceUserID = UUID().uuidString.lowercased()
-		
-		// Step 4: Create new user
-		let newUser = PhotolalaUser(
-			serviceUserID: serviceUserID,
-			provider: provider,
-			providerID: credential.providerID,
-			email: credential.email,
-			fullName: credential.fullName,
-			photoURL: credential.photoURL,
-			subscription: Subscription.freeTrial()
-		)
-		
-		// Step 5: Save user
-		try await saveUser(newUser)
-		
-		// Step 6: Create S3 structure
-		try await createS3UserFolders(for: newUser)
-		
-		// Step 7: Update app state
-		await MainActor.run {
-			self.currentUser = newUser
-			self.isSignedIn = true
-		}
-		
-		return newUser
+		try await authenticateAndProcess(with: provider, intent: .createAccount)
+	}
+	
+	private enum AuthIntent {
+		case signIn
+		case createAccount
 	}
 	
 	/// Link another provider to existing account

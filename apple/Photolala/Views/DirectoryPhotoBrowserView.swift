@@ -232,6 +232,18 @@ struct DirectoryPhotoBrowserView: View {
 				ToolbarItemGroup(placement: .automatic) {
 					// Local browser-specific items before core items
 					
+					// Account management
+					if identityManager.isSignedIn {
+						UserAccountView()
+					} else {
+						Button(action: {
+							showingSignInPrompt = true
+						}) {
+							Label("Sign In", systemImage: "person.circle")
+						}
+						.help("Sign in to your account")
+					}
+					
 					// Backup queue indicator
 					if backupQueueManager.queuedPhotos.count > 0 {
 						Button(action: {

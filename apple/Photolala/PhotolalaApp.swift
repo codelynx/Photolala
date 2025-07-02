@@ -84,6 +84,7 @@ struct PhotolalaApp: App {
 			WindowGroup("Photolala", for: URL.self) { $folderURL in
 				if let folderURL {
 					DirectoryPhotoBrowserView(directoryPath: folderURL.path as NSString)
+						.environmentObject(IdentityManager.shared)
 				}
 //				else {
 //					Text("No folder selected")
@@ -100,6 +101,7 @@ struct PhotolalaApp: App {
 			WindowGroup {
 				NavigationStack {
 					WelcomeView()
+						.environmentObject(IdentityManager.shared)
 				}
 			}
 		#endif

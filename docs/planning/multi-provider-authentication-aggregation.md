@@ -207,19 +207,31 @@ extension IdentityManager {
 ### 3. S3 Storage Structure
 
 ```
-photolala-backups/
+photolala/
+├── identities/                       # Provider ID → UUID lookups
+│   ├── apple/
+│   │   └── 001234.5678abcd.9012    # Contains: a3f4d5e6-b7c8...
+│   └── google/
+│       └── 123456789012345678901    # Contains: a3f4d5e6-b7c8...
+│
 └── users/
     └── {serviceUserID}/              # Single UUID per user
         ├── photos/
-        │   └── {photo-hash}.jpg
+        │   └── {md5-hash}.jpg
         ├── thumbnails/
-        │   └── {photo-hash}_thumb.jpg
+        │   └── {md5-hash}_thumb.jpg
         ├── metadata/
-        │   └── photos.db
+        │   └── catalog.json
         └── account/
-            ├── user.json             # User profile
-            └── providers.json        # Linked providers
+            ├── profile.json          # User profile & subscription
+            └── providers.json        # Linked providers (reverse lookup)
 ```
+
+**Key Points**:
+- `/identities/` directory enables provider ID → UUID lookup
+- Each identity file is a simple text file containing just the UUID
+- `/users/{uuid}/` contains all user data
+- `providers.json` enables reverse lookup (UUID → provider IDs)
 
 ### 4. Security Considerations
 

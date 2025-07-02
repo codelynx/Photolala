@@ -12,6 +12,8 @@ struct WelcomeView: View {
 	@State private var showingFolderPicker = false
 	@State private var navigateToPhotoBrowser = false
 	@State private var navigateToPhotoLibrary = false
+	@State private var showingSignIn = false
+	@EnvironmentObject var identityManager: IdentityManager
 	#if os(macOS)
 		@Environment(\.openWindow) private var openWindow
 	#endif
@@ -69,6 +71,36 @@ struct WelcomeView: View {
 				.controlSize(.large)
 			}
 			#endif
+			
+			// Sign In section
+			if !identityManager.isSignedIn {
+				VStack(spacing: 8) {
+					Text("or")
+						.font(.caption)
+						.foregroundStyle(.secondary)
+					
+					Button(action: {
+						showingSignIn = true
+					}) {
+						Label("Sign In / Create Account", systemImage: "person.circle")
+							.frame(minWidth: 200)
+					}
+					.controlSize(.regular)
+					
+					Text("Sign in to backup photos to the cloud")
+						.font(.caption)
+						.foregroundStyle(.secondary)
+				}
+			} else {
+				// Show signed in status
+				HStack {
+					Image(systemName: "checkmark.circle.fill")
+						.foregroundColor(.green)
+					Text("Signed in as \(identityManager.currentUser?.displayName ?? "User")")
+						.font(.caption)
+						.foregroundStyle(.secondary)
+				}
+			}
 
 			// Selected folder display
 			if let folder = selectedFolder {
@@ -128,6 +160,10 @@ struct WelcomeView: View {
 			}
 		}
 		#endif
+		.sheet(isPresented: $showingSignIn) {
+			AuthenticationChoiceView()
+				.environmentObject(identityManager)
+		}
 	}
 
 	private func selectFolder() {

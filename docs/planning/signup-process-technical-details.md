@@ -129,28 +129,53 @@ struct GoogleJWTPayload: Codable {
 }
 ```
 
-### Step 2: Check for Existing Account
+### Step 2: Check for Existing Account via Identity Mapping
 
 ```swift
 func checkExistingAccount(provider: AuthProvider, providerID: String) async throws -> PhotolalaUser? {
-    // Load all users from Keychain
-    let allUsers = try KeychainManager.shared.loadAllUsers()
+    // Check S3 identity mapping first
+    let identityPath = "identities/\(provider.rawValue)/\(providerID)"
     
-    // Check if this provider ID already exists
-    for user in allUsers {
-        if user.primaryProvider == provider && user.primaryProviderID == providerID {
-            return user
-        }
+    do {
+        // Try to get the UUID from identity mapping
+        let getRequest = GetObjectRequest(
+            bucket: "photolala",
+            key: identityPath
+        )
         
-        // Also check linked accounts
-        for linked in user.linkedProviders {
-            if linked.provider == provider && linked.providerID == providerID {
-                return user
-            }
+        let response = try await s3Client.getObject(getRequest)
+        if let data = response.body?.asData(),
+           let serviceUserID = String(data: data, encoding: .utf8) {
+            // Found existing user, load their profile
+            return try await loadUserProfile(serviceUserID: serviceUserID)
         }
+    } catch {
+        // 404 Not Found is expected for new users
+        if error.isNotFound {
+            return nil
+        }
+        throw error
     }
     
     return nil
+}
+
+func loadUserProfile(serviceUserID: String) async throws -> PhotolalaUser? {
+    let profilePath = "users/\(serviceUserID)/account/profile.json"
+    
+    let getRequest = GetObjectRequest(
+        bucket: "photolala",
+        key: profilePath
+    )
+    
+    let response = try await s3Client.getObject(getRequest)
+    guard let data = response.body?.asData() else {
+        throw SignupError.invalidProfileData
+    }
+    
+    let decoder = JSONDecoder()
+    decoder.dateDecodingStrategy = .iso8601
+    return try decoder.decode(PhotolalaUser.self, from: data)
 }
 ```
 
@@ -266,12 +291,39 @@ extension KeychainManager {
 }
 ```
 
-### Step 6: Create S3 Folder Structure
+### Step 6: Create Identity Mapping and S3 Folder Structure
 
 ```swift
+func createIdentityMapping(provider: AuthProvider, providerID: String, serviceUserID: String) async throws {
+    let s3Client = try await S3Manager.shared.getClient()
+    let bucket = "photolala"
+    
+    // Create identity mapping
+    let identityPath = "identities/\(provider.rawValue)/\(providerID)"
+    let putRequest = PutObjectRequest(
+        bucket: bucket,
+        key: identityPath,
+        body: .data(serviceUserID.data(using: .utf8)!),
+        contentType: "text/plain",
+        metadata: [
+            "created-at": ISO8601DateFormatter().string(from: Date()),
+            "service-user-id": serviceUserID
+        ]
+    )
+    
+    _ = try await s3Client.putObject(putRequest)
+}
+
 func createS3UserFolders(for user: PhotolalaUser) async throws {
     let s3Client = try await S3Manager.shared.getClient()
-    let bucket = "photolala-backups"
+    let bucket = "photolala"
+    
+    // Create identity mapping first
+    try await createIdentityMapping(
+        provider: user.primaryProvider,
+        providerID: user.primaryProviderID,
+        serviceUserID: user.serviceUserID
+    )
     
     // Create folder structure by uploading placeholder files
     let folders = [
@@ -296,6 +348,9 @@ func createS3UserFolders(for user: PhotolalaUser) async throws {
     
     // Upload initial user profile
     try await uploadUserProfile(user, to: s3Client)
+    
+    // Upload providers.json for reverse lookup
+    try await uploadProvidersInfo(user, to: s3Client)
 }
 
 private func uploadUserProfile(_ user: PhotolalaUser, to s3Client: S3Client) async throws {
@@ -306,7 +361,7 @@ private func uploadUserProfile(_ user: PhotolalaUser, to s3Client: S3Client) asy
     let profileData = try encoder.encode(user)
     
     let putRequest = PutObjectRequest(
-        bucket: "photolala-backups",
+        bucket: "photolala",
         key: "users/\(user.serviceUserID)/account/profile.json",
         body: .data(profileData),
         contentType: "application/json",
@@ -314,6 +369,54 @@ private func uploadUserProfile(_ user: PhotolalaUser, to s3Client: S3Client) asy
             "created-at": ISO8601DateFormatter().string(from: user.createdAt),
             "provider": user.primaryProvider.rawValue
         ]
+    )
+    
+    _ = try await s3Client.putObject(putRequest)
+}
+
+private func uploadProvidersInfo(_ user: PhotolalaUser, to s3Client: S3Client) async throws {
+    struct ProvidersInfo: Codable {
+        let version: Int = 1
+        let primaryProvider: String
+        let providers: [ProviderInfo]
+        
+        struct ProviderInfo: Codable {
+            let type: String
+            let id: String
+            let email: String?
+            let displayName: String?
+            let linkedAt: Date
+            let lastUsed: Date
+            let isPrimary: Bool
+        }
+    }
+    
+    let providersInfo = ProvidersInfo(
+        primaryProvider: user.primaryProvider.rawValue,
+        providers: [
+            ProvidersInfo.ProviderInfo(
+                type: user.primaryProvider.rawValue,
+                id: user.primaryProviderID,
+                email: user.email,
+                displayName: user.fullName,
+                linkedAt: user.createdAt,
+                lastUsed: user.lastUpdated,
+                isPrimary: true
+            )
+        ]
+    )
+    
+    let encoder = JSONEncoder()
+    encoder.dateEncodingStrategy = .iso8601
+    encoder.outputFormatting = .prettyPrinted
+    
+    let data = try encoder.encode(providersInfo)
+    
+    let putRequest = PutObjectRequest(
+        bucket: "photolala",
+        key: "users/\(user.serviceUserID)/account/providers.json",
+        body: .data(data),
+        contentType: "application/json"
     )
     
     _ = try await s3Client.putObject(putRequest)
