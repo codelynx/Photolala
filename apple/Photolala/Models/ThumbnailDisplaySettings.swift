@@ -28,6 +28,19 @@ enum ThumbnailOption: CaseIterable, Hashable {
 
 	static var `default`: ThumbnailOption { .medium }
 
+	// Get device-aware size based on screen width
+	func size(for screenWidth: CGFloat) -> CGFloat {
+		let category = DeviceCategory.current(for: screenWidth)
+		let sizes = DeviceSizeHelper.getRecommendedThumbnailSizes(for: category)
+		
+		switch self {
+		case .small: return sizes[0].size
+		case .medium: return sizes[1].size
+		case .large: return sizes[2].size
+		}
+	}
+	
+	// Legacy fixed size for backwards compatibility
 	var size: CGFloat {
 		switch self {
 		case .small: 64
@@ -90,7 +103,17 @@ class ThumbnailDisplaySettings {
 
 	init() {
 		// No UserDefaults - each window gets its own settings
+		// Use device-aware size if we can get screen width
+		#if os(iOS)
+		if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene {
+			let screenWidth = windowScene.screen.bounds.width
+			self.thumbnailSize = thumbnailOption.size(for: screenWidth)
+		} else {
+			self.thumbnailSize = thumbnailOption.size
+		}
+		#else
 		self.thumbnailSize = thumbnailOption.size
+		#endif
 		self.spacing = thumbnailOption.spacing
 	}
 	

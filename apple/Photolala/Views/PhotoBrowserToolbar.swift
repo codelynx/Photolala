@@ -16,6 +16,68 @@ struct PhotoBrowserCoreToolbar: ToolbarContent {
 	
 	var body: some ToolbarContent {
 		ToolbarItemGroup(placement: .automatic) {
+			#if os(iOS)
+			// Combined view options menu for iOS
+			Menu {
+				// Thumbnail size section
+				Section("Thumbnail Size") {
+					Button {
+						settings.thumbnailOption = .small
+					} label: {
+						if settings.thumbnailOption == .small {
+							Label("Small", systemImage: "checkmark")
+						} else {
+							Text("Small")
+						}
+					}
+					Button {
+						settings.thumbnailOption = .medium
+					} label: {
+						if settings.thumbnailOption == .medium {
+							Label("Medium", systemImage: "checkmark")
+						} else {
+							Text("Medium")
+						}
+					}
+					Button {
+						settings.thumbnailOption = .large
+					} label: {
+						if settings.thumbnailOption == .large {
+							Label("Large", systemImage: "checkmark")
+						} else {
+							Text("Large")
+						}
+					}
+				}
+				
+				Divider()
+				
+				// Display options section
+				Section("Display Options") {
+					Button {
+						settings.displayMode = settings.displayMode == .scaleToFit ? .scaleToFill : .scaleToFit
+					} label: {
+						Label(
+							settings.displayMode == .scaleToFit ? "Scale to Fill" : "Scale to Fit",
+							systemImage: settings.displayMode == .scaleToFit ? "aspectratio.fill" : "aspectratio"
+						)
+					}
+					
+					Button {
+						settings.showItemInfo.toggle()
+					} label: {
+						if settings.showItemInfo {
+							Label("Hide Info Bar", systemImage: "checkmark")
+						} else {
+							Text("Show Info Bar")
+						}
+					}
+				}
+			} label: {
+				Image(systemName: "gearshape")
+			}
+			#else
+			// Keep separate controls for macOS
 			// Display mode toggle
 			Button(action: {
 				settings.displayMode = settings
@@ -23,9 +85,7 @@ struct PhotoBrowserCoreToolbar: ToolbarContent {
 			}) {
 				Image(systemName: settings.displayMode == .scaleToFit ? "aspectratio" : "aspectratio.fill")
 			}
-			#if os(macOS)
 			.help(settings.displayMode == .scaleToFit ? "Switch to Fill" : "Switch to Fit")
-			#endif
 			
 			// Item info toggle
 			Button(action: {
@@ -33,27 +93,8 @@ struct PhotoBrowserCoreToolbar: ToolbarContent {
 			}) {
 				Image(systemName: "squares.below.rectangle")
 			}
-			#if os(macOS)
 			.help(settings.showItemInfo ? "Hide item info" : "Show item info")
-			#endif
 			
-			// Size controls
-			#if os(iOS)
-			// Size menu for iOS
-			Menu {
-				Button("S") {
-					settings.thumbnailOption = .small
-				}
-				Button("M") {
-					settings.thumbnailOption = .medium
-				}
-				Button("L") {
-					settings.thumbnailOption = .large
-				}
-			} label: {
-				Image(systemName: "slider.horizontal.3")
-			}
-			#else
 			// Size picker for macOS
 			Picker("Size", selection: $settings.thumbnailOption) {
 				Text("S").tag(ThumbnailOption.small)

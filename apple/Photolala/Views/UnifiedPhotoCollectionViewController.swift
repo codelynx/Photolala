@@ -155,10 +155,13 @@ class UnifiedPhotoCollectionViewController: XViewController {
 		return layout
 		#else
 		let thumbnailOption = settings.thumbnailOption
+		// Get device-aware size for iOS
+		let screenWidth = UIScreen.main.bounds.width
+		let thumbnailSize = thumbnailOption.size(for: screenWidth)
 		// Add 24pt for info bar if shown
-		let cellHeight = thumbnailOption.size + (settings.showItemInfo ? 24 : 0)
+		let cellHeight = thumbnailSize + (settings.showItemInfo ? 24 : 0)
 		let itemSize = NSCollectionLayoutSize(
-			widthDimension: .absolute(thumbnailOption.size),
+			widthDimension: .absolute(thumbnailSize),
 			heightDimension: .absolute(cellHeight)
 		)
 		let item = NSCollectionLayoutItem(layoutSize: itemSize)
@@ -776,6 +779,34 @@ extension UnifiedPhotoCollectionViewController: UICollectionViewDelegate {
 	func scrollViewDidEndDragging(_ scrollView: UIScrollView, willDecelerate decelerate: Bool) {
 		if !decelerate, let provider = photoProvider as? DirectoryPhotoProvider {
 			updateVisibleRange(for: provider)
+		}
+	}
+	
+	// MARK: - Orientation Change Handling
+	
+	override func viewWillTransition(to size: CGSize, with coordinator: UIViewControllerTransitionCoordinator) {
+		super.viewWillTransition(to: size, with: coordinator)
+		
+		// Update layout for new orientation
+		coordinator.animate(alongsideTransition: { _ in
+			// Update settings with new size if needed
+			if let screenWidth = self.view.window?.bounds.width {
+				// Update thumbnail size based on new orientation
+				let thumbnailSize = self.settings.thumbnailOption.size(for: screenWidth)
+				self.settings.thumbnailSize = thumbnailSize
+			}
+			// Recreate layout with new configuration
+			self.collectionView.setCollectionViewLayout(self.createLayout(), animated: true)
+		}, completion: nil)
+	}
+	
+	override func traitCollectionDidChange(_ previousTraitCollection: UITraitCollection?) {
+		super.traitCollectionDidChange(previousTraitCollection)
+		
+		// Update layout if size class changed
+		if traitCollection.horizontalSizeClass != previousTraitCollection?.horizontalSizeClass ||
+		   traitCollection.verticalSizeClass != previousTraitCollection?.verticalSizeClass {
+			collectionView.setCollectionViewLayout(createLayout(), animated: true)
 		}
 	}
 }

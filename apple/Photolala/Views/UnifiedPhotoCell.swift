@@ -20,8 +20,8 @@ class UnifiedPhotoCell: NSCollectionViewItem {
 	// UI Elements
 	private var photoImageView: ScalableImageView!
 	private var placeholderImageView: NSImageView!
-	private var starImageView: NSImageView!
-	private var flagContainerView: NSStackView!
+	private var starImageView: NSImageView! // Star indicates S3 backup status (yellow=backed up/queued, red=failed)
+	private var flagContainerView: NSStackView! // Flags represent user-assigned tags (ColorFlag)
 	private var fileSizeLabel: NSTextField!
 	private var badgeView: NSView?
 	private var tagBadgeView: NSView?
@@ -108,13 +108,13 @@ class UnifiedPhotoCell: NSCollectionViewItem {
 			imageViewWidthConstraint,
 			imageViewHeightConstraint,
 			
-			// Star image view - positioned at bottom of view
+			// Star image view - positioned at bottom of view (shows S3 backup status)
 			starImageView.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 4),
 			starImageView.topAnchor.constraint(equalTo: photoImageView.bottomAnchor, constant: 2),
 			starImageView.widthAnchor.constraint(equalToConstant: 16),
 			starImageView.heightAnchor.constraint(equalToConstant: 16),
 			
-			// Flag container - positioned after star image
+			// Flag container - positioned after star image (shows user tags)
 			flagContainerView.leadingAnchor.constraint(equalTo: starImageView.trailingAnchor, constant: 2),
 			flagContainerView.centerYAnchor.constraint(equalTo: starImageView.centerYAnchor),
 			flagContainerView.trailingAnchor.constraint(lessThanOrEqualTo: fileSizeLabel.leadingAnchor, constant: -4),
@@ -173,6 +173,9 @@ class UnifiedPhotoCell: NSCollectionViewItem {
 	func configure(with photo: any PhotoItem, settings: ThumbnailDisplaySettings) {
 		currentPhoto = photo
 		
+		// Update scale mode based on settings
+		photoImageView.scaleMode = settings.displayMode == .scaleToFit ? .scaleToFit : .scaleToFill
+		
 		// Update image view constraints based on thumbnail option
 		let imageSize = settings.thumbnailOption.size
 		imageViewWidthConstraint.constant = imageSize
@@ -187,6 +190,10 @@ class UnifiedPhotoCell: NSCollectionViewItem {
 		fileSizeLabel.isHidden = !showInfo
 		
 		// Configure star based on backup state
+		// Star = S3 backup status indicator (not a tag/bookmark)
+		// Yellow star = queued for backup or already uploaded
+		// Red exclamation = backup failed
+		// Blue cloud = S3 photos (already in cloud)
 		if let photoFile = photo as? PhotoFile {
 			// Only show backup status for local PhotoFile items
 			if let md5 = photoFile.md5Hash {
@@ -367,6 +374,8 @@ class UnifiedPhotoCell: NSCollectionViewItem {
 	}
 	
 	private func loadTagForInfoBar(for photo: any PhotoItem) {
+		// Load and display user-assigned tags (ColorFlags)
+		// These are displayed as colored flag icons next to the star
 		Task {
 			let tag = await TagManager.shared.getTag(for: photo)
 			await MainActor.run {
@@ -426,8 +435,8 @@ class UnifiedPhotoCell: UICollectionViewCell {
 	// UI Elements
 	private var photoImageView: UIImageView!
 	private var placeholderImageView: UIImageView!
-	private var starImageView: UIImageView!
-	private var flagContainerView: UIStackView!
+	private var starImageView: UIImageView! // Star indicates S3 backup status (yellow=backed up/queued, red=failed)
+	private var flagContainerView: UIStackView! // Flags represent user-assigned tags (ColorFlag)
 	private var fileSizeLabel: UILabel!
 	private var badgeView: UIView?
 	private var loadingIndicator: UIActivityIndicatorView!
@@ -517,13 +526,13 @@ class UnifiedPhotoCell: UICollectionViewCell {
 			photoImageView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor),
 			photoImageViewBottomConstraint,
 			
-			// Star image view - positioned at bottom of contentView
+			// Star image view - positioned at bottom of contentView (shows S3 backup status)
 			starImageView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 4),
 			starImageView.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -4),
 			starImageView.widthAnchor.constraint(equalToConstant: 16),
 			starImageView.heightAnchor.constraint(equalToConstant: 16),
 			
-			// Flag container - positioned after star image
+			// Flag container - positioned after star image (shows user tags)
 			flagContainerView.leadingAnchor.constraint(equalTo: starImageView.trailingAnchor, constant: 2),
 			flagContainerView.centerYAnchor.constraint(equalTo: starImageView.centerYAnchor),
 			flagContainerView.trailingAnchor.constraint(lessThanOrEqualTo: fileSizeLabel.leadingAnchor, constant: -4),
@@ -575,6 +584,9 @@ class UnifiedPhotoCell: UICollectionViewCell {
 	func configure(with photo: any PhotoItem, settings: ThumbnailDisplaySettings) {
 		currentPhoto = photo
 		
+		// Update content mode based on display mode setting
+		photoImageView.contentMode = settings.displayMode == .scaleToFit ? .scaleAspectFit : .scaleAspectFill
+		
 		// Update info bar visibility based on showItemInfo
 		let showInfo = settings.showItemInfo
 		starImageView.isHidden = !showInfo
@@ -585,6 +597,10 @@ class UnifiedPhotoCell: UICollectionViewCell {
 		photoImageViewBottomConstraint.constant = showInfo ? -24 : 0
 		
 		// Configure star based on backup state
+		// Star = S3 backup status indicator (not a tag/bookmark)
+		// Yellow star = queued for backup or already uploaded
+		// Red exclamation = backup failed
+		// Blue cloud = S3 photos (already in cloud)
 		if let photoFile = photo as? PhotoFile {
 			// Only show backup status for local PhotoFile items
 			if let md5 = photoFile.md5Hash {
@@ -750,6 +766,8 @@ class UnifiedPhotoCell: UICollectionViewCell {
 	}
 	
 	private func loadTagForInfoBar(for photo: any PhotoItem) {
+		// Load and display user-assigned tags (ColorFlags)
+		// These are displayed as colored flag icons next to the star
 		Task {
 			let tag = await TagManager.shared.getTag(for: photo)
 			await MainActor.run {

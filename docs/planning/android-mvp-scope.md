@@ -45,7 +45,7 @@ This document defines the Minimum Viable Product (MVP) scope for Photolala Andro
 - Swipe between photos
 - Show basic metadata (name, date, size)
 
-### 4. Basic Selection ✅
+### 4. Basic Selection ✅KY
 - Long-press to enter selection mode
 - Tap to select/deselect photos
 - Selection count indicator
@@ -264,7 +264,7 @@ This document defines the Minimum Viable Product (MVP) scope for Photolala Andro
 4. Basic photo grid with Coil
 5. Set up AWS SDK
 
-### Week 3-4: Core Features  
+### Week 3-4: Core Features
 1. Album/folder navigation
 2. Photo viewer screen
 3. Selection mode
@@ -322,10 +322,10 @@ This document defines the Minimum Viable Product (MVP) scope for Photolala Andro
 ### Identified Risks
 1. **MediaStore Performance**: Varies by device/OEM
    - Mitigation: Implement paging and caching
-   
+
 2. **Memory Issues**: Large photos can cause OOM
    - Mitigation: Careful bitmap management with Coil
-   
+
 3. **Permission Handling**: Scoped storage complexity
    - Mitigation: Clear permission request flow
 
