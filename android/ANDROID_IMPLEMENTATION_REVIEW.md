@@ -289,7 +289,9 @@ This document provides a comprehensive review of the Android implementation comp
 | Offline support | ✅ Complete | ❌ Not started |
 | Share functionality | ✅ Complete | ✅ Complete |
 | Delete operation | ❌ Non-destructive | ⚠️ Dev-only |
-| Color flag tags | ✅ Complete | ✅ Basic impl |
+| Color flag tags | ✅ Complete | ✅ Complete |
+| Tag selection UI | ✅ Inspector panel | ✅ Modal dialog |
+| Tag keyboard shortcuts | ✅ 1-7, 0, S | ✅ 1-7, T, Esc |
 | Tag sync (iCloud) | ✅ Complete | ❌ Not started |
 
 ## 12. Critical Implementation Priorities
@@ -406,6 +408,10 @@ Framework Layer (Room, Network, MediaStore)
 - ✅ Color flag tag system (matching iOS)
 - ✅ Multiple tags per photo support
 - ✅ Tag persistence in Room database
+- ✅ Tag selection UI (modal dialog with 4-3 grid layout)
+- ✅ Keyboard shortcuts (1-7 toggle flags, T opens dialog, Esc exits mode)
+- ✅ Equal-sized flag buttons using Modifier.weight(1f).aspectRatio(1f)
+- ✅ Visual feedback matching iOS (colored borders, check marks, background tint)
 
 ### Estimated Effort (Updated July 2)
 With Phase 1, 2, and Phase 4.1 (Selection) complete (~3 days of work), the remaining effort estimate:
@@ -437,12 +443,12 @@ With Phase 1, 2, and Phase 4.1 (Selection) complete (~3 days of work), the remai
 2. ~~Add share functionality~~ ✅
 3. ~~Add delete operation (dev only)~~ ✅
 4. ~~Implement tag system (ColorFlag)~~ ✅
-5. Add tag selection UI (dialog/bottom sheet)
-6. Implement keyboard shortcuts (1-7 for tags)
-7. Create PhotoRepository with Room
-8. Add album/folder browsing
-9. Implement basic search/filter
-10. Add tag filtering capabilities
+5. ~~Add tag selection UI (dialog/bottom sheet)~~ ✅
+6. ~~Implement keyboard shortcuts (1-7 for tags)~~ ✅
+7. Add tag filtering capabilities
+8. Create PhotoRepository with Room
+9. Add album/folder browsing
+10. Implement basic search/filter
 
 ## 16. Architecture Comparison with iOS/macOS (Updated July 2, 2025)
 
@@ -655,18 +661,46 @@ This review should be updated weekly as implementation progresses to track compl
 | **Multiple Tags** | ✅ Set<ColorFlag> per photo | ✅ Set<ColorFlag> per photo |
 | **UI Display** | ✅ Colored flag icons | ✅ Colored flag icons |
 | **Display Position** | ✅ Bottom-left corner | ✅ Bottom-left corner |
-| **Keyboard Shortcuts** | ❌ Not implemented | ✅ Keys 1-7 toggle flags |
+| **Keyboard Shortcuts** | ✅ Keys 1-7, T, Escape | ✅ Keys 1-7, 0 to clear |
 | **Toolbar Button** | ✅ Flag icon | ❌ Via inspector panel |
-| **Tag Selection UI** | ⚠️ Only red flag (TODO) | ✅ Grid in inspector |
+| **Tag Selection UI** | ✅ Dialog with 4x2 grid | ✅ Horizontal row |
 | **Persistence** | ✅ Room database | ✅ JSON + iCloud sync |
 | **Sync Support** | ❌ Local only | ✅ iCloud Documents |
+| **UI Presentation** | ✅ Modal dialog | ✅ Inspector panel |
+| **Clear All Option** | ✅ In dialog | ✅ X button (Key 0) |
+| **Keyboard Hint** | ✅ Shows "Press 1-7" | ❌ No hint shown |
+| **Toggle Behavior** | ✅ Immediate toggle | ✅ Immediate toggle |
+| **Visual Feedback** | ✅ Border + check mark | ✅ Background + border |
+| **Grid Layout** | ✅ 4-3 arrangement | ✅ 7 in single row |
+| **Tag Filtering** | ❌ Not implemented | ❌ Not implemented |
 
 **Implementation Notes:**
 - Android correctly uses "tags" terminology (not "bookmarks")
 - ColorFlag enum matches iOS exactly (red=1 through gray=7)
 - UI placement of flags matches iOS (bottom-left of thumbnails)
-- Main missing features: keyboard shortcuts and tag selection UI
 - Android uses Room for local storage vs iOS's JSON + iCloud approach
+- Both platforms lack tag filtering implementation (planned future feature)
+
+**Key Design Differences:**
+1. **UI Approach**:
+   - iOS: Inspector panel with horizontal flag row (always visible when inspector open)
+   - Android: Modal dialog with 4-3 grid layout (on-demand via toolbar button)
+   - Rationale: Android follows Material Design patterns; iOS follows Mac conventions
+
+2. **Keyboard Shortcuts**:
+   - iOS: 1-7 for flags, 0 to clear all, S for star
+   - Android: 1-7 for flags, T to open dialog, Escape to exit mode
+   - Rationale: Android adds dialog shortcut; iOS has direct clear shortcut
+
+3. **Visual Feedback**:
+   - iOS: Colored background with border for selected flags
+   - Android: Colored border with check mark overlay + background tint
+   - Both: Immediate toggle feedback without save/cancel pattern
+
+4. **Photo Identification**:
+   - iOS: Uses MD5 hash with `md5#` prefix for all non-iCloud photos
+   - Android: Uses MediaStore ID with `amp#` prefix
+   - Impact: Tags won't sync between platforms without ID mapping
 
 **Select All/Deselect All Toggle (July 2, 2025):**
 - User suggestion: "I like select all, but if all selected I like deselect all, is it popular?"
@@ -723,6 +757,25 @@ This review should be updated weekly as implementation progresses to track compl
 - Flag colors: red=1, orange=2, yellow=3, green=4, blue=5, purple=6, gray=7
 - Tags displayed in bottom-left corner of thumbnails
 - Flag button in toolbar (replaced star button)
+
+**Tag Selection UI Implementation (Session 3 continued):**
+- Created `TagSelectionDialog` with visual color flag grid
+- Shows all 7 color options in 4-3 layout (vs iOS's single horizontal row)
+- Visual feedback with:
+  - Colored flag icons matching iOS colors exactly
+  - Selected state with colored border and check mark overlay
+  - Background tint for selected items (12% opacity)
+- Supports single and multi-photo selection:
+  - Single photo: shows its current tags
+  - Multiple photos: shows common tags (intersection) - matches iOS behavior
+- Clear All button when tags are selected (vs iOS's X button + Key 0)
+- Keyboard shortcuts implemented:
+  - Keys 1-7: Toggle respective color flag (same as iOS)
+  - Key T: Open tag selection dialog (Android-specific)
+  - Escape: Exit selection mode (Android-specific)
+  - Note: iOS uses Key 0 to clear all, Android uses Clear All button
+- Dialog shows keyboard hint: "Press 1-7 for quick selection" (iOS has no hint)
+- Fixed layout issues to ensure all flag buttons have equal size using weight + aspectRatio
 
 **Architecture Alignment:**
 - Android already had ColorFlag enum, TagEntity, and TagDao

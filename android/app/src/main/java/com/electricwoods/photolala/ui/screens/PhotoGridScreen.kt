@@ -24,6 +24,10 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.input.key.*
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.painter.ColorPainter
 import androidx.compose.ui.layout.ContentScale
@@ -38,7 +42,9 @@ import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.electricwoods.photolala.R
 import com.electricwoods.photolala.models.PhotoMediaStore
+import com.electricwoods.photolala.models.ColorFlag
 import com.electricwoods.photolala.ui.viewmodels.PhotoGridViewModel
+import com.electricwoods.photolala.ui.components.TagSelectionDialog
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
@@ -57,13 +63,76 @@ fun PhotoGridScreen(
 	val photoTags by viewModel.photoTags.collectAsState()
 	val context = LocalContext.current
 	
+	// Tag selection dialog state
+	var showTagDialog by remember { mutableStateOf(false) }
+	
+	// Focus for keyboard shortcuts
+	val focusRequester = remember { FocusRequester() }
+	val focusManager = LocalFocusManager.current
+	
+	// Request focus on first composition
+	LaunchedEffect(Unit) {
+		focusRequester.requestFocus()
+	}
+	
 	// Load photos on first composition
 	LaunchedEffect(Unit) {
 		viewModel.loadPhotos()
 	}
 	
 	Scaffold(
-		modifier = modifier.fillMaxSize(),
+		modifier = modifier
+			.fillMaxSize()
+			.focusRequester(focusRequester)
+			.onKeyEvent { event ->
+				// Handle keyboard shortcuts when in selection mode
+				if (isSelectionMode && event.type == KeyEventType.KeyDown) {
+					when (event.key) {
+						// Number keys 1-7 for color flags
+						Key.One -> {
+							ColorFlag.fromValue(1)?.let { viewModel.toggleTagForSelected(it) }
+							true
+						}
+						Key.Two -> {
+							ColorFlag.fromValue(2)?.let { viewModel.toggleTagForSelected(it) }
+							true
+						}
+						Key.Three -> {
+							ColorFlag.fromValue(3)?.let { viewModel.toggleTagForSelected(it) }
+							true
+						}
+						Key.Four -> {
+							ColorFlag.fromValue(4)?.let { viewModel.toggleTagForSelected(it) }
+							true
+						}
+						Key.Five -> {
+							ColorFlag.fromValue(5)?.let { viewModel.toggleTagForSelected(it) }
+							true
+						}
+						Key.Six -> {
+							ColorFlag.fromValue(6)?.let { viewModel.toggleTagForSelected(it) }
+							true
+						}
+						Key.Seven -> {
+							ColorFlag.fromValue(7)?.let { viewModel.toggleTagForSelected(it) }
+							true
+						}
+						// T key to open tag dialog
+						Key.T -> {
+							showTagDialog = true
+							true
+						}
+						// Escape to exit selection mode
+						Key.Escape -> {
+							viewModel.exitSelectionMode()
+							true
+						}
+						else -> false
+					}
+				} else {
+					false
+				}
+			},
 		topBar = {
 			if (isSelectionMode) {
 				SelectionTopBar(
@@ -82,9 +151,7 @@ fun PhotoGridScreen(
 						viewModel.deleteSelectedPhotos()
 					},
 					onTag = {
-						// For now, toggle red flag (ColorFlag 1)
-						// TODO: Show tag selection dialog
-						viewModel.toggleTagForSelected(com.electricwoods.photolala.models.ColorFlag.fromValue(1)!!)
+						showTagDialog = true
 					}
 				)
 			} else {
@@ -158,6 +225,34 @@ fun PhotoGridScreen(
 				)
 			}
 		}
+	}
+	
+	// Tag selection dialog
+	if (showTagDialog) {
+		val selectedIds = selectedPhotos.toList()
+		val currentTags = if (selectedIds.size == 1) {
+			// Single photo - show its current tags
+			photoTags[selectedIds.first()] ?: emptySet()
+		} else {
+			// Multiple photos - show tags common to all
+			if (selectedIds.isEmpty()) {
+				emptySet()
+			} else {
+				selectedIds.map { photoTags[it] ?: emptySet() }
+					.reduce { acc, tags -> acc.intersect(tags) }
+			}
+		}
+		
+		TagSelectionDialog(
+			currentTags = currentTags,
+			onDismiss = { showTagDialog = false },
+			onToggleTag = { colorFlag ->
+				viewModel.toggleTagForSelected(colorFlag)
+			},
+			onClearAll = {
+				viewModel.removeAllTagsForSelected()
+			}
+		)
 	}
 }
 
