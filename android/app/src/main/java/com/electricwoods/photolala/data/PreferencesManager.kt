@@ -22,11 +22,13 @@ class PreferencesManager @Inject constructor(
 		val PHOTO_VIEWER_SCALE_MODE = stringPreferencesKey("photo_viewer_scale_mode")
 		val GRID_THUMBNAIL_SIZE = intPreferencesKey("grid_thumbnail_size")
 		val GRID_SCALE_MODE = stringPreferencesKey("grid_scale_mode")
+		val SHOW_INFO_BAR = booleanPreferencesKey("show_info_bar")
 		
 		// Default values
 		const val DEFAULT_SCALE_MODE = "fit" // "fit" or "fill"
 		const val DEFAULT_THUMBNAIL_SIZE = 100 // Will be overridden by device-aware default
 		const val DEFAULT_GRID_SCALE_MODE = "fill" // Grid defaults to fill for better appearance
+		const val DEFAULT_SHOW_INFO_BAR = true // Show info bar by default like iOS
 	}
 	
 	// Device-aware default values
@@ -89,6 +91,25 @@ class PreferencesManager @Inject constructor(
 	suspend fun setGridScaleMode(mode: String) {
 		dataStore.edit { preferences ->
 			preferences[GRID_SCALE_MODE] = mode
+		}
+	}
+	
+	// Show info bar preference
+	val showInfoBar: Flow<Boolean> = dataStore.data
+		.catch { exception ->
+			if (exception is IOException) {
+				emit(emptyPreferences())
+			} else {
+				throw exception
+			}
+		}
+		.map { preferences ->
+			preferences[SHOW_INFO_BAR] ?: DEFAULT_SHOW_INFO_BAR
+		}
+	
+	suspend fun setShowInfoBar(show: Boolean) {
+		dataStore.edit { preferences ->
+			preferences[SHOW_INFO_BAR] = show
 		}
 	}
 }

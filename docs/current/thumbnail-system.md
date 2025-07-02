@@ -108,6 +108,37 @@ Each option includes:
 - Displays truncated filename with secondary label color
 - Toggleable via toolbar button
 
+### Scale Mode Support (Added July 2, 2025)
+
+Scale mode determines how thumbnails are displayed within their cells:
+
+#### iOS/macOS Implementation
+- Toggle in unified gear menu (iOS) or toolbar (macOS)
+- Two modes: `scaleToFit` and `scaleToFill`
+- Uses system icons: `aspectratio` (fit) and `aspectratio.fill` (fill)
+- Applied via `contentMode` on iOS, `imageScaling` on macOS
+- Settings persist in `ThumbnailDisplaySettings`
+
+#### Android Implementation
+- Radio button selection in grid options menu
+- Uses Compose's `ContentScale.Fit` or `ContentScale.Crop`
+- Persisted in `PreferencesManager`
+- Follows Material Design patterns
+
+#### User Experience
+- **Scale to Fit**: Shows entire photo, may have letterboxing
+- **Scale to Fill**: Crops to fill cell (default on both platforms)
+- Instant visual feedback when toggling
+- Works within 256px thumbnail generation constraints
+
+### Android Info Bar (Added July 2, 2025)
+Platform parity implementation for Android:
+- Shows file size (formatted as B/KB/MB/GB)
+- Tag flags display on left side
+- Column layout with dynamic aspect ratio adjustment
+- When hidden, flags overlay on image bottom-left
+- 24dp height matching iOS/macOS 24pt
+
 ## Apple Photos Thumbnail Handling
 
 Photolala uses a dual-path approach for Apple Photos thumbnails:

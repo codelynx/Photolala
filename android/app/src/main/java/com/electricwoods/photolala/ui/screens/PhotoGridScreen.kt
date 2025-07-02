@@ -24,6 +24,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.input.key.*
@@ -66,6 +67,7 @@ fun PhotoGridScreen(
 	val photoTags by viewModel.photoTags.collectAsState()
 	val thumbnailSize by viewModel.thumbnailSize.collectAsState()
 	val gridScaleMode by viewModel.gridScaleMode.collectAsState()
+	val showInfoBar by viewModel.showInfoBar.collectAsState()
 	val context = LocalContext.current
 	
 	// Tag selection dialog state
@@ -175,8 +177,10 @@ fun PhotoGridScreen(
 						GridViewOptionsMenu(
 							currentThumbnailSize = thumbnailSize,
 							currentScaleMode = gridScaleMode,
+							showInfoBar = showInfoBar,
 							onThumbnailSizeChange = viewModel::updateThumbnailSize,
-							onScaleModeChange = viewModel::updateGridScaleMode
+							onScaleModeChange = viewModel::updateGridScaleMode,
+							onShowInfoBarChange = viewModel::updateShowInfoBar
 						)
 					}
 				)
@@ -209,6 +213,7 @@ fun PhotoGridScreen(
 						photoTags = photoTags,
 						thumbnailSize = thumbnailSize,
 						scaleMode = gridScaleMode,
+						showInfoBar = showInfoBar,
 						onPhotoClick = { photo, index ->
 							// Tap always toggles selection
 							if (!isSelectionMode) {
@@ -278,6 +283,7 @@ private fun PhotoGrid(
 	photoTags: Map<String, Set<com.electricwoods.photolala.models.ColorFlag>>,
 	thumbnailSize: Int,
 	scaleMode: String,
+	showInfoBar: Boolean,
 	onPhotoClick: (PhotoMediaStore, Int) -> Unit,
 	onPhotoLongClick: (PhotoMediaStore) -> Unit,
 	onLoadMore: () -> Unit
@@ -327,6 +333,7 @@ private fun PhotoGrid(
 				tags = photoTags[photo.id] ?: emptySet(),
 				thumbnailSize = thumbnailSize,
 				scaleMode = scaleMode,
+				showInfoBar = showInfoBar,
 				onClick = { onPhotoClick(photo, photos.indexOf(photo)) },
 				onLongClick = { onPhotoLongClick(photo) }
 			)
@@ -343,12 +350,13 @@ private fun PhotoThumbnail(
 	tags: Set<com.electricwoods.photolala.models.ColorFlag>,
 	thumbnailSize: Int,
 	scaleMode: String,
+	showInfoBar: Boolean,
 	onClick: () -> Unit,
 	onLongClick: () -> Unit
 ) {
-	Box(
+	Column(
 		modifier = Modifier
-			.aspectRatio(1f)
+			.aspectRatio(if (showInfoBar) thumbnailSize.toFloat() / (thumbnailSize + 24f) else 1f)
 			.combinedClickable(
 				onClick = onClick,
 				onLongClick = onLongClick
@@ -357,7 +365,7 @@ private fun PhotoThumbnail(
 				if (isSelected && isSelectionMode) {
 					MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)
 				} else {
-					Color.LightGray
+					Color.Transparent
 				},
 				shape = RoundedCornerShape(8.dp)
 			)
@@ -373,56 +381,122 @@ private fun PhotoThumbnail(
 				}
 			)
 	) {
-		AsyncImage(
-			model = ImageRequest.Builder(LocalContext.current)
-				.data(photo.uri)
-				.crossfade(true)
-				.size(thumbnailSize)
-				.listener(
-					onStart = {
-						// Log when loading starts
-						android.util.Log.d("PhotoGrid", "Loading image: ${photo.uri}")
-					},
-					onError = { _, result ->
-						// Log any errors
-						android.util.Log.e("PhotoGrid", "Error loading ${photo.uri}: ${result.throwable}")
-					}
-				)
-				.build(),
-			contentDescription = photo.filename,
-			contentScale = if (scaleMode == "fit") ContentScale.Fit else ContentScale.Crop,
-			modifier = Modifier.fillMaxSize(),
-			placeholder = ColorPainter(Color.LightGray),
-			error = ColorPainter(Color.Red.copy(alpha = 0.3f))
-		)
-		
-		// Tag flags overlay
-		if (tags.isNotEmpty()) {
-			Row(
-				modifier = Modifier
-					.align(Alignment.BottomStart)
-					.padding(4.dp),
-				horizontalArrangement = Arrangement.spacedBy(2.dp)
-			) {
-				tags.sortedBy { it.value }.forEach { colorFlag ->
-					Icon(
-						imageVector = Icons.Default.Flag,
-						contentDescription = "Tag ${colorFlag.value}",
-						modifier = Modifier.size(16.dp),
-						tint = when (colorFlag.value) {
-							1 -> Color.Red
-							2 -> Color(0xFFFFA500) // Orange
-							3 -> Color.Yellow
-							4 -> Color.Green
-							5 -> Color.Blue
-							6 -> Color(0xFF800080) // Purple
-							7 -> Color.Gray
-							else -> Color.Gray
+		// Image container
+		Box(
+			modifier = Modifier
+				.weight(1f)
+				.fillMaxWidth()
+				.background(Color.LightGray, shape = RoundedCornerShape(8.dp))
+		) {
+			AsyncImage(
+				model = ImageRequest.Builder(LocalContext.current)
+					.data(photo.uri)
+					.crossfade(true)
+					.size(thumbnailSize)
+					.listener(
+						onStart = {
+							// Log when loading starts
+							android.util.Log.d("PhotoGrid", "Loading image: ${photo.uri}")
+						},
+						onError = { _, result ->
+							// Log any errors
+							android.util.Log.e("PhotoGrid", "Error loading ${photo.uri}: ${result.throwable}")
 						}
 					)
+					.build(),
+				contentDescription = photo.filename,
+				contentScale = if (scaleMode == "fit") ContentScale.Fit else ContentScale.Crop,
+				modifier = Modifier
+					.fillMaxSize()
+					.clip(RoundedCornerShape(8.dp)),
+				placeholder = ColorPainter(Color.LightGray),
+				error = ColorPainter(Color.Red.copy(alpha = 0.3f))
+			)
+			
+			// Tag flags overlay (only when info bar is hidden)
+			if (!showInfoBar && tags.isNotEmpty()) {
+				Row(
+					modifier = Modifier
+						.align(Alignment.BottomStart)
+						.padding(4.dp),
+					horizontalArrangement = Arrangement.spacedBy(2.dp)
+				) {
+					tags.sortedBy { it.value }.forEach { colorFlag ->
+						Icon(
+							imageVector = Icons.Default.Flag,
+							contentDescription = "Tag ${colorFlag.value}",
+							modifier = Modifier.size(16.dp),
+							tint = when (colorFlag.value) {
+								1 -> Color.Red
+								2 -> Color(0xFFFFA500) // Orange
+								3 -> Color.Yellow
+								4 -> Color.Green
+								5 -> Color.Blue
+								6 -> Color(0xFF800080) // Purple
+								7 -> Color.Gray
+								else -> Color.Gray
+							}
+						)
+					}
 				}
 			}
 		}
+		
+		// Info bar
+		if (showInfoBar) {
+			Row(
+				modifier = Modifier
+					.fillMaxWidth()
+					.height(24.dp)
+					.padding(horizontal = 4.dp),
+				horizontalArrangement = Arrangement.SpaceBetween,
+				verticalAlignment = Alignment.CenterVertically
+			) {
+				// Tag flags
+				if (tags.isNotEmpty()) {
+					Row(
+						horizontalArrangement = Arrangement.spacedBy(2.dp)
+					) {
+						tags.sortedBy { it.value }.forEach { colorFlag ->
+							Icon(
+								imageVector = Icons.Default.Flag,
+								contentDescription = "Tag ${colorFlag.value}",
+								modifier = Modifier.size(12.dp),
+								tint = when (colorFlag.value) {
+									1 -> Color.Red
+									2 -> Color(0xFFFFA500) // Orange
+									3 -> Color.Yellow
+									4 -> Color.Green
+									5 -> Color.Blue
+									6 -> Color(0xFF800080) // Purple
+									7 -> Color.Gray
+									else -> Color.Gray
+								}
+							)
+						}
+					}
+				} else {
+					Spacer(modifier = Modifier.width(1.dp))
+				}
+				
+				// File size
+				Text(
+					text = formatFileSize(photo.fileSize ?: 0L),
+					style = MaterialTheme.typography.labelSmall,
+					color = MaterialTheme.colorScheme.onSurfaceVariant
+				)
+			}
+		}
+	}
+}
+
+// Helper function to format file size
+private fun formatFileSize(sizeInBytes: Long): String {
+	return when {
+		sizeInBytes < 1024 -> "$sizeInBytes B"
+		sizeInBytes < 1024 * 1024 -> "${sizeInBytes / 1024} KB"
+		sizeInBytes < 1024 * 1024 * 1024 -> "${sizeInBytes / (1024 * 1024)} MB"
+		else -> "${sizeInBytes / (1024 * 1024 * 1024)} GB"
 	}
 }
 

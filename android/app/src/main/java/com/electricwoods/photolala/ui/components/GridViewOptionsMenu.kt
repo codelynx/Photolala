@@ -15,8 +15,10 @@ import com.electricwoods.photolala.utils.DeviceUtils
 fun GridViewOptionsMenu(
 	currentThumbnailSize: Int,
 	currentScaleMode: String,
+	showInfoBar: Boolean,
 	onThumbnailSizeChange: (Int) -> Unit,
 	onScaleModeChange: (String) -> Unit,
+	onShowInfoBarChange: (Boolean) -> Unit,
 	modifier: Modifier = Modifier
 ) {
 	var expanded by remember { mutableStateOf(false) }
@@ -88,6 +90,28 @@ fun GridViewOptionsMenu(
 					}
 				)
 			}
+			
+			Divider(modifier = Modifier.padding(vertical = 8.dp))
+			
+			// Info bar toggle
+			DropdownMenuItem(
+				text = { 
+					Row(
+						horizontalArrangement = Arrangement.SpaceBetween,
+						modifier = Modifier.fillMaxWidth()
+					) {
+						Text("Show Info Bar")
+						Checkbox(
+							checked = showInfoBar,
+							onCheckedChange = null
+						)
+					}
+				},
+				onClick = {
+					onShowInfoBarChange(!showInfoBar)
+					expanded = false
+				}
+			)
 		}
 	}
 }

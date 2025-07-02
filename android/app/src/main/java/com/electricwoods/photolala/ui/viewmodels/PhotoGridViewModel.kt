@@ -69,6 +69,13 @@ class PhotoGridViewModel @Inject constructor(
 			initialValue = PreferencesManager.DEFAULT_GRID_SCALE_MODE
 		)
 	
+	val showInfoBar: StateFlow<Boolean> = preferencesManager.showInfoBar
+		.stateIn(
+			scope = viewModelScope,
+			started = SharingStarted.WhileSubscribed(5_000),
+			initialValue = PreferencesManager.DEFAULT_SHOW_INFO_BAR
+		)
+	
 	
 	init {
 		// Load tags for photos when they are loaded
@@ -316,6 +323,12 @@ class PhotoGridViewModel @Inject constructor(
 	fun updateGridScaleMode(mode: String) {
 		viewModelScope.launch {
 			preferencesManager.setGridScaleMode(mode)
+		}
+	}
+	
+	fun updateShowInfoBar(show: Boolean) {
+		viewModelScope.launch {
+			preferencesManager.setShowInfoBar(show)
 		}
 	}
 	
