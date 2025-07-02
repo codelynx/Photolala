@@ -392,7 +392,7 @@ Framework Layer (Room, Network, MediaStore)
 - ✅ Image caching with Coil
 
 ### Estimated Effort (Updated July 2)
-With Phase 1, 2, and partial Phase 4 complete (~3 days of work), the remaining effort estimate:
+With Phase 1, 2, and Phase 4.1 (Selection) complete (~3 days of work), the remaining effort estimate:
 - Phase 3: Services Layer (1 week)
 - Phase 4: Selection & Operations (2 days remaining - batch operations, keyboard shortcuts)
 - Phase 5: S3/Cloud Integration (2 weeks)
@@ -602,3 +602,11 @@ This review should be updated weekly as implementation progresses to track compl
 - Icon changes: SelectAll ↔ CheckBoxOutlineBlank
 - Maintains selection mode after deselecting all for continued selection
 - More touch-friendly than separate menu items
+
+**Troubleshooting & Utilities (July 2, 2025):**
+- Created helper scripts for test photo management:
+  - `download-and-push-photos.sh`: One-step photo loader for emulator
+  - Downloads from Unsplash and auto-pushes to device
+- Fixed image loading issue: Android robot placeholders
+  - Root cause: Missing READ_MEDIA_IMAGES permission
+  - Solution: Grant permissions via ADB or UI flow

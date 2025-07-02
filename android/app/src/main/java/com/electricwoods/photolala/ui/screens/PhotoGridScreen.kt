@@ -23,6 +23,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.painter.ColorPainter
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
@@ -230,13 +231,23 @@ private fun PhotoThumbnail(
 			model = ImageRequest.Builder(LocalContext.current)
 				.data(photo.uri)
 				.crossfade(true)
-				.size(300) // Request 300px thumbnails
+				.size(400) // Larger thumbnail size
+				.listener(
+					onStart = {
+						// Log when loading starts
+						android.util.Log.d("PhotoGrid", "Loading image: ${photo.uri}")
+					},
+					onError = { _, result ->
+						// Log any errors
+						android.util.Log.e("PhotoGrid", "Error loading ${photo.uri}: ${result.throwable}")
+					}
+				)
 				.build(),
 			contentDescription = photo.filename,
 			contentScale = ContentScale.Crop,
 			modifier = Modifier.fillMaxSize(),
-			placeholder = painterResource(R.drawable.ic_launcher_foreground), // Placeholder while loading
-			error = painterResource(R.drawable.ic_launcher_foreground) // Error image
+			placeholder = ColorPainter(Color.LightGray),
+			error = ColorPainter(Color.Red.copy(alpha = 0.3f))
 		)
 	}
 }
