@@ -114,7 +114,7 @@ class GoogleAuthService @Inject constructor(
 						val authCredential = AuthCredential(
 							provider = AuthProvider.GOOGLE,
 							providerID = googleIdTokenCredential.id,
-							email = googleIdTokenCredential.id, // Google ID is the email
+							email = null, // Email not provided by GoogleIdTokenCredential
 							fullName = googleIdTokenCredential.displayName,
 							photoURL = googleIdTokenCredential.profilePictureUri?.toString(),
 							idToken = googleIdTokenCredential.idToken,

@@ -55,10 +55,11 @@ class GoogleSignInLegacyService @Inject constructor(
 		return try {
 			val account = task.getResult(ApiException::class.java)
 			Log.d(TAG, "Sign-in successful: ${account.email}")
+			Log.d(TAG, "Google User ID: ${account.id}")
 			
 			val credential = AuthCredential(
 				provider = AuthProvider.GOOGLE,
-				providerID = account.email ?: account.id ?: "",
+				providerID = account.id ?: "",
 				email = account.email,
 				fullName = account.displayName,
 				photoURL = account.photoUrl?.toString(),
