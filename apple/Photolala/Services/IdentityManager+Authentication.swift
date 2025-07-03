@@ -66,11 +66,21 @@ extension IdentityManager {
 			// Sign in failed - no account exists
 			throw AuthError.noAccountFound(provider: provider)
 			
-		case (.createAccount, let user?):
+		case (.createAccount, _?):
 			// Create account failed - user already exists
 			throw AuthError.accountAlreadyExists(provider: provider)
 			
 		case (.createAccount, nil):
+			// Check if there's an existing account with the same email
+			if let email = credential.email,
+			   let existingUserWithEmail = try await findUserByEmail(email) {
+				// Found existing account with same email - prompt for linking
+				throw AuthError.emailAlreadyInUse(
+					existingUser: existingUserWithEmail,
+					newCredential: credential
+				)
+			}
+			
 			// Create account successful - create new user
 			let serviceUserID = UUID().uuidString.lowercased()
 			
@@ -86,6 +96,11 @@ extension IdentityManager {
 			
 			try await saveUser(newUser)
 			try await createS3UserFolders(for: newUser)
+			
+			// Create email mapping if email exists
+			if let email = credential.email {
+				try await updateEmailMapping(email: email, serviceUserID: serviceUserID)
+			}
 			
 			await MainActor.run {
 				self.currentUser = newUser
@@ -103,6 +118,34 @@ extension IdentityManager {
 	/// Create a new account
 	func createAccount(with provider: AuthProvider) async throws -> PhotolalaUser {
 		try await authenticateAndProcess(with: provider, intent: .createAccount)
+	}
+	
+	/// Force create a new account even if email exists
+	func forceCreateAccount(with provider: AuthProvider, credential: AuthCredential) async throws -> PhotolalaUser {
+		// Skip email check and create new account
+		let serviceUserID = UUID().uuidString.lowercased()
+		
+		let newUser = PhotolalaUser(
+			serviceUserID: serviceUserID,
+			provider: provider,
+			providerID: credential.providerID,
+			email: credential.email,
+			fullName: credential.fullName,
+			photoURL: credential.photoURL,
+			subscription: Subscription.freeTrial()
+		)
+		
+		try await saveUser(newUser)
+		try await createS3UserFolders(for: newUser)
+		
+		// Don't create email mapping for forced accounts to avoid conflicts
+		
+		await MainActor.run {
+			self.currentUser = newUser
+			self.isSignedIn = true
+		}
+		
+		return newUser
 	}
 	
 	private enum AuthIntent {
@@ -127,9 +170,7 @@ extension IdentityManager {
 		let providerLink = ProviderLink(
 			provider: credential.provider,
 			providerID: credential.providerID,
-			email: credential.email,
-			linkedAt: Date(),
-			linkMethod: .userInitiated
+			linkedAt: Date()
 		)
 		
 		// Step 4: Update user
@@ -154,7 +195,7 @@ extension IdentityManager {
 		case .apple:
 			return try await authenticateWithApple()
 		case .google:
-			throw AuthError.providerNotImplemented
+			return try await GoogleAuthProvider.shared.signIn()
 		}
 	}
 	
@@ -326,9 +367,4 @@ extension IdentityManager {
 }
 
 // MARK: - Additional Auth Errors
-
-extension AuthError {
-	static var providerAlreadyLinked: AuthError {
-		.authenticationFailed(reason: "This provider is already linked to another account")
-	}
-}
+// Note: providerAlreadyLinked moved to AuthError enum in AuthProvider.swift

@@ -9,6 +9,8 @@ struct AuthenticationChoiceView: View {
 	@State private var authMode: AuthMode = .signIn
 	@State private var showError = false
 	@State private var errorMessage = ""
+	@State private var showAccountLinking = false
+	@State private var linkingData: (existingUser: PhotolalaUser, newCredential: AuthCredential)?
 	
 	enum AuthMode {
 		case signIn
@@ -209,10 +211,9 @@ struct AuthenticationChoiceView: View {
 						.cornerRadius(8)
 						#endif
 						
-						// Google Sign-In button (placeholder for now)
+						// Google Sign-In button
 						Button(action: {
-							// TODO: Implement Google Sign-In in Phase 2
-							handleError(AuthError.providerNotImplemented)
+							handleProviderSelection(.google)
 						}) {
 							HStack {
 								Image(systemName: "globe")
@@ -301,6 +302,45 @@ struct AuthenticationChoiceView: View {
 		} message: {
 			Text(errorMessage)
 		}
+		.sheet(isPresented: $showAccountLinking) {
+			if let data = linkingData {
+				AccountLinkingPrompt(
+					existingUser: data.existingUser,
+					newCredential: data.newCredential,
+					onLink: {
+						// Link the accounts
+						Task {
+							do {
+								_ = try await identityManager.linkProvider(
+									data.newCredential.provider,
+									credential: data.newCredential,
+									to: data.existingUser
+								)
+								dismiss()
+							} catch {
+								handleError(error)
+							}
+						}
+						showAccountLinking = false
+					},
+					onCreateNew: {
+						// Force create new account despite email match
+						Task {
+							do {
+								_ = try await identityManager.forceCreateAccount(
+									with: data.newCredential.provider,
+									credential: data.newCredential
+								)
+								dismiss()
+							} catch {
+								handleError(error)
+							}
+						}
+						showAccountLinking = false
+					}
+				)
+			}
+		}
 	}
 	
 	private func handleProviderSelection(_ provider: AuthProvider) {
@@ -322,6 +362,16 @@ struct AuthenticationChoiceView: View {
 	private func handleError(_ error: Error) {
 		// Don't show error for user cancellation
 		if error is CancellationError {
+			withAnimation(.easeInOut(duration: 0.3)) {
+				showingProviders = false
+			}
+			return
+		}
+		
+		// Check if it's an account linking scenario
+		if case AuthError.emailAlreadyInUse(let existingUser, let newCredential) = error {
+			linkingData = (existingUser, newCredential)
+			showAccountLinking = true
 			withAnimation(.easeInOut(duration: 0.3)) {
 				showingProviders = false
 			}

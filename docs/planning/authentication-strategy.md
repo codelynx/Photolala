@@ -14,16 +14,19 @@ This document outlines the authentication strategy for Photolala across Apple (i
 ## Current State
 
 ### Apple Platforms (iOS/macOS/tvOS)
-- **Implemented**: Sign in with Apple
-- **Architecture**: Native AuthenticationServices framework
+- **Implemented**: Sign in with Apple, Sign in with Google (July 3, 2025)
+- **Architecture**: Native AuthenticationServices framework, GoogleSignIn SDK v8.0.0
 - **Storage**: Keychain for secure credential storage
-- **User Model**: Internal service ID + Apple user ID
+- **User Model**: Internal service ID + provider user ID
 - **Subscription System**: Tiered storage plans (Free, Starter, Essential, Plus, Family)
+- **Cross-Device Auth**: S3-based identity persistence
 
 ### Android Platform
-- **Implemented**: None
-- **Current State**: No user authentication
-- **AWS Integration**: Basic credential management only
+- **Implemented**: Google Sign-In (July 3, 2025)
+- **Current State**: Complete authentication system with explicit signup/signin flows
+- **Architecture**: Credential Manager API with Google Sign-In SDK
+- **Storage**: Android Keystore encryption
+- **AWS Integration**: Full S3 identity mapping support
 
 ## Authentication Requirements
 
@@ -207,24 +210,24 @@ Mobile App -> Auth Provider -> Backend Service -> Database
 
 ### 4. Implementation Phases
 
-#### Phase 1: Android Authentication (Priority)
-1. Implement Google Sign-In for Android
-2. Create Android user model matching iOS structure
-3. Implement secure credential storage (Android Keystore)
-4. Add sign-in UI components
-5. Test subscription flow
+#### Phase 1: Android Authentication (✅ COMPLETED - July 3, 2025)
+1. ✅ Implement Google Sign-In for Android
+2. ✅ Create Android user model matching iOS structure
+3. ✅ Implement secure credential storage (Android Keystore)
+4. ✅ Add sign-in UI components
+5. ✅ Test subscription flow
 
-#### Phase 2: Google Sign-In for Apple Platforms
-1. Add Google Sign-In SDK to iOS/macOS
-2. Extend IdentityManager for multiple providers
-3. Update UI to show provider options
-4. Test cross-provider scenarios
+#### Phase 2: Google Sign-In for Apple Platforms (✅ COMPLETED - July 3, 2025)
+1. ✅ Add Google Sign-In SDK to iOS/macOS
+2. ✅ Extend IdentityManager for multiple providers
+3. ✅ Update UI to show provider options
+4. ✅ Test cross-provider scenarios
 
-#### Phase 3: Cross-Platform Account Linking
-1. Implement email-based account linking
-2. Add account management UI
-3. Handle provider switching
-4. Test migration scenarios
+#### Phase 3: Cross-Platform Account Linking (✅ COMPLETED - July 3, 2025)
+1. ✅ Implement S3-based identity persistence
+2. ✅ Add account management UI
+3. ✅ Handle provider ID to UUID mapping
+4. ✅ Test cross-device sign-in scenarios
 
 #### Phase 4: Backend Integration (Future)
 1. Design backend API

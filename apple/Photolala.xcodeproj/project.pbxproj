@@ -7,6 +7,8 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		CC52BA562E16B81E00908941 /* GoogleSignIn in Frameworks */ = {isa = PBXBuildFile; productRef = CC52BA552E16B81E00908941 /* GoogleSignIn */; };
+		CC52BA582E16B81E00908941 /* GoogleSignInSwift in Frameworks */ = {isa = PBXBuildFile; productRef = CC52BA572E16B81E00908941 /* GoogleSignInSwift */; };
 		CC8E83C22E0001E200FE4558 /* AWSS3 in Frameworks */ = {isa = PBXBuildFile; productRef = CC8E83C12E0001E200FE4558 /* AWSS3 */; };
 		CC8E83C42E0001F800FE4558 /* AWSClientRuntime in Frameworks */ = {isa = PBXBuildFile; productRef = CC8E83C32E0001F800FE4558 /* AWSClientRuntime */; };
 /* End PBXBuildFile section */
@@ -34,9 +36,22 @@
 		CC72EFEB2DF6C68F00E1C25A /* PhotolalaUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = PhotolalaUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		CCC706582E1668D800B0766F /* Exceptions for "Photolala" folder in "Photolala" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = CC72EFD02DF6C68D00E1C25A /* Photolala */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
+
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		CC72EFD32DF6C68D00E1C25A /* Photolala */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				CCC706582E1668D800B0766F /* Exceptions for "Photolala" folder in "Photolala" target */,
+			);
 			path = Photolala;
 			sourceTree = "<group>";
 		};
@@ -59,6 +74,8 @@
 			files = (
 				CC8E83C42E0001F800FE4558 /* AWSClientRuntime in Frameworks */,
 				CC8E83C22E0001E200FE4558 /* AWSS3 in Frameworks */,
+				CC52BA562E16B81E00908941 /* GoogleSignIn in Frameworks */,
+				CC52BA582E16B81E00908941 /* GoogleSignInSwift in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -129,6 +146,8 @@
 			packageProductDependencies = (
 				CC8E83C12E0001E200FE4558 /* AWSS3 */,
 				CC8E83C32E0001F800FE4558 /* AWSClientRuntime */,
+				CC52BA552E16B81E00908941 /* GoogleSignIn */,
+				CC52BA572E16B81E00908941 /* GoogleSignInSwift */,
 			);
 			productName = Photolala;
 			productReference = CC72EFD12DF6C68D00E1C25A /* Photolala.app */;
@@ -214,6 +233,7 @@
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
 				CC8E83BF2E00018100FE4558 /* XCRemoteSwiftPackageReference "aws-sdk-swift" */,
+				CCC706562E1667EF00B0766F /* XCRemoteSwiftPackageReference "GoogleSignIn-iOS" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = CC72EFD22DF6C68D00E1C25A /* Products */;
@@ -365,6 +385,7 @@
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = Photolala/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = Photolala;
 				INFOPLIST_KEY_LSApplicationCategoryType = NSApplicationSupportsRestorableState;
 				INFOPLIST_KEY_NSPhotoLibraryAddUsageDescription = "Photolala needs permission to save photos to your photo library.";
@@ -459,6 +480,7 @@
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = Photolala/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = Photolala;
 				INFOPLIST_KEY_LSApplicationCategoryType = NSApplicationSupportsRestorableState;
 				INFOPLIST_KEY_NSPhotoLibraryAddUsageDescription = "Photolala needs permission to save photos to your photo library.";
@@ -839,9 +861,27 @@
 				minimumVersion = 1.3.36;
 			};
 		};
+		CCC706562E1667EF00B0766F /* XCRemoteSwiftPackageReference "GoogleSignIn-iOS" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/google/GoogleSignIn-iOS";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 8.0.0;
+			};
+		};
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
+		CC52BA552E16B81E00908941 /* GoogleSignIn */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = CCC706562E1667EF00B0766F /* XCRemoteSwiftPackageReference "GoogleSignIn-iOS" */;
+			productName = GoogleSignIn;
+		};
+		CC52BA572E16B81E00908941 /* GoogleSignInSwift */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = CCC706562E1667EF00B0766F /* XCRemoteSwiftPackageReference "GoogleSignIn-iOS" */;
+			productName = GoogleSignInSwift;
+		};
 		CC8E83C12E0001E200FE4558 /* AWSS3 */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = CC8E83BF2E00018100FE4558 /* XCRemoteSwiftPackageReference "aws-sdk-swift" */;

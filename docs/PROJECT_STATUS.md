@@ -1299,6 +1299,38 @@ The application now has a complete authentication system with explicit sign-up/s
      - Cross-device authentication prepared
      - Consistent with iOS/macOS implementation
 
+54. **Google Sign-In Integration for iOS/macOS (July 3)**:
+   - **SDK Integration**:
+     - Added GoogleSignIn SDK v8.0.0 via Swift Package Manager
+     - Manually linked GoogleSignIn and GoogleSignInSwift frameworks to Photolala target
+     - Updated to async/await API from completion-based callbacks
+     - Fixed all API compatibility issues with v8.0.0
+   
+   - **OAuth Configuration**:
+     - Created OAuth 2.0 client IDs for iOS and macOS bundle IDs
+     - iOS Client ID: 105828093997-m35e980noaks5ahke5ge38q76rgq2bik
+     - Configured URL schemes in Info.plist
+     - Added CFBundleURLTypes for OAuth callback handling
+   
+   - **Implementation Details**:
+     - GoogleAuthProvider actor with async/await methods
+     - Updated AuthCredential model with Google-specific properties
+     - Fixed AccountLinkingPrompt preview to use new initializer
+     - Proper error handling with mapped error types
+   
+   - **Platform Support**:
+     - ✅ iOS Simulator (builds successfully)
+     - ✅ iPad Simulator (builds successfully)
+     - ✅ macOS (builds successfully)
+     - ✅ Physical iPhone device (tested and working)
+     - ⚠️ Simulator has known passkey/authentication limitations
+   
+   - **Integration Complete**:
+     - Google Sign-In button shows in authentication UI
+     - Sign-in flow ready for testing
+     - Provider ID to UUID mapping supported
+     - Cross-device authentication prepared
+
 51. **Scale Mode (Fit/Fill) Implementation (July 2)**:
    - **iOS/macOS Implementation**:
      - Added scale mode toggle to unified gear menu

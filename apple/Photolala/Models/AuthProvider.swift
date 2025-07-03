@@ -1,6 +1,6 @@
 import Foundation
 
-enum AuthProvider: String, Codable {
+enum AuthProvider: String, Codable, CaseIterable {
 	case apple = "apple"
 	case google = "google"
 	
@@ -8,6 +8,13 @@ enum AuthProvider: String, Codable {
 		switch self {
 		case .apple: return "Apple"
 		case .google: return "Google"
+		}
+	}
+	
+	var iconName: String {
+		switch self {
+		case .apple: return "apple.logo"
+		case .google: return "globe"
 		}
 	}
 }
@@ -20,6 +27,23 @@ enum AuthError: LocalizedError {
 	case invalidCredentials
 	case networkError
 	case keychainError
+	case userCancelled
+	case noStoredCredentials
+	case unknownError(String)
+	
+	// Account linking errors
+	case emailAlreadyInUse(existingUser: PhotolalaUser, newCredential: AuthCredential)
+	case providerAlreadyLinked
+	case providerInUseByAnotherAccount
+	case cannotUnlinkLastProvider
+	case emailMismatch
+	
+	// Custom error with code and message
+	case custom(code: String, message: String)
+	
+	init(code: String, message: String) {
+		self = .custom(code: code, message: message)
+	}
 	
 	var errorDescription: String? {
 		switch self {
@@ -37,6 +61,27 @@ enum AuthError: LocalizedError {
 			return "Network error. Please check your connection."
 		case .keychainError:
 			return "Failed to save account information"
+		case .userCancelled:
+			return "Sign in was cancelled"
+		case .noStoredCredentials:
+			return "No stored credentials found"
+		case .unknownError(let message):
+			return message
+			
+		// Account linking errors
+		case .emailAlreadyInUse:
+			return "An account with this email already exists"
+		case .providerAlreadyLinked:
+			return "This sign-in method is already linked to your account"
+		case .providerInUseByAnotherAccount:
+			return "This sign-in method is already used by another account"
+		case .cannotUnlinkLastProvider:
+			return "Cannot remove your only sign-in method"
+		case .emailMismatch:
+			return "The email addresses don't match"
+			
+		case .custom(_, let message):
+			return message
 		}
 	}
 }

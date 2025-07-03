@@ -54,7 +54,7 @@ New to Photolala?
 Sign in with / Create account with
 
 [Apple Logo] Sign in with Apple - Black button
-[Globe Icon] Sign in with Google - Gray button (placeholder)
+[Google Logo] Sign in with Google - White button
 
 [Back] - Text link
 ```

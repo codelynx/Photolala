@@ -10,6 +10,10 @@ struct AuthCredential {
 	let identityToken: Data?
 	let authorizationCode: Data?
 	
+	// Google Sign In properties
+	let idToken: String?
+	let accessToken: String?
+	
 	// For Apple Sign In
 	init(appleCredential: ASAuthorizationAppleIDCredential) {
 		self.provider = .apple
@@ -19,17 +23,20 @@ struct AuthCredential {
 		self.photoURL = nil
 		self.identityToken = appleCredential.identityToken
 		self.authorizationCode = appleCredential.authorizationCode
+		self.idToken = nil
+		self.accessToken = nil
 	}
 	
-	// For Google Sign In (placeholder for Phase 2)
-	init(googleUser: Any) {
-		// TODO: Implement in Phase 2
-		self.provider = .google
-		self.providerID = ""
-		self.email = nil
-		self.fullName = nil
-		self.photoURL = nil
+	// For Google Sign In
+	init(provider: AuthProvider, providerID: String, email: String?, fullName: String?, photoURL: String?, idToken: String?, accessToken: String?) {
+		self.provider = provider
+		self.providerID = providerID
+		self.email = email
+		self.fullName = fullName
+		self.photoURL = photoURL
 		self.identityToken = nil
 		self.authorizationCode = nil
+		self.idToken = idToken
+		self.accessToken = accessToken
 	}
 }

@@ -76,12 +76,23 @@ struct PhotolalaUser: Codable {
 
 // MARK: - Provider Link
 
-struct ProviderLink: Codable {
+struct ProviderLink: Codable, Identifiable {
 	let provider: AuthProvider
 	let providerID: String
 	let email: String?            // Provider-specific email
 	let linkedAt: Date
-	let linkMethod: LinkMethod    // How it was linked
+	let linkMethod: LinkMethod = .userInitiated    // Default to user initiated
+	
+	var id: String {
+		"\(provider.rawValue):\(providerID)"
+	}
+	
+	init(provider: AuthProvider, providerID: String, linkedAt: Date = Date()) {
+		self.provider = provider
+		self.providerID = providerID
+		self.email = nil
+		self.linkedAt = linkedAt
+	}
 }
 
 enum LinkMethod: String, Codable {

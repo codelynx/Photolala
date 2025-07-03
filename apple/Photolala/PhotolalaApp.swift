@@ -6,6 +6,9 @@
 //
 
 import SwiftUI
+#if canImport(GoogleSignIn)
+import GoogleSignIn
+#endif
 
 #if os(macOS)
 	class AppDelegate: NSObject, NSApplicationDelegate {
@@ -75,6 +78,37 @@ struct PhotolalaApp: App {
 		
 		// Perform cache migration if needed
 		CacheManager.shared.performMigrationIfNeeded()
+		
+		// Configure Google Sign-In
+		configureGoogleSignIn()
+	}
+	
+	private func configureGoogleSignIn() {
+		#if canImport(GoogleSignIn)
+		// Web Client ID for server-side verification (same as Android)
+		let webClientID = "105828093997-qmr9jdj3h4ia0tt2772cnrejh4k0p609.apps.googleusercontent.com"
+		
+		// Extract iOS client ID from Info.plist
+		guard let path = Bundle.main.path(forResource: "Info", ofType: "plist"),
+			  let plist = NSDictionary(contentsOfFile: path),
+			  let urlTypes = plist["CFBundleURLTypes"] as? [[String: Any]],
+			  let urlSchemes = urlTypes.first?["CFBundleURLSchemes"] as? [String],
+			  let reversedClientId = urlSchemes.first(where: { $0.hasPrefix("com.googleusercontent.apps.") }) else {
+			print("[GoogleSignIn] Warning: Google Sign-In client ID not found in Info.plist")
+			return
+		}
+		
+		// Extract client ID from reversed client ID
+		let components = reversedClientId.replacingOccurrences(of: "com.googleusercontent.apps.", with: "")
+		let clientId = components + ".apps.googleusercontent.com"
+		
+		print("[GoogleSignIn] Configuring with client ID: \(clientId)")
+		
+		GIDSignIn.sharedInstance.configuration = GIDConfiguration(
+			clientID: clientId,
+			serverClientID: webClientID
+		)
+		#endif
 	}
 	
 
@@ -82,15 +116,20 @@ struct PhotolalaApp: App {
 		#if os(macOS)
 			// Folder browser windows only - no default window
 			WindowGroup("Photolala", for: URL.self) { $folderURL in
-				if let folderURL {
-					DirectoryPhotoBrowserView(directoryPath: folderURL.path as NSString)
-						.environmentObject(IdentityManager.shared)
+				Group {
+					if let folderURL {
+						DirectoryPhotoBrowserView(directoryPath: folderURL.path as NSString)
+							.environmentObject(IdentityManager.shared)
+					}
+//					else {
+//						Text("No folder selected")
+//							.foregroundStyle(.secondary)
+//							.frame(minWidth: 400, minHeight: 300)
+//					}
 				}
-//				else {
-//					Text("No folder selected")
-//						.foregroundStyle(.secondary)
-//						.frame(minWidth: 400, minHeight: 300)
-//				}
+				.onOpenURL { url in
+					handleOpenURL(url)
+				}
 			}
 			.defaultSize(width: 1200, height: 600)
 			.commands {
@@ -103,7 +142,25 @@ struct PhotolalaApp: App {
 					WelcomeView()
 						.environmentObject(IdentityManager.shared)
 				}
+				.onOpenURL { url in
+					handleOpenURL(url)
+				}
 			}
 		#endif
+	}
+	
+	private func handleOpenURL(_ url: URL) {
+		#if canImport(GoogleSignIn)
+		// Try Google Sign-In first
+		Task {
+			if await GoogleAuthProvider.shared.handle(url: url) {
+				print("[GoogleSignIn] Handled URL callback")
+				return
+			}
+		}
+		#endif
+		
+		// Handle other URL schemes if needed
+		print("[PhotolalaApp] Unhandled URL: \(url)")
 	}
 }
