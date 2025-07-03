@@ -28,6 +28,17 @@ fun AuthenticationScreen(
 	val identityManager = viewModel.identityManager
 	val isLoading by identityManager.isLoading.collectAsStateWithLifecycle()
 	val errorMessage by identityManager.errorMessage.collectAsStateWithLifecycle()
+	val currentUser by identityManager.currentUser.collectAsStateWithLifecycle()
+	
+	// Monitor authentication state changes
+	LaunchedEffect(currentUser) {
+		android.util.Log.d("AuthenticationScreen", "LaunchedEffect triggered, currentUser: $currentUser")
+		if (currentUser != null) {
+			android.util.Log.d("AuthenticationScreen", "User authenticated, calling onAuthSuccess")
+			// User successfully authenticated, trigger success callback
+			onAuthSuccess()
+		}
+	}
 	
 	Column(
 		modifier = Modifier
@@ -107,38 +118,42 @@ fun AuthenticationScreen(
 		
 		Spacer(modifier = Modifier.height(16.dp))
 		
-		// Apple Sign In Button (disabled for Android)
-		OutlinedButton(
-			onClick = { /* Not available on Android */ },
+		// Apple Sign In Button
+		Button(
+			onClick = {
+				viewModel.authenticate(
+					provider = AuthProvider.APPLE,
+					isSignUp = isSignUp,
+					onSuccess = onAuthSuccess
+				)
+			},
 			modifier = Modifier
 				.fillMaxWidth()
 				.height(56.dp),
-			enabled = false
+			enabled = !isLoading,
+			colors = ButtonDefaults.buttonColors(
+				containerColor = Color.Black,
+				contentColor = Color.White
+			)
 		) {
 			Row(
 				verticalAlignment = Alignment.CenterVertically,
 				horizontalArrangement = Arrangement.Center
 			) {
 				Icon(
-					painter = painterResource(id = R.drawable.ic_launcher_foreground),
+					painter = painterResource(id = R.drawable.ic_apple_logo),
 					contentDescription = null,
-					modifier = Modifier.size(24.dp)
+					modifier = Modifier.size(24.dp),
+					tint = Color.White
 				)
 				Spacer(modifier = Modifier.width(12.dp))
 				Text(
-					text = "Sign in with Apple",
-					fontSize = 16.sp
+					text = if (isSignUp) "Continue with Apple" else "Sign in with Apple",
+					fontSize = 16.sp,
+					color = Color.White
 				)
 			}
 		}
-		
-		Spacer(modifier = Modifier.height(8.dp))
-		
-		Text(
-			text = "Apple Sign In is not available on Android",
-			fontSize = 12.sp,
-			color = MaterialTheme.colorScheme.onSurfaceVariant
-		)
 		
 		// Error message
 		errorMessage?.let { error ->

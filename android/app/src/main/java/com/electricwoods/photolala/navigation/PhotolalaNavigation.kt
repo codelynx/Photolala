@@ -21,6 +21,9 @@ object PhotolalaNavigation {
 	// Static reference to handle Google Sign-In result
 	internal var pendingGoogleSignInHandler: ((Intent?) -> Unit)? = null
 	
+	// Track if we were in create account flow when Apple Sign-In was triggered
+	internal var wasInCreateAccountFlow: Boolean = false
+	
 	fun handleGoogleSignInResult(data: Intent?) {
 		pendingGoogleSignInHandler?.invoke(data)
 		pendingGoogleSignInHandler = null
@@ -40,6 +43,15 @@ fun PhotolalaNavigation(
 		startDestination = PhotolalaRoute.Welcome.route
 	) {
 		composable(PhotolalaRoute.Welcome.route) {
+			// Check if we need to restore navigation state after Apple Sign-In
+			LaunchedEffect(Unit) {
+				if (PhotolalaNavigation.wasInCreateAccountFlow) {
+					// Reset the flag and navigate to create account
+					PhotolalaNavigation.wasInCreateAccountFlow = false
+					navController.navigate(PhotolalaRoute.CreateAccount.route)
+				}
+			}
+			
 			WelcomeScreen(
 				onBrowsePhotosClick = {
 					navController.navigate(PhotolalaRoute.PhotoGrid.route)
@@ -101,11 +113,21 @@ fun PhotolalaNavigation(
 					}
 					googleSignInLauncher.launch(intent)
 				}
+				
+				// Set up Apple Sign-In callback
+				authViewModel.onAppleSignInRequired = {
+					// Clear the create account flow flag
+					PhotolalaNavigation.wasInCreateAccountFlow = false
+					// Apple Sign-In will open in browser and return via deep link
+					// The callback is handled in MainActivity
+					// The browser is opened by AppleAuthService.signIn() which was already called
+				}
 			}
 			
 			AuthenticationScreen(
 				isSignUp = false,
 				onAuthSuccess = {
+					PhotolalaNavigation.wasInCreateAccountFlow = false
 					navController.popBackStack()
 				},
 				onCancel = {
@@ -129,11 +151,21 @@ fun PhotolalaNavigation(
 					}
 					googleSignInLauncher.launch(intent)
 				}
+				
+				// Set up Apple Sign-In callback
+				authViewModel.onAppleSignInRequired = {
+					// Mark that we're in create account flow
+					PhotolalaNavigation.wasInCreateAccountFlow = true
+					// Apple Sign-In will open in browser and return via deep link
+					// The callback is handled in MainActivity
+					// The browser is opened by AppleAuthService.signIn() which was already called
+				}
 			}
 			
 			AuthenticationScreen(
 				isSignUp = true,
 				onAuthSuccess = {
+					PhotolalaNavigation.wasInCreateAccountFlow = false
 					navController.popBackStack()
 				},
 				onCancel = {

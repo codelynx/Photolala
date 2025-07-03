@@ -7,5 +7,6 @@ data class AuthCredential(
 	val fullName: String?,
 	val photoURL: String?,
 	val idToken: String?,
-	val accessToken: String?
+	val accessToken: String?,
+	val serviceUserId: String? = null
 )
