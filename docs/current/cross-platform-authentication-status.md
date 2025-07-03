@@ -1,6 +1,6 @@
 # Cross-Platform Authentication Status
 
-Last Updated: July 3, 2025
+Last Updated: July 3, 2025 (Updated with Android provider ID fix)
 
 ## Overview
 
@@ -68,6 +68,7 @@ This enables users to sign in from any device and maintain their account.
 - **OAuth Client IDs**:
   - Android: com.electricwoods.photolala (SHA-1: 9B:E2:5F:F5...)
   - Web: 105828093997-qmr9jdj3h4ia0tt2772cnrejh4k0p609
+- **Provider ID**: Fixed to use Google user ID (not email address)
 
 ## Known Limitations
 
@@ -85,9 +86,9 @@ This enables users to sign in from any device and maintain their account.
 
 ### Working Features
 - ✅ Google Sign-In on iPhone (physical device)
-- ✅ Google Sign-In on Android
-- ✅ Cross-device sign-in (iOS ↔ Android)
-- ✅ S3 identity persistence
+- ✅ Google Sign-In on Android (with provider ID fix)
+- ✅ Cross-device sign-in (iOS ↔ Android) - Now working correctly
+- ✅ S3 identity persistence with consistent provider IDs
 - ✅ Sign out functionality
 
 ### Pending Testing
@@ -119,6 +120,14 @@ This enables users to sign in from any device and maintain their account.
 4. **Backend Service**: Replace S3-based identity with proper backend
 5. **Apple Sign-In on Android**: When Apple provides better support
 
+## Recent Fixes
+
+### Android Provider ID Bug (July 3, 2025)
+- **Issue**: Android was using email address instead of Google user ID
+- **Impact**: Created incorrect S3 mappings preventing cross-platform sign-in
+- **Fix**: Updated GoogleSignInLegacyService to use `account.id`
+- **Result**: iOS and Android now use consistent provider ID format
+
 ## Developer Notes
 
 ### Adding New Providers
@@ -135,3 +144,4 @@ This enables users to sign in from any device and maintain their account.
 2. Verify OAuth client configuration
 3. Test on physical devices when possible
 4. Review platform-specific logs
+5. Ensure provider IDs are consistent across platforms

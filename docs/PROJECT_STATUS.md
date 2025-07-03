@@ -742,6 +742,7 @@ The application now has a complete authentication system with explicit sign-up/s
 4. Fixed duplicate thumbnail loading in collection views
 5. Fixed photo matching logic in BackupQueueManager
 6. Fixed S3 catalog sync "file exists" error preventing cloud browser from working
+7. Fixed Android Google Sign-In using email instead of user ID for provider mapping
 
 ### 📋 Technical Debt
 
@@ -1331,6 +1332,21 @@ The application now has a complete authentication system with explicit sign-up/s
      - Provider ID to UUID mapping supported
      - Cross-device authentication prepared
 
+55. **Android Google Sign-In Provider ID Fix (July 3)**:
+   - **Issue Found**:
+     - Android was using email address as provider ID instead of Google user ID
+     - Created incorrect S3 mappings like `/identities/google:user@example.com`
+   
+   - **Fix Applied**:
+     - Updated GoogleSignInLegacyService to use `account.id` instead of `account.email`
+     - Added debug logging to verify Google user ID
+     - Fixed GoogleAuthService comment about ID being email
+   
+   - **Impact**:
+     - Ensures consistent identity mappings across iOS and Android
+     - Both platforms now use format: `/identities/google:115288286590115386621`
+     - Enables proper cross-device authentication
+
 51. **Scale Mode (Fit/Fill) Implementation (July 2)**:
    - **iOS/macOS Implementation**:
      - Added scale mode toggle to unified gear menu
@@ -1413,3 +1429,23 @@ The application now has a complete authentication system with explicit sign-up/s
      - Created credential-management.md
      - Script usage in scripts/README.md
      - Security best practices documented
+
+55. **Android Google Sign-In Provider ID Bug Fix (July 3)**:
+   - **Issue Identified**:
+     - Android was using email address instead of Google user ID for provider mappings
+     - Caused identity mismatch between iOS and Android platforms
+     - Created incorrect S3 mappings like `/identities/google:user@email.com`
+   
+   - **Fix Applied**:
+     - GoogleSignInLegacyService now correctly uses `account.id` instead of `account.email`
+     - Added debug logging to show Google User ID
+     - Ensures consistent provider ID format across platforms
+   
+   - **Correct Identity Format**:
+     - Before: `/identities/google:user@example.com` (incorrect)
+     - After: `/identities/google:115288286590115386621` (correct)
+   
+   - **Impact**:
+     - Cross-platform sign-in now works correctly
+     - Users can sign in on iOS and Android with same Google account
+     - Resolves to same serviceUserID on both platforms

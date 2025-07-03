@@ -1,5 +1,7 @@
 # Google Sign-In Implementation Summary
 
+Last Updated: July 3, 2025 (Added provider ID fix)
+
 ## Quick Reference for Future Implementations
 
 ### What Worked
@@ -46,6 +48,11 @@ You need **BOTH** in the same Google Cloud project:
 ### 4. Package Name Issues
 - OAuth client package doesn't match app
 - Android client already exists with package (can't create duplicate)
+
+### 5. Provider ID Issues (Fixed July 3, 2025)
+- Was using email instead of Google user ID
+- Fixed in GoogleSignInLegacyService.kt
+- Now correctly uses `account.id` for provider ID
 - Solution: Find existing client or use different package
 
 ## Implementation Checklist
@@ -86,3 +93,24 @@ MainActivity
 2. Add test email to OAuth consent screen
 3. Check Logcat for detailed errors
 4. Verify both OAuth clients exist in same project
+5. **IMPORTANT**: Verify provider ID uses `account.id` not `account.email`
+   - Check logs for "Google User ID: 115288286590115386621"
+   - S3 identity should be `/identities/google:115288286590115386621`
+   - NOT `/identities/google:user@example.com`
+
+### Issue
+Android was incorrectly using email as provider ID instead of Google user ID
+
+### Fix
+```kotlin
+// Correct:
+providerID = account.id ?: ""
+
+// Wrong:
+providerID = account.email ?: account.id ?: ""
+```
+
+### Verification
+Check S3 identity format:
+- ✅ Correct: `/identities/google:115288286590115386621`
+- ❌ Wrong: `/identities/google:user@example.com`
