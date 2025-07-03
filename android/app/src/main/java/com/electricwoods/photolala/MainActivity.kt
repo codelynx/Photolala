@@ -8,11 +8,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.*
 import androidx.compose.runtime.*
-import androidx.compose.ui.Modifier
 import androidx.core.content.ContextCompat
 import com.electricwoods.photolala.navigation.PhotolalaNavigation
 import com.electricwoods.photolala.ui.theme.PhotolalaTheme
@@ -20,6 +16,14 @@ import dagger.hilt.android.AndroidEntryPoint
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
+	
+	// Google Sign-In launcher
+	val googleSignInLauncher = registerForActivityResult(
+		ActivityResultContracts.StartActivityForResult()
+	) { result ->
+		// Pass the result to navigation
+		PhotolalaNavigation.handleGoogleSignInResult(result.data)
+	}
 	
 	private val requestPermissionLauncher = registerForActivityResult(
 		ActivityResultContracts.RequestPermission()
@@ -38,7 +42,9 @@ class MainActivity : ComponentActivity() {
 		
 		setContent {
 			PhotolalaTheme {
-				PhotolalaNavigation()
+				PhotolalaNavigation(
+					googleSignInLauncher = googleSignInLauncher
+				)
 			}
 		}
 	}

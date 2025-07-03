@@ -134,20 +134,50 @@ The UI follows Material3 design guidelines while maintaining functional parity w
 - S3Service extensions for identity operations
 - PreferencesManager updates for encrypted storage
 
-⏳ **Pending (External Configuration Required):**
-- Google Sign-In SDK integration
-- OAuth 2.0 client configuration
-- google-services.json setup
+✅ **Completed (July 3, 2025):**
+- Google Sign-In SDK integration using Legacy API (after Credential Manager API failed)
+- GoogleSignInLegacyService with traditional sign-in flow
+- IdentityManager integration with activity-based Google authentication
+- Google logo vector drawable
+- Setup documentation (GOOGLE_SIGNIN_SETUP.md)
+- Comprehensive troubleshooting documentation
+
+✅ **Configuration Completed:**
+- OAuth 2.0 clients configured in Google Cloud Console (photolala project)
+- Android OAuth client with SHA-1: 9B:E2:5F:F5:0A:1D:B9:3F:18:99:D0:FF:E2:3A:80:EF:5A:A7:FB:89
+- Web OAuth client ID: 105828093997-qmr9jdj3h4ia0tt2772cnrejh4k0p609.apps.googleusercontent.com
+- google-services.json configured and integrated
+
+## Implementation Changes
+
+### Google Sign-In - Legacy API Approach
+
+Due to persistent Error 28444 with Credential Manager API, we switched to the legacy Google Sign-In API:
+
+1. **Created GoogleSignInLegacyService**
+   - Uses `com.google.android.gms.auth.api.signin.GoogleSignIn`
+   - Implements activity result pattern
+   - Requires both Android and Web OAuth clients
+
+2. **Modified Authentication Flow**
+   - Added `GoogleSignInPending` exception to trigger activity launch
+   - Updated MainActivity with activity result launcher
+   - Connected through PhotolalaNavigation
+
+3. **OAuth Configuration**
+   - Consolidated to single Google Cloud project: `photolala`
+   - Deleted conflicting project `photolala-4b5ed`
+   - Both OAuth clients in same project
 
 ## Next Steps
 
-1. **Google Sign-In Configuration**
-   - Add Google Play Services dependencies
-   - Configure OAuth 2.0 client in Google Cloud Console
-   - Add google-services.json to project
-   - Implement authenticateWithGoogle() method
+1. **Code Cleanup**
+   - Remove GoogleAuthService.kt if staying with legacy approach
+   - Remove debug logging statements
+   - Add ProGuard rules for release builds
 
 2. **Testing**
+   - ✅ Google Sign-In functional
    - Test cross-device sign-in with iOS/macOS accounts
    - Verify S3 identity mappings
    - Test error scenarios
@@ -178,10 +208,45 @@ Custom AuthException sealed class hierarchy:
 - NetworkError
 - StorageError
 
+## Google Sign-In Implementation Details
+
+### GoogleSignInLegacyService (Active Implementation)
+- Traditional implementation using GoogleSignInClient
+- Activity-based sign-in flow with result handling
+- Requires both Android and Web OAuth clients
+- Web Client ID used for requestIdToken()
+- Comprehensive error mapping (10, 12500, 12501, 12502)
+
+### GoogleAuthService (Deprecated - Failed Implementation)
+- Modern implementation using Credential Manager API
+- Failed with persistent Error 28444
+- Kept for reference but not used
+
+### Error Handling
+Enhanced AuthException types:
+- UserCancelled - Silent handling, no error shown
+- NoGoogleAccount - Directs to add account
+- ConfigurationError - Shows setup instructions
+
+### UI Components
+- Google logo vector drawable with official colors
+- Proper Material3 button styling
+- Loading states during authentication
+- Error display with recovery options
+
 ## Code Locations
 
 - **Models**: `android/app/src/main/java/com/electricwoods/photolala/models/`
 - **Services**: `android/app/src/main/java/com/electricwoods/photolala/services/`
+  - `GoogleSignInLegacyService.kt` - Working Google Sign-In implementation
+  - `GoogleAuthService.kt` - Failed Credential Manager attempt (kept for reference)
+  - `IdentityManager.kt` - Updated with activity-based Google authentication
 - **UI**: `android/app/src/main/java/com/electricwoods/photolala/ui/screens/`
 - **ViewModels**: `android/app/src/main/java/com/electricwoods/photolala/ui/viewmodels/`
 - **Utils**: `android/app/src/main/java/com/electricwoods/photolala/utils/`
+- **Resources**: `android/app/src/main/res/drawable/`
+  - `ic_google_logo.xml` - Google brand logo
+- **Documentation**: 
+  - `android/GOOGLE_SIGNIN_SETUP.md` - Setup guide
+  - `android/docs/GOOGLE_SIGNIN_TROUBLESHOOTING_JOURNEY.md` - Complete troubleshooting history
+  - `android/docs/GOOGLE_SIGNIN_IMPLEMENTATION_SUMMARY.md` - Quick reference

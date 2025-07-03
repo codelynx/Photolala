@@ -5,6 +5,8 @@ plugins {
 	alias(libs.plugins.kotlin.serialization)
 	alias(libs.plugins.hilt)
 	alias(libs.plugins.ksp)
+	// Google Services plugin
+	alias(libs.plugins.google.services)
 }
 
 android {
@@ -96,6 +98,14 @@ dependencies {
 	
 	// Serialization
 	implementation(libs.kotlinx.serialization.json)
+	
+	// Google Sign-In
+	// Note: Requires google-services.json from Firebase/Google Cloud Console
+	// See GOOGLE_SIGNIN_SETUP.md for configuration instructions
+	implementation(libs.play.services.auth)
+	implementation(libs.androidx.credentials)
+	implementation(libs.androidx.credentials.play.services.auth)
+	implementation(libs.googleid)
 	
 	// Testing
 	testImplementation(libs.junit)

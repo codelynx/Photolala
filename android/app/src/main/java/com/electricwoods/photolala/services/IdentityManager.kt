@@ -1,6 +1,7 @@
 package com.electricwoods.photolala.services
 
 import android.content.Context
+import android.content.Intent
 import com.electricwoods.photolala.data.PreferencesManager
 import com.electricwoods.photolala.models.*
 import com.electricwoods.photolala.utils.SecurityUtils
@@ -18,7 +19,8 @@ import javax.inject.Singleton
 class IdentityManager @Inject constructor(
 	@ApplicationContext private val context: Context,
 	private val s3Service: S3Service,
-	private val preferencesManager: PreferencesManager
+	private val preferencesManager: PreferencesManager,
+	private val googleSignInLegacyService: GoogleSignInLegacyService
 ) {
 	private val json = Json { 
 		ignoreUnknownKeys = true
@@ -123,10 +125,15 @@ class IdentityManager @Inject constructor(
 				else -> Result.failure(AuthException.UnknownError)
 			}
 		} catch (e: Exception) {
-			_errorMessage.value = e.message
+			// Don't show error for user cancellation or pending sign-in
+			if (e !is AuthException.UserCancelled && e !is AuthException.GoogleSignInPending) {
+				_errorMessage.value = e.message
+			}
+			// For GoogleSignInPending, we don't set loading to false yet
+			if (e !is AuthException.GoogleSignInPending) {
+				_isLoading.value = false
+			}
 			return Result.failure(e)
-		} finally {
-			_isLoading.value = false
 		}
 	}
 	
@@ -138,11 +145,128 @@ class IdentityManager @Inject constructor(
 		}
 	}
 	
-	// Google authentication (to be implemented with actual Google Sign-In)
+	// Store the pending auth info for Google Sign-In
+	data class PendingGoogleAuth(
+		val intent: Intent,
+		val authIntent: AuthIntent
+	)
+	
+	var pendingGoogleAuth: PendingGoogleAuth? = null
+		private set
+	
+	// Google authentication using GoogleSignInLegacyService
 	private suspend fun authenticateWithGoogle(): Result<AuthCredential> {
-		// TODO: Implement actual Google Sign-In
-		// For now, return a mock result for development
-		return Result.failure(AuthException.ProviderNotImplemented)
+		// For Google Sign-In, we need to return a special error that triggers the activity
+		// The actual authentication will happen when handleGoogleSignInResult is called
+		return Result.failure(AuthException.GoogleSignInPending)
+	}
+	
+	// Create Google Sign-In intent and store auth intent
+	fun prepareGoogleSignIn(authIntent: AuthIntent): Intent {
+		val signInIntent = googleSignInLegacyService.getSignInIntent()
+		pendingGoogleAuth = PendingGoogleAuth(signInIntent, authIntent)
+		return signInIntent
+	}
+	
+	// Handle Google Sign-In result from activity
+	suspend fun handleGoogleSignInResult(data: Intent?): Result<PhotolalaUser> {
+		val authIntent = pendingGoogleAuth?.authIntent ?: AuthIntent.SIGN_IN
+		pendingGoogleAuth = null
+		
+		_isLoading.value = true
+		_errorMessage.value = null
+		
+		return try {
+			// Get the credential from the sign-in result
+			val credentialResult = googleSignInLegacyService.handleSignInResult(data)
+			
+			if (credentialResult.isFailure) {
+				val error = credentialResult.exceptionOrNull()
+				val authException = when (error) {
+					is GoogleAuthException.UserCancelled -> AuthException.UserCancelled
+					is GoogleAuthException.ConfigurationError -> AuthException.ConfigurationError(error.message)
+					is GoogleAuthException.NetworkError -> AuthException.NetworkError
+					else -> AuthException.AuthenticationFailed(error?.message ?: "Google Sign-In failed")
+				}
+				
+				if (authException !is AuthException.UserCancelled) {
+					_errorMessage.value = authException.message
+				}
+				return Result.failure(authException)
+			}
+			
+			val credential = credentialResult.getOrThrow()
+			
+			// Now process the credential based on the auth intent
+			val existingUser = findUserByProviderID(AuthProvider.GOOGLE, credential.providerID)
+			
+			when {
+				authIntent == AuthIntent.SIGN_IN && existingUser != null -> {
+					// Sign in successful - user exists
+					val updatedUser = existingUser.copy(
+						email = credential.email ?: existingUser.email,
+						fullName = credential.fullName ?: existingUser.fullName,
+						photoURL = credential.photoURL ?: existingUser.photoURL,
+						lastUpdated = Date()
+					)
+					saveUser(updatedUser)
+					_currentUser.value = updatedUser
+					_isSignedIn.value = true
+					Result.success(updatedUser)
+				}
+				
+				authIntent == AuthIntent.SIGN_IN && existingUser == null -> {
+					// Sign in failed - no account exists
+					val error = AuthException.NoAccountFound(AuthProvider.GOOGLE)
+					_errorMessage.value = error.message
+					Result.failure(error)
+				}
+				
+				authIntent == AuthIntent.CREATE_ACCOUNT && existingUser != null -> {
+					// Create account failed - user already exists
+					val error = AuthException.AccountAlreadyExists(AuthProvider.GOOGLE)
+					_errorMessage.value = error.message
+					Result.failure(error)
+				}
+				
+				authIntent == AuthIntent.CREATE_ACCOUNT && existingUser == null -> {
+					// Create account successful - create new user
+					val serviceUserID = UUID.randomUUID().toString().lowercase()
+					val newUser = PhotolalaUser(
+						serviceUserID = serviceUserID,
+						primaryProvider = AuthProvider.GOOGLE,
+						primaryProviderID = credential.providerID,
+						email = credential.email,
+						fullName = credential.fullName,
+						photoURL = credential.photoURL,
+						createdAt = Date(),
+						lastUpdated = Date(),
+						subscription = Subscription.freeTrial()
+					)
+					
+					saveUser(newUser)
+					createS3UserFolders(newUser)
+					
+					_currentUser.value = newUser
+					_isSignedIn.value = true
+					Result.success(newUser)
+				}
+				
+				else -> {
+					val error = AuthException.UnknownError
+					_errorMessage.value = error.message
+					Result.failure(error)
+				}
+			}
+		} catch (e: Exception) {
+			val authError = if (e is AuthException) e else AuthException.AuthenticationFailed(e.message ?: "Unknown error")
+			if (authError !is AuthException.UserCancelled) {
+				_errorMessage.value = authError.message
+			}
+			Result.failure(authError)
+		} finally {
+			_isLoading.value = false
+		}
 	}
 	
 	// Find user by provider ID
@@ -287,5 +411,29 @@ sealed class AuthException : Exception() {
 	
 	object UnknownError : AuthException() {
 		override val message = "An unknown error occurred"
+	}
+	
+	object UserCancelled : AuthException() {
+		override val message = "Sign in cancelled"
+	}
+	
+	object NoGoogleAccount : AuthException() {
+		override val message = "No Google account found. Please add a Google account to your device."
+	}
+	
+	data class ConfigurationError(val details: String) : AuthException() {
+		override val message = "Configuration error: $details"
+	}
+	
+	object GoogleSignInPending : AuthException() {
+		override val message = "Google Sign-In requires activity interaction"
+	}
+}
+
+// Extension function to map Result errors
+inline fun <T, E, F> Result<T>.mapError(transform: (E) -> F): Result<T> where E : Throwable, F : Throwable {
+	return when {
+		isSuccess -> this
+		else -> Result.failure(transform(exceptionOrNull() as E))
 	}
 }

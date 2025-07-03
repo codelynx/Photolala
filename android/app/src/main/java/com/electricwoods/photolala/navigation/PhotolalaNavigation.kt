@@ -1,7 +1,8 @@
 package com.electricwoods.photolala.navigation
 
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
+import android.content.Intent
+import androidx.activity.result.ActivityResultLauncher
+import androidx.compose.runtime.*
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
@@ -13,11 +14,23 @@ import com.electricwoods.photolala.ui.screens.AuthenticationScreen
 import com.electricwoods.photolala.ui.screens.PhotoGridScreen
 import com.electricwoods.photolala.ui.screens.PhotoViewerScreen
 import com.electricwoods.photolala.ui.screens.WelcomeScreen
+import com.electricwoods.photolala.ui.viewmodels.AuthenticationViewModel
 import com.electricwoods.photolala.ui.viewmodels.PhotoGridViewModel
+
+object PhotolalaNavigation {
+	// Static reference to handle Google Sign-In result
+	internal var pendingGoogleSignInHandler: ((Intent?) -> Unit)? = null
+	
+	fun handleGoogleSignInResult(data: Intent?) {
+		pendingGoogleSignInHandler?.invoke(data)
+		pendingGoogleSignInHandler = null
+	}
+}
 
 @Composable
 fun PhotolalaNavigation(
-	navController: NavHostController = rememberNavController()
+	navController: NavHostController = rememberNavController(),
+	googleSignInLauncher: ActivityResultLauncher<Intent>
 ) {
 	// Shared ViewModel for photo data
 	val photoGridViewModel: PhotoGridViewModel = hiltViewModel()
@@ -75,6 +88,21 @@ fun PhotolalaNavigation(
 		}
 		
 		composable(PhotolalaRoute.SignIn.route) {
+			val authViewModel: AuthenticationViewModel = hiltViewModel()
+			
+			// Set up Google Sign-In callback
+			LaunchedEffect(authViewModel) {
+				authViewModel.onGoogleSignInRequired = { intent ->
+					// Store the handler for when result comes back
+					PhotolalaNavigation.pendingGoogleSignInHandler = { data ->
+						authViewModel.handleGoogleSignInResult(data) {
+							navController.popBackStack()
+						}
+					}
+					googleSignInLauncher.launch(intent)
+				}
+			}
+			
 			AuthenticationScreen(
 				isSignUp = false,
 				onAuthSuccess = {
@@ -82,11 +110,27 @@ fun PhotolalaNavigation(
 				},
 				onCancel = {
 					navController.popBackStack()
-				}
+				},
+				viewModel = authViewModel
 			)
 		}
 		
 		composable(PhotolalaRoute.CreateAccount.route) {
+			val authViewModel: AuthenticationViewModel = hiltViewModel()
+			
+			// Set up Google Sign-In callback
+			LaunchedEffect(authViewModel) {
+				authViewModel.onGoogleSignInRequired = { intent ->
+					// Store the handler for when result comes back
+					PhotolalaNavigation.pendingGoogleSignInHandler = { data ->
+						authViewModel.handleGoogleSignInResult(data) {
+							navController.popBackStack()
+						}
+					}
+					googleSignInLauncher.launch(intent)
+				}
+			}
+			
 			AuthenticationScreen(
 				isSignUp = true,
 				onAuthSuccess = {
@@ -94,7 +138,8 @@ fun PhotolalaNavigation(
 				},
 				onCancel = {
 					navController.popBackStack()
-				}
+				},
+				viewModel = authViewModel
 			)
 		}
 	}

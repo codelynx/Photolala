@@ -5,6 +5,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -90,12 +91,11 @@ fun AuthenticationScreen(
 				verticalAlignment = Alignment.CenterVertically,
 				horizontalArrangement = Arrangement.Center
 			) {
-				// Google logo placeholder
 				Icon(
-					painter = painterResource(id = R.drawable.ic_launcher_foreground),
+					painter = painterResource(id = R.drawable.ic_google_logo),
 					contentDescription = null,
 					modifier = Modifier.size(24.dp),
-					tint = MaterialTheme.colorScheme.primary
+					tint = Color.Unspecified // Keep original Google colors
 				)
 				Spacer(modifier = Modifier.width(12.dp))
 				Text(
