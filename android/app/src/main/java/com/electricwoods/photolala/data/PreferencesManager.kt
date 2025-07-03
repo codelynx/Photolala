@@ -7,7 +7,9 @@ import com.electricwoods.photolala.utils.DeviceUtils
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.runBlocking
 import java.io.IOException
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -23,6 +25,9 @@ class PreferencesManager @Inject constructor(
 		val GRID_THUMBNAIL_SIZE = intPreferencesKey("grid_thumbnail_size")
 		val GRID_SCALE_MODE = stringPreferencesKey("grid_scale_mode")
 		val SHOW_INFO_BAR = booleanPreferencesKey("show_info_bar")
+		
+		// User authentication
+		val ENCRYPTED_USER_DATA = stringPreferencesKey("encrypted_user_data")
 		
 		// Default values
 		const val DEFAULT_SCALE_MODE = "fit" // "fit" or "fill"
@@ -110,6 +115,29 @@ class PreferencesManager @Inject constructor(
 	suspend fun setShowInfoBar(show: Boolean) {
 		dataStore.edit { preferences ->
 			preferences[SHOW_INFO_BAR] = show
+		}
+	}
+	
+	// User authentication preferences
+	suspend fun setEncryptedUserData(encryptedData: String) {
+		dataStore.edit { preferences ->
+			preferences[ENCRYPTED_USER_DATA] = encryptedData
+		}
+	}
+	
+	fun getEncryptedUserData(): String? {
+		return runBlocking {
+			try {
+				dataStore.data.first()[ENCRYPTED_USER_DATA]
+			} catch (e: Exception) {
+				null
+			}
+		}
+	}
+	
+	suspend fun clearUserData() {
+		dataStore.edit { preferences ->
+			preferences.remove(ENCRYPTED_USER_DATA)
 		}
 	}
 }

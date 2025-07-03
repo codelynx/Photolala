@@ -2,6 +2,7 @@ plugins {
 	alias(libs.plugins.android.application)
 	alias(libs.plugins.kotlin.android)
 	alias(libs.plugins.kotlin.compose)
+	alias(libs.plugins.kotlin.serialization)
 	alias(libs.plugins.hilt)
 	alias(libs.plugins.ksp)
 }
@@ -92,6 +93,9 @@ dependencies {
 	// AWS SDK
 	implementation(libs.aws.android.sdk.s3)
 	implementation(libs.aws.android.sdk.auth.userpools)
+	
+	// Serialization
+	implementation(libs.kotlinx.serialization.json)
 	
 	// Testing
 	testImplementation(libs.junit)

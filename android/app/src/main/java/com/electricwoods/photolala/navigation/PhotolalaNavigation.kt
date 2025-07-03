@@ -9,6 +9,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import com.electricwoods.photolala.ui.screens.AuthenticationScreen
 import com.electricwoods.photolala.ui.screens.PhotoGridScreen
 import com.electricwoods.photolala.ui.screens.PhotoViewerScreen
 import com.electricwoods.photolala.ui.screens.WelcomeScreen
@@ -29,6 +30,12 @@ fun PhotolalaNavigation(
 			WelcomeScreen(
 				onBrowsePhotosClick = {
 					navController.navigate(PhotolalaRoute.PhotoGrid.route)
+				},
+				onSignInClick = {
+					navController.navigate(PhotolalaRoute.SignIn.route)
+				},
+				onCreateAccountClick = {
+					navController.navigate(PhotolalaRoute.CreateAccount.route)
 				}
 			)
 		}
@@ -66,6 +73,30 @@ fun PhotolalaNavigation(
 				viewModel = viewerViewModel
 			)
 		}
+		
+		composable(PhotolalaRoute.SignIn.route) {
+			AuthenticationScreen(
+				isSignUp = false,
+				onAuthSuccess = {
+					navController.popBackStack()
+				},
+				onCancel = {
+					navController.popBackStack()
+				}
+			)
+		}
+		
+		composable(PhotolalaRoute.CreateAccount.route) {
+			AuthenticationScreen(
+				isSignUp = true,
+				onAuthSuccess = {
+					navController.popBackStack()
+				},
+				onCancel = {
+					navController.popBackStack()
+				}
+			)
+		}
 	}
 }
 
@@ -75,4 +106,6 @@ sealed class PhotolalaRoute(val route: String) {
 	object PhotoViewer : PhotolalaRoute("photo_viewer/{photoIndex}") {
 		fun createRoute(photoIndex: Int) = "photo_viewer/$photoIndex"
 	}
+	object SignIn : PhotolalaRoute("sign_in")
+	object CreateAccount : PhotolalaRoute("create_account")
 }

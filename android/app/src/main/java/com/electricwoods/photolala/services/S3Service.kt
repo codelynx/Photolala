@@ -5,9 +5,11 @@ import android.net.Uri
 import com.amazonaws.services.s3.AmazonS3Client
 import com.amazonaws.services.s3.model.ObjectMetadata
 import com.amazonaws.services.s3.model.PutObjectRequest
+import com.amazonaws.services.s3.model.S3Object
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import java.io.ByteArrayInputStream
 import java.io.File
 import java.io.FileInputStream
 import javax.inject.Inject
@@ -101,5 +103,72 @@ class S3Service @Inject constructor(
             }
         }
         return tempFile
+    }
+    
+    /**
+     * Upload raw data to S3
+     * @param data The byte array to upload
+     * @param key The S3 key (path) for the data
+     */
+    suspend fun uploadData(data: ByteArray, key: String): Result<Unit> = withContext(Dispatchers.IO) {
+        try {
+            val metadata = ObjectMetadata().apply {
+                contentLength = data.size.toLong()
+                contentType = "text/plain"
+            }
+            
+            val putRequest = PutObjectRequest(
+                BUCKET_NAME,
+                key,
+                ByteArrayInputStream(data),
+                metadata
+            )
+            
+            s3Client.putObject(putRequest)
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+    
+    /**
+     * Download raw data from S3
+     * @param key The S3 key (path) for the data
+     * @return The downloaded data as byte array
+     */
+    suspend fun downloadData(key: String): Result<ByteArray> = withContext(Dispatchers.IO) {
+        try {
+            val s3Object: S3Object = s3Client.getObject(BUCKET_NAME, key)
+            val data = s3Object.objectContent.use { stream ->
+                stream.readBytes()
+            }
+            Result.success(data)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+    
+    /**
+     * Create a folder (by creating an empty object with trailing slash)
+     * @param folderPath The folder path to create (should end with /)
+     */
+    suspend fun createFolder(folderPath: String): Result<Unit> = withContext(Dispatchers.IO) {
+        try {
+            val metadata = ObjectMetadata().apply {
+                contentLength = 0
+            }
+            
+            val putRequest = PutObjectRequest(
+                BUCKET_NAME,
+                folderPath,
+                ByteArrayInputStream(ByteArray(0)),
+                metadata
+            )
+            
+            s3Client.putObject(putRequest)
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
     }
 }

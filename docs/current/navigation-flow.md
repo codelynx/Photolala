@@ -1,10 +1,10 @@
 # Navigation Flow
 
-Last Updated: June 14, 2025
+Last Updated: July 3, 2025
 
 ## Overview
 
-Photolala uses platform-appropriate navigation patterns with NavigationStack on both platforms, but with different architectural approaches.
+Photolala uses platform-appropriate navigation patterns - NavigationStack on Apple platforms and Jetpack Navigation on Android, each with platform-specific architectural approaches.
 
 ## macOS Navigation
 
@@ -32,6 +32,15 @@ NavigationStack(path: $navigationPath) {
 - **Keyboard**: Arrow keys for navigation
 - **Escape**: Close preview
 
+### Authentication (macOS)
+- **Menu Access**: 
+  - Photolala → Sign In... (when signed out)
+  - Photolala → Sign Out [Username] (when signed in)
+- **Toolbar Access**: Sign In button in folder browser windows
+- **Window-based**: Authentication opens in dedicated window (600x700)
+- **Cloud Settings**: Photolala → Cloud Backup Settings...
+- **Native UI**: Uses macOS button styles (.borderedProminent, .bordered)
+
 ## iOS Navigation
 
 ### Single NavigationStack Architecture
@@ -58,6 +67,13 @@ PhotoBrowserView uses `.navigationDestination(item:)`:
 - **Selection mode**: Tap to select, eye button to preview
 - **Swipe**: Navigate between photos in preview
 - **Pinch**: Zoom in preview
+
+### Authentication (iOS)
+- **Welcome View**: "Sign In to Enable Backup" button
+- **Sheet Presentation**: Full-screen authentication sheet
+- **Sign Out**: Available in both WelcomeView and AuthenticationChoiceView
+- **Custom UI**: iOS-style buttons with colored backgrounds
+- **Persistence**: Sign-in state maintained across app launches
 
 ## Selection Preview Feature
 
@@ -104,3 +120,47 @@ struct PreviewNavigation: Hashable {
     let initialIndex: Int
 }
 ```
+
+## Android Navigation
+
+### Jetpack Navigation Architecture
+Single NavHost with composable destinations:
+```kotlin
+NavHost(
+    navController = navController,
+    startDestination = PhotolalaRoute.Welcome.route
+) {
+    composable(PhotolalaRoute.Welcome.route) { /* ... */ }
+    composable(PhotolalaRoute.PhotoGrid.route) { /* ... */ }
+    composable(PhotolalaRoute.PhotoViewer.route) { /* ... */ }
+    composable(PhotolalaRoute.SignIn.route) { /* ... */ }
+    composable(PhotolalaRoute.CreateAccount.route) { /* ... */ }
+}
+```
+
+### Navigation Routes
+```kotlin
+sealed class PhotolalaRoute(val route: String) {
+    object Welcome : PhotolalaRoute("welcome")
+    object PhotoGrid : PhotolalaRoute("photo_grid")
+    object PhotoViewer : PhotolalaRoute("photo_viewer/{photoIndex}")
+    object SignIn : PhotolalaRoute("sign_in")
+    object CreateAccount : PhotolalaRoute("create_account")
+}
+```
+
+### User Interactions
+- **Tap "Browse Photos"**: Navigate to PhotoGrid
+- **Tap photo**: Navigate to PhotoViewer with index
+- **Back gesture/button**: Pop back stack
+- **Authentication**: Navigate to SignIn or CreateAccount
+
+### Authentication (Android)
+- **Welcome Screen**: 
+  - "Sign In" button for existing users
+  - "Create Account" button for new users
+  - SignedInCard showing user status when authenticated
+- **Full-Screen Navigation**: Authentication screens use navigation routes
+- **Material3 UI**: Follows Material Design guidelines
+- **Success/Cancel**: Pop back to previous screen
+- **Secure Storage**: Android Keystore for credential encryption

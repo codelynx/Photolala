@@ -81,12 +81,20 @@ struct AuthenticationChoiceView: View {
 						}) {
 							Text("Continue to Photos")
 								.font(.headline)
+								#if os(iOS)
 								.foregroundColor(.white)
 								.frame(maxWidth: .infinity)
 								.frame(height: 50)
 								.background(Color.accentColor)
 								.cornerRadius(10)
+								#else
+								.frame(minWidth: 200)
+								#endif
 						}
+						#if os(macOS)
+						.buttonStyle(.borderedProminent)
+						.controlSize(.large)
+						#endif
 					}
 				} else if !showingProviders {
 					// Initial buttons
@@ -103,12 +111,20 @@ struct AuthenticationChoiceView: View {
 						}) {
 							Text("Sign In")
 								.font(.headline)
+								#if os(iOS)
 								.foregroundColor(.white)
 								.frame(maxWidth: .infinity)
 								.frame(height: 50)
 								.background(Color.accentColor)
 								.cornerRadius(10)
+								#else
+								.frame(minWidth: 200)
+								#endif
 						}
+						#if os(macOS)
+						.buttonStyle(.borderedProminent)
+						.controlSize(.large)
+						#endif
 					}
 					
 					// Divider
@@ -143,12 +159,20 @@ struct AuthenticationChoiceView: View {
 						}) {
 							Text("Create Account")
 								.font(.headline)
+								#if os(iOS)
 								.foregroundColor(.accentColor)
 								.frame(maxWidth: .infinity)
 								.frame(height: 50)
 								.background(Color.accentColor.opacity(0.15))
 								.cornerRadius(10)
+								#else
+								.frame(minWidth: 200)
+								#endif
 						}
+						#if os(macOS)
+						.buttonStyle(.bordered)
+						.controlSize(.large)
+						#endif
 					}
 				} else {
 					// Provider selection
@@ -166,12 +190,24 @@ struct AuthenticationChoiceView: View {
 								Text(authMode == .signIn ? "Sign in with Apple" : "Sign up with Apple")
 									.font(.headline)
 							}
+							#if os(iOS)
 							.foregroundColor(.white)
 							.frame(maxWidth: .infinity)
 							.frame(height: 50)
 							.background(Color.black)
 							.cornerRadius(8)
+							#else
+							.frame(minWidth: 280)
+							#endif
 						}
+						#if os(macOS)
+						.buttonStyle(.plain)
+						.padding(.horizontal, 20)
+						.padding(.vertical, 12)
+						.background(Color.black)
+						.foregroundColor(.white)
+						.cornerRadius(8)
+						#endif
 						
 						// Google Sign-In button (placeholder for now)
 						Button(action: {
@@ -184,6 +220,7 @@ struct AuthenticationChoiceView: View {
 								Text(authMode == .signIn ? "Sign in with Google" : "Sign up with Google")
 									.font(.headline)
 							}
+							#if os(iOS)
 							.foregroundColor(.black)
 							.frame(maxWidth: .infinity)
 							.frame(height: 50)
@@ -193,7 +230,22 @@ struct AuthenticationChoiceView: View {
 									.stroke(Color.gray.opacity(0.3), lineWidth: 1)
 							)
 							.cornerRadius(8)
+							#else
+							.frame(minWidth: 280)
+							#endif
 						}
+						#if os(macOS)
+						.buttonStyle(.plain)
+						.padding(.horizontal, 20)
+						.padding(.vertical, 12)
+						.background(Color(NSColor.controlBackgroundColor))
+						.foregroundColor(.primary)
+						.overlay(
+							RoundedRectangle(cornerRadius: 8)
+								.stroke(Color.gray.opacity(0.3), lineWidth: 1)
+						)
+						.cornerRadius(8)
+						#endif
 						
 						// Back button
 						Button(action: {

@@ -1,5 +1,7 @@
 # Provider ID to UUID Mapping Architecture
 
+## Implementation Status: ✅ COMPLETED (July 3, 2025)
+
 ## Overview
 
 This document describes the identity mapping system that allows multiple authentication providers (Apple ID, Google ID) to map to a single internal UUID for S3 storage, while maintaining the ability to look up users by their provider IDs.
@@ -414,3 +416,45 @@ Located at `/users/{uuid}/account/profile.json`:
 4. **System creates**: `/identities/google/123456789012345678901` (contains: a3f4d5e6-b7c8...)
 5. **Updates**: `/users/a3f4d5e6-b7c8.../account/providers.json` to include Google
 6. **Now Bob can sign in with either provider**
+
+## Implementation Details
+
+### iOS/macOS Files Modified
+1. **IdentityManager+Authentication.swift**
+   - `createS3UserFolders()`: Creates identity mapping files
+   - `findUserByProviderID()`: Checks S3 when user not found locally
+   - Reconstructs user from S3 mapping on cross-device sign-in
+
+2. **S3BackupService.swift**
+   - Added `uploadData()` and `downloadData()` generic methods
+   - Used for identity file operations
+
+3. **S3BackupManager.swift**
+   - Added `createFolder()` and `uploadData()` wrapper methods
+
+### Android Implementation (July 3, 2025)
+1. **IdentityManager.kt**
+   - `createS3UserFolders()`: Creates identity mapping files
+   - `findUserByProviderID()`: Checks S3 when user not found locally
+   - Complete sign-up/sign-in flow with intent handling
+   - Android Keystore encryption for secure storage
+
+2. **S3Service.kt**
+   - Added `uploadData()`, `downloadData()`, and `createFolder()` methods
+   - Matches iOS functionality for identity operations
+
+3. **SecurityUtils.kt**
+   - Android Keystore implementation with AES/GCM encryption
+   - Secure storage of user credentials
+
+4. **Data Models**
+   - PhotolalaUser, AuthProvider, AuthCredential, ProviderLink
+   - Kotlinx.serialization support with custom DateSerializer
+
+### Key Implementation Points
+- Identity mappings stored at `/identities/{provider}:{providerID}`
+- File contains only the UUID as plain text
+- Sign-in flow: Local encrypted storage → S3 identity lookup → Reconstruct user
+- User properties (email, fullName) updated from fresh JWT on sign-in
+- Supports cross-device authentication seamlessly
+- Consistent implementation across all platforms (iOS, macOS, Android)

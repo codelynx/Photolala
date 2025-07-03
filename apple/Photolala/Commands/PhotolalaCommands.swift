@@ -13,8 +13,10 @@ struct PhotolalaCommands: Commands {
 	static var applePhotosWindow: NSWindow?
 	static var cloudBrowserWindow: NSWindow?
 	static var cacheStatisticsWindow: NSWindow?
+	static var s3SettingsWindow: NSWindow?
 	static var s3BackupWindow: NSWindow?
 	static var iapDeveloperWindow: NSWindow?
+	static var signInWindow: NSWindow?
 	#endif
 	@Environment(\.openWindow) private var openWindow
 
@@ -74,11 +76,33 @@ struct PhotolalaCommands: Commands {
 		
 		// Create a new Photolala menu for app-specific features
 		CommandMenu("Photolala") {
+			// Sign In/Out
+			if IdentityManager.shared.isSignedIn {
+				if let user = IdentityManager.shared.currentUser {
+					Button("Sign Out \(user.displayName)") {
+						IdentityManager.shared.signOut()
+					}
+				} else {
+					Button("Sign Out") {
+						IdentityManager.shared.signOut()
+					}
+				}
+			} else {
+				Button("Sign In...") {
+					#if os(macOS)
+						self.showSignIn()
+					#endif
+				}
+			}
+			
+			Divider()
+			
 			Button("Manage Subscription...") {
 				#if os(macOS)
 					self.showSubscriptionView()
 				#endif
 			}
+			.disabled(!IdentityManager.shared.isSignedIn)
 			
 			Divider()
 			
@@ -302,14 +326,29 @@ struct PhotolalaCommands: Commands {
 		}
 
 		private func showS3BackupTest() {
-			// TODO: S3BackupTestView was removed - implement proper S3 backup UI if needed
-			print("S3 Backup test view has been removed")
+			// Close existing window if open
+			if let existingWindow = Self.s3SettingsWindow {
+				existingWindow.close()
+			}
 			
-			// Temporary: Show alert instead
-			let alert = NSAlert()
-			alert.messageText = "S3 Backup Test"
-			alert.informativeText = "The S3 backup test view has been removed. This functionality needs to be reimplemented."
-			alert.runModal()
+			let window = NSWindow(
+				contentRect: NSRect(x: 0, y: 0, width: 500, height: 400),
+				styleMask: [.titled, .closable],
+				backing: .buffered,
+				defer: false
+			)
+			
+			window.title = "Cloud Backup Settings"
+			window.center()
+			window.contentView = NSHostingView(rootView: AWSCredentialsView())
+			window.makeKeyAndOrderFront(nil)
+			
+			// Keep window in front but not floating
+			window.level = .normal
+			window.isReleasedWhenClosed = false
+			
+			// Store reference to keep window alive
+			Self.s3SettingsWindow = window
 		}
 
 		private func showSubscriptionView() {
@@ -330,6 +369,37 @@ struct PhotolalaCommands: Commands {
 			window.isReleasedWhenClosed = false
 		}
 
+		private func showSignIn() {
+			// Close existing window if open
+			if let existingWindow = Self.signInWindow {
+				existingWindow.close()
+			}
+			
+			let window = NSWindow(
+				contentRect: NSRect(x: 0, y: 0, width: 600, height: 700),
+				styleMask: [.titled, .closable],
+				backing: .buffered,
+				defer: false
+			)
+			
+			window.title = "Sign In to Photolala"
+			window.center()
+			window.contentView = NSHostingView(
+				rootView: AuthenticationChoiceView()
+					.environmentObject(IdentityManager.shared)
+					.frame(width: 600, height: 700)
+					.background(Color(NSColor.windowBackgroundColor))
+			)
+			window.makeKeyAndOrderFront(nil)
+			
+			// Keep window in front but not floating
+			window.level = .normal
+			window.isReleasedWhenClosed = false
+			
+			// Store reference to keep window alive
+			Self.signInWindow = window
+		}
+		
 		private func showIAPDeveloper() {
 			let window = NSWindow(
 				contentRect: NSRect(x: 0, y: 0, width: 600, height: 700),
