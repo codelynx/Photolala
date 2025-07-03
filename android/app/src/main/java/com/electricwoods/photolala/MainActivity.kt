@@ -1,6 +1,7 @@
 package com.electricwoods.photolala
 
 import android.Manifest
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
@@ -10,12 +11,19 @@ import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.*
 import androidx.core.content.ContextCompat
+import androidx.lifecycle.lifecycleScope
 import com.electricwoods.photolala.navigation.PhotolalaNavigation
+import com.electricwoods.photolala.services.IdentityManager
 import com.electricwoods.photolala.ui.theme.PhotolalaTheme
 import dagger.hilt.android.AndroidEntryPoint
+import kotlinx.coroutines.launch
+import javax.inject.Inject
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
+	
+	@Inject
+	lateinit var identityManager: IdentityManager
 	
 	// Google Sign-In launcher
 	val googleSignInLauncher = registerForActivityResult(
@@ -37,6 +45,9 @@ class MainActivity : ComponentActivity() {
 		super.onCreate(savedInstanceState)
 		enableEdgeToEdge()
 		
+		// Check if this is an Apple Sign-In callback
+		handleAppleSignInCallbackIfNeeded(intent)
+		
 		// Request permission if not granted
 		requestPhotoPermission()
 		
@@ -45,6 +56,21 @@ class MainActivity : ComponentActivity() {
 				PhotolalaNavigation(
 					googleSignInLauncher = googleSignInLauncher
 				)
+			}
+		}
+	}
+	
+	override fun onNewIntent(intent: Intent) {
+		super.onNewIntent(intent)
+		handleAppleSignInCallbackIfNeeded(intent)
+	}
+	
+	private fun handleAppleSignInCallbackIfNeeded(intent: Intent?) {
+		intent?.data?.let { uri ->
+			if (uri.scheme == "photolala" && uri.host == "auth" && uri.path == "/apple") {
+				lifecycleScope.launch {
+					identityManager.handleAppleSignInCallback(uri)
+				}
 			}
 		}
 	}

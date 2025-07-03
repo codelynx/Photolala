@@ -14,13 +14,16 @@ import kotlinx.serialization.json.Json
 import java.util.*
 import javax.inject.Inject
 import javax.inject.Singleton
+import android.net.Uri
 
 @Singleton
 class IdentityManager @Inject constructor(
 	@ApplicationContext private val context: Context,
 	private val s3Service: S3Service,
 	private val preferencesManager: PreferencesManager,
-	private val googleSignInLegacyService: GoogleSignInLegacyService
+	private val googleSignInLegacyService: GoogleSignInLegacyService,
+	private val appleAuthService: AppleAuthService,
+	private val authEventBus: AuthenticationEventBus
 ) {
 	private val json = Json { 
 		ignoreUnknownKeys = true
@@ -41,6 +44,10 @@ class IdentityManager @Inject constructor(
 	
 	init {
 		loadStoredUser()
+	}
+	
+	companion object {
+		const val APPLE_AUTH_ENDPOINT = "https://tygm499koc.execute-api.us-east-1.amazonaws.com"
 	}
 	
 	enum class AuthIntent {
@@ -141,7 +148,7 @@ class IdentityManager @Inject constructor(
 	private suspend fun authenticate(provider: AuthProvider): Result<AuthCredential> {
 		return when (provider) {
 			AuthProvider.GOOGLE -> authenticateWithGoogle()
-			AuthProvider.APPLE -> Result.failure(AuthException.ProviderNotImplemented)
+			AuthProvider.APPLE -> authenticateWithApple()
 		}
 	}
 	
@@ -268,6 +275,157 @@ class IdentityManager @Inject constructor(
 			_isLoading.value = false
 		}
 	}
+	
+	// Apple Sign-In Support
+	data class PendingAppleAuth(
+		val authIntent: AuthIntent
+	)
+	
+	var pendingAppleAuth: PendingAppleAuth? = null
+		private set
+	
+	// Apple authentication
+	private suspend fun authenticateWithApple(): Result<AuthCredential> {
+		// Similar to Google, we return a special error to trigger the flow
+		return Result.failure(AuthException.AppleSignInPending)
+	}
+	
+	// Prepare Apple Sign-In
+	fun prepareAppleSignIn(authIntent: AuthIntent) {
+		pendingAppleAuth = PendingAppleAuth(authIntent)
+		appleAuthService.signIn()
+	}
+	
+	// Handle Apple Sign-In callback
+	suspend fun handleAppleSignInCallback(uri: Uri): Result<PhotolalaUser> {
+		val authIntent = pendingAppleAuth?.authIntent ?: AuthIntent.SIGN_IN
+		pendingAppleAuth = null
+		
+		_isLoading.value = true
+		_errorMessage.value = null
+		
+		return try {
+			// Let AppleAuthService handle the callback
+			if (!appleAuthService.handleCallback(uri)) {
+				return Result.failure(AuthException.AuthenticationFailed("Invalid callback"))
+			}
+			
+			// Wait for the auth state to update
+			val authState = appleAuthService.authState.value
+			when (authState) {
+				is AppleAuthState.Success -> {
+					val credential = authState.credential
+					val verifiedCredential = credential.copy(
+						serviceUserId = null // Will be assigned by processAuthCredential
+					)
+					return processAuthCredential(verifiedCredential, authIntent)
+				}
+				is AppleAuthState.Cancelled -> {
+					_isLoading.value = false
+					Result.failure(AuthException.UserCancelled)
+				}
+				is AppleAuthState.Error -> {
+					_isLoading.value = false
+					_errorMessage.value = authState.error.message
+					Result.failure(AuthException.AuthenticationFailed(authState.error.message))
+				}
+				else -> {
+					_isLoading.value = false
+					Result.failure(AuthException.UnknownError)
+				}
+			}
+		} catch (e: Exception) {
+			_isLoading.value = false
+			_errorMessage.value = e.message
+			Result.failure(e)
+		}
+	}
+	
+	// Process authenticated credential
+	private suspend fun processAuthCredential(
+		credential: AuthCredential,
+		authIntent: AuthIntent
+	): Result<PhotolalaUser> {
+		val provider = AuthProvider.APPLE
+		val existingUser = findUserByProviderID(provider, credential.providerID)
+		
+		return when {
+			authIntent == AuthIntent.SIGN_IN && existingUser != null -> {
+				// Sign in successful - user exists
+				val updatedUser = existingUser.copy(
+					email = credential.email ?: existingUser.email,
+					fullName = credential.fullName ?: existingUser.fullName,
+					photoURL = credential.photoURL ?: existingUser.photoURL,
+					lastUpdated = Date()
+				)
+				saveUser(updatedUser)
+				_currentUser.value = updatedUser
+				_isSignedIn.value = true
+				_isLoading.value = false
+				
+				// Emit event for Apple Sign-In completion
+				if (provider == AuthProvider.APPLE) {
+					authEventBus.emitAppleSignInCompleted()
+				}
+				
+				Result.success(updatedUser)
+			}
+			
+			authIntent == AuthIntent.SIGN_IN && existingUser == null -> {
+				// Sign in failed - no account exists
+				val error = AuthException.NoAccountFound(provider)
+				_errorMessage.value = error.message
+				_isLoading.value = false
+				Result.failure(error)
+			}
+			
+			authIntent == AuthIntent.CREATE_ACCOUNT && existingUser != null -> {
+				// Create account failed - user already exists
+				val error = AuthException.AccountAlreadyExists(provider)
+				_errorMessage.value = error.message
+				_isLoading.value = false
+				Result.failure(error)
+			}
+			
+			authIntent == AuthIntent.CREATE_ACCOUNT && existingUser == null -> {
+				// Create account successful - create new user
+				val serviceUserID = credential.serviceUserId ?: UUID.randomUUID().toString().lowercase()
+				val newUser = PhotolalaUser(
+					serviceUserID = serviceUserID,
+					primaryProvider = provider,
+					primaryProviderID = credential.providerID,
+					email = credential.email,
+					fullName = credential.fullName,
+					photoURL = credential.photoURL,
+					createdAt = Date(),
+					lastUpdated = Date(),
+					subscription = Subscription.freeTrial()
+				)
+				
+				saveUser(newUser)
+				createS3UserFolders(newUser)
+				
+				_currentUser.value = newUser
+				_isSignedIn.value = true
+				_isLoading.value = false
+				
+				// Emit event for Apple Sign-In completion
+				if (provider == AuthProvider.APPLE) {
+					authEventBus.emitAppleSignInCompleted()
+				}
+				
+				Result.success(newUser)
+			}
+			
+			else -> {
+				val error = AuthException.UnknownError
+				_errorMessage.value = error.message
+				_isLoading.value = false
+				Result.failure(error)
+			}
+		}
+	}
+	
 	
 	// Find user by provider ID
 	private suspend fun findUserByProviderID(
@@ -428,7 +586,12 @@ sealed class AuthException : Exception() {
 	object GoogleSignInPending : AuthException() {
 		override val message = "Google Sign-In requires activity interaction"
 	}
+	
+	object AppleSignInPending : AuthException() {
+		override val message = "Apple Sign-In requires browser interaction"
+	}
 }
+
 
 // Extension function to map Result errors
 inline fun <T, E, F> Result<T>.mapError(transform: (E) -> F): Result<T> where E : Throwable, F : Throwable {
