@@ -21,7 +21,7 @@ enum AuthProvider: String, Codable, CaseIterable {
 
 enum AuthError: LocalizedError {
 	case providerNotImplemented
-	case noAccountFound(provider: AuthProvider)
+	case noAccountFound(provider: AuthProvider, credential: AuthCredential? = nil)
 	case accountAlreadyExists(provider: AuthProvider)
 	case authenticationFailed(reason: String)
 	case invalidCredentials
@@ -49,7 +49,7 @@ enum AuthError: LocalizedError {
 		switch self {
 		case .providerNotImplemented:
 			return "This sign-in method is not yet available"
-		case .noAccountFound(let provider):
+		case .noAccountFound(let provider, _):
 			return "No account found with \(provider.displayName). Please create an account first."
 		case .accountAlreadyExists(let provider):
 			return "An account already exists with \(provider.displayName). Please sign in instead."

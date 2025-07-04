@@ -1,11 +1,21 @@
 package com.electricwoods.photolala.ui.screens
 
+import androidx.compose.animation.*
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.selection.SelectionContainer
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AccountCircle
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -29,13 +39,41 @@ fun WelcomeScreen(
 ) {
 	val currentUser by viewModel.currentUser.collectAsStateWithLifecycle()
 	val isSignedIn by viewModel.isSignedIn.collectAsStateWithLifecycle()
-	Column(
-		modifier = Modifier
-			.fillMaxSize()
-			.padding(24.dp),
-		verticalArrangement = Arrangement.Center,
-		horizontalAlignment = Alignment.CenterHorizontally
+	
+	// Debug logging
+	LaunchedEffect(isSignedIn, currentUser) {
+		android.util.Log.d("WelcomeScreen", "=== WELCOME SCREEN STATE ===")
+		android.util.Log.d("WelcomeScreen", "isSignedIn: $isSignedIn")
+		android.util.Log.d("WelcomeScreen", "currentUser: ${currentUser?.displayName ?: "null"}")
+		android.util.Log.d("WelcomeScreen", "currentUser details: $currentUser")
+	}
+	
+	// Success message state
+	var showSignInSuccess by remember { mutableStateOf(false) }
+	var signInSuccessMessage by remember { mutableStateOf("") }
+	
+	// Monitor sign-in status changes
+	LaunchedEffect(isSignedIn, currentUser) {
+		if (isSignedIn && currentUser != null && !showSignInSuccess) {
+			signInSuccessMessage = "Welcome, ${currentUser!!.displayName}!"
+			showSignInSuccess = true
+			
+			// Hide success message after 3 seconds
+			kotlinx.coroutines.delay(3000)
+			showSignInSuccess = false
+		}
+	}
+	
+	Box(
+		modifier = Modifier.fillMaxSize()
 	) {
+		Column(
+			modifier = Modifier
+				.fillMaxSize()
+				.padding(24.dp),
+			verticalArrangement = Arrangement.Center,
+			horizontalAlignment = Alignment.CenterHorizontally
+		) {
 		// App icon
 		Image(
 			painter = painterResource(id = R.drawable.ic_launcher_foreground),
@@ -55,7 +93,11 @@ fun WelcomeScreen(
 		Spacer(modifier = Modifier.height(16.dp))
 		
 		Text(
-			text = "Browse your photos with ease",
+			text = if (isSignedIn) {
+				"Welcome back! Choose how to browse your photos"
+			} else {
+				"Welcome! Sign in to access cloud features or browse locally"
+			},
 			style = MaterialTheme.typography.bodyLarge,
 			textAlign = TextAlign.Center,
 			color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -129,6 +171,56 @@ fun WelcomeScreen(
 				Text("Create Account")
 			}
 		}
+		}
+		
+		// Success message overlay
+		AnimatedVisibility(
+			visible = showSignInSuccess,
+			enter = slideInVertically(
+				initialOffsetY = { -it },
+				animationSpec = tween(300, easing = FastOutSlowInEasing)
+			) + fadeIn(
+				animationSpec = tween(300)
+			),
+			exit = slideOutVertically(
+				targetOffsetY = { -it },
+				animationSpec = tween(300, easing = FastOutSlowInEasing)
+			) + fadeOut(
+				animationSpec = tween(300)
+			),
+			modifier = Modifier.align(Alignment.TopCenter)
+		) {
+			Card(
+				modifier = Modifier
+					.padding(top = 48.dp)
+					.padding(horizontal = 24.dp),
+				shape = RoundedCornerShape(8.dp),
+				colors = CardDefaults.cardColors(
+					containerColor = Color(0xFF4CAF50).copy(alpha = 0.1f)
+				),
+				border = BorderStroke(1.dp, Color(0xFF4CAF50).copy(alpha = 0.3f))
+			) {
+				Row(
+					modifier = Modifier.padding(16.dp),
+					verticalAlignment = Alignment.CenterVertically,
+					horizontalArrangement = Arrangement.Center
+				) {
+					Icon(
+						imageVector = Icons.Default.CheckCircle,
+						contentDescription = null,
+						tint = Color(0xFF4CAF50),
+						modifier = Modifier.size(24.dp)
+					)
+					Spacer(modifier = Modifier.width(12.dp))
+					Text(
+						text = signInSuccessMessage,
+						style = MaterialTheme.typography.bodyLarge,
+						fontWeight = FontWeight.Medium,
+						color = MaterialTheme.colorScheme.onSurface
+					)
+				}
+			}
+		}
 	}
 }
 
@@ -137,46 +229,55 @@ fun SignedInCard(
 	user: PhotolalaUser,
 	onSignOut: () -> Unit
 ) {
-	Card(
+	Column(
 		modifier = Modifier.fillMaxWidth(),
-		colors = CardDefaults.cardColors(
-			containerColor = MaterialTheme.colorScheme.secondaryContainer
-		)
+		horizontalAlignment = Alignment.CenterHorizontally
 	) {
+		// Profile Icon
+		Icon(
+			imageVector = Icons.Default.AccountCircle,
+			contentDescription = null,
+			modifier = Modifier.size(50.dp),
+			tint = MaterialTheme.colorScheme.primary
+		)
+		
+		Spacer(modifier = Modifier.height(16.dp))
+		
+		// User Information
 		Column(
-			modifier = Modifier
-				.fillMaxWidth()
-				.padding(16.dp),
 			horizontalAlignment = Alignment.CenterHorizontally
 		) {
 			Text(
 				text = "Signed in as",
-				fontSize = 14.sp,
-				color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.7f)
+				style = MaterialTheme.typography.bodySmall,
+				color = MaterialTheme.colorScheme.onSurfaceVariant
 			)
 			Spacer(modifier = Modifier.height(4.dp))
 			Text(
 				text = user.displayName,
-				fontSize = 16.sp,
-				fontWeight = FontWeight.Medium,
-				color = MaterialTheme.colorScheme.onSecondaryContainer
+				style = MaterialTheme.typography.headlineSmall,
+				color = MaterialTheme.colorScheme.onSurface
 			)
 			user.email?.let { email ->
+				Spacer(modifier = Modifier.height(4.dp))
 				Text(
 					text = email,
-					fontSize = 14.sp,
-					color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.7f)
+					style = MaterialTheme.typography.bodySmall,
+					color = MaterialTheme.colorScheme.onSurfaceVariant
 				)
 			}
-			Spacer(modifier = Modifier.height(8.dp))
-			TextButton(
-				onClick = onSignOut
-			) {
-				Text(
-					text = "Sign Out",
-					color = MaterialTheme.colorScheme.error
-				)
-			}
+		}
+		
+		Spacer(modifier = Modifier.height(16.dp))
+		
+		// Sign Out Button
+		TextButton(
+			onClick = onSignOut,
+			colors = ButtonDefaults.textButtonColors(
+				contentColor = MaterialTheme.colorScheme.error
+			)
+		) {
+			Text("Sign Out")
 		}
 	}
 }

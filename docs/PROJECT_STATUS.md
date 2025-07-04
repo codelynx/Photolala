@@ -1,6 +1,6 @@
 ## 📍 PROJECT STATUS REPORT
 
-Last Updated: July 3, 2025
+Last Updated: July 4, 2025
 
 ### 🚀 Current Status: Authentication System & Cross-Platform Identity Management
 
@@ -1449,3 +1449,96 @@ The application now has a complete authentication system with explicit sign-up/s
      - Cross-platform sign-in now works correctly
      - Users can sign in on iOS and Android with same Google account
      - Resolves to same serviceUserID on both platforms
+
+56. **macOS Welcome Screen and Authentication UX Improvements (July 4)**:
+   - **Welcome Screen Implementation**:
+     - Added welcome screen for macOS (previously iOS-only)
+     - App no longer opens blank windows at startup
+     - Shows platform-specific welcome messages and browse options
+     - "Browse Local Folder", "Apple Photos Library", and "Cloud Photos" buttons
+     - Sign-in status display with user profile when authenticated
+   
+   - **S3 as Single Source of Truth**:
+     - Added S3 verification on app startup
+     - If stored user not found in S3, automatically signs out
+     - Prevents local-only authentication state
+     - Ensures account exists before allowing sign-in
+   
+   - **Authentication Credential Reuse**:
+     - Fixed UX issue where users authenticated twice (sign-in → no account → create)
+     - AuthError.noAccountFound now includes optional AuthCredential
+     - Create account flow reuses the authentication credential
+     - No need to re-authenticate when creating account after failed sign-in
+   
+   - **Platform-Specific Fixes**:
+     - macOS: Fixed window architecture to prevent blank "Photolala" window
+     - macOS: Added PhotoCommands for window operations
+     - Android: Fixed AuthCredential import and smart cast issues
+     - All platforms: Build errors resolved
+   
+   - **Legacy Data Cleanup**:
+     - Identified incorrect S3 entries (email-based instead of provider ID)
+     - Confirmed current implementation uses correct format
+     - Example: `identities/google:{googleUserID}` not `identities/google:email@example.com`
+
+57. **Apple Sign-In for Android - Complete Implementation (July 4)**:
+   - **Cross-Platform Authentication Achieved**:
+     - Users can now create Apple accounts on iOS/macOS and sign in on Android
+     - Single source of truth for user identity across all platforms
+     - Consistent S3 identity mapping format: `identities/apple:{appleUserID}`
+   
+   - **JWT Token Exchange Implementation**:
+     - Complete server-side token exchange using Apple's REST API
+     - ES256 JWT signing with Apple private key for client authentication
+     - Authorization code → ID token exchange for subsequent sign-ins
+     - Secure private key storage using credential-code encryption
+   
+   - **Technical Architecture**:
+     - AppleAuthService: OAuth flow with Chrome Custom Tabs
+     - JWT parsing and Apple user ID extraction from `sub` field
+     - Async processing with proper state management
+     - Event bus coordination for navigation flow
+     - Race condition fixes for auth state synchronization
+   
+   - **Security Implementation**:
+     - Apple Developer configuration: Team ID, Service ID, Key ID, Private Key
+     - Credential-code integration for encrypted key storage
+     - PKCE, state validation, nonce verification
+     - Proper OAuth security measures throughout
+   
+   - **UI/UX Parity with iOS**:
+     - WelcomeScreen shows signed-in state with user profile
+     - SignedInCard component matches iOS design
+     - Proper hiding of sign-in buttons when authenticated
+     - Success animations and state transitions
+     - Navigation flow identical to iOS/macOS
+   
+   - **Navigation and State Management**:
+     - Fixed race conditions in callback processing
+     - Event bus pattern for async auth completion
+     - Proper separation of Google vs Apple Sign-In flows
+     - Enhanced debugging with comprehensive logging
+     - Async auth state synchronization using Flow.first()
+   
+   - **Files Implemented/Modified**:
+     - AppleAuthService.kt: Complete rewrite with token exchange
+     - IdentityManager.kt: Apple callback handling and async coordination
+     - AuthenticationViewModel.kt: Event bus integration
+     - AuthenticationScreen.kt: Fixed duplicate navigation callbacks
+     - WelcomeScreen.kt: Enhanced state debugging and display
+     - MainActivity.kt: Deep link processing with logging
+     - Credentials.kt: Apple private key support
+     - PhotolalaNavigation.kt: Navigation flow coordination
+   
+   - **Documentation Created**:
+     - docs/implementation/apple-signin-android-implementation.md
+     - Comprehensive technical documentation
+     - Troubleshooting guide and security considerations
+     - Complete authentication flow documentation
+   
+   - **Result**:
+     - ✅ Cross-platform Apple Sign-In working
+     - ✅ iOS/macOS users can sign in on Android
+     - ✅ Android users can access same S3 cloud data
+     - ✅ UI shows proper signed-in state
+     - ✅ Navigation flow works end-to-end

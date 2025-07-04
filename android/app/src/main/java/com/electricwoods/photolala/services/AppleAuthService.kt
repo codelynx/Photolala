@@ -7,13 +7,30 @@ import androidx.browser.customtabs.CustomTabsClient
 import com.electricwoods.photolala.models.AuthCredential
 import com.electricwoods.photolala.models.AuthProvider
 import com.electricwoods.photolala.utils.SecurityUtils
+import com.electricwoods.photolala.utils.Credentials
+import com.electricwoods.photolala.utils.CredentialKey
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.launch
 import java.security.MessageDigest
 import java.util.Base64
 import javax.inject.Inject
 import javax.inject.Singleton
+import okhttp3.OkHttpClient
+import okhttp3.FormBody
+import okhttp3.Request
+import com.google.gson.Gson
+import com.google.gson.annotations.SerializedName
+import io.jsonwebtoken.Jwts
+import io.jsonwebtoken.SignatureAlgorithm
+import io.jsonwebtoken.security.Keys
+import java.security.KeyFactory
+import java.security.spec.PKCS8EncodedKeySpec
+import java.util.Date
 
 /**
  * Service for handling Sign in with Apple on Android using web-based OAuth flow.
@@ -29,10 +46,15 @@ class AppleAuthService @Inject constructor(
     @ApplicationContext private val context: Context
 ) {
     companion object {
-        // Service ID from Apple Developer Portal
+        // Apple Developer Configuration
+        const val TEAM_ID = "2P97EM4L4N"  // From CLAUDE.md
         const val SERVICE_ID = "com.electricwoods.photolala.android"
+        const val KEY_ID = "FPZRF65BMT"
+        
         const val AUTH_ENDPOINT = "https://appleid.apple.com/auth/authorize"
         const val TOKEN_ENDPOINT = "https://appleid.apple.com/auth/token"
+        // Note: This redirect URI must be configured in Apple Developer Portal
+        // For Android, we need a web URL that Apple can POST to
         const val REDIRECT_URI = "https://photolala.eastlynx.com/auth/apple/callback"
         
         // Scopes
@@ -65,12 +87,13 @@ class AppleAuthService @Inject constructor(
                 appendQueryParameter("client_id", SERVICE_ID)
                 appendQueryParameter("redirect_uri", REDIRECT_URI)
                 appendQueryParameter("response_type", "code")
-                appendQueryParameter("scope", "$SCOPE_EMAIL $SCOPE_NAME")
-                appendQueryParameter("response_mode", "form_post")
+                // TEMPORARY: Skip scopes to test token exchange
+                // TODO: Implement web bridge for full scope support
+                // appendQueryParameter("scope", "$SCOPE_EMAIL $SCOPE_NAME")
+                // appendQueryParameter("response_mode", "form_post")
+                appendQueryParameter("response_mode", "query")
                 appendQueryParameter("state", currentState)
                 appendQueryParameter("nonce", currentNonce)
-                appendQueryParameter("code_challenge", codeChallenge)
-                appendQueryParameter("code_challenge_method", "S256")
             }.build()
             
             // Update state
@@ -98,6 +121,9 @@ class AppleAuthService @Inject constructor(
             )
         }
     }
+    
+    // Add property for coroutine scope
+    private val scope = CoroutineScope(Dispatchers.Main)
     
     /**
      * Handles the OAuth callback from Apple
@@ -140,42 +166,61 @@ class AppleAuthService @Inject constructor(
             return false
         }
         
-        try {
-            // Parse ID token to extract user info (if available)
-            val tokenData = if (idToken != null) parseIdToken(idToken) else null
-            
-            // If we have token data, validate nonce
-            if (tokenData != null && tokenData.nonce != currentNonce) {
+        // Handle token extraction with exchange if needed
+        scope.launch {
+            try {
+                var tokenResponse: AppleTokenResponse? = null
+                val tokenData = when {
+                    idToken != null -> {
+                        // First-time sign in - token provided directly
+                        parseIdToken(idToken)
+                    }
+                    code != null -> {
+                        // Subsequent sign in - need to exchange
+                        _authState.value = AppleAuthState.Loading
+                        tokenResponse = exchangeCodeForTokens(code)
+                        parseIdToken(tokenResponse.idToken)
+                    }
+                    else -> {
+                        throw Exception("No code or token received")
+                    }
+                }
+                
+                // Validate nonce if present
+                if (tokenData.nonce != null && tokenData.nonce != currentNonce) {
+                    _authState.value = AppleAuthState.Error(
+                        AppleAuthError.InvalidNonce("Nonce mismatch - possible replay attack")
+                    )
+                    cleanup()
+                    return@launch
+                }
+                
+                // Create credential with proper Apple user ID from JWT
+                val credential = AuthCredential(
+                    provider = AuthProvider.APPLE,
+                    providerID = tokenData.sub, // Always use sub from JWT
+                    email = tokenData.email,
+                    fullName = tokenData.fullName,
+                    photoURL = null,
+                    idToken = idToken ?: tokenResponse?.idToken,
+                    accessToken = tokenResponse?.accessToken
+                )
+                
+                
+                
+                _authState.value = AppleAuthState.Success(credential)
+                cleanup()
+                
+            } catch (e: Exception) {
+                android.util.Log.e("AppleAuthService", "Auth failed", e)
                 _authState.value = AppleAuthState.Error(
-                    AppleAuthError.InvalidNonce("Nonce mismatch - possible replay attack")
+                    AppleAuthError.TokenParseFailed(e.message ?: "Failed to process tokens")
                 )
                 cleanup()
-                return false
             }
-            
-            // For now, we'll create a minimal credential with just the code
-            // The actual user info will be fetched by the Lambda
-            val credential = AuthCredential(
-                provider = AuthProvider.APPLE,
-                providerID = code, // Using code as temporary ID
-                email = tokenData?.email,
-                fullName = tokenData?.fullName,
-                photoURL = null,
-                idToken = idToken,
-                accessToken = null
-            )
-            
-            _authState.value = AppleAuthState.Success(credential)
-            cleanup()
-            return true
-            
-        } catch (e: Exception) {
-            _authState.value = AppleAuthState.Error(
-                AppleAuthError.TokenParseFailed(e.message ?: "Failed to parse ID token")
-            )
-            cleanup()
-            return false
         }
+        
+        return true
     }
     
     /**
@@ -204,13 +249,16 @@ class AppleAuthService @Inject constructor(
             "${extractJsonValue(payload, "given_name") ?: ""} ${extractJsonValue(payload, "family_name") ?: ""}".trim()
         } else null
         
-        return AppleIdTokenData(
+        val tokenData = AppleIdTokenData(
             sub = sub,
             email = email,
             fullName = fullName,
             nonce = nonce,
             isPrivateEmail = isPrivateEmail
         )
+        
+        android.util.Log.d("AppleAuthService", "Parsed Apple JWT - sub: $sub, email: $email, fullName: $fullName")
+        return tokenData
     }
     
     /**
@@ -261,6 +309,121 @@ class AppleAuthService @Inject constructor(
     fun resetState() {
         _authState.value = AppleAuthState.Idle
         cleanup()
+    }
+    
+    /**
+     * Token exchange response from Apple
+     */
+    data class AppleTokenResponse(
+        @SerializedName("access_token")
+        val accessToken: String,
+        @SerializedName("token_type")
+        val tokenType: String,
+        @SerializedName("expires_in")
+        val expiresIn: Int,
+        @SerializedName("refresh_token")
+        val refreshToken: String,
+        @SerializedName("id_token")
+        val idToken: String
+    )
+    
+    /**
+     * Generate client secret JWT for token exchange
+     */
+    private fun generateClientSecret(): String {
+        // Get the private key from encrypted credentials
+        val privateKeyPEM = Credentials.decrypt(CredentialKey.APPLE_PRIVATE_KEY)
+            ?: throw Exception("Failed to decrypt Apple private key")
+        
+        android.util.Log.d("AppleAuthService", "Generating client secret with:")
+        android.util.Log.d("AppleAuthService", "  Team ID: $TEAM_ID")
+        android.util.Log.d("AppleAuthService", "  Service ID: $SERVICE_ID")
+        android.util.Log.d("AppleAuthService", "  Key ID: $KEY_ID")
+        
+        // Parse the private key
+        val privateKeyContent = privateKeyPEM
+            .replace("-----BEGIN PRIVATE KEY-----", "")
+            .replace("-----END PRIVATE KEY-----", "")
+            .replace("\n", "")
+            .trim()
+        
+        val keyBytes = Base64.getDecoder().decode(privateKeyContent)
+        val keySpec = PKCS8EncodedKeySpec(keyBytes)
+        val keyFactory = KeyFactory.getInstance("EC")
+        val privateKey = keyFactory.generatePrivate(keySpec)
+        
+        // Create JWT
+        val now = Date()
+        val expiration = Date(now.time + 86400 * 180 * 1000L) // 180 days
+        
+        val jwt = Jwts.builder()
+            .setHeaderParam("kid", KEY_ID)
+            .setHeaderParam("alg", "ES256")
+            .setIssuer(TEAM_ID)
+            .setAudience("https://appleid.apple.com")
+            .setSubject(SERVICE_ID)
+            .setIssuedAt(now)
+            .setExpiration(expiration)
+            .signWith(privateKey, SignatureAlgorithm.ES256)
+            .compact()
+            
+        android.util.Log.d("AppleAuthService", "Generated client secret JWT (first 50 chars): ${jwt.take(50)}...")
+        return jwt
+    }
+    
+    /**
+     * Exchange authorization code for tokens
+     */
+    private suspend fun exchangeCodeForTokens(code: String): AppleTokenResponse {
+        return withContext(Dispatchers.IO) {
+            try {
+                val client = OkHttpClient()
+                val gson = Gson()
+                
+                // Generate client secret
+                val clientSecret = generateClientSecret()
+                
+                // Build form body
+                val formBody = FormBody.Builder()
+                    .add("client_id", SERVICE_ID)
+                    .add("client_secret", clientSecret)
+                    .add("code", code)
+                    .add("grant_type", "authorization_code")
+                    .add("redirect_uri", REDIRECT_URI)
+                    .build()
+                
+                // Log request details
+                android.util.Log.d("AppleAuthService", "Token exchange request:")
+                android.util.Log.d("AppleAuthService", "  URL: $TOKEN_ENDPOINT")
+                android.util.Log.d("AppleAuthService", "  client_id: $SERVICE_ID")
+                android.util.Log.d("AppleAuthService", "  code: ${code.take(20)}...")
+                android.util.Log.d("AppleAuthService", "  redirect_uri: $REDIRECT_URI")
+                
+                // Create request
+                val request = Request.Builder()
+                    .url(TOKEN_ENDPOINT)
+                    .post(formBody)
+                    .header("Content-Type", "application/x-www-form-urlencoded")
+                    .build()
+                
+                android.util.Log.d("AppleAuthService", "Exchanging code for tokens...")
+                
+                // Execute request
+                val response = client.newCall(request).execute()
+                val responseBody = response.body?.string()
+                
+                if (response.isSuccessful && responseBody != null) {
+                    android.util.Log.d("AppleAuthService", "Token exchange successful")
+                    gson.fromJson(responseBody, AppleTokenResponse::class.java)
+                } else {
+                    android.util.Log.e("AppleAuthService", "Token exchange failed: ${response.code} - $responseBody")
+                    throw Exception("Token exchange failed: ${response.code} - $responseBody")
+                }
+            } catch (e: Exception) {
+                android.util.Log.e("AppleAuthService", "Token exchange error", e)
+                throw e
+            }
+        }
     }
 }
 

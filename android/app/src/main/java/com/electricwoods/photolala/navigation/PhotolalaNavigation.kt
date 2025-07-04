@@ -131,8 +131,11 @@ fun PhotolalaNavigation(
 			AuthenticationScreen(
 				isSignUp = false,
 				onAuthSuccess = {
+					android.util.Log.d("PhotolalaNav", "=== SIGN-IN AUTH SUCCESS ===")
+					android.util.Log.d("PhotolalaNav", "Clearing create account flow flag and navigating back")
 					PhotolalaNavigation.wasInCreateAccountFlow = false
 					navController.popBackStack()
+					android.util.Log.d("PhotolalaNav", "Navigation completed")
 				},
 				onCancel = {
 					navController.popBackStack()
@@ -169,8 +172,11 @@ fun PhotolalaNavigation(
 			AuthenticationScreen(
 				isSignUp = true,
 				onAuthSuccess = {
+					android.util.Log.d("PhotolalaNav", "=== CREATE ACCOUNT AUTH SUCCESS ===")
+					android.util.Log.d("PhotolalaNav", "Clearing create account flow flag and navigating back")
 					PhotolalaNavigation.wasInCreateAccountFlow = false
 					navController.popBackStack()
+					android.util.Log.d("PhotolalaNav", "Navigation completed")
 				},
 				onCancel = {
 					navController.popBackStack()

@@ -22,6 +22,11 @@ class IdentityManager: NSObject, ObservableObject {
 	override init() {
 		super.init()
 		self.loadStoredUser()
+		
+		// Verify stored user exists in S3
+		Task { @MainActor in
+			await self.verifyStoredUserWithS3()
+		}
 	}
 
 	// MARK: - Public Methods
@@ -43,11 +48,16 @@ class IdentityManager: NSObject, ObservableObject {
 		self.currentUser = nil
 		self.isSignedIn = false
 
-		// Clear stored user
+		// Clear stored user from Keychain
 		try? KeychainManager.shared.delete(key: self.keychainKey)
 
 		// Clear any cached data
 		S3BackupManager.shared.clearCache()
+		
+		// Clear backup queue state
+		UserDefaults.standard.removeObject(forKey: "BackupQueueState")
+		
+		print("User signed out - all local state cleared")
 	}
 
 	// MARK: - Private Methods
@@ -58,9 +68,10 @@ class IdentityManager: NSObject, ObservableObject {
 			
 			// Try to decode as new model first
 			if let user = try? JSONDecoder().decode(PhotolalaUser.self, from: userData) {
+				// Temporarily set user - will be verified against S3
 				self.currentUser = user
 				self.isSignedIn = true
-				print("Loaded stored user: \(user.displayName)")
+				print("Loaded stored user: \(user.displayName) - pending S3 verification")
 				return
 			}
 			
@@ -74,15 +85,52 @@ class IdentityManager: NSObject, ObservableObject {
 				let migratedData = try encoder.encode(migratedUser)
 				try KeychainManager.shared.save(migratedData, for: self.keychainKey)
 				
+				// Temporarily set user - will be verified against S3
 				self.currentUser = migratedUser
 				self.isSignedIn = true
-				print("Migrated legacy user: \(migratedUser.displayName)")
+				print("Migrated legacy user: \(migratedUser.displayName) - pending S3 verification")
 				return
 			}
 			
 			print("Failed to decode user data")
 		} catch {
 			print("No stored user found: \(error)")
+		}
+	}
+	
+	private func verifyStoredUserWithS3() async {
+		guard let user = self.currentUser else { return }
+		
+		do {
+			// Check if user exists in S3 by verifying identity mapping
+			// This requires the extension method to be available
+			let identityKey = "\(user.primaryProvider.rawValue):\(user.primaryProviderID)"
+			let identityPath = "identities/\(identityKey)"
+			
+			let s3Manager = S3BackupManager.shared
+			guard let s3Service = s3Manager.s3Service else {
+				print("S3 service not available - keeping local user")
+				return
+			}
+			
+			do {
+				// Try to download the identity mapping
+				let _ = try await s3Service.downloadData(from: identityPath)
+				print("User verified in S3: \(user.displayName)")
+				// User exists - keep signed in state
+			} catch {
+				// User doesn't exist in S3 - clear local state
+				print("User not found in S3 (\(identityPath)), clearing local state")
+				try? KeychainManager.shared.delete(key: self.keychainKey)
+				self.currentUser = nil
+				self.isSignedIn = false
+			}
+		} catch {
+			// Error verifying - clear local state to be safe
+			print("Error verifying user in S3: \(error). Clearing local state.")
+			try? KeychainManager.shared.delete(key: self.keychainKey)
+			self.currentUser = nil
+			self.isSignedIn = false
 		}
 	}
 

@@ -8,6 +8,7 @@ import javax.crypto.spec.GCMParameterSpec
 import javax.crypto.spec.SecretKeySpec
 
 enum class CredentialKey {
+    APPLE_PRIVATE_KEY,
     AWS_ACCESS_KEY_ID,
     AWS_DEFAULT_REGION,
     AWS_SECRET_ACCESS_KEY,
@@ -22,64 +23,109 @@ object Credentials {
     
     // Encrypted credential data as byte arrays
     private val encryptedData = mapOf(
-        CredentialKey.AWS_ACCESS_KEY_ID to EncryptedData(
+        CredentialKey.APPLE_PRIVATE_KEY to EncryptedData(
             data = byteArrayOf(
-                -53, -31, -15, 0x41, 0x59, -69, 0x22, 0x6F,
-                -77, 0x6D, 0x51, 0x46, -40, 0x4A, -100, 0x78,
-                0x6E, -90, 0x44, -14
+                0x46, 0x21, -76, 0x17, 0x73, 0x4F, 0x49, -29,
+                0x41, 0x51, 0x69, -52, 0x69, -94, -64, -49,
+                -66, -75, -83, 0x18, -76, 0x06, 0x74, -68,
+                -18, 0x4D, -125, 0x55, -3, 0x45, 0x28, -15,
+                0x76, -74, 0x21, 0x31, 0x7D, -117, 0x44, -6,
+                -85, 0x1B, -11, 0x0F, 0x55, 0x53, -107, -100,
+                0x70, -45, 0x72, -10, 0x76, 0x28, 0x51, 0x3D,
+                0x71, 0x6F, 0x1E, 0x3D, -95, 0x13, 0x78, -45,
+                0x62, -56, -51, -84, -40, 0x6E, 0x11, 0x12,
+                -122, -118, -24, 0x52, -53, -87, 0x3E, 0x3B,
+                -38, 0x44, 0x1F, 0x18, 0x7E, 0x50, -119, -84,
+                0x34, 0x6F, -126, -2, -114, 0x31, -32, -92,
+                0x37, -109, -76, 0x2F, 0x1A, -80, 0x04, -61,
+                0x00, -87, -9, -17, 0x35, 0x6D, -99, 0x6D,
+                -92, -10, -3, -103, 0x47, -65, -64, 0x47,
+                -85, 0x2B, -78, 0x5C, 0x01, 0x24, 0x3E, -54,
+                -68, 0x2D, 0x7D, -46, -9, -51, 0x65, -33,
+                0x33, -72, 0x1C, 0x09, -6, 0x42, 0x45, 0x21,
+                0x23, -52, -4, -7, -90, 0x7A, 0x72, 0x08,
+                -106, -53, -57, 0x40, -114, -11, -57, 0x24,
+                0x54, -34, -67, -100, -39, -71, 0x22, 0x72,
+                -35, -82, 0x6E, -75, 0x1C, 0x55, 0x75, -127,
+                -111, 0x08, 0x16, -109, -55, -45, 0x38, -120,
+                -100, 0x1C, 0x13, 0x28, -6, -80, -124, -68,
+                0x27, -58, -85, 0x49, -81, 0x44, 0x3C, 0x0C,
+                0x6E, 0x70, -79, 0x0E, -92, -115, 0x6B, -127,
+                0x63, -48, -127, 0x4B, 0x14, 0x47, -56, 0x3E,
+                -121, 0x77, -88, 0x1A, -72, 0x7D, 0x7D, -37,
+                -26, -115, -77, -39, 0x22, 0x15, 0x47, -7,
+                -108, -105, 0x5D, -13, 0x4B, -84, -16, 0x34,
+                0x08, -36, -72, 0x1E, -76, -10, -18, -48,
+                -71, 0x53, 0x30, 0x1E, -121, -1, -37, -37,
+                0x6D
             ),
             nonce = byteArrayOf(
-                -51, 0x6E, -81, 0x1A, -19, -1, 0x4A, -58,
-                -94, -29, 0x66, 0x3E
+                -101, -34, -125, -126, 0x5A, -126, 0x72, 0x5E,
+                -32, -48, 0x68, 0x02
             ),
             tag = byteArrayOf(
-                0x17, -88, -112, -46, -57, 0x64, -33, -96,
-                -1, -61, -66, 0x4C, -20, -71, 0x0F, -21
+                -58, 0x4D, 0x5E, 0x13, -88, 0x67, 0x03, 0x48,
+                -1, 0x61, 0x57, -49, 0x0F, 0x3B, 0x0D, 0x76
+            )
+        ),
+        CredentialKey.AWS_ACCESS_KEY_ID to EncryptedData(
+            data = byteArrayOf(
+                0x03, -38, -29, 0x1D, 0x76, -97, -1, 0x4A,
+                -121, -81, -65, 0x55, -37, -55, -120, -63,
+                -87, -128, 0x69, -91
+            ),
+            nonce = byteArrayOf(
+                0x17, 0x59, -60, 0x35, 0x56, 0x46, 0x74, -67,
+                -88, -40, -73, -73
+            ),
+            tag = byteArrayOf(
+                0x51, 0x3F, -8, 0x3C, 0x75, 0x4A, 0x34, -34,
+                -13, 0x07, -36, -6, 0x1E, 0x03, -45, 0x55
             )
         ),
         CredentialKey.AWS_DEFAULT_REGION to EncryptedData(
             data = byteArrayOf(
-                0x18, 0x5E, -51, -104, -52, 0x1A, 0x25, 0x4F,
-                -35
+                -85, -18, -9, -6, 0x3F, 0x05, 0x02, 0x3E,
+                -16
             ),
             nonce = byteArrayOf(
-                -39, -124, -21, -68, -35, -12, -35, 0x32,
-                -13, -62, 0x24, 0x79
+                -68, -7, 0x61, 0x39, -109, 0x67, -73, -85,
+                0x0C, -7, -103, 0x72
             ),
             tag = byteArrayOf(
-                -42, 0x46, -63, 0x3D, -15, -34, 0x16, -18,
-                -73, 0x39, 0x79, 0x1B, 0x10, -63, -59, 0x47
+                -93, 0x17, 0x6D, 0x13, -34, 0x11, 0x17, 0x00,
+                -100, -94, 0x03, -16, -67, -63, 0x14, -115
             )
         ),
         CredentialKey.AWS_SECRET_ACCESS_KEY to EncryptedData(
             data = byteArrayOf(
-                -85, -43, 0x1D, 0x52, -3, -102, 0x49, -63,
-                0x09, -89, 0x42, -119, 0x74, 0x1F, 0x26, 0x7F,
-                -52, -61, -62, -46, 0x1E, -103, 0x36, 0x69,
-                -39, -45, -37, 0x3F, 0x49, 0x5F, 0x56, 0x1E,
-                -109, 0x4F, -91, -59, -9, -25, 0x02, -65
+                0x44, 0x1D, 0x55, 0x22, -99, -112, 0x03, 0x7E,
+                -64, -18, 0x33, 0x56, 0x35, -112, -71, 0x70,
+                0x1A, -32, -16, -23, 0x56, 0x2D, -108, -83,
+                0x23, 0x62, 0x04, -24, 0x0C, 0x15, -17, 0x1B,
+                0x32, 0x64, -67, -123, 0x03, -40, 0x64, -3
             ),
             nonce = byteArrayOf(
-                0x56, -124, -119, -27, 0x08, 0x15, 0x2C, -115,
-                -25, 0x24, 0x63, -6
+                -73, 0x3B, -5, -67, -100, 0x03, 0x3D, 0x7A,
+                -34, -128, -22, -100
             ),
             tag = byteArrayOf(
-                0x7A, -31, -80, -31, -69, 0x43, -57, 0x77,
-                0x09, 0x6E, -2, 0x44, -96, 0x5A, 0x71, -28
+                -55, 0x2F, -38, -93, -110, 0x50, 0x2E, -106,
+                0x6F, -76, 0x2D, 0x26, -2, -10, 0x21, -122
             )
         ),
     )
 
     // Runtime decryption key (obfuscated)
     private val keyComponents = arrayOf(
-        byteArrayOf(0x79, 0x4B, -124, 0x15),
-        byteArrayOf(0x51, -85, 0x59, 0x3D),
-        byteArrayOf(0x79, 0x4B, 0x03, -116),
-        byteArrayOf(-115, -37, 0x5C, 0x11),
-        byteArrayOf(-20, -108, -103, -46),
-        byteArrayOf(-49, -100, 0x1E, -75),
-        byteArrayOf(-39, 0x6F, -7, -5),
-        byteArrayOf(-72, -33, -124, 0x53),
+        byteArrayOf(-110, 0x1D, 0x1C, 0x0B),
+        byteArrayOf(0x2A, -27, 0x37, 0x09),
+        byteArrayOf(-65, -107, -70, -48),
+        byteArrayOf(0x52, -31, -107, 0x5E),
+        byteArrayOf(-40, -115, -4, 0x02),
+        byteArrayOf(-52, 0x38, 0x34, 0x6F),
+        byteArrayOf(0x6D, 0x64, 0x52, -9),
+        byteArrayOf(0x17, 0x5B, 0x42, 0x28),
     )
 
     @JvmStatic

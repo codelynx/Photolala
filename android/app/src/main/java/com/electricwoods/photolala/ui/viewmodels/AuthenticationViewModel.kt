@@ -4,6 +4,7 @@ import android.content.Intent
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.electricwoods.photolala.models.AuthCredential
 import com.electricwoods.photolala.models.AuthProvider
 import com.electricwoods.photolala.services.AuthException
 import com.electricwoods.photolala.services.AuthenticationEventBus
@@ -26,6 +27,9 @@ class AuthenticationViewModel @Inject constructor(
 	// Callback for launching Apple Sign-In
 	var onAppleSignInRequired: (() -> Unit)? = null
 	
+	// Callback for handling no account found error
+	var onNoAccountFound: ((AuthProvider, AuthCredential?) -> Unit)? = null
+	
 	// Store the pending success callback for Apple Sign-In
 	private var pendingAppleSignInSuccessCallback: (() -> Unit)? = null
 	
@@ -38,8 +42,16 @@ class AuthenticationViewModel @Inject constructor(
 			.onEach { event ->
 				when (event) {
 					is AuthenticationEventBus.AuthEvent.AppleSignInCompleted -> {
+						android.util.Log.d("AuthViewModel", "=== APPLE SIGN-IN EVENT RECEIVED ===")
+						android.util.Log.d("AuthViewModel", "Pending callback available: ${pendingAppleSignInSuccessCallback != null}")
 						// Call the pending success callback if available
-						pendingAppleSignInSuccessCallback?.invoke()
+						pendingAppleSignInSuccessCallback?.let { callback ->
+							android.util.Log.d("AuthViewModel", "Invoking success callback for navigation")
+							// Add small delay to ensure user state is fully updated
+							kotlinx.coroutines.delay(100)
+							callback()
+							android.util.Log.d("AuthViewModel", "Success callback invoked")
+						} ?: android.util.Log.d("AuthViewModel", "No pending callback to invoke")
 						pendingAppleSignInSuccessCallback = null
 					}
 					else -> {}
@@ -91,11 +103,31 @@ class AuthenticationViewModel @Inject constructor(
 						// Handle user cancellation silently
 						Log.d("AuthViewModel", "User cancelled authentication")
 					}
+					is AuthException.NoAccountFound -> {
+						// Invoke the callback to show create account dialog
+						// Pass the credential if available to avoid re-authentication
+						onNoAccountFound?.invoke(provider, error.credential)
+					}
 					else -> {
 						// Error is already set in identityManager.errorMessage
 						Log.e("AuthViewModel", "Authentication failed", error)
 					}
 				}
+			}
+		}
+	}
+	
+	fun createAccountWithCredential(
+		credential: AuthCredential,
+		onSuccess: () -> Unit
+	) {
+		viewModelScope.launch {
+			val result = identityManager.createAccount(credential)
+			result.onSuccess {
+				onSuccess()
+			}.onFailure { error ->
+				// Error is already set in identityManager.errorMessage
+				Log.e("AuthViewModel", "Account creation failed", error)
 			}
 		}
 	}
@@ -106,9 +138,20 @@ class AuthenticationViewModel @Inject constructor(
 			result.onSuccess {
 				onSuccess()
 			}.onFailure { error ->
-				// Handle errors (already set in identityManager.errorMessage)
-				if (error !is AuthException.UserCancelled) {
-					Log.e("AuthViewModel", "Google Sign-In failed", error)
+				when (error) {
+					is AuthException.NoAccountFound -> {
+						// Invoke the callback to show create account dialog
+						// Pass the credential if available to avoid re-authentication
+						onNoAccountFound?.invoke(error.provider, error.credential)
+					}
+					is AuthException.UserCancelled -> {
+						// Handle user cancellation silently
+						Log.d("AuthViewModel", "User cancelled Google Sign-In")
+					}
+					else -> {
+						// Error is already set in identityManager.errorMessage
+						Log.e("AuthViewModel", "Google Sign-In failed", error)
+					}
 				}
 			}
 		}

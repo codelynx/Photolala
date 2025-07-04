@@ -11,6 +11,9 @@ struct AuthenticationChoiceView: View {
 	@State private var errorMessage = ""
 	@State private var showAccountLinking = false
 	@State private var linkingData: (existingUser: PhotolalaUser, newCredential: AuthCredential)?
+	@State private var showCreateAccountPrompt = false
+	@State private var pendingProvider: AuthProvider?
+	@State private var pendingCredential: AuthCredential?
 	
 	enum AuthMode {
 		case signIn
@@ -302,6 +305,36 @@ struct AuthenticationChoiceView: View {
 		} message: {
 			Text(errorMessage)
 		}
+		.alert("No Account Found", isPresented: $showCreateAccountPrompt) {
+			Button("Create Account") {
+				// Use the existing credential if available to avoid re-authentication
+				if let credential = pendingCredential {
+					Task {
+						do {
+							_ = try await identityManager.createAccount(with: credential)
+							dismiss()
+						} catch {
+							handleError(error)
+						}
+					}
+				} else if let provider = pendingProvider {
+					// Fallback to re-authentication if no credential is available
+					authMode = .createAccount
+					showingProviders = true
+					DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+						handleProviderSelection(provider)
+					}
+				}
+			}
+			Button("Cancel", role: .cancel) {
+				pendingProvider = nil
+				pendingCredential = nil
+			}
+		} message: {
+			if let provider = pendingProvider {
+				Text("No account found with \(provider.displayName). Would you like to create a new account?")
+			}
+		}
 		.sheet(isPresented: $showAccountLinking) {
 			if let data = linkingData {
 				AccountLinkingPrompt(
@@ -362,6 +395,17 @@ struct AuthenticationChoiceView: View {
 	private func handleError(_ error: Error) {
 		// Don't show error for user cancellation
 		if error is CancellationError {
+			withAnimation(.easeInOut(duration: 0.3)) {
+				showingProviders = false
+			}
+			return
+		}
+		
+		// Check if it's a "no account found" error
+		if case AuthError.noAccountFound(let provider, let credential) = error {
+			pendingProvider = provider
+			pendingCredential = credential
+			showCreateAccountPrompt = true
 			withAnimation(.easeInOut(duration: 0.3)) {
 				showingProviders = false
 			}

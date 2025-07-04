@@ -1,12 +1,17 @@
 package com.electricwoods.photolala.ui.screens
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -14,7 +19,9 @@ import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.electricwoods.photolala.R
+import com.electricwoods.photolala.models.AuthCredential
 import com.electricwoods.photolala.models.AuthProvider
+import com.electricwoods.photolala.services.AuthException
 import com.electricwoods.photolala.services.IdentityManager
 import com.electricwoods.photolala.ui.viewmodels.AuthenticationViewModel
 
@@ -30,12 +37,27 @@ fun AuthenticationScreen(
 	val errorMessage by identityManager.errorMessage.collectAsStateWithLifecycle()
 	val currentUser by identityManager.currentUser.collectAsStateWithLifecycle()
 	
-	// Monitor authentication state changes
+	// State for showing create account dialog
+	var showCreateAccountDialog by remember { mutableStateOf(false) }
+	var pendingProvider by remember { mutableStateOf<AuthProvider?>(null) }
+	var pendingCredential by remember { mutableStateOf<AuthCredential?>(null) }
+	
+	// Set up the no account found callback
+	LaunchedEffect(Unit) {
+		viewModel.onNoAccountFound = { provider, credential ->
+			pendingProvider = provider
+			pendingCredential = credential
+			showCreateAccountDialog = true
+		}
+	}
+	
+	// Monitor authentication state changes - but only for Google Sign-In
+	// Apple Sign-In uses the event bus mechanism in AuthenticationViewModel
 	LaunchedEffect(currentUser) {
 		android.util.Log.d("AuthenticationScreen", "LaunchedEffect triggered, currentUser: $currentUser")
-		if (currentUser != null) {
-			android.util.Log.d("AuthenticationScreen", "User authenticated, calling onAuthSuccess")
-			// User successfully authenticated, trigger success callback
+		// Only handle Google Sign-In success here, Apple Sign-In is handled via event bus
+		if (currentUser != null && currentUser!!.primaryProvider == AuthProvider.GOOGLE) {
+			android.util.Log.d("AuthenticationScreen", "Google user authenticated, calling onAuthSuccess")
 			onAuthSuccess()
 		}
 	}
@@ -157,18 +179,44 @@ fun AuthenticationScreen(
 		
 		// Error message
 		errorMessage?.let { error ->
+			val clipboardManager = LocalClipboardManager.current
+			val context = LocalContext.current
+			
 			Spacer(modifier = Modifier.height(24.dp))
 			Card(
-				modifier = Modifier.fillMaxWidth(),
+				modifier = Modifier
+					.fillMaxWidth()
+					.clickable {
+						// Copy to clipboard when clicked
+						clipboardManager.setText(AnnotatedString(error))
+						// Show toast
+						android.widget.Toast.makeText(
+							context,
+							"Error message copied to clipboard",
+							android.widget.Toast.LENGTH_SHORT
+						).show()
+					},
 				colors = CardDefaults.cardColors(
 					containerColor = MaterialTheme.colorScheme.errorContainer
 				)
 			) {
-				Text(
-					text = error,
-					modifier = Modifier.padding(16.dp),
-					color = MaterialTheme.colorScheme.onErrorContainer
-				)
+				Column(
+					modifier = Modifier.padding(16.dp)
+				) {
+					SelectionContainer {
+						Text(
+							text = error,
+							color = MaterialTheme.colorScheme.onErrorContainer
+						)
+					}
+					Spacer(modifier = Modifier.height(8.dp))
+					Text(
+						text = "Tap to copy",
+						fontSize = 12.sp,
+						color = MaterialTheme.colorScheme.onErrorContainer.copy(alpha = 0.6f),
+						modifier = Modifier.align(Alignment.End)
+					)
+				}
 			}
 		}
 		
@@ -193,5 +241,64 @@ fun AuthenticationScreen(
 				CircularProgressIndicator()
 			}
 		}
+	}
+	
+	// Show create account dialog
+	if (showCreateAccountDialog && pendingProvider != null) {
+		AlertDialog(
+			onDismissRequest = {
+				showCreateAccountDialog = false
+				pendingProvider = null
+			},
+			title = { 
+				SelectionContainer {
+					Text("No Account Found")
+				}
+			},
+			text = {
+				SelectionContainer {
+					Text("No account found with ${pendingProvider?.displayName}. Would you like to create a new account?")
+				}
+			},
+			confirmButton = {
+				TextButton(
+					onClick = {
+						showCreateAccountDialog = false
+						// Use the existing credential if available to avoid re-authentication
+						val credential = pendingCredential
+						if (credential != null) {
+							viewModel.createAccountWithCredential(
+								credential = credential,
+								onSuccess = onAuthSuccess
+							)
+						} else {
+							// Fallback to re-authentication if no credential is available
+							pendingProvider?.let { provider ->
+								viewModel.authenticate(
+									provider = provider,
+									isSignUp = true,
+									onSuccess = onAuthSuccess
+								)
+							}
+						}
+						pendingProvider = null
+						pendingCredential = null
+					}
+				) {
+					Text("Create Account")
+				}
+			},
+			dismissButton = {
+				TextButton(
+					onClick = {
+						showCreateAccountDialog = false
+						pendingProvider = null
+						pendingCredential = null
+					}
+				) {
+					Text("Cancel")
+				}
+			}
+		)
 	}
 }

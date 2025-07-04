@@ -137,13 +137,17 @@ class S3Service @Inject constructor(
      * @return The downloaded data as byte array
      */
     suspend fun downloadData(key: String): Result<ByteArray> = withContext(Dispatchers.IO) {
+        android.util.Log.d("S3Service", "downloadData called for key: $key")
         try {
+            android.util.Log.d("S3Service", "Attempting to get object from bucket: $BUCKET_NAME, key: $key")
             val s3Object: S3Object = s3Client.getObject(BUCKET_NAME, key)
             val data = s3Object.objectContent.use { stream ->
                 stream.readBytes()
             }
+            android.util.Log.d("S3Service", "Successfully downloaded ${data.size} bytes from $key")
             Result.success(data)
         } catch (e: Exception) {
+            android.util.Log.e("S3Service", "Failed to download from $key: ${e.message}", e)
             Result.failure(e)
         }
     }

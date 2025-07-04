@@ -110,6 +110,13 @@ dependencies {
 	// Chrome Custom Tabs for Apple Sign-In
 	implementation("androidx.browser:browser:1.7.0")
 	
+	// Apple Sign-In dependencies
+	implementation("com.squareup.okhttp3:okhttp:4.11.0")
+	implementation("com.google.code.gson:gson:2.10.1")
+	implementation("io.jsonwebtoken:jjwt-api:0.11.5")
+	runtimeOnly("io.jsonwebtoken:jjwt-impl:0.11.5")
+	runtimeOnly("io.jsonwebtoken:jjwt-jackson:0.11.5")
+	
 	// Ktor HTTP client for Lambda calls
 	implementation("io.ktor:ktor-client-core:2.3.7")
 	implementation("io.ktor:ktor-client-cio:2.3.7")

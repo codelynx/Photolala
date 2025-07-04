@@ -64,7 +64,8 @@ extension IdentityManager {
 			
 		case (.signIn, nil):
 			// Sign in failed - no account exists
-			throw AuthError.noAccountFound(provider: provider)
+			// Include the credential so it can be reused for account creation
+			throw AuthError.noAccountFound(provider: provider, credential: credential)
 			
 		case (.createAccount, _?):
 			// Create account failed - user already exists
@@ -118,6 +119,63 @@ extension IdentityManager {
 	/// Create a new account
 	func createAccount(with provider: AuthProvider) async throws -> PhotolalaUser {
 		try await authenticateAndProcess(with: provider, intent: .createAccount)
+	}
+	
+	/// Create a new account with an existing credential (avoids re-authentication)
+	func createAccount(with credential: AuthCredential) async throws -> PhotolalaUser {
+		isLoading = true
+		errorMessage = nil
+		
+		defer { isLoading = false }
+		
+		// Check if user already exists with this provider ID
+		let existingUser = try await findUserByProviderID(
+			provider: credential.provider,
+			providerID: credential.providerID
+		)
+		
+		if existingUser != nil {
+			// User already exists - this shouldn't happen in normal flow
+			throw AuthError.accountAlreadyExists(provider: credential.provider)
+		}
+		
+		// Check if there's an existing account with the same email
+		if let email = credential.email,
+		   let existingUserWithEmail = try await findUserByEmail(email) {
+			// Found existing account with same email - prompt for linking
+			throw AuthError.emailAlreadyInUse(
+				existingUser: existingUserWithEmail,
+				newCredential: credential
+			)
+		}
+		
+		// Create new account
+		let serviceUserID = UUID().uuidString.lowercased()
+		
+		let newUser = PhotolalaUser(
+			serviceUserID: serviceUserID,
+			provider: credential.provider,
+			providerID: credential.providerID,
+			email: credential.email,
+			fullName: credential.fullName,
+			photoURL: credential.photoURL,
+			subscription: Subscription.freeTrial()
+		)
+		
+		try await saveUser(newUser)
+		try await createS3UserFolders(for: newUser)
+		
+		// Create email mapping if email exists
+		if let email = credential.email {
+			try await updateEmailMapping(email: email, serviceUserID: serviceUserID)
+		}
+		
+		await MainActor.run {
+			self.currentUser = newUser
+			self.isSignedIn = true
+		}
+		
+		return newUser
 	}
 	
 	/// Force create a new account even if email exists
@@ -191,12 +249,17 @@ extension IdentityManager {
 	// MARK: - Provider Authentication
 	
 	private func authenticate(with provider: AuthProvider) async throws -> AuthCredential {
+		let credential: AuthCredential
+		
 		switch provider {
 		case .apple:
-			return try await authenticateWithApple()
+			credential = try await authenticateWithApple()
 		case .google:
-			return try await GoogleAuthProvider.shared.signIn()
+			credential = try await GoogleAuthProvider.shared.signIn()
 		}
+		
+		print("[IdentityManager] Authenticated with \(provider.rawValue) - ID: \(credential.providerID), Email: \(credential.email ?? "nil"), Name: \(credential.fullName ?? "nil")")
+		return credential
 	}
 	
 	private func authenticateWithApple() async throws -> AuthCredential {
@@ -223,24 +286,10 @@ extension IdentityManager {
 	
 	// MARK: - User Management
 	
-	private func findUserByProviderID(provider: AuthProvider, providerID: String) async throws -> PhotolalaUser? {
-		// First, check local cache
-		if let userData = try? KeychainManager.shared.load(key: keychainKey),
-		   let user = try? JSONDecoder().decode(PhotolalaUser.self, from: userData) {
-			// Check if this provider matches
-			if user.primaryProvider == provider && user.primaryProviderID == providerID {
-				return user
-			}
-			
-			// Check linked providers
-			for linked in user.linkedProviders {
-				if linked.provider == provider && linked.providerID == providerID {
-					return user
-				}
-			}
-		}
+	internal func findUserByProviderID(provider: AuthProvider, providerID: String, checkLocalCache: Bool = true) async throws -> PhotolalaUser? {
+		print("[IdentityManager] findUserByProviderID called with \(provider.rawValue):\(providerID)")
 		
-		// If not found locally, check S3 identity mapping
+		// Always check S3 first as the single source of truth
 		let s3Manager = S3BackupManager.shared
 		guard let s3Service = s3Manager.s3Service else {
 			// Try legacy model if S3 not available
@@ -256,6 +305,8 @@ extension IdentityManager {
 		// Look up UUID from identity mapping
 		let identityKey = "\(provider.rawValue):\(providerID)"
 		let identityPath = "identities/\(identityKey)"
+		
+		print("[IdentityManager] Checking S3 for identity mapping: \(identityPath)")
 		
 		do {
 			let uuidData = try await s3Service.downloadData(from: identityPath)

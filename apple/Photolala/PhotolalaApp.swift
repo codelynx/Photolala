@@ -26,12 +26,8 @@ import GoogleSignIn
 		}
 		
 		func applicationDidFinishLaunching(_ notification: Notification) {
-			// Ensure no windows are restored
-			NSApp.windows.forEach { window in
-				if window.identifier?.rawValue.contains("NSWindow") == true {
-					window.close()
-				}
-			}
+			// The welcome window should open automatically from the main WindowGroup
+			print("[AppDelegate] applicationDidFinishLaunching - Windows count: \(NSApp.windows.count)")
 		}
 		
 		func applicationSupportsSecureRestorableState(_ app: NSApplication) -> Bool {
@@ -45,8 +41,18 @@ import GoogleSignIn
 		}
 		
 		func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
-			// Don't reopen windows
-			true
+			if !flag {
+				// If no visible windows, open the welcome window
+				if let welcomeCommand = NSApp.mainMenu?.item(withTitle: "Window")?.submenu?.item(withTitle: "Welcome") {
+					NSApp.sendAction(welcomeCommand.action!, to: welcomeCommand.target, from: welcomeCommand)
+				}
+			}
+			return true
+		}
+		
+		func applicationShouldOpenUntitledFile(_ sender: NSApplication) -> Bool {
+			// Prevent opening untitled windows
+			return false
 		}
 	}
 #endif
@@ -114,24 +120,36 @@ struct PhotolalaApp: App {
 
 	var body: some Scene {
 		#if os(macOS)
-			// Folder browser windows only - no default window
-			WindowGroup("Photolala", for: URL.self) { $folderURL in
+			// Main window group - shows welcome screen by default
+			WindowGroup {
+				WelcomeView()
+					.environmentObject(IdentityManager.shared)
+					.frame(minWidth: 600, minHeight: 700)
+					.onOpenURL { url in
+						handleOpenURL(url)
+					}
+			}
+			.windowResizability(.contentSize)
+			.defaultSize(width: 600, height: 700)
+			
+			// Folder browser windows (for programmatic opening)
+			WindowGroup("Folder Browser", for: URL.self) { $folderURL in
 				Group {
 					if let folderURL {
 						DirectoryPhotoBrowserView(directoryPath: folderURL.path as NSString)
 							.environmentObject(IdentityManager.shared)
+					} else {
+						// This should never show since we only open this programmatically
+						EmptyView()
 					}
-//					else {
-//						Text("No folder selected")
-//							.foregroundStyle(.secondary)
-//							.frame(minWidth: 400, minHeight: 300)
-//					}
 				}
 				.onOpenURL { url in
 					handleOpenURL(url)
 				}
 			}
 			.defaultSize(width: 1200, height: 600)
+			.handlesExternalEvents(matching: [])
+			
 			.commands {
 				PhotolalaCommands()
 			}

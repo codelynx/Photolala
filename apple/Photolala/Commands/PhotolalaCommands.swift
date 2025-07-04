@@ -17,6 +17,7 @@ struct PhotolalaCommands: Commands {
 	static var s3BackupWindow: NSWindow?
 	static var iapDeveloperWindow: NSWindow?
 	static var signInWindow: NSWindow?
+	static var welcomeWindow: NSWindow?
 	#endif
 	@Environment(\.openWindow) private var openWindow
 
@@ -159,6 +160,13 @@ struct PhotolalaCommands: Commands {
 		// Add special browsers to Window menu
 		#if os(macOS)
 		CommandGroup(before: .windowList) {
+			Button("Welcome") {
+				self.openWelcomeWindow()
+			}
+			.keyboardShortcut("0", modifiers: .command)
+			
+			Divider()
+			
 			Button("Apple Photos Library") {
 				self.openApplePhotosLibrary()
 			}
@@ -197,10 +205,68 @@ struct PhotolalaCommands: Commands {
 			panel.begin { response in
 				if response == .OK, let url = panel.url {
 					print("[PhotolalaCommands] Opening folder: \(url.path)")
-					// Open new window with the selected folder
-					self.openWindow(value: url)
+					// Open new window with the folder browser
+					let window = NSWindow(
+						contentRect: NSRect(x: 0, y: 0, width: 1200, height: 800),
+						styleMask: [.titled, .closable, .resizable, .miniaturizable],
+						backing: .buffered,
+						defer: false
+					)
+					
+					window.title = url.lastPathComponent
+					window.center()
+					window.contentView = NSHostingView(
+						rootView: DirectoryPhotoBrowserView(directoryPath: url.path as NSString)
+							.environmentObject(IdentityManager.shared)
+					)
+					
+					// Set minimum window size
+					window.minSize = NSSize(width: 800, height: 600)
+					
+					window.makeKeyAndOrderFront(nil)
+					
+					// Keep window in front but not floating
+					window.level = .normal
+					window.isReleasedWhenClosed = false
 				}
 			}
+		#endif
+	}
+	
+	func openWelcomeWindow() {
+		#if os(macOS)
+			// Close existing window if open
+			if let existingWindow = Self.welcomeWindow {
+				existingWindow.close()
+			}
+			
+			// Open new welcome window
+			let window = NSWindow(
+				contentRect: NSRect(x: 0, y: 0, width: 600, height: 700),
+				styleMask: [.titled, .closable, .resizable, .miniaturizable],
+				backing: .buffered,
+				defer: false
+			)
+			
+			window.title = "Welcome to Photolala"
+			window.center()
+			window.contentView = NSHostingView(
+				rootView: WelcomeView()
+					.environmentObject(IdentityManager.shared)
+			)
+			
+			// Set minimum and maximum window sizes
+			window.minSize = NSSize(width: 600, height: 700)
+			window.maxSize = NSSize(width: 800, height: 900)
+			
+			window.makeKeyAndOrderFront(nil)
+			
+			// Keep window in front but not floating
+			window.level = .normal
+			window.isReleasedWhenClosed = false
+			
+			// Store reference to keep window alive
+			Self.welcomeWindow = window
 		#endif
 	}
 	

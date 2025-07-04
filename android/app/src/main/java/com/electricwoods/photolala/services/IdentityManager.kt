@@ -15,6 +15,10 @@ import java.util.*
 import javax.inject.Inject
 import javax.inject.Singleton
 import android.net.Uri
+import kotlinx.coroutines.DelicateCoroutinesApi
+import kotlinx.coroutines.GlobalScope
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.flow.first
 
 @Singleton
 class IdentityManager @Inject constructor(
@@ -43,7 +47,14 @@ class IdentityManager @Inject constructor(
 	val errorMessage: StateFlow<String?> = _errorMessage.asStateFlow()
 	
 	init {
+		android.util.Log.d("IdentityManager", "Initializing IdentityManager")
 		loadStoredUser()
+		// Verify stored user exists in S3
+		@OptIn(DelicateCoroutinesApi::class)
+		GlobalScope.launch {
+			android.util.Log.d("IdentityManager", "Starting S3 verification of stored user")
+			verifyStoredUserWithS3()
+		}
 	}
 	
 	companion object {
@@ -65,22 +76,77 @@ class IdentityManager @Inject constructor(
 		return authenticateAndProcess(provider, AuthIntent.CREATE_ACCOUNT)
 	}
 	
+	// Create a new account with an existing credential (avoids re-authentication)
+	suspend fun createAccount(credential: AuthCredential): Result<PhotolalaUser> {
+		_isLoading.value = true
+		_errorMessage.value = null
+		
+		try {
+			// Check if user already exists with this provider ID
+			val existingUser = findUserByProviderID(credential.provider, credential.providerID)
+			
+			if (existingUser != null) {
+				// User already exists - this shouldn't happen in normal flow
+				_errorMessage.value = "An account already exists with ${credential.provider.displayName}"
+				return Result.failure(AuthException.AccountAlreadyExists(credential.provider))
+			}
+			
+			// Create new account
+			val serviceUserID = UUID.randomUUID().toString().lowercase()
+			val newUser = PhotolalaUser(
+				serviceUserID = serviceUserID,
+				primaryProvider = credential.provider,
+				primaryProviderID = credential.providerID,
+				email = credential.email,
+				fullName = credential.fullName,
+				photoURL = credential.photoURL,
+				createdAt = Date(),
+				lastUpdated = Date(),
+				subscription = Subscription.freeTrial()
+			)
+			
+			saveUser(newUser)
+			createS3UserFolders(newUser)
+			
+			_currentUser.value = newUser
+			_isSignedIn.value = true
+			return Result.success(newUser)
+		} catch (e: Exception) {
+			_errorMessage.value = e.message
+			return Result.failure(e)
+		} finally {
+			_isLoading.value = false
+		}
+	}
+	
 	// Unified authentication flow
 	private suspend fun authenticateAndProcess(
 		provider: AuthProvider,
 		intent: AuthIntent
 	): Result<PhotolalaUser> {
+		android.util.Log.d("IdentityManager", "=== authenticateAndProcess START ===")
+		android.util.Log.d("IdentityManager", "Provider: ${provider.value}, Intent: $intent")
+		println("[IdentityManager] === authenticateAndProcess START ===")
+		println("[IdentityManager] Provider: ${provider.value}, Intent: $intent")
+		
 		_isLoading.value = true
 		_errorMessage.value = null
 		
 		try {
 			// Step 1: Authenticate with provider
+			android.util.Log.d("IdentityManager", "Step 1: Authenticating with provider...")
 			val credential = authenticate(provider).getOrThrow()
+			android.util.Log.d("IdentityManager", "Authentication successful - Credential: provider=${credential.provider.value}, providerID=${credential.providerID}")
 			
 			// Step 2: Check if user exists with this provider ID
+			android.util.Log.d("IdentityManager", "Step 2: Checking if user exists...")
+			android.util.Log.d("IdentityManager", "Looking for: ${provider.value}:${credential.providerID}")
 			val existingUser = findUserByProviderID(provider, credential.providerID)
+			android.util.Log.d("IdentityManager", "Step 2 Result: ${if (existingUser != null) "Found user ${existingUser.serviceUserID}" else "No user found"}")
 			
 			// Step 3: Handle based on intent and existence
+			android.util.Log.d("IdentityManager", "Step 3: Processing intent=$intent, existingUser=${existingUser?.serviceUserID}")
+			
 			return when {
 				intent == AuthIntent.SIGN_IN && existingUser != null -> {
 					// Sign in successful - user exists
@@ -98,7 +164,9 @@ class IdentityManager @Inject constructor(
 				
 				intent == AuthIntent.SIGN_IN && existingUser == null -> {
 					// Sign in failed - no account exists
-					Result.failure(AuthException.NoAccountFound(provider))
+					// Include the credential so it can be reused for account creation
+					android.util.Log.d("IdentityManager", "SIGN_IN failed: No account found for ${provider.value}:${credential.providerID}")
+					Result.failure(AuthException.NoAccountFound(provider, credential))
 				}
 				
 				intent == AuthIntent.CREATE_ACCOUNT && existingUser != null -> {
@@ -205,11 +273,14 @@ class IdentityManager @Inject constructor(
 			val credential = credentialResult.getOrThrow()
 			
 			// Now process the credential based on the auth intent
-			val existingUser = findUserByProviderID(AuthProvider.GOOGLE, credential.providerID)
+			val existingUser = kotlinx.coroutines.runBlocking {
+				findUserByProviderID(AuthProvider.GOOGLE, credential.providerID)
+			}
 			
 			when {
 				authIntent == AuthIntent.SIGN_IN && existingUser != null -> {
 					// Sign in successful - user exists
+					android.util.Log.d("IdentityManager", "Google Sign in successful - existing user found: ${existingUser.serviceUserID}")
 					val updatedUser = existingUser.copy(
 						email = credential.email ?: existingUser.email,
 						fullName = credential.fullName ?: existingUser.fullName,
@@ -224,7 +295,9 @@ class IdentityManager @Inject constructor(
 				
 				authIntent == AuthIntent.SIGN_IN && existingUser == null -> {
 					// Sign in failed - no account exists
-					val error = AuthException.NoAccountFound(AuthProvider.GOOGLE)
+					// Include the credential so it can be reused for account creation
+					android.util.Log.d("IdentityManager", "Google Sign in failed - no account found for ${AuthProvider.GOOGLE.value}:${credential.providerID}")
+					val error = AuthException.NoAccountFound(AuthProvider.GOOGLE, credential)
 					_errorMessage.value = error.message
 					Result.failure(error)
 				}
@@ -292,13 +365,17 @@ class IdentityManager @Inject constructor(
 	
 	// Prepare Apple Sign-In
 	fun prepareAppleSignIn(authIntent: AuthIntent) {
+		android.util.Log.d("IdentityManager", "=== APPLE SIGN-IN FLOW START ===")
+		android.util.Log.d("IdentityManager", "Auth Intent: $authIntent")
 		pendingAppleAuth = PendingAppleAuth(authIntent)
 		appleAuthService.signIn()
 	}
 	
 	// Handle Apple Sign-In callback
 	suspend fun handleAppleSignInCallback(uri: Uri): Result<PhotolalaUser> {
+		android.util.Log.d("IdentityManager", "=== APPLE CALLBACK START ===")
 		val authIntent = pendingAppleAuth?.authIntent ?: AuthIntent.SIGN_IN
+		android.util.Log.d("IdentityManager", "Auth intent: $authIntent")
 		pendingAppleAuth = null
 		
 		_isLoading.value = true
@@ -306,35 +383,50 @@ class IdentityManager @Inject constructor(
 		
 		return try {
 			// Let AppleAuthService handle the callback
+			android.util.Log.d("IdentityManager", "Calling AppleAuthService.handleCallback")
 			if (!appleAuthService.handleCallback(uri)) {
+				android.util.Log.e("IdentityManager", "AppleAuthService.handleCallback returned false")
 				return Result.failure(AuthException.AuthenticationFailed("Invalid callback"))
 			}
 			
-			// Wait for the auth state to update
-			val authState = appleAuthService.authState.value
+			android.util.Log.d("IdentityManager", "AppleAuthService.handleCallback returned true, waiting for state update...")
+			
+			// Wait for the auth state to update (AppleAuthService processes async)
+			// Use first() to wait for the first non-Loading state
+			val authState = appleAuthService.authState
+				.first { state -> 
+					state !is AppleAuthState.Loading && state !is AppleAuthState.Idle 
+				}
+			
+			android.util.Log.d("IdentityManager", "Final auth state: ${authState::class.simpleName}")
 			when (authState) {
 				is AppleAuthState.Success -> {
+					android.util.Log.d("IdentityManager", "Apple auth successful, processing credential")
 					val credential = authState.credential
 					val verifiedCredential = credential.copy(
 						serviceUserId = null // Will be assigned by processAuthCredential
 					)
-					return processAuthCredential(verifiedCredential, authIntent)
+					processAuthCredential(verifiedCredential, authIntent)
 				}
 				is AppleAuthState.Cancelled -> {
+					android.util.Log.d("IdentityManager", "Apple auth cancelled")
 					_isLoading.value = false
 					Result.failure(AuthException.UserCancelled)
 				}
 				is AppleAuthState.Error -> {
+					android.util.Log.e("IdentityManager", "Apple auth error: ${authState.error.message}")
 					_isLoading.value = false
 					_errorMessage.value = authState.error.message
 					Result.failure(AuthException.AuthenticationFailed(authState.error.message))
 				}
 				else -> {
+					android.util.Log.e("IdentityManager", "Unexpected auth state: $authState")
 					_isLoading.value = false
 					Result.failure(AuthException.UnknownError)
 				}
 			}
 		} catch (e: Exception) {
+			android.util.Log.e("IdentityManager", "Exception in handleAppleSignInCallback", e)
 			_isLoading.value = false
 			_errorMessage.value = e.message
 			Result.failure(e)
@@ -346,12 +438,17 @@ class IdentityManager @Inject constructor(
 		credential: AuthCredential,
 		authIntent: AuthIntent
 	): Result<PhotolalaUser> {
-		val provider = AuthProvider.APPLE
-		val existingUser = findUserByProviderID(provider, credential.providerID)
+		val provider = credential.provider
+		android.util.Log.d("IdentityManager", "Processing auth credential - Provider: ${provider.value}, ID: ${credential.providerID}, Intent: $authIntent")
+		android.util.Log.d("IdentityManager", "JWT Data - Email: ${credential.email}, Name: ${credential.fullName}")
+		val existingUser = kotlinx.coroutines.runBlocking {
+			findUserByProviderID(provider, credential.providerID)
+		}
 		
 		return when {
 			authIntent == AuthIntent.SIGN_IN && existingUser != null -> {
 				// Sign in successful - user exists
+				android.util.Log.d("IdentityManager", "Sign in successful - existing user found: ${existingUser.serviceUserID}")
 				val updatedUser = existingUser.copy(
 					email = credential.email ?: existingUser.email,
 					fullName = credential.fullName ?: existingUser.fullName,
@@ -365,7 +462,9 @@ class IdentityManager @Inject constructor(
 				
 				// Emit event for Apple Sign-In completion
 				if (provider == AuthProvider.APPLE) {
-					authEventBus.emitAppleSignInCompleted()
+					GlobalScope.launch {
+						authEventBus.emitAppleSignInCompleted()
+					}
 				}
 				
 				Result.success(updatedUser)
@@ -373,7 +472,9 @@ class IdentityManager @Inject constructor(
 			
 			authIntent == AuthIntent.SIGN_IN && existingUser == null -> {
 				// Sign in failed - no account exists
-				val error = AuthException.NoAccountFound(provider)
+				// Include the credential so it can be reused for account creation
+				android.util.Log.d("IdentityManager", "Sign in failed - no account found for provider: ${provider.value}, ID: ${credential.providerID}")
+				val error = AuthException.NoAccountFound(provider, credential)
 				_errorMessage.value = error.message
 				_isLoading.value = false
 				Result.failure(error)
@@ -411,7 +512,9 @@ class IdentityManager @Inject constructor(
 				
 				// Emit event for Apple Sign-In completion
 				if (provider == AuthProvider.APPLE) {
-					authEventBus.emitAppleSignInCompleted()
+					GlobalScope.launch {
+						authEventBus.emitAppleSignInCompleted()
+					}
 				}
 				
 				Result.success(newUser)
@@ -432,11 +535,16 @@ class IdentityManager @Inject constructor(
 		provider: AuthProvider,
 		providerID: String
 	): PhotolalaUser? {
-		// First, check local storage
+		android.util.Log.d("IdentityManager", "findUserByProviderID called with ${provider.value}:$providerID")
+		
+		// Always check S3 as the single source of truth
+		// We'll still check local storage but S3 takes precedence
 		val localUser = loadStoredUser()
 		if (localUser != null) {
+			android.util.Log.d("IdentityManager", "Checking local user: ${localUser.primaryProvider.value}:${localUser.primaryProviderID} against ${provider.value}:$providerID")
 			if (localUser.primaryProvider == provider && 
 				localUser.primaryProviderID == providerID) {
+				android.util.Log.d("IdentityManager", "Found matching local user")
 				return localUser
 			}
 			
@@ -444,22 +552,39 @@ class IdentityManager @Inject constructor(
 			if (localUser.linkedProviders.any { 
 				it.provider == provider && it.providerID == providerID 
 			}) {
+				android.util.Log.d("IdentityManager", "Found matching linked provider")
 				return localUser
 			}
+			android.util.Log.d("IdentityManager", "Local user exists but no matching provider")
+		} else {
+			android.util.Log.d("IdentityManager", "No local user found")
 		}
 		
 		// If not found locally, check S3 identity mapping
+		val identityKey = "${provider.value}:$providerID"
+		val identityPath = "identities/$identityKey"
+		
+		android.util.Log.d("IdentityManager", "=== S3 LOOKUP START ===")
+		android.util.Log.d("IdentityManager", "Provider: ${provider.value}, ProviderID: $providerID")
+		android.util.Log.d("IdentityManager", "Identity path: $identityPath")
+		println("[IdentityManager] === S3 LOOKUP START ===")
+		println("[IdentityManager] Looking for identity: $identityPath")
+		
 		try {
-			val identityKey = "${provider.value}:$providerID"
-			val identityPath = "identities/$identityKey"
+			android.util.Log.d("IdentityManager", "About to call s3Service.downloadData...")
+			println("[IdentityManager] About to download from S3: $identityPath")
 			
-			val uuidData = s3Service.downloadData(identityPath).getOrNull()
+			val downloadResult = s3Service.downloadData(identityPath)
+			android.util.Log.d("IdentityManager", "S3 download result: ${if (downloadResult.isSuccess) "Success" else "Failure: ${downloadResult.exceptionOrNull()?.message}"}")
+			println("[IdentityManager] S3 download result: ${if (downloadResult.isSuccess) "Success" else "Failure: ${downloadResult.exceptionOrNull()?.message}"}")
+			val uuidData = downloadResult.getOrNull()
 			if (uuidData != null) {
-				val serviceUserID = String(uuidData)
+				val serviceUserID = String(uuidData).trim()
+				android.util.Log.d("IdentityManager", "Found identity mapping: $identityPath -> $serviceUserID")
 				println("Found identity mapping: $identityPath -> $serviceUserID")
 				
 				// Reconstruct basic user (will be updated with fresh JWT data)
-				return PhotolalaUser(
+				val reconstructedUser = PhotolalaUser(
 					serviceUserID = serviceUserID,
 					primaryProvider = provider,
 					primaryProviderID = providerID,
@@ -470,9 +595,15 @@ class IdentityManager @Inject constructor(
 					lastUpdated = Date(),
 					subscription = Subscription.freeTrial()
 				)
+				android.util.Log.d("IdentityManager", "Returning reconstructed user from S3")
+				return reconstructedUser
+			} else {
+				android.util.Log.d("IdentityManager", "No identity mapping found at: $identityPath")
 			}
 		} catch (e: Exception) {
-			println("No identity mapping found: ${e.message}")
+			android.util.Log.e("IdentityManager", "Error checking identity mapping for $identityPath", e)
+			println("Error checking identity mapping: ${e.message}")
+			e.printStackTrace()
 		}
 		
 		return null
@@ -527,6 +658,38 @@ class IdentityManager @Inject constructor(
 		}
 	}
 	
+	// Verify stored user exists in S3
+	private suspend fun verifyStoredUserWithS3() {
+		val user = _currentUser.value ?: return
+		
+		try {
+			// Check if user exists in S3 by verifying identity mapping
+			val identityKey = "${user.primaryProvider.value}:${user.primaryProviderID}"
+			val identityPath = "identities/$identityKey"
+			
+			android.util.Log.d("IdentityManager", "Verifying user in S3: $identityPath")
+			
+			// Try to download the identity mapping
+			val result = s3Service.downloadData(identityPath)
+			if (result.isSuccess) {
+				android.util.Log.d("IdentityManager", "User verified in S3: ${user.displayName}")
+				// User exists - keep signed in state
+			} else {
+				// User doesn't exist in S3 - clear local state
+				android.util.Log.d("IdentityManager", "User not found in S3 ($identityPath), clearing local state")
+				preferencesManager.clearUserData()
+				_currentUser.value = null
+				_isSignedIn.value = false
+			}
+		} catch (e: Exception) {
+			// Error verifying - clear local state to be safe
+			android.util.Log.e("IdentityManager", "Error verifying user in S3: ${e.message}. Clearing local state.")
+			preferencesManager.clearUserData()
+			_currentUser.value = null
+			_isSignedIn.value = false
+		}
+	}
+	
 	// Sign out
 	fun signOut() {
 		_currentUser.value = null
@@ -543,7 +706,7 @@ sealed class AuthException : Exception() {
 		override val message = "This sign-in method is not yet available"
 	}
 	
-	data class NoAccountFound(val provider: AuthProvider) : AuthException() {
+	data class NoAccountFound(val provider: AuthProvider, val credential: AuthCredential? = null) : AuthException() {
 		override val message = "No account found with ${provider.displayName}. Please create an account first."
 	}
 	

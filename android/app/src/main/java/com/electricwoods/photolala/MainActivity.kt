@@ -67,9 +67,13 @@ class MainActivity : ComponentActivity() {
 	
 	private fun handleAppleSignInCallbackIfNeeded(intent: Intent?) {
 		intent?.data?.let { uri ->
+			android.util.Log.d("MainActivity", "Received deep link: $uri")
 			if (uri.scheme == "photolala" && uri.host == "auth" && uri.path == "/apple") {
+				android.util.Log.d("MainActivity", "=== APPLE DEEP LINK DETECTED ===")
+				android.util.Log.d("MainActivity", "Processing Apple Sign-In callback...")
 				lifecycleScope.launch {
-					identityManager.handleAppleSignInCallback(uri)
+					val result = identityManager.handleAppleSignInCallback(uri)
+					android.util.Log.d("MainActivity", "Apple callback result: ${if (result.isSuccess) "SUCCESS" else "FAILURE: ${result.exceptionOrNull()?.message}"}")
 				}
 			}
 		}

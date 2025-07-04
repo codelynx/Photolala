@@ -13,6 +13,8 @@ struct WelcomeView: View {
 	@State private var navigateToPhotoBrowser = false
 	@State private var navigateToPhotoLibrary = false
 	@State private var showingSignIn = false
+	@State private var showSignInSuccess = false
+	@State private var signInSuccessMessage = ""
 	@EnvironmentObject var identityManager: IdentityManager
 	#if os(macOS)
 		@Environment(\.openWindow) private var openWindow
@@ -20,7 +22,11 @@ struct WelcomeView: View {
 	
 	private var welcomeMessage: String {
 		#if os(macOS)
-			"Choose a folder to browse photos"
+			if identityManager.isSignedIn {
+				"Welcome back! Choose how to browse your photos"
+			} else {
+				"Welcome! Sign in to access cloud features or browse locally"
+			}
 		#else
 			"Choose a source to browse photos"
 		#endif
@@ -46,13 +52,54 @@ struct WelcomeView: View {
 
 			// Source selection buttons
 			#if os(macOS)
-			// On macOS, only show folder selection - other options are in Window menu
-			Button(action: self.selectFolder) {
-				Label("Browse Folder", systemImage: "folder")
-					.frame(minWidth: 200)
+			// On macOS, show main browsing options
+			VStack(spacing: 12) {
+				// Browse folder button
+				Button(action: self.selectFolder) {
+					Label("Browse Local Folder", systemImage: "folder")
+						.frame(minWidth: 280)
+				}
+				.controlSize(.large)
+				.buttonStyle(.borderedProminent)
+				
+				// Apple Photos button
+				#if os(macOS)
+				Button(action: {
+					// Open Apple Photos window
+					PhotoCommands.openApplePhotosLibrary()
+				}) {
+					Label("Apple Photos Library", systemImage: "photo.on.rectangle")
+						.frame(minWidth: 280)
+				}
+				.controlSize(.large)
+				#else
+				NavigationLink(destination: ApplePhotosBrowserView()) {
+					Label("Apple Photos Library", systemImage: "photo.on.rectangle")
+						.frame(minWidth: 280)
+				}
+				.controlSize(.large)
+				#endif
+				
+				// Cloud browser button - only show if signed in
+				if identityManager.isSignedIn {
+					#if os(macOS)
+					Button(action: {
+						// Open S3 browser window
+						PhotoCommands.openS3Browser()
+					}) {
+						Label("Cloud Photos", systemImage: "cloud")
+							.frame(minWidth: 280)
+					}
+					.controlSize(.large)
+					#else
+					NavigationLink(destination: S3PhotoBrowserView()) {
+						Label("Cloud Photos", systemImage: "cloud")
+							.frame(minWidth: 280)
+					}
+					.controlSize(.large)
+					#endif
+				}
 			}
-			.controlSize(.large)
-			.buttonStyle(.borderedProminent)
 			#else
 			// On iOS, show both buttons since there's no menu bar
 			VStack(spacing: 12) {
@@ -72,43 +119,99 @@ struct WelcomeView: View {
 			}
 			#endif
 			
+			Divider()
+				.frame(maxWidth: 300)
+				.padding(.vertical, 20)
+			
 			// Sign In section
 			if !identityManager.isSignedIn {
-				VStack(spacing: 8) {
-					Text("or")
-						.font(.caption)
-						.foregroundStyle(.secondary)
-					
-					Button(action: {
-						showingSignIn = true
-					}) {
-						Label("Sign In / Create Account", systemImage: "person.circle")
-							.frame(minWidth: 200)
-					}
-					.controlSize(.regular)
-					
-					Text("Sign in to backup photos to the cloud")
-						.font(.caption)
-						.foregroundStyle(.secondary)
-				}
-			} else {
-				// Show signed in status with sign out option
-				VStack(spacing: 8) {
-					HStack {
-						Image(systemName: "checkmark.circle.fill")
-							.foregroundColor(.green)
-						Text("Signed in as \(identityManager.currentUser?.displayName ?? "User")")
+				VStack(spacing: 16) {
+					VStack(spacing: 8) {
+						Text("Sign in for cloud features")
+							.font(.headline)
+							.foregroundStyle(.primary)
+						
+						Text("Backup photos • Access from anywhere • Sync across devices")
 							.font(.caption)
 							.foregroundStyle(.secondary)
+							.multilineTextAlignment(.center)
 					}
 					
-					Button(action: {
-						identityManager.signOut()
-					}) {
-						Text("Sign Out")
-							.font(.caption)
-							.foregroundColor(.red)
-							.underline()
+					HStack(spacing: 12) {
+						Button(action: {
+							showingSignIn = true
+						}) {
+							Label("Sign In", systemImage: "person.circle")
+								.frame(minWidth: 130)
+						}
+						.controlSize(.large)
+						.buttonStyle(.borderedProminent)
+						
+						Button(action: {
+							showingSignIn = true
+						}) {
+							Text("Create Account")
+								.frame(minWidth: 130)
+						}
+						.controlSize(.large)
+					}
+				}
+			} else {
+				// Show signed in status with enhanced display
+				VStack(spacing: 16) {
+					VStack(spacing: 12) {
+						Image(systemName: "person.circle.fill")
+							.font(.system(size: 50))
+							.foregroundColor(.accentColor)
+						
+						VStack(spacing: 4) {
+							Text("Signed in as")
+								.font(.caption)
+								.foregroundStyle(.secondary)
+							
+							Text(identityManager.currentUser?.displayName ?? "User")
+								.font(.headline)
+								.foregroundStyle(.primary)
+							
+							if let email = identityManager.currentUser?.email {
+								Text(email)
+									.font(.caption)
+									.foregroundStyle(.secondary)
+							}
+						}
+					}
+					
+					HStack(spacing: 16) {
+						#if os(macOS)
+						Button(action: {
+							// Open subscription management
+							PhotoCommands.showSubscriptionView()
+						}) {
+							Text("Manage Subscription")
+								.font(.callout)
+						}
+						#if os(macOS)
+						.buttonStyle(.link)
+						#else
+						.buttonStyle(.plain)
+						#endif
+						
+						Text("•")
+							.foregroundStyle(.secondary)
+						#endif
+						
+						Button(action: {
+							identityManager.signOut()
+						}) {
+							Text("Sign Out")
+								.font(.callout)
+								.foregroundColor(.red)
+						}
+						#if os(macOS)
+						.buttonStyle(.link)
+						#else
+						.buttonStyle(.plain)
+						#endif
 					}
 				}
 			}
@@ -137,7 +240,52 @@ struct WelcomeView: View {
 			}
 		}
 		.padding(40)
+		#if os(macOS)
+		.frame(minWidth: 600, minHeight: 700)
+		#else
 		.frame(minWidth: 400, minHeight: 300)
+		#endif
+		.onReceive(identityManager.$isSignedIn) { isSignedIn in
+			// Show success message when user signs in
+			if isSignedIn && !showSignInSuccess {
+				if let user = identityManager.currentUser {
+					signInSuccessMessage = "Welcome, \(user.displayName)!"
+					showSignInSuccess = true
+					
+					// Hide success message after 3 seconds
+					DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
+						withAnimation {
+							showSignInSuccess = false
+						}
+					}
+				}
+			}
+		}
+		.overlay(alignment: .top) {
+			// Success message overlay
+			if showSignInSuccess {
+				VStack {
+					HStack {
+						Image(systemName: "checkmark.circle.fill")
+							.foregroundColor(.green)
+						Text(signInSuccessMessage)
+							.fontWeight(.medium)
+					}
+					.padding(.horizontal, 20)
+					.padding(.vertical, 12)
+					.background(Color.green.opacity(0.1))
+					.background(.regularMaterial)
+					.cornerRadius(8)
+					.overlay(
+						RoundedRectangle(cornerRadius: 8)
+							.stroke(Color.green.opacity(0.3), lineWidth: 1)
+					)
+				}
+				.padding(.top, 20)
+				.transition(.move(edge: .top).combined(with: .opacity))
+				.animation(.easeInOut(duration: 0.3), value: showSignInSuccess)
+			}
+		}
 		#if os(iOS)
 			.navigationDestination(isPresented: self.$navigateToPhotoBrowser) {
 				if let folder = selectedFolder {
@@ -187,7 +335,29 @@ struct WelcomeView: View {
 
 	private func openPhotoBrowser(for url: URL) {
 		#if os(macOS)
-			self.openWindow(value: url)
+			// Open a new window with the folder browser
+			let window = NSWindow(
+				contentRect: NSRect(x: 0, y: 0, width: 1200, height: 800),
+				styleMask: [.titled, .closable, .resizable, .miniaturizable],
+				backing: .buffered,
+				defer: false
+			)
+			
+			window.title = url.lastPathComponent
+			window.center()
+			window.contentView = NSHostingView(
+				rootView: DirectoryPhotoBrowserView(directoryPath: url.path as NSString)
+					.environmentObject(IdentityManager.shared)
+			)
+			
+			// Set minimum window size
+			window.minSize = NSSize(width: 800, height: 600)
+			
+			window.makeKeyAndOrderFront(nil)
+			
+			// Keep window in front but not floating
+			window.level = .normal
+			window.isReleasedWhenClosed = false
 		#else
 			self.navigateToPhotoBrowser = true
 		#endif
