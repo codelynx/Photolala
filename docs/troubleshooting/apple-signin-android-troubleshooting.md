@@ -156,7 +156,46 @@
 - Check that WelcomeScreen observes state with `collectAsStateWithLifecycle()`
 - Add debugging to verify state propagation
 
-### 5. Deep Link Not Being Processed
+### 5. "No Account Found" Dialog Not Showing
+
+**Symptoms:**
+- User signs in with Apple but no account exists
+- Error message appears but no dialog to create account
+- User stuck with no way to create account
+- Event bus not triggering proper UI response
+
+**Causes:**
+- Apple Sign-In bypassed normal auth flow callbacks
+- Event bus not configured for Apple-specific events
+- IdentityManager only setting error message without event
+- AuthenticationViewModel not handling Apple no account scenario
+
+**Debug Steps:**
+1. Check if proper event is emitted:
+   ```
+   IdentityManager: Sign in failed - no account found for provider: apple
+   AuthenticationEventBus: Emitting AppleSignInNoAccountFound event
+   ```
+
+2. Verify event handling in ViewModel:
+   ```
+   AuthViewModel: === APPLE SIGN-IN NO ACCOUNT FOUND ===
+   AuthViewModel: Invoking onNoAccountFound callback
+   ```
+
+3. Check dialog state in AuthenticationScreen:
+   ```
+   AuthenticationScreen: showCreateAccountDialog = true
+   AuthenticationScreen: pendingProvider = APPLE
+   ```
+
+**Solutions:**
+- Add `AppleSignInNoAccountFound` event to AuthenticationEventBus
+- Emit event in IdentityManager when no account exists
+- Handle event in AuthenticationViewModel to invoke callback
+- Ensure AuthenticationScreen sets up onNoAccountFound callback
+
+### 6. Deep Link Not Being Processed
 
 **Symptoms:**
 - User completes Apple authentication in browser

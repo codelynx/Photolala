@@ -54,6 +54,12 @@ class AuthenticationViewModel @Inject constructor(
 						} ?: android.util.Log.d("AuthViewModel", "No pending callback to invoke")
 						pendingAppleSignInSuccessCallback = null
 					}
+					is AuthenticationEventBus.AuthEvent.AppleSignInNoAccountFound -> {
+						android.util.Log.d("AuthViewModel", "=== APPLE SIGN-IN NO ACCOUNT FOUND ===")
+						// Invoke the no account found callback
+						onNoAccountFound?.invoke(event.provider, event.credential)
+						pendingAppleSignInSuccessCallback = null
+					}
 					else -> {}
 				}
 			}

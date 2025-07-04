@@ -475,8 +475,19 @@ class IdentityManager @Inject constructor(
 				// Include the credential so it can be reused for account creation
 				android.util.Log.d("IdentityManager", "Sign in failed - no account found for provider: ${provider.value}, ID: ${credential.providerID}")
 				val error = AuthException.NoAccountFound(provider, credential)
-				_errorMessage.value = error.message
+				// Don't set error message for Apple Sign-In - let the UI handle it
+				if (provider != AuthProvider.APPLE) {
+					_errorMessage.value = error.message
+				}
 				_isLoading.value = false
+				
+				// Emit event for Apple Sign-In no account found
+				if (provider == AuthProvider.APPLE) {
+					GlobalScope.launch {
+						authEventBus.emitAppleSignInNoAccountFound(provider, credential)
+					}
+				}
+				
 				Result.failure(error)
 			}
 			
