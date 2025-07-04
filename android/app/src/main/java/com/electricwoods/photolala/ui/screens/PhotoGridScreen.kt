@@ -13,6 +13,7 @@ import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.CheckBoxOutlineBlank
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Refresh
@@ -58,7 +59,8 @@ import com.electricwoods.photolala.utils.DeviceUtils
 fun PhotoGridScreen(
 	modifier: Modifier = Modifier,
 	viewModel: PhotoGridViewModel = hiltViewModel(),
-	onPhotoClick: (PhotoMediaStore, Int) -> Unit = { _, _ -> }
+	onPhotoClick: (PhotoMediaStore, Int) -> Unit = { _, _ -> },
+	onBackClick: (() -> Unit)? = null
 ) {
 	val photos by viewModel.photos.collectAsState()
 	val isLoading by viewModel.isLoading.collectAsState()
@@ -175,7 +177,17 @@ fun PhotoGridScreen(
 				)
 			} else {
 				TopAppBar(
-					title = { Text("Photos") },
+					title = { Text("Local Browser") },
+					navigationIcon = {
+						if (onBackClick != null) {
+							IconButton(onClick = onBackClick) {
+								Icon(
+									imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+									contentDescription = "Back to Welcome"
+								)
+							}
+						}
+					},
 					actions = {
 						IconButton(
 							onClick = { viewModel.refreshPhotos() },

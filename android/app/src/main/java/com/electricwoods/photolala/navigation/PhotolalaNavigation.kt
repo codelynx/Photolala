@@ -74,6 +74,9 @@ fun PhotolalaNavigation(
 				viewModel = photoGridViewModel,
 				onPhotoClick = { photo, index ->
 					navController.navigate(PhotolalaRoute.PhotoViewer.createRoute(index))
+				},
+				onBackClick = {
+					navController.popBackStack()
 				}
 			)
 		}
