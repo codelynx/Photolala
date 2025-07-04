@@ -442,34 +442,34 @@ private fun PhotoThumbnail(
 				error = ColorPainter(Color.Red.copy(alpha = 0.3f))
 			)
 			
-			// Star icon overlay (top-right corner)
-			IconButton(
-				onClick = onStarClick,
-				modifier = Modifier
-					.align(Alignment.TopEnd)
-					.size(40.dp)
-			) {
-				Icon(
-					imageVector = if (isStarred) Icons.Filled.Star else Icons.Filled.StarBorder,
-					contentDescription = if (isStarred) "Remove from backup queue" else "Add to backup queue",
-					modifier = Modifier.size(24.dp),
-					tint = if (isStarred) Color(0xFFFFB000) else Color.White.copy(alpha = 0.8f)
-				)
-			}
 			
-			// Tag flags overlay (only when info bar is hidden)
-			if (!showInfoBar && tags.isNotEmpty()) {
+			// Star and tag flags overlay (only when info bar is hidden)
+			if (!showInfoBar && (isStarred || tags.isNotEmpty())) {
 				Row(
 					modifier = Modifier
 						.align(Alignment.BottomStart)
 						.padding(4.dp),
-					horizontalArrangement = Arrangement.spacedBy(2.dp)
+					horizontalArrangement = Arrangement.spacedBy(4.dp),
+					verticalAlignment = Alignment.CenterVertically
 				) {
+					// Star icon for backup status
+					if (isStarred) {
+						Icon(
+							imageVector = Icons.Filled.Star,
+							contentDescription = "Backed up",
+							modifier = Modifier
+								.size(16.dp)
+								.clickable { onStarClick() },
+							tint = Color(0xFFFFD700) // Gold/yellow color to match iOS systemYellow
+						)
+					}
+					
+					// Tag flags
 					tags.sortedBy { it.value }.forEach { colorFlag ->
 						Icon(
 							imageVector = Icons.Default.Flag,
 							contentDescription = "Tag ${colorFlag.value}",
-							modifier = Modifier.size(16.dp),
+							modifier = Modifier.size(12.dp),
 							tint = when (colorFlag.value) {
 								1 -> Color.Red
 								2 -> Color(0xFFFFA500) // Orange
@@ -496,31 +496,47 @@ private fun PhotoThumbnail(
 				horizontalArrangement = Arrangement.SpaceBetween,
 				verticalAlignment = Alignment.CenterVertically
 			) {
-				// Tag flags
-				if (tags.isNotEmpty()) {
-					Row(
-						horizontalArrangement = Arrangement.spacedBy(2.dp)
-					) {
-						tags.sortedBy { it.value }.forEach { colorFlag ->
-							Icon(
-								imageVector = Icons.Default.Flag,
-								contentDescription = "Tag ${colorFlag.value}",
-								modifier = Modifier.size(12.dp),
-								tint = when (colorFlag.value) {
-									1 -> Color.Red
-									2 -> Color(0xFFFFA500) // Orange
-									3 -> Color.Yellow
-									4 -> Color.Green
-									5 -> Color.Blue
-									6 -> Color(0xFF800080) // Purple
-									7 -> Color.Gray
-									else -> Color.Gray
-								}
-							)
+				// Star icon and tag flags
+				Row(
+					horizontalArrangement = Arrangement.spacedBy(4.dp),
+					verticalAlignment = Alignment.CenterVertically
+				) {
+					// Star icon for backup status
+					if (isStarred) {
+						Icon(
+							imageVector = Icons.Filled.Star,
+							contentDescription = "Backed up",
+							modifier = Modifier
+								.size(16.dp)
+								.clickable { onStarClick() },
+							tint = Color(0xFFFFD700) // Gold/yellow color to match iOS systemYellow
+						)
+					}
+					
+					// Tag flags
+					if (tags.isNotEmpty()) {
+						Row(
+							horizontalArrangement = Arrangement.spacedBy(2.dp)
+						) {
+							tags.sortedBy { it.value }.forEach { colorFlag ->
+								Icon(
+									imageVector = Icons.Default.Flag,
+									contentDescription = "Tag ${colorFlag.value}",
+									modifier = Modifier.size(12.dp),
+									tint = when (colorFlag.value) {
+										1 -> Color.Red
+										2 -> Color(0xFFFFA500) // Orange
+										3 -> Color.Yellow
+										4 -> Color.Green
+										5 -> Color.Blue
+										6 -> Color(0xFF800080) // Purple
+										7 -> Color.Gray
+										else -> Color.Gray
+									}
+								)
+							}
 						}
 					}
-				} else {
-					Spacer(modifier = Modifier.width(1.dp))
 				}
 				
 				// File size
@@ -593,7 +609,7 @@ private fun SelectionTopBar(
 					Icon(
 						imageVector = Icons.Default.Star,
 						contentDescription = "Star selected",
-						tint = Color(0xFFFFB000)
+						tint = Color(0xFFFFD700) // Gold/yellow to match iOS
 					)
 				}
 				IconButton(onClick = onShare) {
