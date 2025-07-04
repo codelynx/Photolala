@@ -36,3 +36,6 @@ android/app/debug/
 !.vscode/extensions.json
 
 .credential-code/**
+
+# Temporary/untracked files
+untracked/**

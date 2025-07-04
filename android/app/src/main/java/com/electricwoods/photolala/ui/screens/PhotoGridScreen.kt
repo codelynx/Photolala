@@ -50,6 +50,7 @@ import com.electricwoods.photolala.models.ColorFlag
 import com.electricwoods.photolala.ui.viewmodels.PhotoGridViewModel
 import com.electricwoods.photolala.ui.components.TagSelectionDialog
 import com.electricwoods.photolala.ui.components.GridViewOptionsMenu
+import com.electricwoods.photolala.ui.components.BackupStatusIndicator
 import com.electricwoods.photolala.utils.DeviceUtils
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
@@ -198,11 +199,17 @@ fun PhotoGridScreen(
 			}
 		}
 	) { paddingValues ->
-		Box(
+		Column(
 			modifier = Modifier
 				.fillMaxSize()
 				.padding(paddingValues)
 		) {
+			// Backup status indicator at the top
+			BackupStatusIndicator(
+				backupQueueManager = viewModel.backupQueueManager
+			)
+			
+			Box(modifier = Modifier.fillMaxSize()) {
 			when {
 				error != null -> {
 					// Error state
@@ -257,6 +264,7 @@ fun PhotoGridScreen(
 					modifier = Modifier.align(Alignment.Center)
 				)
 			}
+		}
 		}
 	}
 	

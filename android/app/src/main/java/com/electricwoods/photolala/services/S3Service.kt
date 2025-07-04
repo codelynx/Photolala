@@ -21,14 +21,16 @@ class S3Service @Inject constructor(
     private val s3Client: AmazonS3Client
 ) {
     companion object {
-        private const val BUCKET_NAME = "photolala" // Update with your actual bucket name
+        private const val BUCKET_NAME = "photolala"
         private const val PHOTOS_PREFIX = "photos/"
+        private const val THUMBNAILS_PREFIX = "thumbnails/"
+        private const val USERS_PREFIX = "users/"
     }
     
     /**
      * Upload a photo to S3
      * @param uri The URI of the photo to upload
-     * @param key The S3 key (path) for the photo
+     * @param key The S3 key (path) for the photo (without bucket name)
      * @return The S3 URL of the uploaded photo
      */
     suspend fun uploadPhoto(uri: Uri, key: String): String = withContext(Dispatchers.IO) {
@@ -45,7 +47,7 @@ class S3Service @Inject constructor(
             // Create put request
             val putRequest = PutObjectRequest(
                 BUCKET_NAME,
-                "$PHOTOS_PREFIX$key",
+                key,
                 FileInputStream(tempFile),
                 metadata
             )
@@ -54,7 +56,7 @@ class S3Service @Inject constructor(
             s3Client.putObject(putRequest)
             
             // Return the S3 URL
-            return@withContext "https://$BUCKET_NAME.s3.amazonaws.com/$PHOTOS_PREFIX$key"
+            return@withContext "https://$BUCKET_NAME.s3.amazonaws.com/$key"
         } finally {
             // Clean up temp file
             tempFile.delete()

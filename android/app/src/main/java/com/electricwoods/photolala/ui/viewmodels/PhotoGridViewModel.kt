@@ -7,6 +7,7 @@ import com.electricwoods.photolala.models.ColorFlag
 import com.electricwoods.photolala.models.PhotoMediaStore
 import com.electricwoods.photolala.repositories.PhotoRepository
 import com.electricwoods.photolala.repositories.PhotoTagRepository
+import com.electricwoods.photolala.services.BackupQueueManager
 import com.electricwoods.photolala.services.MediaStoreService
 import com.electricwoods.photolala.utils.DeviceUtils
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -23,7 +24,8 @@ class PhotoGridViewModel @Inject constructor(
 	private val mediaStoreService: MediaStoreService,
 	private val photoRepository: PhotoRepository,
 	private val photoTagRepository: PhotoTagRepository,
-	private val preferencesManager: PreferencesManager
+	private val preferencesManager: PreferencesManager,
+	val backupQueueManager: BackupQueueManager
 ) : ViewModel() {
 	
 	private val _photos = MutableStateFlow<List<PhotoMediaStore>>(emptyList())
@@ -301,6 +303,7 @@ class PhotoGridViewModel @Inject constructor(
 			photoRepository.toggleStarredStatus(photoId)
 			
 			// The UI will update automatically via the Flow collection
+			// BackupQueueManager will automatically detect the change and start backup after inactivity
 		}
 	}
 	

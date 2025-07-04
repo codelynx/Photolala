@@ -57,6 +57,10 @@ class PhotoRepository @Inject constructor(
 		photoDao.insertPhoto(entity)
 	}
 	
+	suspend fun updatePhoto(photo: PhotoEntity) = withContext(ioDispatcher) {
+		photoDao.updatePhoto(photo)
+	}
+	
 	suspend fun getStarredCount(): Int = withContext(ioDispatcher) {
 		photoDao.getStarredPhotos().let { flow ->
 			// This is a simple implementation - in production you might want a specific count query
