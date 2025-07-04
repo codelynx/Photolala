@@ -47,6 +47,9 @@ object AppModule {
 	}
 	
 	@Provides
+	fun providePhotoDao(database: PhotolalaDatabase) = database.photoDao()
+	
+	@Provides
 	fun provideTagDao(database: PhotolalaDatabase) = database.tagDao()
 
 	@Provides

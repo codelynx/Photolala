@@ -20,6 +20,8 @@ import androidx.compose.material.icons.filled.SelectAll
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Flag
+import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.StarBorder
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -65,6 +67,7 @@ fun PhotoGridScreen(
 	val selectionCount by viewModel.selectionCount.collectAsState()
 	val areAllPhotosSelected by viewModel.areAllPhotosSelected.collectAsState()
 	val photoTags by viewModel.photoTags.collectAsState()
+	val starredPhotos by viewModel.starredPhotos.collectAsState()
 	val thumbnailSize by viewModel.thumbnailSize.collectAsState()
 	val gridScaleMode by viewModel.gridScaleMode.collectAsState()
 	val showInfoBar by viewModel.showInfoBar.collectAsState()
@@ -129,6 +132,11 @@ fun PhotoGridScreen(
 							showTagDialog = true
 							true
 						}
+						// S key to toggle star for selected
+						Key.S -> {
+							viewModel.toggleStarForSelected()
+							true
+						}
 						// Escape to exit selection mode
 						Key.Escape -> {
 							viewModel.exitSelectionMode()
@@ -159,6 +167,9 @@ fun PhotoGridScreen(
 					},
 					onTag = {
 						showTagDialog = true
+					},
+					onStar = {
+						viewModel.toggleStarForSelected()
 					}
 				)
 			} else {
@@ -211,6 +222,7 @@ fun PhotoGridScreen(
 						isSelectionMode = isSelectionMode,
 						selectedPhotos = selectedPhotos,
 						photoTags = photoTags,
+						starredPhotos = starredPhotos,
 						thumbnailSize = thumbnailSize,
 						scaleMode = gridScaleMode,
 						showInfoBar = showInfoBar,
@@ -230,6 +242,9 @@ fun PhotoGridScreen(
 							if (photoIndex >= 0) {
 								onPhotoClick(photo, photoIndex)
 							}
+						},
+						onStarClick = { photo ->
+							viewModel.toggleStar(photo.id)
 						},
 						onLoadMore = { viewModel.loadMorePhotos() }
 					)
@@ -281,11 +296,13 @@ private fun PhotoGrid(
 	isSelectionMode: Boolean,
 	selectedPhotos: Set<String>,
 	photoTags: Map<String, Set<com.electricwoods.photolala.models.ColorFlag>>,
+	starredPhotos: Set<String>,
 	thumbnailSize: Int,
 	scaleMode: String,
 	showInfoBar: Boolean,
 	onPhotoClick: (PhotoMediaStore, Int) -> Unit,
 	onPhotoLongClick: (PhotoMediaStore) -> Unit,
+	onStarClick: (PhotoMediaStore) -> Unit,
 	onLoadMore: () -> Unit
 ) {
 	val context = LocalContext.current
@@ -330,12 +347,14 @@ private fun PhotoGrid(
 				photo = photo,
 				isSelected = selectedPhotos.contains(photo.id),
 				isSelectionMode = isSelectionMode,
+				isStarred = starredPhotos.contains(photo.id),
 				tags = photoTags[photo.id] ?: emptySet(),
 				thumbnailSize = thumbnailSize,
 				scaleMode = scaleMode,
 				showInfoBar = showInfoBar,
 				onClick = { onPhotoClick(photo, photos.indexOf(photo)) },
-				onLongClick = { onPhotoLongClick(photo) }
+				onLongClick = { onPhotoLongClick(photo) },
+				onStarClick = { onStarClick(photo) }
 			)
 		}
 	}
@@ -347,12 +366,14 @@ private fun PhotoThumbnail(
 	photo: PhotoMediaStore,
 	isSelected: Boolean,
 	isSelectionMode: Boolean,
+	isStarred: Boolean,
 	tags: Set<com.electricwoods.photolala.models.ColorFlag>,
 	thumbnailSize: Int,
 	scaleMode: String,
 	showInfoBar: Boolean,
 	onClick: () -> Unit,
-	onLongClick: () -> Unit
+	onLongClick: () -> Unit,
+	onStarClick: () -> Unit
 ) {
 	Column(
 		modifier = Modifier
@@ -412,6 +433,21 @@ private fun PhotoThumbnail(
 				placeholder = ColorPainter(Color.LightGray),
 				error = ColorPainter(Color.Red.copy(alpha = 0.3f))
 			)
+			
+			// Star icon overlay (top-right corner)
+			IconButton(
+				onClick = onStarClick,
+				modifier = Modifier
+					.align(Alignment.TopEnd)
+					.size(40.dp)
+			) {
+				Icon(
+					imageVector = if (isStarred) Icons.Filled.Star else Icons.Filled.StarBorder,
+					contentDescription = if (isStarred) "Remove from backup queue" else "Add to backup queue",
+					modifier = Modifier.size(24.dp),
+					tint = if (isStarred) Color(0xFFFFB000) else Color.White.copy(alpha = 0.8f)
+				)
+			}
 			
 			// Tag flags overlay (only when info bar is hidden)
 			if (!showInfoBar && tags.isNotEmpty()) {
@@ -509,7 +545,8 @@ private fun SelectionTopBar(
 	onToggleSelectAll: () -> Unit,
 	onShare: () -> Unit,
 	onDelete: () -> Unit,
-	onTag: () -> Unit
+	onTag: () -> Unit,
+	onStar: () -> Unit
 ) {
 	TopAppBar(
 		title = { Text("$selectionCount selected") },
@@ -542,6 +579,13 @@ private fun SelectionTopBar(
 						imageVector = Icons.Default.Flag,
 						contentDescription = "Tag selected",
 						tint = MaterialTheme.colorScheme.tertiary
+					)
+				}
+				IconButton(onClick = onStar) {
+					Icon(
+						imageVector = Icons.Default.Star,
+						contentDescription = "Star selected",
+						tint = Color(0xFFFFB000)
 					)
 				}
 				IconButton(onClick = onShare) {

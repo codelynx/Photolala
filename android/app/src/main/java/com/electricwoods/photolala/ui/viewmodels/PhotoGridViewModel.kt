@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.electricwoods.photolala.data.PreferencesManager
 import com.electricwoods.photolala.models.ColorFlag
 import com.electricwoods.photolala.models.PhotoMediaStore
+import com.electricwoods.photolala.repositories.PhotoRepository
 import com.electricwoods.photolala.repositories.PhotoTagRepository
 import com.electricwoods.photolala.services.MediaStoreService
 import com.electricwoods.photolala.utils.DeviceUtils
@@ -20,6 +21,7 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 class PhotoGridViewModel @Inject constructor(
 	@ApplicationContext private val context: Context,
 	private val mediaStoreService: MediaStoreService,
+	private val photoRepository: PhotoRepository,
 	private val photoTagRepository: PhotoTagRepository,
 	private val preferencesManager: PreferencesManager
 ) : ViewModel() {
@@ -54,6 +56,10 @@ class PhotoGridViewModel @Inject constructor(
 	private val _photoTags = MutableStateFlow<Map<String, Set<ColorFlag>>>(emptyMap())
 	val photoTags: StateFlow<Map<String, Set<ColorFlag>>> = _photoTags.asStateFlow()
 	
+	// Starred photos state - set of photo IDs that are starred
+	private val _starredPhotos = MutableStateFlow<Set<String>>(emptySet())
+	val starredPhotos: StateFlow<Set<String>> = _starredPhotos.asStateFlow()
+	
 	// Grid preferences from DataStore
 	val thumbnailSize: StateFlow<Int> = preferencesManager.gridThumbnailSize
 		.stateIn(
@@ -83,7 +89,15 @@ class PhotoGridViewModel @Inject constructor(
 			_photos.collect { photoList ->
 				if (photoList.isNotEmpty()) {
 					loadTagsForPhotos(photoList.map { it.id })
+					loadStarredStatusForPhotos(photoList.map { it.id })
 				}
+			}
+		}
+		
+		// Load starred photos from database
+		viewModelScope.launch {
+			photoRepository.getStarredPhotos().collect { starredPhotoEntities ->
+				_starredPhotos.value = starredPhotoEntities.map { it.id }.toSet()
 			}
 		}
 	}
@@ -266,6 +280,48 @@ class PhotoGridViewModel @Inject constructor(
 	private suspend fun loadTagsForPhotos(photoIds: List<String>) {
 		val tags = photoTagRepository.getTagsForPhotos(photoIds)
 		_photoTags.value = tags
+	}
+	
+	// Star methods
+	private suspend fun loadStarredStatusForPhotos(photoIds: List<String>) {
+		// This is already handled by the Flow collection in init
+		// but we can use this method for any additional logic if needed
+	}
+	
+	fun toggleStar(photoId: String) {
+		viewModelScope.launch {
+			// First, ensure the photo exists in the database
+			val photo = _photos.value.find { it.id == photoId }
+			photo?.let {
+				// Insert or update the photo in database if needed
+				photoRepository.insertOrUpdatePhoto(it, !_starredPhotos.value.contains(photoId))
+			}
+			
+			// Toggle the starred status
+			photoRepository.toggleStarredStatus(photoId)
+			
+			// The UI will update automatically via the Flow collection
+		}
+	}
+	
+	fun toggleStarForSelected() {
+		viewModelScope.launch {
+			val selectedIds = _selectedPhotos.value.toList()
+			val currentStarredIds = _starredPhotos.value
+			
+			// Determine if we should star or unstar
+			// If any selected photo is not starred, we star all
+			// If all selected photos are starred, we unstar all
+			val shouldStar = selectedIds.any { !currentStarredIds.contains(it) }
+			
+			selectedIds.forEach { photoId ->
+				val photo = _photos.value.find { it.id == photoId }
+				photo?.let {
+					photoRepository.insertOrUpdatePhoto(it, shouldStar)
+					photoRepository.updateStarredStatus(photoId, shouldStar)
+				}
+			}
+		}
 	}
 	
 	fun toggleTag(photoId: String, colorFlag: ColorFlag) {
