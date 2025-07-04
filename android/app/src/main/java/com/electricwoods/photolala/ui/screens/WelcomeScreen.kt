@@ -22,6 +22,7 @@ import com.electricwoods.photolala.ui.viewmodels.WelcomeViewModel
 @Composable
 fun WelcomeScreen(
 	onBrowsePhotosClick: () -> Unit = {},
+	onCloudBrowserClick: () -> Unit = {},
 	onSignInClick: () -> Unit = {},
 	onCreateAccountClick: () -> Unit = {},
 	viewModel: WelcomeViewModel = hiltViewModel()
@@ -80,7 +81,7 @@ fun WelcomeScreen(
 		
 		// Cloud browser button (enabled if signed in)
 		OutlinedButton(
-			onClick = { /* TODO: Navigate to cloud browser */ },
+			onClick = onCloudBrowserClick,
 			modifier = Modifier.fillMaxWidth(),
 			enabled = isSignedIn
 		) {

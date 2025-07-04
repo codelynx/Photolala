@@ -11,6 +11,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.electricwoods.photolala.ui.screens.AuthenticationScreen
+import com.electricwoods.photolala.ui.screens.CloudBrowserScreen
 import com.electricwoods.photolala.ui.screens.PhotoGridScreen
 import com.electricwoods.photolala.ui.screens.PhotoViewerScreen
 import com.electricwoods.photolala.ui.screens.WelcomeScreen
@@ -55,6 +56,9 @@ fun PhotolalaNavigation(
 			WelcomeScreen(
 				onBrowsePhotosClick = {
 					navController.navigate(PhotolalaRoute.PhotoGrid.route)
+				},
+				onCloudBrowserClick = {
+					navController.navigate(PhotolalaRoute.CloudBrowser.route)
 				},
 				onSignInClick = {
 					navController.navigate(PhotolalaRoute.SignIn.route)
@@ -174,6 +178,19 @@ fun PhotolalaNavigation(
 				viewModel = authViewModel
 			)
 		}
+		
+		composable(PhotolalaRoute.CloudBrowser.route) {
+			CloudBrowserScreen(
+				onPhotoClick = { photo, index ->
+					// TODO: Navigate to photo viewer for S3 photos
+					// For now, just go back
+					navController.popBackStack()
+				},
+				onBackClick = {
+					navController.popBackStack()
+				}
+			)
+		}
 	}
 }
 
@@ -185,4 +202,5 @@ sealed class PhotolalaRoute(val route: String) {
 	}
 	object SignIn : PhotolalaRoute("sign_in")
 	object CreateAccount : PhotolalaRoute("create_account")
+	object CloudBrowser : PhotolalaRoute("cloud_browser")
 }

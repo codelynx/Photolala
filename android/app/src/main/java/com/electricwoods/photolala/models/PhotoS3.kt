@@ -30,15 +30,15 @@ data class PhotoS3(
 	override val source: PhotoSource = PhotoSource.S3_CLOUD
 	
 	override suspend fun loadThumbnail(): ByteArray? {
-		// Implementation will use S3 download service
-		// Download from thumbnailKey if available
-		return null
+		// This will be implemented by S3PhotoProvider
+		// The provider has access to S3Service for downloading
+		throw UnsupportedOperationException("Use S3PhotoProvider.loadThumbnail() instead")
 	}
 	
 	override suspend fun loadImageData(): ByteArray {
-		// Download from S3
-		// This will be implemented with AWS SDK
-		return ByteArray(0)
+		// This will be implemented by S3PhotoProvider
+		// The provider has access to S3Service for downloading
+		throw UnsupportedOperationException("Use S3PhotoProvider.loadImageData() instead")
 	}
 	
 	override fun contextMenuItems(): List<PhotoContextMenuItem> {
