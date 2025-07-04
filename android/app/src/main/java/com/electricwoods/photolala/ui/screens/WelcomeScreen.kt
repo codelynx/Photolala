@@ -11,6 +11,8 @@ import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Folder
+import androidx.compose.material.icons.filled.Cloud
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -94,9 +96,9 @@ fun WelcomeScreen(
 		
 		Text(
 			text = if (isSignedIn) {
-				"Welcome back! Choose how to browse your photos"
+				"Welcome back! Browse your local photos or access cloud storage"
 			} else {
-				"Welcome! Sign in to access cloud features or browse locally"
+				"Welcome! Browse your local photos or sign in for cloud features"
 			},
 			style = MaterialTheme.typography.bodyLarge,
 			textAlign = TextAlign.Center,
@@ -111,12 +113,23 @@ fun WelcomeScreen(
 		
 		Spacer(modifier = Modifier.height(48.dp))
 		
-		// Browse button
+		// Local browser button
 		Button(
 			onClick = onBrowsePhotosClick,
-			modifier = Modifier.fillMaxWidth()
+			modifier = Modifier
+				.fillMaxWidth()
+				.height(56.dp),
+			colors = ButtonDefaults.buttonColors(
+				containerColor = MaterialTheme.colorScheme.primary
+			)
 		) {
-			Text("Browse Photos")
+			Icon(
+				imageVector = Icons.Default.Folder,
+				contentDescription = null,
+				modifier = Modifier.size(20.dp)
+			)
+			Spacer(modifier = Modifier.width(8.dp))
+			Text("Local Browser", fontSize = 16.sp)
 		}
 		
 		Spacer(modifier = Modifier.height(16.dp))
@@ -124,10 +137,21 @@ fun WelcomeScreen(
 		// Cloud browser button (enabled if signed in)
 		OutlinedButton(
 			onClick = onCloudBrowserClick,
-			modifier = Modifier.fillMaxWidth(),
+			modifier = Modifier
+				.fillMaxWidth()
+				.height(56.dp),
 			enabled = isSignedIn
 		) {
-			Text(if (isSignedIn) "Cloud Browser" else "Cloud Browser (Sign In Required)")
+			Icon(
+				imageVector = Icons.Default.Cloud,
+				contentDescription = null,
+				modifier = Modifier.size(20.dp)
+			)
+			Spacer(modifier = Modifier.width(8.dp))
+			Text(
+				text = if (isSignedIn) "Cloud Browser" else "Cloud Browser (Sign In Required)",
+				fontSize = 16.sp
+			)
 		}
 		
 		// Sign in/Create account section
