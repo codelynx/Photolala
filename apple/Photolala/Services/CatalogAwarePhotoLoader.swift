@@ -100,8 +100,16 @@ class CatalogAwarePhotoLoader {
 		// Load all entries
 		let entries = try await catalogService.loadAllEntries()
 		
-		// Convert to PhotoFile objects
-		let photos = entries.map { entry in
+		// Convert to PhotoFile objects, removing duplicates
+		var seenFilenames = Set<String>()
+		let photos = entries.compactMap { entry -> PhotoFile? in
+			// Skip duplicate filenames
+			if seenFilenames.contains(entry.filename) {
+				logger.warning("Skipping duplicate catalog entry: \(entry.filename)")
+				return nil
+			}
+			seenFilenames.insert(entry.filename)
+			
 			let photo = PhotoFile(
 				directoryPath: directory.path as NSString,
 				filename: entry.filename

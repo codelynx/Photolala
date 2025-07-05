@@ -353,11 +353,34 @@ class UnifiedPhotoCollectionViewController: XViewController {
 		// Create new snapshot
 		var snapshot = NSDiffableDataSourceSnapshot<Int, AnyHashable>()
 		
+		// Remove duplicates based on photo identity
+		var seen = Set<String>()
+		var uniquePhotos: [any PhotoItem] = []
+		
+		for photo in photos {
+			let photoId: String
+			if let photoFile = photo as? PhotoFile {
+				photoId = photoFile.filePath
+			} else if let applePhoto = photo as? PhotoApple {
+				photoId = applePhoto.id
+			} else {
+				// For other photo types, use a description
+				photoId = "\(type(of: photo))-\(photos.firstIndex(where: { $0.id == photo.id }) ?? 0)"
+			}
+			
+			if !seen.contains(photoId) {
+				seen.insert(photoId)
+				uniquePhotos.append(photo)
+			} else {
+				print("[UnifiedPhotoCollectionViewController] Warning: Duplicate photo detected: \(photoId)")
+			}
+		}
+		
 		// For now, always use single section mode to prevent crashes
 		// TODO: Implement proper grouping support
-		photoGroups = [("", photos)]
+		photoGroups = [("", uniquePhotos)]
 		snapshot.appendSections([0])
-		let hashablePhotos = photos.map { AnyHashable($0) }
+		let hashablePhotos = uniquePhotos.map { AnyHashable($0) }
 		snapshot.appendItems(hashablePhotos, toSection: 0)
 		
 		#if os(macOS)
