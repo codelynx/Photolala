@@ -201,6 +201,12 @@ vim .credential-code/credentials.json
 mv Generated/Credentials.swift Photolala/Utilities/
 ```
 
+## Pricing Strategy
+
+The project uses an ultra-aggressive pricing model leveraging AWS Glacier Deep Archive. All photos automatically archive after 14 days while thumbnails remain instantly accessible. This enables pricing 85-90% below competitors.
+
+For detailed pricing strategy and tiers, see: `docs/planning/final-pricing-strategy-v3.md`
+
 ## Memories
 
 - 1, question is semi-real user id or sphedo user id?
