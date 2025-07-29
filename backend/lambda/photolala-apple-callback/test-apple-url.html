@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Apple Sign-In URL</title>
+    <style>
+        body { font-family: -apple-system, sans-serif; padding: 20px; }
+        .url { background: #f0f0f0; padding: 10px; word-break: break-all; margin: 10px 0; }
+        button { padding: 10px 20px; background: black; color: white; border: none; border-radius: 5px; cursor: pointer; }
+    </style>
+</head>
+<body>
+    <h1>Test Apple Sign-In URLs</h1>
+    
+    <h2>Option 1: Current URL (photolala.eastlynx.com)</h2>
+    <div class="url" id="url1"></div>
+    <button onclick="testUrl1()">Test This URL</button>
+    
+    <h2>Option 2: Without trailing slash</h2>
+    <div class="url" id="url2"></div>
+    <button onclick="testUrl2()">Test This URL</button>
+    
+    <h2>Option 3: Direct Lambda URL</h2>
+    <div class="url" id="url3"></div>
+    <button onclick="testUrl3()">Test This URL</button>
+
+    <script>
+        const CLIENT_ID = 'com.electricwoods.photolala.android';
+        const STATE = 'test' + Date.now();
+        
+        function buildAppleUrl(redirectUri) {
+            const params = new URLSearchParams({
+                client_id: CLIENT_ID,
+                redirect_uri: redirectUri,
+                response_type: 'code',
+                scope: 'email name',
+                response_mode: 'form_post',
+                state: STATE,
+                nonce: 'test-nonce'
+            });
+            return `https://appleid.apple.com/auth/authorize?${params}`;
+        }
+        
+        const url1 = buildAppleUrl('https://photolala.eastlynx.com/auth/apple/callback');
+        const url2 = buildAppleUrl('https://photolala.eastlynx.com/auth/apple/callback/');
+        const url3 = buildAppleUrl('https://xrfhu5bmphta4qcthdb46siviu0wmmty.lambda-url.us-east-1.on.aws/');
+        
+        document.getElementById('url1').textContent = url1;
+        document.getElementById('url2').textContent = url2;
+        document.getElementById('url3').textContent = url3;
+        
+        function testUrl1() { window.open(url1, '_blank'); }
+        function testUrl2() { window.open(url2, '_blank'); }
+        function testUrl3() { window.open(url3, '_blank'); }
+    </script>
+</body>
+</html>

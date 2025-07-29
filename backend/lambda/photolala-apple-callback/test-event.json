@@ -1,0 +1,18 @@
+{
+  "version": "2.0",
+  "routeKey": "POST /auth/apple/callback",
+  "rawPath": "/prod/auth/apple/callback",
+  "rawQueryString": "",
+  "headers": {
+    "content-type": "application/x-www-form-urlencoded"
+  },
+  "requestContext": {
+    "http": {
+      "method": "POST",
+      "path": "/prod/auth/apple/callback"
+    },
+    "httpMethod": "POST"
+  },
+  "body": "code=test123&state=teststate",
+  "isBase64Encoded": false
+}

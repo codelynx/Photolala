@@ -1,70 +1,138 @@
 # Photolala Documentation
 
+Welcome to the Photolala documentation. This guide will help you navigate the project documentation and find the information you need.
+
 ## Quick Links
 
-📊 **[PROJECT_STATUS.md](./PROJECT_STATUS.md)** - Current implementation status and recent changes
+- [Project Status](./PROJECT_STATUS.md) - Current implementation status
+- [Architecture Overview](./architecture/overview.md) - System design and architecture
+- [Build Commands](./development/build-commands.md) - How to build the project
+- [Authentication](./features/authentication/overview.md) - Authentication system
 
 ## Documentation Structure
 
-### Current State
-Documents describing the current architecture and implementation:
+### 📐 Architecture
+Core system architecture and design decisions.
 
-- **[current/architecture.md](./current/architecture.md)** - System architecture and component overview
-- **[current/navigation-flow.md](./current/navigation-flow.md)** - Platform-specific navigation patterns
-- **[current/thumbnail-system.md](./current/thumbnail-system.md)** - Thumbnail generation and caching
-- **[current/selection-system.md](./current/selection-system.md)** - Selection management and UI
-- **[current/native-thumbnail-strip.md](./current/native-thumbnail-strip.md)** - Native collection view thumbnail strip
-- **[current/archive-retrieval-system.md](./current/archive-retrieval-system.md)** - S3 Deep Archive photo retrieval
-- **[current/metadata-backup-system.md](./current/metadata-backup-system.md)** - Metadata backup to S3
-- **[current/catalog-system.md](./current/catalog-system.md)** - v5.0 Photolala catalog format for fast photo loading
-- **[current/metadata-system.md](./current/metadata-system.md)** - Metadata extraction, caching, and display
-- **[current/tag-system.md](./current/tag-system.md)** - Color tag system with iCloud sync
-- **[current/thumbnail-cache-system.md](./current/thumbnail-cache-system.md)** - Three-tier thumbnail cache optimization
+- [System Overview](./architecture/overview.md) - High-level architecture
+- [Navigation Patterns](./architecture/navigation.md) - Platform navigation flows
+- [Data Flow](./architecture/data-flow.md) - Data management architecture
+- [Platform Differences](./architecture/platform-differences.md) - iOS vs Android
 
-### History
-Historical design documents and implementation notes:
+### 🚀 Features
+Documentation for implemented features.
 
-#### Design Decisions
-- **[history/design-decisions/](./history/design-decisions/)** - Original design documents
-  - `photo-browser-design.md` - Initial photo browser architecture
-  - `selection-and-preview-design.md` - Selection and preview feature design
-  - `thumbnail-*.md` - Various thumbnail system designs
-  - `swiftdata-thumbnail-metadata-design.md` - SwiftData integration plans
+#### Authentication
+- [Overview](./features/authentication/overview.md) - Authentication system design
+- [Apple Sign In](./features/authentication/apple-signin.md) - Apple Sign In implementation
+- [Google Sign In](./features/authentication/google-signin.md) - Google Sign In setup
+- [Account Linking](./features/authentication/account-linking.md) - Multi-provider accounts
 
-#### Implementation Notes  
-- **[history/implementation-notes/](./history/implementation-notes/)** - Development journey
-  - `implementation-phase1-details.md` - Phase 1 implementation
-  - `photo-preview-implementation.md` - Preview feature implementation
-  - `navigation-architecture.md` - Original navigation design
-  - `photo-id-system-implementation.md` - Universal photo ID and tag sync implementation
+#### Catalog System
+- [Overview](./features/catalog/overview.md) - Photo catalog architecture
+- [Implementation](./features/catalog/implementation.md) - Current implementation (v2)
+- [API Reference](./features/catalog/api-reference.md) - Catalog API documentation
 
-### Planning
-Future features and enhancements:
+#### Photo Browsers
+- [Local Browser](./features/browsers/local-browser.md) - File system browser
+- [Apple Photos](./features/browsers/apple-photos.md) - Photos app integration
+- [Cloud Browser](./features/browsers/cloud-browser.md) - S3 cloud storage
+- [Google Photos](./features/browsers/google-photos.md) - Google Photos integration
 
-- **[planning/photo-loading-enhancements.md](./planning/photo-loading-enhancements.md)** - Performance optimization plan (Phase 1 completed)
-- **[planning/sort-by-date-feature.md](./planning/sort-by-date-feature.md)** - Sort by date feature design (implemented)
-- **[planning/enhanced-preview-features.md](./planning/enhanced-preview-features.md)** - Enhanced preview with thumbnail strip
-- **[planning/thumbnail-strip-design.md](./planning/thumbnail-strip-design.md)** - Thumbnail strip design for preview
-- **[planning/ios-security-scoped-resources.md](./planning/ios-security-scoped-resources.md)** - iOS folder access fix needed before release
+#### Backup & Sync
+- [Star System](./features/backup/star-system.md) - Star-based backup queue
+- [S3 Upload](./features/backup/s3-upload.md) - Cloud upload implementation
+- [Queue Management](./features/backup/queue-management.md) - Backup queue handling
 
-## About This Structure
+#### UI Components
+- [Thumbnail System](./features/ui-components/thumbnail-system.md) - Thumbnail generation
+- [Selection System](./features/ui-components/selection-system.md) - Multi-selection
+- [Bookmark System](./features/ui-components/bookmark-system.md) - Photo bookmarking
 
-This documentation is organized to separate:
-- **Current state** - What's actually implemented and how it works today
-- **History** - Design decisions, discussions, and implementation journey
-- **Planning** - Future features and roadmap (when needed)
+### 🛠 Development
+Developer guides and setup instructions.
 
-This makes it easy for:
-- New developers to understand the current system
-- Team members to reference historical decisions
-- Everyone to track what's been implemented vs. planned
+#### Setup Guides
+- [macOS Setup](./development/setup/macos.md) - macOS development setup
+- [iOS Setup](./development/setup/ios.md) - iOS development setup
+- [Android Setup](./development/setup/android.md) - Android development setup
 
-## Contributing
+#### Guides
+- [Build Commands](./development/build-commands.md) - Build instructions
+- [Testing Guide](./development/testing-guide.md) - Testing procedures
+- [Release Process](./development/release-process.md) - Release workflow
 
-When adding documentation:
-1. **Current features** → Add to `current/` or update existing docs
-2. **Design proposals** → Start in `planning/`, move to `history/` after implementation
-3. **Implementation notes** → Add to `history/implementation-notes/`
-4. **Status updates** → Update `PROJECT_STATUS.md`
+#### Troubleshooting
+- [Build Issues](./development/troubleshooting/build-issues.md) - Common build problems
+- [Auth Issues](./development/troubleshooting/auth-issues.md) - Authentication troubleshooting
+- [Xcode Issues](./development/troubleshooting/xcode-issues.md) - Xcode-specific problems
 
-Last updated: June 25, 2025
+### 🔌 API Documentation
+Backend API references.
+
+- [Backend API](./api/backend-api.md) - Main API endpoints
+- [S3 Operations](./api/s3-operations.md) - S3 integration
+- [Auth Endpoints](./api/auth-endpoints.md) - Authentication APIs
+
+### 💼 Business
+Business and deployment documentation.
+
+- [Pricing Strategy](./business/pricing-strategy.md) - Current pricing model
+- [IAP Setup](./business/iap-setup.md) - In-app purchase configuration
+- [TestFlight Guide](./business/testflight-guide.md) - TestFlight deployment
+
+### 📋 Planning
+Future features and roadmap.
+
+- [Roadmap](./planning/roadmap.md) - Feature roadmap
+- [Android MVP](./planning/android-mvp.md) - Android minimum viable product
+- [Feature Requests](./planning/feature-requests/) - User requested features
+
+### 📦 Archive
+Historical documentation and old versions.
+
+- [2025-06](./archive/2025-06/) - June 2025 archives
+- [2025-07](./archive/2025-07/) - July 2025 archives
+- [Design Decisions](./archive/design-decisions/) - Original design documents
+- [Old Versions](./archive/old-versions/) - Superseded documentation
+
+## Getting Started
+
+### For New Developers
+1. Read the [Architecture Overview](./architecture/overview.md)
+2. Follow the setup guide for your platform
+3. Review [Build Commands](./development/build-commands.md)
+4. Check [Project Status](./PROJECT_STATUS.md) for current state
+
+### For Contributors
+1. Check [Planning](./planning/) for upcoming features
+2. Review relevant feature documentation
+3. Follow the [Testing Guide](./development/testing-guide.md)
+4. Submit PRs with documentation updates
+
+## Documentation Standards
+
+### File Naming
+- Use lowercase with hyphens: `feature-name.md`
+- Be descriptive but concise
+- Include version numbers when relevant: `catalog-v2.md`
+
+### Content Structure
+- Start with a clear title and overview
+- Use headers to organize sections
+- Include code examples where helpful
+- Link to related documentation
+
+### Maintenance
+- Keep documentation up-to-date with code
+- Archive outdated documents
+- Update links when moving files
+- Add to relevant index files
+
+## Recent Updates
+
+See [PROJECT_STATUS.md](./PROJECT_STATUS.md) for the latest implementation updates and changes.
+
+---
+
+Last updated: July 29, 2025

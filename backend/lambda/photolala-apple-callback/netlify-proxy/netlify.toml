@@ -1,0 +1,12 @@
+[[redirects]]
+  from = "/auth/apple/callback"
+  to = "https://kbzojywsa5.execute-api.us-east-1.amazonaws.com/prod/auth/apple/callback"
+  status = 200
+  force = true
+
+[[headers]]
+  for = "/auth/apple/callback"
+  [headers.values]
+    Access-Control-Allow-Origin = "*"
+    Access-Control-Allow-Methods = "GET, POST, OPTIONS"
+    Access-Control-Allow-Headers = "*"
