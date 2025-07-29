@@ -651,6 +651,9 @@ enum S3BackupError: Error, LocalizedError {
 	case batchRestoreFailed(errors: [Error])
 	case notConfigured
 	case notAuthenticated
+	case serviceNotConfigured
+	case notSignedIn
+	case quotaExceeded
 
 	var errorDescription: String? {
 		switch self {
@@ -668,6 +671,12 @@ enum S3BackupError: Error, LocalizedError {
 			"S3 backup service is not configured"
 		case .notAuthenticated:
 			"User is not authenticated"
+		case .serviceNotConfigured:
+			"S3 service is not initialized. Please check your AWS credentials."
+		case .notSignedIn:
+			"Please sign in to use backup features"
+		case .quotaExceeded:
+			"Storage quota exceeded. Please upgrade your plan."
 		}
 	}
 }

@@ -35,21 +35,47 @@ class S3BackupManager: ObservableObject {
 	}
 
 	func checkConfiguration() {
-		self.isConfigured = KeychainManager.shared.hasAnyAWSCredentials()
-		if self.isConfigured {
-			Task {
-				await self.initializeService()
-			}
+		Task {
+			await self.initializeServiceIfNeeded()
 		}
 	}
 
-	private func initializeService() async {
+	private func initializeServiceIfNeeded() async {
+		// Reset configuration state
+		self.isConfigured = false
+		self.s3Service = nil
+		
 		do {
+			// Try to initialize the S3 service
+			// This will try keychain, env vars, and encrypted credentials in order
 			self.s3Service = try await S3BackupService()
+			self.isConfigured = true
 			print("S3 service initialized successfully")
 		} catch {
 			print("Failed to initialize S3 service: \(error)")
 			self.isConfigured = false
+			
+			// Log more details about the failure
+			if let s3Error = error as? S3BackupError {
+				switch s3Error {
+				case .credentialsNotFound:
+					print("No valid AWS credentials found in any source")
+					print("Checked: Keychain, Environment variables, Encrypted credentials")
+				default:
+					print("S3 initialization error: \(s3Error.localizedDescription)")
+				}
+			}
+		}
+	}
+	
+	// Add a method to ensure service is initialized before use
+	func ensureInitialized() async throws {
+		if self.s3Service == nil {
+			await self.initializeServiceIfNeeded()
+		}
+		
+		guard self.s3Service != nil else {
+			throw S3BackupError.serviceNotConfigured
 		}
 	}
 
@@ -58,6 +84,9 @@ class S3BackupManager: ObservableObject {
 		guard let userId else {
 			throw S3BackupError.notSignedIn
 		}
+
+		// Ensure S3 service is initialized
+		try await self.ensureInitialized()
 
 		// Check subscription limits
 		let fileSize = try photoRef.fileURL.resourceValues(forKeys: [.fileSizeKey]).fileSize ?? 0
@@ -109,6 +138,9 @@ class S3BackupManager: ObservableObject {
 		guard let userId else {
 			throw S3BackupError.notSignedIn
 		}
+		
+		// Ensure S3 service is initialized
+		try await self.ensureInitialized()
 		
 		// Load photo data
 		let data = try await photo.loadImageData()
@@ -311,17 +343,10 @@ class S3BackupManager: ObservableObject {
 	func getS3Client() async -> S3Client? {
 		// Ensure we're configured
 		if !isConfigured {
-			await self.initializeService()
+			await self.initializeServiceIfNeeded()
 		}
 		
 		return s3Service?.s3Client
 	}
 }
 
-// MARK: - Updated Error Types
-
-extension S3BackupError {
-	static let notSignedIn = S3BackupError.credentialsNotFound
-	static let serviceNotConfigured = S3BackupError.credentialsNotFound
-	static let quotaExceeded = S3BackupError.uploadFailed
-}

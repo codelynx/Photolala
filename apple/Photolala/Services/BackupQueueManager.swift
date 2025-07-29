@@ -577,10 +577,10 @@ class BackupQueueManager: ObservableObject {
 	
 	// Match loaded photos with restored backup status
 	func matchPhotosWithBackupStatus(_ photos: [PhotoFile], deleteMD5s: [String]? = nil) async {
-		print("[BackupQueueManager] Matching \(photos.count) photos with backup status")
-		print("[BackupQueueManager] Current backup status contains \(backupStatus.count) entries")
-		print("[BackupQueueManager] Path to MD5 mapping contains \(pathToMD5.count) entries")
-		print("[BackupQueueManager] Photos to delete contains \(photosToDelete.count) entries")
+		// Only log if we have something interesting
+		if !backupStatus.isEmpty || !photosToDelete.isEmpty {
+			print("[BackupQueueManager] Matching photos - Backup status: \(backupStatus.count), Delete queue: \(photosToDelete.count)")
+		}
 		if let deleteMD5s = deleteMD5s {
 			print("[BackupQueueManager] Delete MD5s to restore: \(deleteMD5s.count)")
 		}
@@ -607,7 +607,7 @@ class BackupQueueManager: ObservableObject {
 					}
 				} else {
 					// We have MD5 from path but no backup status - this is expected for photos not starred
-					print("[BackupQueueManager] MD5 from path mapping but no backup status: \(photo.displayName)")
+					// Removed log to reduce noise - this is normal for unstarred photos
 				}
 				continue
 			}
@@ -667,7 +667,10 @@ class BackupQueueManager: ObservableObject {
 			}
 		}
 		
-		print("[BackupQueueManager] Matching complete: computed \(computedCount) MD5s, restored \(restoredFromPath) from path mapping, matched \(matchedCount) photos with backup status")
+		// Only log meaningful results
+		if matchedCount > 0 || computedCount > 0 {
+			print("[BackupQueueManager] Matched \(matchedCount) photos with backup status (computed \(computedCount) new MD5s)")
+		}
 		
 		// Save the updated path mappings
 		saveQueueState()
@@ -692,10 +695,10 @@ class BackupQueueManager: ObservableObject {
 
 		if let encoded = try? JSONEncoder().encode(state) {
 			UserDefaults.standard.set(encoded, forKey: queueStateKey)
-			print("[BackupQueueManager] Saved queue state with \(backupStatus.count) backup statuses, \(pathToMD5.count) path mappings, \(photosToDelete.count) pending deletions, and \(queuedApplePhotos.count) Apple Photos")
-			// Log first few entries for debugging
-			for (index, (md5, status)) in backupStatus.enumerated().prefix(3) {
-				print("[BackupQueueManager]   \(md5): \(status)")
+			// Only log if there's actual backup activity
+			let activeItems = state.queuedPhotos.count + state.photosToDelete!.count + state.queuedApplePhotos!.count
+			if activeItems > 0 || !backupStatus.isEmpty {
+				print("[BackupQueueManager] Saved state - Active items: \(activeItems), Backup statuses: \(backupStatus.count)")
 			}
 		}
 	}
@@ -709,15 +712,19 @@ class BackupQueueManager: ObservableObject {
 
 		// Restore backup status
 		backupStatus = state.backupStatus
-		print("[BackupQueueManager] Restored backup status with \(backupStatus.count) entries")
-		for (md5, status) in backupStatus {
-			print("[BackupQueueManager] Restored: \(md5) -> \(status)")
+		if !backupStatus.isEmpty {
+			print("[BackupQueueManager] Restored \(backupStatus.count) backup statuses")
+			// Only show failed or queued items that need attention
+			let needsAttention = backupStatus.filter { $0.value == .failed || $0.value == .queued }
+			for (md5, status) in needsAttention {
+				print("[BackupQueueManager] Needs attention: \(String(md5.prefix(6)))... -> \(status)")
+			}
 		}
 		
 		// Restore path to MD5 mapping
 		if let savedPathToMD5 = state.pathToMD5 {
 			pathToMD5 = savedPathToMD5
-			print("[BackupQueueManager] Restored path to MD5 mapping with \(pathToMD5.count) entries")
+			// Silent - path mappings are just a cache
 		}
 		
 		// Restore queued Apple Photos
