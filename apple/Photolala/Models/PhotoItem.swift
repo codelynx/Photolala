@@ -96,6 +96,21 @@ extension PhotoFile: PhotoItem {
 	}
 	
 	func loadThumbnail() async throws -> XImage? {
+		// If already loaded (success or failure with placeholder), return cached result
+		if thumbnailLoadingState == .loaded && thumbnail != nil {
+			return thumbnail
+		}
+		
+		// If already failed, check if we have a placeholder and return it
+		if case .failed(let error) = thumbnailLoadingState {
+			if thumbnail != nil {
+				// We have a placeholder, return it
+				return thumbnail
+			}
+			// Re-throw the original error
+			throw error
+		}
+		
 		// Load thumbnail through PhotoManager
 		try await loadPhotoData()
 		return thumbnail

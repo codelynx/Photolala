@@ -67,9 +67,14 @@ struct PhotoBrowserCoreToolbar: ToolbarContent {
 						settings.showItemInfo.toggle()
 					} label: {
 						if settings.showItemInfo {
-							Label("Hide Info Bar", systemImage: "checkmark")
+							Label("Hide Info Bar", systemImage: "squares.below.rectangle")
+								.labelStyle(.titleAndIcon)
+								.padding(.horizontal, 4)
+								.background(Color.primary)
+								.foregroundColor(Color(XPlatform.primaryBackgroundColor))
+								.cornerRadius(4)
 						} else {
-							Text("Show Info Bar")
+							Label("Show Info Bar", systemImage: "squares.below.rectangle")
 						}
 					}
 				}
@@ -92,7 +97,12 @@ struct PhotoBrowserCoreToolbar: ToolbarContent {
 				settings.showItemInfo.toggle()
 			}) {
 				Image(systemName: "squares.below.rectangle")
+					.padding(4)
+					.background(settings.showItemInfo ? Color.primary : Color.clear)
+					.foregroundColor(settings.showItemInfo ? Color(XPlatform.primaryBackgroundColor) : .primary)
+					.cornerRadius(4)
 			}
+			.buttonStyle(.plain)
 			.help(settings.showItemInfo ? "Hide item info" : "Show item info")
 			
 			// Size picker for macOS
@@ -122,7 +132,7 @@ struct PhotoBrowserCoreToolbar: ToolbarContent {
 			Button(action: {
 				showingInspector.toggle()
 			}) {
-				Label("Inspector", systemImage: "info.circle")
+				Label("Inspector", systemImage: showingInspector ? "info.circle.fill" : "info.circle")
 			}
 			#if os(macOS)
 			.help(showingInspector ? "Hide Inspector" : "Show Inspector")

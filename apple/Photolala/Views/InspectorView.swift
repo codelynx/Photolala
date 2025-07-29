@@ -63,12 +63,14 @@ struct SinglePhotoInspector: View {
 	let photo: any PhotoItem
 	@State private var thumbnail: XImage?
 	@State private var isLoadingMetadata = false
+	@State private var isLoadingThumbnail = false
+	@State private var thumbnailLoadFailed = false
 
 	var body: some View {
 		ScrollView {
 			VStack(alignment: .leading, spacing: 16) {
 				// Thumbnail Preview
-				ThumbnailSection(photo: photo, thumbnail: $thumbnail)
+				ThumbnailSection(photo: photo, thumbnail: $thumbnail, isLoading: $isLoadingThumbnail, loadFailed: $thumbnailLoadFailed)
 
 				Divider()
 
@@ -104,7 +106,18 @@ struct SinglePhotoInspector: View {
 	}
 
 	private func loadThumbnail() async {
-		thumbnail = try? await photo.loadThumbnail()
+		isLoadingThumbnail = true
+		thumbnailLoadFailed = false
+		
+		do {
+			thumbnail = try await photo.loadThumbnail()
+			isLoadingThumbnail = false
+		} catch {
+			print("[SinglePhotoInspector] Failed to load thumbnail: \(error)")
+			thumbnail = nil
+			thumbnailLoadFailed = true
+			isLoadingThumbnail = false
+		}
 	}
 }
 
@@ -139,6 +152,8 @@ struct MultiplePhotosInspector: View {
 struct ThumbnailSection: View {
 	let photo: any PhotoItem
 	@Binding var thumbnail: XImage?
+	@Binding var isLoading: Bool
+	@Binding var loadFailed: Bool
 
 	var body: some View {
 		VStack {
@@ -148,13 +163,32 @@ struct ThumbnailSection: View {
 					.scaledToFit()
 					.frame(maxHeight: 200)
 					.cornerRadius(8)
-			} else {
+			} else if isLoading {
 				RoundedRectangle(cornerRadius: 8)
 					.fill(Color.secondary.opacity(0.1))
 					.frame(height: 200)
 					.overlay(
 						ProgressView()
 					)
+			} else if loadFailed {
+				RoundedRectangle(cornerRadius: 8)
+					.fill(Color.secondary.opacity(0.1))
+					.frame(height: 200)
+					.overlay(
+						VStack(spacing: 10) {
+							Image(systemName: "exclamationmark.triangle")
+								.font(.system(size: 30))
+								.foregroundColor(.secondary)
+							Text("Failed to load thumbnail")
+								.font(.caption)
+								.foregroundColor(.secondary)
+						}
+					)
+			} else {
+				// Initial state or other edge case
+				RoundedRectangle(cornerRadius: 8)
+					.fill(Color.secondary.opacity(0.1))
+					.frame(height: 200)
 			}
 		}
 		.frame(maxWidth: .infinity)

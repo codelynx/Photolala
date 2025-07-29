@@ -94,6 +94,7 @@ struct DirectoryPhotoBrowserView: View {
 				isPresented: $showingInspector,
 				selection: inspectorSelection
 			)
+			.corruptedPhotosAlert()
 		#else
 			self.collectionContent
 				.navigationDestination(item: self.$selectedPhotoNavigation) { navigation in
@@ -126,6 +127,7 @@ struct DirectoryPhotoBrowserView: View {
 					isPresented: $showingInspector,
 					selection: inspectorSelection
 				)
+				.corruptedPhotosAlert()
 		#endif
 	}
 

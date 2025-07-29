@@ -69,6 +69,8 @@ class UnifiedMetadataLoader {
 				return metadata
 			} catch {
 				print("[UnifiedMetadataLoader] Failed to load metadata from cache: \(error)")
+				// Return nil to indicate failure
+				return nil
 			}
 		}
 		

@@ -9,6 +9,7 @@
 /* Begin PBXBuildFile section */
 		CC52BA562E16B81E00908941 /* GoogleSignIn in Frameworks */ = {isa = PBXBuildFile; productRef = CC52BA552E16B81E00908941 /* GoogleSignIn */; };
 		CC52BA582E16B81E00908941 /* GoogleSignInSwift in Frameworks */ = {isa = PBXBuildFile; productRef = CC52BA572E16B81E00908941 /* GoogleSignInSwift */; };
+		CC6FB3052E3861DA00A92D61 /* XPlatform in Frameworks */ = {isa = PBXBuildFile; productRef = CC6FB3042E3861DA00A92D61 /* XPlatform */; };
 		CC8E83C22E0001E200FE4558 /* AWSS3 in Frameworks */ = {isa = PBXBuildFile; productRef = CC8E83C12E0001E200FE4558 /* AWSS3 */; };
 		CC8E83C42E0001F800FE4558 /* AWSClientRuntime in Frameworks */ = {isa = PBXBuildFile; productRef = CC8E83C32E0001F800FE4558 /* AWSClientRuntime */; };
 /* End PBXBuildFile section */
@@ -75,6 +76,7 @@
 				CC8E83C42E0001F800FE4558 /* AWSClientRuntime in Frameworks */,
 				CC8E83C22E0001E200FE4558 /* AWSS3 in Frameworks */,
 				CC52BA562E16B81E00908941 /* GoogleSignIn in Frameworks */,
+				CC6FB3052E3861DA00A92D61 /* XPlatform in Frameworks */,
 				CC52BA582E16B81E00908941 /* GoogleSignInSwift in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -148,6 +150,7 @@
 				CC8E83C32E0001F800FE4558 /* AWSClientRuntime */,
 				CC52BA552E16B81E00908941 /* GoogleSignIn */,
 				CC52BA572E16B81E00908941 /* GoogleSignInSwift */,
+				CC6FB3042E3861DA00A92D61 /* XPlatform */,
 			);
 			productName = Photolala;
 			productReference = CC72EFD12DF6C68D00E1C25A /* Photolala.app */;
@@ -234,6 +237,7 @@
 			packageReferences = (
 				CC8E83BF2E00018100FE4558 /* XCRemoteSwiftPackageReference "aws-sdk-swift" */,
 				CCC706562E1667EF00B0766F /* XCRemoteSwiftPackageReference "GoogleSignIn-iOS" */,
+				CC6FB3032E38615600A92D61 /* XCRemoteSwiftPackageReference "XPlatform" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = CC72EFD22DF6C68D00E1C25A /* Products */;
@@ -853,6 +857,14 @@
 /* End XCConfigurationList section */
 
 /* Begin XCRemoteSwiftPackageReference section */
+		CC6FB3032E38615600A92D61 /* XCRemoteSwiftPackageReference "XPlatform" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/codelynx/XPlatform";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 1.0.0;
+			};
+		};
 		CC8E83BF2E00018100FE4558 /* XCRemoteSwiftPackageReference "aws-sdk-swift" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/awslabs/aws-sdk-swift";
@@ -881,6 +893,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = CCC706562E1667EF00B0766F /* XCRemoteSwiftPackageReference "GoogleSignIn-iOS" */;
 			productName = GoogleSignInSwift;
+		};
+		CC6FB3042E3861DA00A92D61 /* XPlatform */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = CC6FB3032E38615600A92D61 /* XCRemoteSwiftPackageReference "XPlatform" */;
+			productName = XPlatform;
 		};
 		CC8E83C12E0001E200FE4558 /* AWSS3 */ = {
 			isa = XCSwiftPackageProductDependency;

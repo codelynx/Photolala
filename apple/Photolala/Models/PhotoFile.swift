@@ -149,6 +149,18 @@ class PhotoFile: Identifiable, Hashable {
 			} catch {
 				self.thumbnailLoadingState = .failed(error)
 				self.metadataLoadingState = .failed(error)
+				
+				// Track corrupted photos and provide placeholder
+				if let photoError = error as? PhotoError, photoError.isCorrupted {
+					await CorruptedPhotoManager.shared.addCorruptedPhoto(self, error: photoError)
+					
+					// Set placeholder thumbnail for corrupted files
+					if let placeholder = await PhotoProcessor.generateCorruptedFilePlaceholder(for: self.filename) {
+						self.thumbnail = placeholder
+						self.thumbnailLoadingState = .loaded // Mark as loaded with placeholder
+					}
+				}
+				
 				throw error
 			}
 		}

@@ -14,6 +14,67 @@ import ImageIO
 @MainActor
 class PhotoProcessor {
 	
+	// MARK: - Placeholder Generation
+	
+	/// Generate a placeholder image for corrupted/empty files
+	@MainActor
+	static func generateCorruptedFilePlaceholder(for filename: String) -> XImage? {
+		let size = CGSize(width: 256, height: 256)
+		
+		#if os(macOS)
+		let image = NSImage(size: size)
+		image.lockFocus()
+		
+		// Background
+		NSColor.systemGray.withAlphaComponent(0.2).setFill()
+		NSBezierPath(rect: NSRect(origin: .zero, size: size)).fill()
+		
+		// Icon
+		let iconRect = NSRect(x: 96, y: 96, width: 64, height: 64)
+		NSColor.systemRed.withAlphaComponent(0.7).setFill()
+		let path = NSBezierPath()
+		path.move(to: NSPoint(x: iconRect.midX, y: iconRect.minY))
+		path.line(to: NSPoint(x: iconRect.maxX, y: iconRect.maxY))
+		path.line(to: NSPoint(x: iconRect.minX, y: iconRect.maxY))
+		path.close()
+		path.fill()
+		
+		// Exclamation mark
+		NSColor.white.setFill()
+		NSBezierPath(ovalIn: NSRect(x: iconRect.midX - 4, y: iconRect.midY - 12, width: 8, height: 8)).fill()
+		NSBezierPath(rect: NSRect(x: iconRect.midX - 4, y: iconRect.midY, width: 8, height: 20)).fill()
+		
+		image.unlockFocus()
+		return image
+		#else
+		UIGraphicsBeginImageContextWithOptions(size, false, 0)
+		defer { UIGraphicsEndImageContext() }
+		
+		guard let context = UIGraphicsGetCurrentContext() else { return nil }
+		
+		// Background
+		context.setFillColor(UIColor.systemGray.withAlphaComponent(0.2).cgColor)
+		context.fill(CGRect(origin: .zero, size: size))
+		
+		// Icon
+		let iconRect = CGRect(x: 96, y: 96, width: 64, height: 64)
+		context.setFillColor(UIColor.systemRed.withAlphaComponent(0.7).cgColor)
+		context.beginPath()
+		context.move(to: CGPoint(x: iconRect.midX, y: iconRect.minY))
+		context.addLine(to: CGPoint(x: iconRect.maxX, y: iconRect.maxY))
+		context.addLine(to: CGPoint(x: iconRect.minX, y: iconRect.maxY))
+		context.closePath()
+		context.fillPath()
+		
+		// Exclamation mark
+		context.setFillColor(UIColor.white.cgColor)
+		context.fillEllipse(in: CGRect(x: iconRect.midX - 4, y: iconRect.midY - 12, width: 8, height: 8))
+		context.fill(CGRect(x: iconRect.midX - 4, y: iconRect.midY, width: 8, height: 20))
+		
+		return UIGraphicsGetImageFromCurrentImageContext()
+		#endif
+	}
+	
 	/// Result of processing a photo file
 	struct ProcessedData {
 		let thumbnail: XImage
@@ -30,6 +91,12 @@ class PhotoProcessor {
 		let attributes = try FileManager.default.attributesOfItem(atPath: photo.filePath)
 		let fileSize = attributes[.size] as? Int64 ?? 0
 		let modificationDate = attributes[.modificationDate] as? Date ?? Date()
+		
+		// Early check for empty files
+		if fileSize == 0 {
+			print("[PhotoProcessor] Empty file detected: \(photo.filename)")
+			throw PhotoError.emptyFile(filename: photo.filename)
+		}
 		
 		let md5Result: String
 		let needsFullRead: Bool
@@ -107,9 +174,15 @@ class PhotoProcessor {
 	// MARK: - Private Processing Methods
 	
 	private static func generateThumbnail(from data: Data, filename: String) async throws -> (image: XImage, data: Data) {
+		// Check for empty file first
+		if data.isEmpty {
+			throw PhotoError.emptyFile(filename: filename)
+		}
+		
+		// Try to create image
 		guard let sourceImage = XImage(data: data) else {
-			throw NSError(domain: "PhotoProcessor", code: 1, 
-						  userInfo: [NSLocalizedDescriptionKey: "Unable to create image from data"])
+			// File has data but can't be decoded as an image
+			throw PhotoError.corruptedFile(filename: filename)
 		}
 		
 		// Scale so that the shorter side becomes 256 pixels
