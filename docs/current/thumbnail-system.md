@@ -21,7 +21,7 @@ class PhotoManager {
 - **Dual Caching**: Separate caches for full images and thumbnails
 - **Content-Based Keys**: MD5 digest prevents duplicate processing
 - **Thread Safety**: Serial DispatchQueue with QoS .userInitiated
-- **Cross-Platform**: Works on macOS, iOS, and tvOS
+- **Cross-Platform**: Works on macOS and iOS
 
 ## Thumbnail Generation
 

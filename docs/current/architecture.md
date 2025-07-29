@@ -4,7 +4,7 @@ Last Updated: June 21, 2025 (Added Apple Photos Library support)
 
 ## Overview
 
-Photolala is a cross-platform photo browser application built with SwiftUI, supporting macOS, iOS, and tvOS. It follows a window-per-folder architecture on macOS and uses native collection views for optimal performance with large photo collections. The application now features a unified photo browser architecture that supports multiple photo sources (local files, S3 cloud storage) through a consistent interface.
+Photolala is a cross-platform photo browser application built with SwiftUI, supporting macOS and iOS. It follows a window-per-folder architecture on macOS and uses native collection views for optimal performance with large photo collections. The application now features a unified photo browser architecture that supports multiple photo sources (local files, S3 cloud storage) through a consistent interface.
 
 ## Core Architecture Principles
 

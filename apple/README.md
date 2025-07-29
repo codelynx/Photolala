@@ -1,6 +1,6 @@
 # Photolala for Apple Platforms
 
-This directory contains the Photolala implementation for Apple platforms (iOS, macOS, tvOS).
+This directory contains the Photolala implementation for Apple platforms (iOS, macOS).
 
 ## Structure
 
@@ -24,11 +24,6 @@ xcodebuild -scheme Photolala -destination 'platform=macOS' build
 xcodebuild -scheme Photolala -destination 'platform=iOS Simulator,name=iPhone 16 Pro' build
 ```
 
-### tvOS Simulator
-```bash
-xcodebuild -scheme Photolala -destination 'platform=tvOS Simulator,name=Apple TV' build
-```
-
 ## Development
 
 1. Open `Photolala.xcodeproj` in Xcode
@@ -45,6 +40,5 @@ xcodebuild -scheme Photolala -destination 'platform=tvOS Simulator,name=Apple TV
 
 - macOS 14.0+
 - iOS 18.5+
-- tvOS 18.0+
 
 See the main project README for more information.

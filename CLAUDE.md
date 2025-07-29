@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Photolala is a cross-platform photo browser application similar to Adobe Bridge, supporting macOS, iOS, tvOS, and Android. It uses a window-per-folder architecture where each window displays photos from a single folder. The app provides efficient browsing of large photo collections with thumbnail generation, metadata management, and multi-selection capabilities.
+Photolala is a cross-platform photo browser application similar to Adobe Bridge, supporting macOS, iOS, and Android. It uses a window-per-folder architecture where each window displays photos from a single folder. The app provides efficient browsing of large photo collections with thumbnail generation, metadata management, and multi-selection capabilities.
 
 ## Build Commands
 
@@ -18,9 +18,6 @@ cd apple && xcodebuild -scheme Photolala -destination 'platform=macOS' build
 
 # Build for iOS Simulator
 cd apple && xcodebuild -scheme Photolala -destination 'platform=iOS Simulator,name=iPhone 16 Pro' build
-
-# Build for tvOS Simulator  
-cd apple && xcodebuild -scheme Photolala -destination 'platform=tvOS Simulator,name=Apple TV' build
 
 # Clean build
 cd apple && xcodebuild -scheme Photolala clean
@@ -60,7 +57,7 @@ cd android/
 
 ```
 Photolala/
-├── apple/                  # Apple platform code (iOS/macOS/tvOS)
+├── apple/                  # Apple platform code (iOS/macOS)
 │   ├── Photolala/         # Main app target
 │   │   ├── Models/        # Data models
 │   │   ├── Views/         # SwiftUI views
@@ -88,7 +85,7 @@ Photolala/
 
 - Development Team ID: 2P97EM4L4N
 - Bundle ID: com.electricwoods.photolala
-- Supported platforms: macOS 14.0+, iOS 18.5+, tvOS 18.0+, Android 13+
+- Supported platforms: macOS 14.0+, iOS 18.5+, Android 13+
 - Architecture: SwiftUI (Apple), Jetpack Compose (Android)
 - **App Status**: Pre-release (no migration needed for breaking changes)
 - Key features implemented:

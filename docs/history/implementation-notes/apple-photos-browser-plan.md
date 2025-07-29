@@ -10,7 +10,7 @@ Implement a new photo browser that integrates with Apple's Photos Library, allow
 
 1. **Read-only access** to Apple Photos Library (initially)
 2. **Seamless integration** with existing Photolala architecture
-3. **Platform support**: macOS and iOS (tvOS later if feasible)
+3. **Platform support**: macOS and iOS
 4. **Unified browser experience** using existing infrastructure
 
 ## Technical Requirements

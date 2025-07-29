@@ -17,7 +17,6 @@ The application now has a complete authentication system with explicit sign-up/s
 2. **Cross-Platform Support**:
    - macOS (primary platform)
    - iOS/iPadOS (adapted for touch)
-   - tvOS (experimental)
 
 3. **Photo Selection System**:
    - Native platform selection
@@ -193,7 +192,6 @@ The application now has a complete authentication system with explicit sign-up/s
 
 - ✅ macOS: Building successfully (with Sendable warnings)
 - ✅ iOS: Building successfully (fixed photo access and tag UI)
-- ✅ tvOS: Unable to test (no simulators available)
 - ✅ Android: Building successfully (photo grid, AWS integration, UI features implemented)
 
 ### 📝 Recent Sessions
@@ -781,7 +779,6 @@ The application now has a complete authentication system with explicit sign-up/s
 
 - **macOS**: Primary platform, all features working
 - **iOS**: Secondary platform, touch-optimized, some features limited
-- **tvOS**: Experimental, basic browsing only
 - **Android**: In development, basic photo grid with scale modes and info bar implemented
 
 ## 🏗️ Recent Architecture Improvements (June 21)

@@ -10,7 +10,7 @@ This document outlines the plan for adding Android support to Photolala, creatin
 
 ```
 Photolala/
-├── apple/                      # Renamed from current root (iOS/macOS/tvOS)
+├── apple/                      # Renamed from current root (iOS/macOS)
 │   ├── Photolala/             # Swift sources
 │   ├── PhotolalaTests/
 │   └── Photolala.xcodeproj

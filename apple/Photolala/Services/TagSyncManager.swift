@@ -27,8 +27,6 @@ class TagSyncManager: ObservableObject {
 		return "Mac-\(deviceName)"
 		#elseif os(iOS)
 		return UIDevice.current.userInterfaceIdiom == .pad ? "iPad-\(deviceName)" : "iPhone-\(deviceName)"
-		#elseif os(tvOS)
-		return "AppleTV-\(deviceName)"
 		#endif
 	}()
 	

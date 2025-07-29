@@ -178,7 +178,7 @@ Catalog updates are atomic to prevent corruption:
 
 ### Platform Compatibility
 
-- Works on all platforms (macOS, iOS, tvOS)
+- Works on all platforms (macOS, iOS)
 - FileManager operations are platform-agnostic
 - CSV parsing uses standard Swift APIs
 

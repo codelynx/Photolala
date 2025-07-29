@@ -2,7 +2,7 @@
 
 ## Overview
 
-This document outlines the authentication strategy for Photolala across Apple (iOS/macOS/tvOS) and Android platforms, including implementation of Sign in with Apple and Sign in with Google with explicit signup/signin flows to prevent duplicate accounts.
+This document outlines the authentication strategy for Photolala across Apple (iOS/macOS) and Android platforms, including implementation of Sign in with Apple and Sign in with Google with explicit signup/signin flows to prevent duplicate accounts.
 
 **Key Decision**: Implement separate "Sign In" and "Create Account" flows to prevent users from accidentally creating multiple accounts when they forget which provider they used.
 
@@ -13,7 +13,7 @@ This document outlines the authentication strategy for Photolala across Apple (i
 
 ## Current State
 
-### Apple Platforms (iOS/macOS/tvOS)
+### Apple Platforms (iOS/macOS)
 - **Implemented**: Sign in with Apple, Sign in with Google (July 3, 2025)
 - **Architecture**: Native AuthenticationServices framework, GoogleSignIn SDK v8.0.0
 - **Storage**: Keychain for secure credential storage

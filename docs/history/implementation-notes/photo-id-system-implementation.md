@@ -2,7 +2,7 @@
 
 ## Overview
 
-This document outlines the design for a unified photo identification system that enables consistent photo tracking across macOS, iOS, and tvOS devices. The system will allow users to maintain tags and other metadata synchronized across their devices.
+This document outlines the design for a unified photo identification system that enables consistent photo tracking across macOS and iOS devices. The system will allow users to maintain tags and other metadata synchronized across their devices.
 
 ### Terminology Change: Bookmarks → Tags
 

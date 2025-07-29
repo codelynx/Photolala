@@ -50,7 +50,7 @@ The MVP includes:
 
 ```
 Photolala/
-├── apple/          # iOS/macOS/tvOS code
+├── apple/          # iOS/macOS code
 ├── android/        # Android code
 ├── shared/         # Shared resources
 ├── docs/           # Documentation

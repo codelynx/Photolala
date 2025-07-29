@@ -21,8 +21,6 @@ Photolala now has complete authentication systems across all platforms with Goog
 - ✅ **Secure Storage**: Android Keystore encryption
 - ✅ **UI Integration**: Material3 design
 
-### tvOS
-- ⚠️ **Limited Support**: Basic browsing only, no authentication yet
 
 ## Technical Architecture
 

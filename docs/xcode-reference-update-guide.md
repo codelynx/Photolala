@@ -135,8 +135,6 @@ xcodebuild -scheme Photolala -destination 'platform=macOS' build
 # iOS Simulator
 xcodebuild -scheme Photolala -destination 'platform=iOS Simulator,name=iPhone 15' build
 
-# tvOS Simulator
-xcodebuild -scheme Photolala -destination 'platform=tvOS Simulator,name=Apple TV' build
 ```
 
 ## Step 9: Verify Tests
@@ -214,7 +212,6 @@ echo "Verification complete"
 - [ ] Assets.xcassets loads properly
 - [ ] App builds for macOS
 - [ ] App builds for iOS
-- [ ] App builds for tvOS
 - [ ] Tests run successfully
 - [ ] App runs in simulator/device
 

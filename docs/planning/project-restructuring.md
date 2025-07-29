@@ -2,7 +2,7 @@
 
 ## Overview
 
-This document details the plan for restructuring the Photolala project to support both Apple platforms (iOS/macOS/tvOS) and Android, while maintaining a clean, organized codebase.
+This document details the plan for restructuring the Photolala project to support both Apple platforms (iOS/macOS) and Android, while maintaining a clean, organized codebase.
 
 ## Current Structure
 

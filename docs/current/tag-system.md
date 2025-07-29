@@ -178,7 +178,6 @@ func toggleFlag(_ flag: ColorFlag, for photo: any PhotoItem) async {
 
 - **macOS**: Full keyboard support, inspector panel
 - **iOS/iPadOS**: Touch-optimized, fixed photo access issues
-- **tvOS**: Read-only tag display (no editing)
 
 ## Migration from Bookmarks
 

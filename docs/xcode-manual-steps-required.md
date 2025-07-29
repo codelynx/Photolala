@@ -30,7 +30,7 @@ For each red file:
 ### 4. Verify Build
 1. Clean Build Folder (⇧⌘K)
 2. Build for macOS (⌘B)
-3. If successful, test iOS and tvOS builds
+3. If successful, test iOS builds
 
 ## Why Manual Steps?
 
