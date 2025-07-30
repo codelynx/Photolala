@@ -8,12 +8,21 @@
 import Foundation
 import SwiftUI
 
+/// Wrapper class for PhotoDigest to work with NSCache
+private class PhotoDigestWrapper {
+	let digest: PhotoDigest
+	
+	init(_ digest: PhotoDigest) {
+		self.digest = digest
+	}
+}
+
 /// Cache that maps content MD5 to PhotoDigest (thumbnail + metadata)
 @MainActor
 class PhotoDigestCache {
 	static let shared = PhotoDigestCache()
 	
-	private let memoryCache = NSCache<NSString, PhotoDigest>()
+	private let memoryCache = NSCache<NSString, PhotoDigestWrapper>()
 	private let cacheBaseURL: URL
 	
 	private init() {
@@ -35,8 +44,8 @@ class PhotoDigestCache {
 	/// Get PhotoDigest from cache
 	func getPhotoDigest(for md5: String) async -> PhotoDigest? {
 		// Check memory cache first
-		if let cached = memoryCache.object(forKey: md5 as NSString) {
-			return cached
+		if let wrapper = memoryCache.object(forKey: md5 as NSString) {
+			return wrapper.digest
 		}
 		
 		// Check disk cache
@@ -46,8 +55,9 @@ class PhotoDigestCache {
 	/// Store PhotoDigest in cache
 	func setPhotoDigest(_ digest: PhotoDigest, for md5: String) async {
 		// Store in memory cache
+		let wrapper = PhotoDigestWrapper(digest)
 		let cost = digest.thumbnailData.count
-		memoryCache.setObject(digest, forKey: md5 as NSString, cost: cost)
+		memoryCache.setObject(wrapper, forKey: md5 as NSString, cost: cost)
 		
 		// Store on disk
 		await saveToDisk(digest: digest, md5: md5)
@@ -103,7 +113,7 @@ class PhotoDigestCache {
 			
 			// Load and decode metadata
 			let metadataData = try Data(contentsOf: metadataPath)
-			let metadata = try JSONDecoder().decode(PhotoMetadata.self, from: metadataData)
+			let metadata = try JSONDecoder().decode(PhotoDigestMetadata.self, from: metadataData)
 			
 			// Create PhotoDigest
 			let digest = PhotoDigest(
@@ -113,8 +123,9 @@ class PhotoDigestCache {
 			)
 			
 			// Store in memory cache for faster access
+			let wrapper = PhotoDigestWrapper(digest)
 			let cost = thumbnailData.count
-			memoryCache.setObject(digest, forKey: md5 as NSString, cost: cost)
+			memoryCache.setObject(wrapper, forKey: md5 as NSString, cost: cost)
 			
 			return digest
 		} catch {

@@ -9,6 +9,7 @@ import Foundation
 import SwiftUI
 import Photos
 import ImageIO
+import CryptoKit
 
 @MainActor
 class PhotoManagerV2 {
@@ -169,7 +170,7 @@ class PhotoManagerV2 {
 		// Use existing thumbnail generation logic
 		let imageSource = CGImageSourceCreateWithURL(url as CFURL, nil)
 		guard let source = imageSource else {
-			throw PhotoError.thumbnailGenerationFailed
+			throw PhotoError.processingFailed(filename: url.lastPathComponent, underlyingError: NSError(domain: "PhotoManagerV2", code: 1, userInfo: [NSLocalizedDescriptionKey: "Failed to create thumbnail"]))
 		}
 		
 		let options: [CFString: Any] = [
@@ -179,7 +180,7 @@ class PhotoManagerV2 {
 		]
 		
 		guard let cgImage = CGImageSourceCreateThumbnailAtIndex(source, 0, options as CFDictionary) else {
-			throw PhotoError.thumbnailGenerationFailed
+			throw PhotoError.processingFailed(filename: url.lastPathComponent, underlyingError: NSError(domain: "PhotoManagerV2", code: 1, userInfo: [NSLocalizedDescriptionKey: "Failed to create thumbnail"]))
 		}
 		
 		#if os(macOS)
@@ -187,13 +188,13 @@ class PhotoManagerV2 {
 		guard let tiffData = image.tiffRepresentation,
 			  let bitmap = NSBitmapImageRep(data: tiffData),
 			  let jpegData = bitmap.representation(using: .jpeg, properties: [.compressionFactor: 0.8]) else {
-			throw PhotoError.thumbnailGenerationFailed
+			throw PhotoError.processingFailed(filename: url.lastPathComponent, underlyingError: NSError(domain: "PhotoManagerV2", code: 1, userInfo: [NSLocalizedDescriptionKey: "Failed to create thumbnail"]))
 		}
 		return jpegData
 		#else
 		let image = UIImage(cgImage: cgImage)
 		guard let jpegData = image.jpegData(compressionQuality: 0.8) else {
-			throw PhotoError.thumbnailGenerationFailed
+			throw PhotoError.processingFailed(filename: url.lastPathComponent, underlyingError: NSError(domain: "PhotoManagerV2", code: 1, userInfo: [NSLocalizedDescriptionKey: "Failed to create thumbnail"]))
 		}
 		return jpegData
 		#endif
@@ -204,15 +205,18 @@ class PhotoManagerV2 {
 		filename: String,
 		fileSize: Int64,
 		modificationDate: Date
-	) throws -> PhotoMetadata {
+	) throws -> PhotoDigestMetadata {
 		// Extract image properties
 		guard let imageSource = CGImageSourceCreateWithURL(url as CFURL, nil),
 			  let properties = CGImageSourceCopyPropertiesAtIndex(imageSource, 0, nil) as? [String: Any] else {
 			// Return basic metadata if we can't read image properties
-			return PhotoMetadata(
+			return PhotoDigestMetadata(
 				filename: filename,
 				fileSize: fileSize,
-				modificationDate: modificationDate
+				pixelWidth: nil,
+				pixelHeight: nil,
+				creationDate: nil,
+				modificationTimestamp: Int(modificationDate.timeIntervalSince1970)
 			)
 		}
 		
@@ -230,22 +234,14 @@ class PhotoManagerV2 {
 			creationDate = formatter.date(from: dateString)
 		}
 		
-		return PhotoMetadata(
+		return PhotoDigestMetadata(
 			filename: filename,
 			fileSize: fileSize,
 			pixelWidth: pixelWidth,
 			pixelHeight: pixelHeight,
 			creationDate: creationDate,
-			modificationDate: modificationDate
+			modificationTimestamp: Int(modificationDate.timeIntervalSince1970)
 		)
 	}
 }
 
-// MARK: - Error Types
-
-enum PhotoError: Error {
-	case thumbnailGenerationFailed
-	case metadataExtractionFailed
-	case fileNotFound
-	case invalidImageData
-}

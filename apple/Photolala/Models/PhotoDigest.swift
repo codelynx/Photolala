@@ -12,7 +12,7 @@ import SwiftUI
 struct PhotoDigest: Codable {
 	let md5Hash: String
 	let thumbnailData: Data
-	let metadata: PhotoMetadata
+	let metadata: PhotoDigestMetadata
 	
 	/// Get thumbnail image
 	var thumbnail: XImage? {
@@ -20,8 +20,8 @@ struct PhotoDigest: Codable {
 	}
 }
 
-/// Photo metadata information
-struct PhotoMetadata: Codable {
+/// Simplified metadata for PhotoDigest (different from full PhotoMetadata class)
+struct PhotoDigestMetadata: Codable {
 	let filename: String
 	let fileSize: Int64
 	let pixelWidth: Int?
@@ -57,6 +57,8 @@ struct FileIdentityKey {
 
 // MARK: - String Extensions
 
+import CryptoKit
+
 extension String {
 	/// Get normalized path (resolves symlinks, ~, etc.)
 	var normalizedPath: String {
@@ -65,7 +67,8 @@ extension String {
 	
 	/// Compute MD5 hash of string
 	var md5Hash: String {
-		// Use existing MD5 extension from project
-		return self.md5
+		let data = Data(self.utf8)
+		let hash = Insecure.MD5.hash(data: data)
+		return hash.map { String(format: "%02hhx", $0) }.joined()
 	}
 }
