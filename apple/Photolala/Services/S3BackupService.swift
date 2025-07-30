@@ -348,6 +348,22 @@ class S3BackupService: ObservableObject {
 		}
 	}
 	
+	/// Delete a single object from S3
+	func deleteObject(at path: String) async throws {
+		let deleteInput = DeleteObjectInput(
+			bucket: bucketName,
+			key: path
+		)
+		
+		do {
+			_ = try await client.deleteObject(input: deleteInput)
+			print("[S3BackupService] Successfully deleted object: \(path)")
+		} catch {
+			print("[S3BackupService] Failed to delete object \(path): \(error)")
+			throw error
+		}
+	}
+	
 	func deletePhotos(md5Hashes: [String], userId: String) async throws {
 		// AWS S3 supports batch delete up to 1000 objects at once
 		let maxBatchSize = 1000

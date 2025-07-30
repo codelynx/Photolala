@@ -22,43 +22,125 @@ actor GoogleAuthProvider {
 	/// Sign in with Google
 	func signIn() async throws -> AuthCredential {
 		#if canImport(GoogleSignIn)
+		print("[GoogleAuthProvider] Starting Google Sign-In flow")
+		
 		// Get the presenting view controller
 		let presentingViewController = await getPresentingViewController()
+		print("[GoogleAuthProvider] Got presenting view controller")
 		
 		// Configure if needed
 		await MainActor.run {
 			if GIDSignIn.sharedInstance.configuration == nil {
+				print("[GoogleAuthProvider] Configuring Google Sign-In")
 				configureGoogleSignIn()
 			}
 		}
 		
-		#if os(iOS)
-		let result = try await GIDSignIn.sharedInstance.signIn(
-			withPresenting: presentingViewController as! UIViewController,
-			hint: nil
-		)
-		#elseif os(macOS)
-		let result = try await GIDSignIn.sharedInstance.signIn(
-			withPresenting: presentingViewController as! NSWindow,
-			hint: nil
-		)
-		#endif
+		print("[GoogleAuthProvider] Calling GIDSignIn.sharedInstance.signIn")
 		
-		guard let profile = result.user.profile else {
-			throw AuthError.unknownError("No user profile data")
+		do {
+			#if os(iOS)
+			let result = try await GIDSignIn.sharedInstance.signIn(
+				withPresenting: presentingViewController as! UIViewController,
+				hint: nil
+			)
+			#elseif os(macOS)
+			let result = try await GIDSignIn.sharedInstance.signIn(
+				withPresenting: presentingViewController as! NSWindow,
+				hint: nil
+			)
+			#endif
+			
+			print("[GoogleAuthProvider] Sign-in successful, processing result")
+			
+			guard let profile = result.user.profile else {
+				print("[GoogleAuthProvider] No profile data in result")
+				throw AuthError.unknownError("No user profile data")
+			}
+			
+			print("[GoogleAuthProvider] Creating credential for user: \(result.user.userID ?? "unknown")")
+			
+			let credential = AuthCredential(
+				provider: .google,
+				providerID: result.user.userID ?? "",
+				email: profile.email,
+				fullName: profile.name,
+				photoURL: profile.imageURL(withDimension: 200)?.absoluteString,
+				idToken: result.user.idToken?.tokenString,
+				accessToken: result.user.accessToken.tokenString
+			)
+			
+			print("[GoogleAuthProvider] Credential created successfully")
+			return credential
+		} catch {
+			print("[GoogleAuthProvider] Sign-in failed with error: \(error)")
+			print("[GoogleAuthProvider] Error type: \(type(of: error))")
+			print("[GoogleAuthProvider] Error localized: \(error.localizedDescription)")
+			
+			// Check if it's a keychain error from Google Sign-In
+			let nsError = error as NSError
+			if nsError.domain == "com.google.GIDSignIn" && nsError.code == -2 {
+				print("[GoogleAuthProvider] Google Sign-In keychain error detected, attempting workaround...")
+				
+				// Try to clear Google's keychain and retry
+				await MainActor.run {
+					GIDSignIn.sharedInstance.signOut()
+					// Reset configuration to force fresh start
+					GIDSignIn.sharedInstance.configuration = nil
+					configureGoogleSignIn()
+				}
+				
+				// Try sign-in one more time
+				do {
+					print("[GoogleAuthProvider] Retrying sign-in after clearing state...")
+					#if os(iOS)
+					let result = try await GIDSignIn.sharedInstance.signIn(
+						withPresenting: presentingViewController as! UIViewController,
+						hint: nil
+					)
+					#elseif os(macOS)
+					let result = try await GIDSignIn.sharedInstance.signIn(
+						withPresenting: presentingViewController as! NSWindow,
+						hint: nil
+					)
+					#endif
+					
+					print("[GoogleAuthProvider] Retry successful!")
+					
+					guard let profile = result.user.profile else {
+						throw AuthError.unknownError("No user profile data")
+					}
+					
+					let credential = AuthCredential(
+						provider: .google,
+						providerID: result.user.userID ?? "",
+						email: profile.email,
+						fullName: profile.name,
+						photoURL: profile.imageURL(withDimension: 200)?.absoluteString,
+						idToken: result.user.idToken?.tokenString,
+						accessToken: result.user.accessToken.tokenString
+					)
+					
+					return credential
+				} catch {
+					print("[GoogleAuthProvider] Retry also failed: \(error)")
+					print("[GoogleAuthProvider] Falling back to web-based authentication...")
+					
+					// Use web-based flow as last resort
+					do {
+						let credential = try await signInWithWebFlow()
+						print("[GoogleAuthProvider] Web-based authentication successful!")
+						return credential
+					} catch {
+						print("[GoogleAuthProvider] Web-based authentication also failed: \(error)")
+						throw AuthError.custom(code: "GOOGLE_AUTH_FAILED", 
+							message: "Unable to sign in with Google. Please try again later.")
+					}
+				}
+			}
+			
+			throw error
 		}
-		
-		let credential = AuthCredential(
-			provider: .google,
-			providerID: result.user.userID ?? "",
-			email: profile.email,
-			fullName: profile.name,
-			photoURL: profile.imageURL(withDimension: 200)?.absoluteString,
-			idToken: result.user.idToken?.tokenString,
-			accessToken: result.user.accessToken.tokenString
-		)
-		
-		return credential
 		#else
 		throw AuthError.providerNotImplemented
 		#endif
@@ -152,13 +234,31 @@ actor GoogleAuthProvider {
 	
 	@MainActor
 	private func configureGoogleSignIn() {
-		// Extract client ID from Info.plist
+		print("[GoogleAuthProvider] Configuring Google Sign-In...")
+		
+		// First, try to clear any existing keychain state
+		print("[GoogleAuthProvider] Clearing any existing Google Sign-In state...")
+		GIDSignIn.sharedInstance.signOut()
+		
+		// Check if GIDClientID is in Info.plist (new way)
+		if let bundleId = Bundle.main.object(forInfoDictionaryKey: "GIDClientID") as? String {
+			print("[GoogleAuthProvider] Found GIDClientID in Info.plist: \(bundleId)")
+			GIDSignIn.sharedInstance.configuration = GIDConfiguration(
+				clientID: bundleId,
+				serverClientID: webClientID
+			)
+			print("[GoogleAuthProvider] Configuration set successfully")
+			return
+		}
+		
+		// Fallback: Extract client ID from URL schemes (old way)
+		print("[GoogleAuthProvider] GIDClientID not found, trying URL schemes...")
 		guard let path = Bundle.main.path(forResource: "Info", ofType: "plist"),
 			  let plist = NSDictionary(contentsOfFile: path),
 			  let urlTypes = plist["CFBundleURLTypes"] as? [[String: Any]],
 			  let urlSchemes = urlTypes.first?["CFBundleURLSchemes"] as? [String],
 			  let reversedClientId = urlSchemes.first(where: { $0.hasPrefix("com.googleusercontent.apps.") }) else {
-			print("Error: Google Sign-In client ID not found in Info.plist")
+			print("[GoogleAuthProvider] Error: Google Sign-In client ID not found in Info.plist")
 			return
 		}
 		
@@ -166,14 +266,20 @@ actor GoogleAuthProvider {
 		let components = reversedClientId.replacingOccurrences(of: "com.googleusercontent.apps.", with: "")
 		let clientId = components + ".apps.googleusercontent.com"
 		
+		print("[GoogleAuthProvider] Extracted client ID: \(clientId)")
+		
 		GIDSignIn.sharedInstance.configuration = GIDConfiguration(
 			clientID: clientId,
 			serverClientID: webClientID // Use web client ID for ID token
 		)
+		print("[GoogleAuthProvider] Configuration set successfully (from URL scheme)")
 	}
 	
 	private func mapError(_ error: Error) -> AuthError {
 		let nsError = error as NSError
+		
+		print("[GoogleAuthProvider] Mapping error - Domain: \(nsError.domain), Code: \(nsError.code)")
+		print("[GoogleAuthProvider] Error userInfo: \(nsError.userInfo)")
 		
 		if nsError.domain == kGIDSignInErrorDomain {
 			switch nsError.code {

@@ -66,17 +66,25 @@ class IdentityManager: NSObject, ObservableObject {
 		do {
 			let userData = try KeychainManager.shared.load(key: self.keychainKey)
 			
+			// Create decoder with matching date strategy
+			let decoder = JSONDecoder()
+			decoder.dateDecodingStrategy = .iso8601
+			
 			// Try to decode as new model first
-			if let user = try? JSONDecoder().decode(PhotolalaUser.self, from: userData) {
+			do {
+				let user = try decoder.decode(PhotolalaUser.self, from: userData)
 				// Temporarily set user - will be verified against S3
 				self.currentUser = user
 				self.isSignedIn = true
 				print("Loaded stored user: \(user.displayName) - pending S3 verification")
 				return
+			} catch {
+				print("Failed to decode PhotolalaUser: \(error)")
 			}
 			
 			// Try legacy model and migrate
-			if let legacyUser = try? JSONDecoder().decode(LegacyPhotolalaUser.self, from: userData) {
+			do {
+				let legacyUser = try decoder.decode(LegacyPhotolalaUser.self, from: userData)
 				let migratedUser = PhotolalaUser(legacy: legacyUser)
 				
 				// Save migrated user
@@ -90,9 +98,11 @@ class IdentityManager: NSObject, ObservableObject {
 				self.isSignedIn = true
 				print("Migrated legacy user: \(migratedUser.displayName) - pending S3 verification")
 				return
+			} catch {
+				print("Failed to decode LegacyPhotolalaUser: \(error)")
 			}
 			
-			print("Failed to decode user data")
+			print("Failed to decode user data from keychain")
 		} catch {
 			print("No stored user found: \(error)")
 		}

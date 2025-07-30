@@ -20,5 +20,7 @@
 		<string>googlechrome</string>
 		<string>googlechrome-x-callback</string>
 	</array>
+	<key>GIDClientID</key>
+	<string>105828093997-m35e980noaks5ahke5ge38q76rgq2bik.apps.googleusercontent.com</string>
 </dict>
 </plist>

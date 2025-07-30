@@ -27,6 +27,14 @@ struct PhotolalaUser: Codable {
 		fullName ?? email ?? "Photolala User"
 	}
 	
+	// Check if a provider is linked (either primary or in linkedProviders)
+	func hasProvider(_ provider: AuthProvider) -> Bool {
+		if primaryProvider == provider {
+			return true
+		}
+		return linkedProviders.contains { $0.provider == provider }
+	}
+	
 	// Legacy support for existing users
 	var appleUserID: String? {
 		if primaryProvider == .apple {

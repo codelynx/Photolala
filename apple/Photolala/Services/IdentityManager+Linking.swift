@@ -132,15 +132,16 @@ extension IdentityManager {
 			let identityKey = "\(provider.rawValue):\(link.providerID)"
 			let identityPath = "identities/\(identityKey)"
 			
-			do {
-				let s3Manager = S3BackupManager.shared
-				if let s3Service = s3Manager.s3Service {
-					// Note: S3 deletion not implemented yet
-					print("[IdentityManager] Would delete identity mapping: \(identityPath)")
+			let s3Manager = S3BackupManager.shared
+			if let s3Service = s3Manager.s3Service {
+				do {
+					// Delete the identity mapping from S3
+					try await s3Service.deleteObject(at: identityPath)
+					print("[IdentityManager] Successfully deleted identity mapping: \(identityPath)")
+				} catch {
+					print("[IdentityManager] Failed to delete identity mapping: \(error)")
+					// Continue anyway - the local unlinking is more important
 				}
-				print("[IdentityManager] Removed identity mapping: \(identityPath)")
-			} catch {
-				print("[IdentityManager] Failed to remove identity mapping: \(error)")
 			}
 		}
 		
@@ -158,14 +159,28 @@ extension IdentityManager {
 	/// Save user data (wraps the private saveUser method)
 	private func saveUserData(_ user: PhotolalaUser) async throws {
 		// Save to keychain
-		let userData = try JSONEncoder().encode(user)
-		try KeychainManager.shared.save(userData, for: keychainKey)
+		let encoder = JSONEncoder()
+		encoder.dateEncodingStrategy = .iso8601
+		let userData = try encoder.encode(user)
+		
+		// Log data size for debugging
+		print("[IdentityManager] Saving user data to Keychain, size: \(userData.count) bytes")
+		
+		do {
+			try KeychainManager.shared.save(userData, for: keychainKey)
+			print("[IdentityManager] Successfully saved user data to Keychain")
+		} catch {
+			print("[IdentityManager] Failed to save to Keychain: \(error)")
+			// Continue with S3 save even if Keychain fails
+			// The app can still function with S3 persistence
+		}
 		
 		// Save to S3 if available
 		let s3Manager = S3BackupManager.shared
 		if let s3Service = s3Manager.s3Service {
 			let userPath = "users/\(user.serviceUserID)/profile.json"
 			try await s3Service.uploadData(userData, to: userPath)
+			print("[IdentityManager] Successfully saved user data to S3")
 		}
 		
 		// Update published state
@@ -207,7 +222,9 @@ extension IdentityManager {
 		
 		do {
 			let data = try await s3Service.downloadData(from: userPath)
-			let user = try JSONDecoder().decode(PhotolalaUser.self, from: data)
+			let decoder = JSONDecoder()
+			decoder.dateDecodingStrategy = .iso8601
+			let user = try decoder.decode(PhotolalaUser.self, from: data)
 			return user
 		} catch {
 			print("[IdentityManager] Failed to fetch user data: \(error)")
