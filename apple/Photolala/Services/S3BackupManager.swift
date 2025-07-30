@@ -27,7 +27,13 @@ class S3BackupManager: ObservableObject {
 	}
 
 	var userId: String? {
-		IdentityManager.shared.currentUser?.serviceUserID
+		let id = IdentityManager.shared.currentUser?.serviceUserID
+		if id == nil {
+			print("[S3BackupManager] userId computed property returning nil")
+			print("[S3BackupManager] IdentityManager.shared: \(IdentityManager.shared)")
+			print("[S3BackupManager] currentUser: \(String(describing: IdentityManager.shared.currentUser))")
+		}
+		return id
 	}
 
 	private init() {
@@ -82,6 +88,13 @@ class S3BackupManager: ObservableObject {
 	func uploadPhoto(_ photoRef: PhotoFile) async throws {
 		// Check authentication
 		guard let userId else {
+			// Add detailed debugging
+			print("[S3BackupManager] Upload failed - No userId available")
+			print("[S3BackupManager] IdentityManager.isSignedIn: \(IdentityManager.shared.isSignedIn)")
+			print("[S3BackupManager] IdentityManager.currentUser: \(String(describing: IdentityManager.shared.currentUser))")
+			if let user = IdentityManager.shared.currentUser {
+				print("[S3BackupManager] User details - serviceUserID: \(user.serviceUserID), provider: \(user.primaryProvider.rawValue)")
+			}
 			throw S3BackupError.notSignedIn
 		}
 
@@ -136,6 +149,13 @@ class S3BackupManager: ObservableObject {
 	func uploadApplePhoto(_ photo: PhotoApple) async throws {
 		// Check authentication
 		guard let userId else {
+			// Add detailed debugging
+			print("[S3BackupManager] Apple Photo upload failed - No userId available")
+			print("[S3BackupManager] IdentityManager.isSignedIn: \(IdentityManager.shared.isSignedIn)")
+			print("[S3BackupManager] IdentityManager.currentUser: \(String(describing: IdentityManager.shared.currentUser))")
+			if let user = IdentityManager.shared.currentUser {
+				print("[S3BackupManager] User details - serviceUserID: \(user.serviceUserID), provider: \(user.primaryProvider.rawValue)")
+			}
 			throw S3BackupError.notSignedIn
 		}
 		

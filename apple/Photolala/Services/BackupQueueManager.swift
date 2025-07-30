@@ -28,6 +28,11 @@ class BackupQueueManager: ObservableObject {
 	// Photos to delete from S3 (batched)
 	private var photosToDelete: Set<PhotoFile> = []
 	
+	// Retry tracking
+	private var failedAttempts: [String: Int] = [:] // MD5 -> retry count
+	private var lastFailureTime: [String: Date] = [:] // MD5 -> last failure time
+	private let maxRetryAttempts = 3
+	
 	// Catalog service for persistence
 	private let catalogServiceV2: PhotolalaCatalogServiceV2
 
@@ -370,6 +375,9 @@ class BackupQueueManager: ObservableObject {
 				try await uploadPhoto(photo)
 				if let md5 = photo.md5Hash {
 					backupStatus[md5] = .uploaded
+					// Clear retry tracking on success
+					failedAttempts.removeValue(forKey: md5)
+					lastFailureTime.removeValue(forKey: md5)
 				}
 				queuedPhotos.remove(photo)
 				successCount += 1
@@ -378,6 +386,9 @@ class BackupQueueManager: ObservableObject {
 				print("Failed to upload \(photo.displayName): \(error)")
 				if let md5 = photo.md5Hash {
 					backupStatus[md5] = .failed
+					// Track failure attempt
+					failedAttempts[md5] = (failedAttempts[md5] ?? 0) + 1
+					lastFailureTime[md5] = Date()
 					NotificationCenter.default.post(name: NSNotification.Name("BackupQueueChanged"), object: nil)
 				}
 			}
@@ -436,6 +447,13 @@ class BackupQueueManager: ObservableObject {
 					}
 				} catch {
 					print("Failed to upload Apple Photo \(photoID): \(error)")
+					// Track failure attempt for Apple Photos
+					if let applePhoto = await createPhotoApple(from: photoID),
+					   let md5 = await computeApplePhotoMD5(applePhoto) {
+						backupStatus[md5] = .failed
+						failedAttempts[md5] = (failedAttempts[md5] ?? 0) + 1
+						lastFailureTime[md5] = Date()
+					}
 					// Keep in queue for retry
 				}
 				
@@ -690,7 +708,9 @@ class BackupQueueManager: ObservableObject {
 			lastActivityTime: Date(),
 			pathToMD5: pathToMD5,
 			photosToDelete: photosToDelete.compactMap { $0.md5Hash },
-			queuedApplePhotos: Array(queuedApplePhotos)
+			queuedApplePhotos: Array(queuedApplePhotos),
+			failedAttempts: failedAttempts,
+			lastFailureTime: lastFailureTime
 		)
 
 		if let encoded = try? JSONEncoder().encode(state) {
@@ -712,8 +732,33 @@ class BackupQueueManager: ObservableObject {
 
 		// Restore backup status
 		backupStatus = state.backupStatus
+		
+		// Restore retry tracking
+		failedAttempts = state.failedAttempts ?? [:]
+		lastFailureTime = state.lastFailureTime ?? [:]
+		
+		// Reset failed items to queued for retry (with retry limit)
+		var retriedCount = 0
+		var skippedCount = 0
+		for (md5, status) in backupStatus {
+			if status == .failed {
+				let attempts = failedAttempts[md5] ?? 0
+				if attempts < maxRetryAttempts {
+					backupStatus[md5] = .queued
+					retriedCount += 1
+				} else {
+					// Keep as failed if max retries exceeded
+					skippedCount += 1
+					print("[BackupQueueManager] Skipping retry for \(String(md5.prefix(6)))... (failed \(attempts) times)")
+				}
+			}
+		}
+		
 		if !backupStatus.isEmpty {
 			print("[BackupQueueManager] Restored \(backupStatus.count) backup statuses")
+			if retriedCount > 0 {
+				print("[BackupQueueManager] Reset \(retriedCount) failed items to queued for retry")
+			}
 			// Only show failed or queued items that need attention
 			let needsAttention = backupStatus.filter { $0.value == .failed || $0.value == .queued }
 			for (md5, status) in needsAttention {
@@ -780,6 +825,8 @@ private struct QueueState: Codable {
 	let pathToMD5: [String: String]? // Optional for backward compatibility
 	let photosToDelete: [String]? // MD5 hashes of photos to delete (optional for backward compatibility)
 	let queuedApplePhotos: [String]? // Apple Photo IDs (optional for backward compatibility)
+	let failedAttempts: [String: Int]? // MD5 -> retry count (optional for backward compatibility)
+	let lastFailureTime: [String: Date]? // MD5 -> last failure time (optional for backward compatibility)
 }
 
 enum BackupError: LocalizedError {

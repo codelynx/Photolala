@@ -177,4 +177,20 @@ class S3Service @Inject constructor(
             Result.failure(e)
         }
     }
+    
+    /**
+     * Delete any object from S3
+     * @param key The S3 key of the object to delete
+     */
+    suspend fun deleteObject(key: String): Result<Unit> = withContext(Dispatchers.IO) {
+        try {
+            android.util.Log.d("S3Service", "Deleting object at: $key")
+            s3Client.deleteObject(BUCKET_NAME, key)
+            android.util.Log.d("S3Service", "Successfully deleted object: $key")
+            Result.success(Unit)
+        } catch (e: Exception) {
+            android.util.Log.e("S3Service", "Failed to delete object $key: ${e.message}", e)
+            Result.failure(e)
+        }
+    }
 }

@@ -1,10 +1,24 @@
 ## 📍 PROJECT STATUS REPORT
 
-Last Updated: July 4, 2025
+Last Updated: July 30, 2025
 
-### 🚀 Current Status: Authentication System & Cross-Platform Identity Management
+### 🚀 Current Status: Multi-Provider Account Linking
 
-The application now has a complete authentication system with explicit sign-up/sign-in flows, S3-based identity persistence for cross-device authentication, and platform-specific UI implementations. The system supports Apple Sign In with provider ID to UUID mapping, enabling users to sign in from any device while maintaining consistent identity.
+The application now supports linking multiple authentication providers (Apple ID and Google) to a single Photolala account. Users can sign in with either provider to access the same photos, subscriptions, and data. The implementation includes complete provider unlinking with S3 cleanup, modern UI design, and fallback authentication methods for enhanced reliability.
+
+## 🆕 Recent Updates
+
+### July 30, 2025: Account Linking Feature (iOS/macOS/Android)
+- ✅ Multi-provider authentication - link Apple ID and Google to same account
+- ✅ Web-based OAuth fallback for Google Sign-In keychain errors (iOS/macOS)
+- ✅ Complete provider unlinking with S3 identity mapping deletion
+- ✅ Modern UI design:
+  - iOS/macOS: Card-based AccountSettingsView with gradients
+  - Android: Material3 AccountSettingsScreen with consistent UX
+- ✅ Graceful Keychain failure handling with S3 persistence fallback
+- ✅ Confirmation dialogs for destructive actions
+- ✅ Full platform parity across iOS, macOS, and Android
+- ✅ Documentation of UX decisions and implementation details
 
 ### ✅ Completed Features
 
@@ -1539,3 +1553,47 @@ The application now has a complete authentication system with explicit sign-up/s
      - ✅ Android users can access same S3 cloud data
      - ✅ UI shows proper signed-in state
      - ✅ Navigation flow works end-to-end
+
+58. **Account Linking Feature Implementation (July 30)**:
+   - **Multi-Provider Authentication**:
+     - Users can link both Apple ID and Google accounts to same Photolala account
+     - Sign in with either provider to access same photos and subscription
+     - Identity mapping: `identities/provider:id` → Photolala UUID
+   
+   - **UI Implementation**:
+     - LinkedProvidersView shows all connected sign-in methods
+     - LinkProviderSheet for adding new providers
+     - Modern card-based AccountSettingsView with gradients and shadows
+     - Access via user menu → "Account Settings..."
+   
+   - **Backend Support**:
+     - linkProvider() method in IdentityManager handles authentication and linking
+     - Prevents linking providers already used by other accounts
+     - Complete unlinking with S3 identity mapping deletion
+     - PhotolalaUser model supports multiple providers via linkedProviders array
+   
+   - **Google Sign-In Keychain Fix**:
+     - Added web-based OAuth fallback when SDK keychain access fails
+     - Implements authorization code flow with JWT decoding
+     - Made Keychain save failures non-fatal (S3 persistence sufficient)
+     - Fixed entitlements for keychain access groups
+   
+   - **Error Handling**:
+     - Clear error messages for conflicts
+     - Prevents duplicate provider linking
+     - Protects against removing last sign-in method
+     - Confirmation dialogs for destructive actions
+   
+   - **Documentation**:
+     - Created docs/features/authentication/account-linking.md
+     - Added UX decisions rationale documentation
+     - Complete user guide and technical details
+     - Security considerations documented
+   
+   - **Android Implementation (July 30)**:
+     - Full account linking/unlinking support in IdentityManager
+     - Material3 AccountSettingsScreen with modern design
+     - S3Service.deleteObject() for identity cleanup
+     - Google Sign-In and Apple Sign-In integration for linking
+     - Navigation and deep link handling
+     - Complete error handling and validation

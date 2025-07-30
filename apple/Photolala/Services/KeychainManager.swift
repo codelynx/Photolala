@@ -32,6 +32,14 @@ class KeychainManager {
 		let status = SecItemAdd(query as CFDictionary, nil)
 
 		guard status == errSecSuccess else {
+			print("[KeychainManager] Failed to save item. Status: \(status)")
+			if status == errSecAuthFailed {
+				print("[KeychainManager] Authentication failed - may need to unlock keychain")
+			} else if status == errSecDuplicateItem {
+				print("[KeychainManager] Duplicate item - this shouldn't happen as we delete first")
+			} else if status == -25308 {
+				print("[KeychainManager] User interaction not allowed - app may need keychain entitlement")
+			}
 			throw KeychainError.unhandledError(status: status)
 		}
 	}

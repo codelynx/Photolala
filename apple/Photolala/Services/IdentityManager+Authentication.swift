@@ -59,6 +59,7 @@ extension IdentityManager {
 			await MainActor.run {
 				self.currentUser = updatedUser
 				self.isSignedIn = true
+				print("[IdentityManager] Sign in successful - User set: \(updatedUser.serviceUserID), provider: \(updatedUser.primaryProvider.rawValue)")
 			}
 			return updatedUser
 			
@@ -106,6 +107,7 @@ extension IdentityManager {
 			await MainActor.run {
 				self.currentUser = newUser
 				self.isSignedIn = true
+				print("[IdentityManager] Account created - User set: \(newUser.serviceUserID), provider: \(newUser.primaryProvider.rawValue)")
 			}
 			return newUser
 		}
@@ -343,14 +345,22 @@ extension IdentityManager {
 			return nil
 		}
 		
-		return try? JSONDecoder().decode(LegacyPhotolalaUser.self, from: userData)
+		let decoder = JSONDecoder()
+		decoder.dateDecodingStrategy = .iso8601
+		return try? decoder.decode(LegacyPhotolalaUser.self, from: userData)
 	}
 	
 	private func saveUser(_ user: PhotolalaUser) async throws {
 		let encoder = JSONEncoder()
 		encoder.dateEncodingStrategy = .iso8601
 		let userData = try encoder.encode(user)
-		try KeychainManager.shared.save(userData, for: keychainKey)
+		
+		do {
+			try KeychainManager.shared.save(userData, for: keychainKey)
+		} catch {
+			print("[IdentityManager] Keychain save failed: \(error), continuing anyway")
+			// Don't throw - S3 persistence is sufficient
+		}
 	}
 	
 	private func createS3UserFolders(for user: PhotolalaUser) async throws {

@@ -37,6 +37,7 @@ fun WelcomeScreen(
 	onCloudBrowserClick: () -> Unit = {},
 	onSignInClick: () -> Unit = {},
 	onCreateAccountClick: () -> Unit = {},
+	onAccountSettingsClick: () -> Unit = {},
 	viewModel: WelcomeViewModel = hiltViewModel()
 ) {
 	val currentUser by viewModel.currentUser.collectAsStateWithLifecycle()
@@ -108,7 +109,11 @@ fun WelcomeScreen(
 		// Show sign-in status if signed in
 		if (isSignedIn && currentUser != null) {
 			Spacer(modifier = Modifier.height(24.dp))
-			SignedInCard(user = currentUser!!, onSignOut = viewModel::signOut)
+			SignedInCard(
+				user = currentUser!!,
+				onSignOut = viewModel::signOut,
+				onAccountSettings = onAccountSettingsClick
+			)
 		}
 		
 		Spacer(modifier = Modifier.height(48.dp))
@@ -251,7 +256,8 @@ fun WelcomeScreen(
 @Composable
 fun SignedInCard(
 	user: PhotolalaUser,
-	onSignOut: () -> Unit
+	onSignOut: () -> Unit,
+	onAccountSettings: () -> Unit = {}
 ) {
 	Column(
 		modifier = Modifier.fillMaxWidth(),
@@ -294,14 +300,26 @@ fun SignedInCard(
 		
 		Spacer(modifier = Modifier.height(16.dp))
 		
-		// Sign Out Button
-		TextButton(
-			onClick = onSignOut,
-			colors = ButtonDefaults.textButtonColors(
-				contentColor = MaterialTheme.colorScheme.error
-			)
+		// Action buttons
+		Row(
+			horizontalArrangement = Arrangement.spacedBy(16.dp)
 		) {
-			Text("Sign Out")
+			// Account Settings Button
+			OutlinedButton(
+				onClick = onAccountSettings
+			) {
+				Text("Account Settings")
+			}
+			
+			// Sign Out Button
+			TextButton(
+				onClick = onSignOut,
+				colors = ButtonDefaults.textButtonColors(
+					contentColor = MaterialTheme.colorScheme.error
+				)
+			) {
+				Text("Sign Out")
+			}
 		}
 	}
 }
