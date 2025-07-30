@@ -4,6 +4,7 @@ struct UserAccountView: View {
 	@StateObject private var identityManager = IdentityManager.shared
 	@StateObject private var s3BackupManager = S3BackupManager.shared
 	@State private var showingSignOut = false
+	@State private var showingAccountSettings = false
 
 	var body: some View {
 		Group {
@@ -31,6 +32,10 @@ struct UserAccountView: View {
 						Divider()
 
 						// Actions
+						Button("Account Settings...") {
+							showingAccountSettings = true
+						}
+						
 						Button("Manage Subscription") {
 							// Show subscription view
 						}
@@ -62,6 +67,10 @@ struct UserAccountView: View {
 			}
 		} message: {
 			Text("Are you sure you want to sign out? You'll need to sign in again to backup photos.")
+		}
+		.sheet(isPresented: $showingAccountSettings) {
+			AccountSettingsView()
+				.environmentObject(identityManager)
 		}
 		.task {
 			await self.s3BackupManager.updateStorageInfo()

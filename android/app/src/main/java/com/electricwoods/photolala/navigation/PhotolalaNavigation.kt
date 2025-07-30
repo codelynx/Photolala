@@ -10,6 +10,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import com.electricwoods.photolala.ui.screens.AccountSettingsScreen
 import com.electricwoods.photolala.ui.screens.AuthenticationScreen
 import com.electricwoods.photolala.ui.screens.CloudBrowserScreen
 import com.electricwoods.photolala.ui.screens.PhotoGridScreen
@@ -17,6 +18,8 @@ import com.electricwoods.photolala.ui.screens.PhotoViewerScreen
 import com.electricwoods.photolala.ui.screens.WelcomeScreen
 import com.electricwoods.photolala.ui.viewmodels.AuthenticationViewModel
 import com.electricwoods.photolala.ui.viewmodels.PhotoGridViewModel
+import com.electricwoods.photolala.viewmodels.AccountSettingsViewModel
+import androidx.compose.runtime.collectAsState
 
 object PhotolalaNavigation {
 	// Static reference to handle Google Sign-In result
@@ -24,6 +27,9 @@ object PhotolalaNavigation {
 	
 	// Track if we were in create account flow when Apple Sign-In was triggered
 	internal var wasInCreateAccountFlow: Boolean = false
+	
+	// Track if we were in account linking flow
+	internal var wasInAccountLinkingFlow: Boolean = false
 	
 	fun handleGoogleSignInResult(data: Intent?) {
 		pendingGoogleSignInHandler?.invoke(data)
@@ -65,6 +71,9 @@ fun PhotolalaNavigation(
 				},
 				onCreateAccountClick = {
 					navController.navigate(PhotolalaRoute.CreateAccount.route)
+				},
+				onAccountSettingsClick = {
+					navController.navigate(PhotolalaRoute.AccountSettings.route)
 				}
 			)
 		}
@@ -200,6 +209,34 @@ fun PhotolalaNavigation(
 				}
 			)
 		}
+		
+		composable(PhotolalaRoute.AccountSettings.route) {
+			val viewModel: AccountSettingsViewModel = hiltViewModel()
+			val uiState by viewModel.uiState.collectAsState()
+			
+			// Handle Google Sign-In for linking
+			LaunchedEffect(uiState.pendingLinkProvider) {
+				if (uiState.pendingLinkProvider == com.electricwoods.photolala.models.AuthProvider.GOOGLE) {
+					val intent = viewModel.getGoogleSignInIntent()
+					if (intent != null) {
+						PhotolalaNavigation.pendingGoogleSignInHandler = { data ->
+							viewModel.handleGoogleSignInResult(data)
+						}
+						googleSignInLauncher.launch(intent)
+					}
+				} else if (uiState.pendingLinkProvider == com.electricwoods.photolala.models.AuthProvider.APPLE) {
+					// Mark that we're in account linking flow
+					PhotolalaNavigation.wasInAccountLinkingFlow = true
+				}
+			}
+			
+			AccountSettingsScreen(
+				onNavigateBack = {
+					navController.popBackStack()
+				},
+				viewModel = viewModel
+			)
+		}
 	}
 }
 
@@ -212,4 +249,5 @@ sealed class PhotolalaRoute(val route: String) {
 	object SignIn : PhotolalaRoute("sign_in")
 	object CreateAccount : PhotolalaRoute("create_account")
 	object CloudBrowser : PhotolalaRoute("cloud_browser")
+	object AccountSettings : PhotolalaRoute("account_settings")
 }

@@ -4,6 +4,8 @@
 
 The account linking feature allows users to connect multiple sign-in methods (Apple ID and Google) to a single Photolala account. This provides flexibility and redundancy - users can sign in with either method and access the same photos, backup storage, and subscription.
 
+**Supported Platforms**: iOS, macOS, Android
+
 ## User Benefits
 
 - **Flexibility**: Sign in with whichever method is most convenient
@@ -65,9 +67,15 @@ struct PhotolalaUser {
 
 ### Key Components
 
+#### iOS/macOS
 1. **LinkedProvidersView.swift**: Main UI for managing linked accounts
 2. **IdentityManager+Authentication.swift**: `linkProvider()` method handles the linking process
 3. **IdentityManager+Linking.swift**: Helper methods for account discovery and management
+
+#### Android
+1. **AccountSettingsScreen.kt**: Material3 UI for managing linked accounts
+2. **IdentityManager.kt**: Enhanced with `linkProvider()`, `unlinkProvider()`, and completion methods
+3. **AccountSettingsViewModel.kt**: Manages UI state and authentication flows
 
 ### Error Handling
 

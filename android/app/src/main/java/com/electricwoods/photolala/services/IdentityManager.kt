@@ -701,6 +701,251 @@ class IdentityManager @Inject constructor(
 		}
 	}
 	
+	// Link a new provider to the current user account
+	suspend fun linkProvider(provider: AuthProvider): Result<PhotolalaUser> {
+		// Must be signed in to link a provider
+		val currentUser = _currentUser.value ?: return Result.failure(
+			AuthException.AuthenticationFailed("Must be signed in to link a provider")
+		)
+		
+		_isLoading.value = true
+		_errorMessage.value = null
+		
+		try {
+			// Check if provider is already linked
+			if (currentUser.primaryProvider == provider || 
+				currentUser.linkedProviders.any { it.provider == provider }) {
+				return Result.failure(
+					AuthException.ProviderAlreadyLinked(provider)
+				)
+			}
+			
+			// Authenticate with the provider
+			val credential = when (provider) {
+				AuthProvider.GOOGLE -> {
+					// For Google, we need to trigger the sign-in flow
+					// This will be handled by the UI layer
+					return Result.failure(AuthException.GoogleSignInPending)
+				}
+				AuthProvider.APPLE -> {
+					// For Apple, we need to trigger the sign-in flow
+					return Result.failure(AuthException.AppleSignInPending)
+				}
+			}
+		} catch (e: Exception) {
+			_errorMessage.value = e.message
+			return Result.failure(e)
+		} finally {
+			_isLoading.value = false
+		}
+	}
+	
+	// Complete the provider linking after authentication
+	suspend fun completeLinkProvider(credential: AuthCredential): Result<PhotolalaUser> {
+		val currentUser = _currentUser.value ?: return Result.failure(
+			AuthException.AuthenticationFailed("Must be signed in to link a provider")
+		)
+		
+		_isLoading.value = true
+		_errorMessage.value = null
+		
+		try {
+			// Check if this provider ID is already used by another account
+			val existingUser = findUserByProviderID(credential.provider, credential.providerID)
+			if (existingUser != null && existingUser.serviceUserID != currentUser.serviceUserID) {
+				return Result.failure(
+					AuthException.ProviderInUse(credential.provider)
+				)
+			}
+			
+			// Create the provider link
+			val providerLink = ProviderLink(
+				provider = credential.provider,
+				providerID = credential.providerID,
+				email = credential.email,
+				linkedAt = Date(),
+				linkMethod = LinkMethod.USER_INITIATED
+			)
+			
+			// Update user with new provider
+			val updatedUser = currentUser.copy(
+				linkedProviders = currentUser.linkedProviders + providerLink,
+				lastUpdated = Date()
+			)
+			
+			// Create S3 identity mapping
+			val identityKey = "${credential.provider.value}:${credential.providerID}"
+			val identityPath = "identities/$identityKey"
+			val uuidData = currentUser.serviceUserID.toByteArray()
+			
+			val uploadResult = s3Service.uploadData(uuidData, identityPath)
+			if (uploadResult.isFailure) {
+				return Result.failure(
+					AuthException.StorageError
+				)
+			}
+			
+			// Save updated user
+			saveUser(updatedUser)
+			_currentUser.value = updatedUser
+			
+			return Result.success(updatedUser)
+		} catch (e: Exception) {
+			_errorMessage.value = e.message
+			return Result.failure(e)
+		} finally {
+			_isLoading.value = false
+		}
+	}
+	
+	// Unlink a provider from the current user account
+	suspend fun unlinkProvider(provider: AuthProvider): Result<PhotolalaUser> {
+		val currentUser = _currentUser.value ?: return Result.failure(
+			AuthException.AuthenticationFailed("Must be signed in to unlink a provider")
+		)
+		
+		_isLoading.value = true
+		_errorMessage.value = null
+		
+		try {
+			// Find the provider to unlink
+			val providerLink = currentUser.linkedProviders.find { it.provider == provider }
+			if (providerLink == null) {
+				// Check if it's the primary provider
+				if (currentUser.primaryProvider != provider) {
+					return Result.failure(
+						AuthException.ProviderNotLinked(provider)
+					)
+				}
+			}
+			
+			// Cannot unlink the last provider
+			if (currentUser.linkedProviders.isEmpty() && currentUser.primaryProvider == provider) {
+				return Result.failure(
+					AuthException.CannotUnlinkLastProvider
+				)
+			}
+			
+			// Get the provider ID to delete
+			val providerID = if (provider == currentUser.primaryProvider) {
+				currentUser.primaryProviderID
+			} else {
+				providerLink?.providerID ?: return Result.failure(
+					AuthException.UnknownError
+				)
+			}
+			
+			// Delete S3 identity mapping
+			val identityKey = "${provider.value}:$providerID"
+			val identityPath = "identities/$identityKey"
+			
+			val deleteResult = s3Service.deleteObject(identityPath)
+			if (deleteResult.isFailure) {
+				android.util.Log.e("IdentityManager", "Failed to delete S3 identity mapping: ${deleteResult.exceptionOrNull()?.message}")
+				// Continue anyway - S3 deletion failure shouldn't prevent unlinking
+			}
+			
+			// Update user by removing the provider
+			val updatedUser = currentUser.copy(
+				linkedProviders = currentUser.linkedProviders.filter { it.provider != provider },
+				lastUpdated = Date()
+			)
+			
+			// Save updated user
+			saveUser(updatedUser)
+			_currentUser.value = updatedUser
+			
+			return Result.success(updatedUser)
+		} catch (e: Exception) {
+			_errorMessage.value = e.message
+			return Result.failure(e)
+		} finally {
+			_isLoading.value = false
+		}
+	}
+	
+	// Handle Google Sign-In result for linking
+	suspend fun handleGoogleLinkResult(data: Intent?): Result<PhotolalaUser> {
+		_isLoading.value = true
+		_errorMessage.value = null
+		
+		return try {
+			// Get the credential from the sign-in result
+			val credentialResult = googleSignInLegacyService.handleSignInResult(data)
+			
+			if (credentialResult.isFailure) {
+				val error = credentialResult.exceptionOrNull()
+				val authException = when (error) {
+					is GoogleAuthException.UserCancelled -> AuthException.UserCancelled
+					is GoogleAuthException.ConfigurationError -> AuthException.ConfigurationError(error.message)
+					is GoogleAuthException.NetworkError -> AuthException.NetworkError
+					else -> AuthException.AuthenticationFailed(error?.message ?: "Google Sign-In failed")
+				}
+				
+				if (authException !is AuthException.UserCancelled) {
+					_errorMessage.value = authException.message
+				}
+				return Result.failure(authException)
+			}
+			
+			val credential = credentialResult.getOrThrow()
+			completeLinkProvider(credential)
+		} catch (e: Exception) {
+			val authError = if (e is AuthException) e else AuthException.AuthenticationFailed(e.message ?: "Unknown error")
+			if (authError !is AuthException.UserCancelled) {
+				_errorMessage.value = authError.message
+			}
+			Result.failure(authError)
+		} finally {
+			_isLoading.value = false
+		}
+	}
+	
+	// Handle Apple Sign-In callback for linking
+	suspend fun handleAppleLinkCallback(uri: Uri): Result<PhotolalaUser> {
+		android.util.Log.d("IdentityManager", "=== APPLE LINK CALLBACK START ===")
+		
+		_isLoading.value = true
+		_errorMessage.value = null
+		
+		return try {
+			// Let AppleAuthService handle the callback
+			if (!appleAuthService.handleCallback(uri)) {
+				return Result.failure(AuthException.AuthenticationFailed("Invalid callback"))
+			}
+			
+			// Wait for the auth state to update
+			val authState = appleAuthService.authState
+				.first { state -> 
+					state !is AppleAuthState.Loading && state !is AppleAuthState.Idle 
+				}
+			
+			when (authState) {
+				is AppleAuthState.Success -> {
+					val credential = authState.credential
+					completeLinkProvider(credential)
+				}
+				is AppleAuthState.Cancelled -> {
+					_isLoading.value = false
+					Result.failure(AuthException.UserCancelled)
+				}
+				is AppleAuthState.Error -> {
+					_isLoading.value = false
+					_errorMessage.value = authState.error.message
+					Result.failure(AuthException.AuthenticationFailed(authState.error.message))
+				}
+				else -> {
+					_isLoading.value = false
+					Result.failure(AuthException.UnknownError)
+				}
+			}
+		} catch (e: Exception) {
+			_isLoading.value = false
+			_errorMessage.value = e.message
+			Result.failure(e)
+		}
+	}
+	
 	// Sign out
 	fun signOut() {
 		_currentUser.value = null
@@ -763,6 +1008,22 @@ sealed class AuthException : Exception() {
 	
 	object AppleSignInPending : AuthException() {
 		override val message = "Apple Sign-In requires browser interaction"
+	}
+	
+	data class ProviderAlreadyLinked(val provider: AuthProvider) : AuthException() {
+		override val message = "${provider.displayName} is already linked to your account"
+	}
+	
+	data class ProviderInUse(val provider: AuthProvider) : AuthException() {
+		override val message = "This ${provider.displayName} account is already linked to a different Photolala account"
+	}
+	
+	data class ProviderNotLinked(val provider: AuthProvider) : AuthException() {
+		override val message = "${provider.displayName} is not linked to your account"
+	}
+	
+	object CannotUnlinkLastProvider : AuthException() {
+		override val message = "Cannot remove your only sign-in method"
 	}
 }
 

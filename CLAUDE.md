@@ -103,6 +103,9 @@ Photolala/
   - Unified photo browser architecture supporting multiple sources
   - Bookmark feature with emoji marking (❤️ 👍 👎 ✏️ 🗑️ 📤 🖨️ ✅ 🔴 📌 💡)
   - MD5-based photo identification for bookmarks
+  - Multi-provider authentication (Apple ID and Google)
+  - Account linking across providers with S3 identity mapping
+  - Cross-platform account settings UI
 
 ## Navigation Architecture
 
@@ -120,10 +123,12 @@ Photolala/
 - Touch-optimized interactions
 
 ### Android
-- Welcome screen for initial folder selection
+- Welcome screen with sign-in status
+- Account Settings accessible when signed in
 - Jetpack Navigation for navigation flow
 - Material3 design system
 - Touch-optimized interactions
+- Deep link handling for Apple Sign-In callbacks
 
 ## Documentation Structure
 
@@ -191,11 +196,16 @@ To update AWS credentials:
 # Edit credentials
 vim .credential-code/credentials.json
 
-# Regenerate encrypted file
+# For iOS/macOS:
 .credential-code-tool/.build/release/credential-code generate --language swift
+mv Generated/Credentials.swift apple/Photolala/Utilities/
 
-# Move to project
-mv Generated/Credentials.swift Photolala/Utilities/
+# For Android:
+.credential-code-tool/.build/release/credential-code generate --language kotlin
+mv Generated/Credentials.kt android/app/src/main/java/com/electricwoods/photolala/utils/
+
+# Or use the convenience script:
+./scripts/generate-credentials.sh
 ```
 
 ## Pricing Strategy

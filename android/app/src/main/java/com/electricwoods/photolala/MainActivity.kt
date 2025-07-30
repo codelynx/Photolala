@@ -71,9 +71,21 @@ class MainActivity : ComponentActivity() {
 			if (uri.scheme == "photolala" && uri.host == "auth" && uri.path == "/apple") {
 				android.util.Log.d("MainActivity", "=== APPLE DEEP LINK DETECTED ===")
 				android.util.Log.d("MainActivity", "Processing Apple Sign-In callback...")
-				lifecycleScope.launch {
-					val result = identityManager.handleAppleSignInCallback(uri)
-					android.util.Log.d("MainActivity", "Apple callback result: ${if (result.isSuccess) "SUCCESS" else "FAILURE: ${result.exceptionOrNull()?.message}"}")
+				
+				// Check if we're in account linking flow
+				if (PhotolalaNavigation.wasInAccountLinkingFlow) {
+					android.util.Log.d("MainActivity", "In account linking flow")
+					lifecycleScope.launch {
+						val result = identityManager.handleAppleLinkCallback(uri)
+						android.util.Log.d("MainActivity", "Apple link callback result: ${if (result.isSuccess) "SUCCESS" else "FAILURE: ${result.exceptionOrNull()?.message}"}")
+						PhotolalaNavigation.wasInAccountLinkingFlow = false
+					}
+				} else {
+					// Regular sign-in flow
+					lifecycleScope.launch {
+						val result = identityManager.handleAppleSignInCallback(uri)
+						android.util.Log.d("MainActivity", "Apple callback result: ${if (result.isSuccess) "SUCCESS" else "FAILURE: ${result.exceptionOrNull()?.message}"}")
+					}
 				}
 			}
 		}
