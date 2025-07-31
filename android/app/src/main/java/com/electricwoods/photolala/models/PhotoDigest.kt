@@ -1,8 +1,14 @@
 package com.electricwoods.photolala.models
 
+import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.Transient
+import kotlinx.serialization.descriptors.PrimitiveKind
+import kotlinx.serialization.descriptors.PrimitiveSerialDescriptor
+import kotlinx.serialization.encoding.Decoder
+import kotlinx.serialization.encoding.Encoder
 import java.time.Instant
+import java.util.Base64
 
 /**
  * PhotoDigest - Unified representation of thumbnail + metadata
@@ -116,13 +122,6 @@ data class FileIdentityKey(
 }
 
 // Custom serializers for kotlinx.serialization
-import kotlinx.serialization.KSerializer
-import kotlinx.serialization.descriptors.PrimitiveKind
-import kotlinx.serialization.descriptors.PrimitiveSerialDescriptor
-import kotlinx.serialization.encoding.Decoder
-import kotlinx.serialization.encoding.Encoder
-import java.util.Base64
-
 object ByteArraySerializer : KSerializer<ByteArray> {
 	override val descriptor = PrimitiveSerialDescriptor("ByteArray", PrimitiveKind.STRING)
 	
