@@ -96,6 +96,7 @@ Photolala/
   - NavigationStack for folder hierarchy navigation
   - Native collection views (NSCollectionView/UICollectionView)
   - Star-based backup queue system (supports both local and Apple Photos)
+  - 1-minute backup timer (was 5 minutes, now aligned across platforms)
   - Platform-specific navigation patterns
   - No welcome screen on macOS (opens directly to browser)
   - Multi-window support on macOS
@@ -106,6 +107,7 @@ Photolala/
   - Multi-provider authentication (Apple ID and Google)
   - Account linking across providers with S3 identity mapping
   - Cross-platform account settings UI
+  - Catalog.json support for Android (CSV format matching iOS)
 
 ## Navigation Architecture
 

@@ -27,7 +27,8 @@ class IdentityManager @Inject constructor(
 	private val preferencesManager: PreferencesManager,
 	private val googleSignInLegacyService: GoogleSignInLegacyService,
 	private val appleAuthService: AppleAuthService,
-	private val authEventBus: AuthenticationEventBus
+	private val authEventBus: AuthenticationEventBus,
+	private val catalogService: CatalogService
 ) {
 	private val json = Json { 
 		ignoreUnknownKeys = true
@@ -634,9 +635,12 @@ class IdentityManager @Inject constructor(
 		
 		// Store the UUID as content of the identity file
 		val uuidData = user.serviceUserID.toByteArray()
-		s3Service.uploadData(uuidData, identityPath)
+		s3Service.uploadData(uuidData, identityPath, "text/plain")
 		
 		println("Created identity mapping: $identityPath -> ${user.serviceUserID}")
+		
+		// Create empty catalog for new user
+		catalogService.createEmptyCatalog(user.serviceUserID)
 	}
 	
 	// Save user to secure storage

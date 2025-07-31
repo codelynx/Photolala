@@ -1612,4 +1612,37 @@ The application now supports linking multiple authentication providers (Apple ID
      - S3Service.deleteObject() for identity cleanup
      - Google Sign-In and Apple Sign-In integration for linking
      - Navigation and deep link handling
+
+59. **Android Catalog and Backup Timer Improvements (July 31)**:
+   - **Backup Timer Alignment**:
+     - Changed backup timer from 5 minutes to 1 minute (matching iOS)
+     - Made timer configurable (15s debug, 1min production) - planned for future
+     - Currently using 1 minute for all builds
+     - Both iOS and Android now use consistent timing
+   
+   - **Catalog.json Implementation**:
+     - Created CatalogService.kt matching iOS PhotolalaCatalogServiceV2
+     - CSV format with headers: `md5,filename,size,photodate,modified,width,height,applephotoid`
+     - Creates empty catalog for new users on sign-up
+     - Updates catalog after successful photo uploads
+     - S3PhotoProvider parses CSV catalog with fallback to object listing
+   
+   - **Bug Fixes**:
+     - Fixed S3 path mismatch in cloud browser (missing "users/" prefix)
+     - Added debug logging for S3 operations
+     - Handle catalog update cancellation due to backup state changes
+   
+   - **Current Status**:
+     - ✅ Photos upload to S3 after 1 minute of starring
+     - ✅ Cloud browser displays uploaded photos via object listing
+     - ✅ Catalog.json created for new users
+     - ✅ Catalog updated after uploads (with minor race condition)
+     - ❌ Thumbnail generation during upload (TODO)
+     - ⚠️ Catalog update race condition when backup state changes
+   
+   - **Technical Details**:
+     - BackupQueueManager monitors starred photos with Flow
+     - Uploads in batches of 10 photos
+     - MD5-based file naming in S3
+     - Proper S3 path structure: `users/{userId}/photos/{md5}.jpg`
      - Complete error handling and validation

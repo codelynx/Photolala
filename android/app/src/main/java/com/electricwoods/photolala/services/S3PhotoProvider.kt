@@ -9,6 +9,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.withContext
+import android.util.Log
 import java.util.Date
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -57,11 +58,11 @@ class S3PhotoProvider @Inject constructor(
             if (catalogData.isSuccess) {
                 // Parse catalog and create PhotoS3 objects
                 // TODO: Implement catalog parsing
-                return@withContext parseCatalog(catalogData.getOrNull())
+                return@withContext parseCatalog(catalogData.getOrNull(), userId)
             }
             
             // Fallback: List objects directly from S3
-            val userPrefix = "$userId/$PHOTOS_PREFIX"
+            val userPrefix = "users/$userId/$PHOTOS_PREFIX"
             var continuationToken: String? = null
             
             do {
@@ -76,12 +77,16 @@ class S3PhotoProvider @Inject constructor(
                 
                 val result = s3Client.listObjectsV2(listRequest)
                 
+                Log.d("S3PhotoProvider", "ListObjectsV2 returned ${result.objectSummaries.size} objects for prefix: $userPrefix")
+                
                 result.objectSummaries.forEach { summary ->
+                    Log.d("S3PhotoProvider", "Found object: ${summary.key} (size: ${summary.size})")
                     if (summary.key.endsWith(".jpg", true) || 
                         summary.key.endsWith(".jpeg", true) || 
                         summary.key.endsWith(".png", true)) {
                         
                         photos.add(createPhotoS3FromSummary(summary, userId))
+                        Log.d("S3PhotoProvider", "Added photo: ${summary.key}")
                     }
                 }
                 
@@ -90,9 +95,11 @@ class S3PhotoProvider @Inject constructor(
             
         } catch (e: Exception) {
             // Handle errors - return empty list or cached data
+            Log.e("S3PhotoProvider", "Error listing photos", e)
             e.printStackTrace()
         }
         
+        Log.d("S3PhotoProvider", "Returning ${photos.size} photos from S3")
         return@withContext photos.sortedByDescending { it.creationDate }
     }
     
@@ -122,15 +129,61 @@ class S3PhotoProvider @Inject constructor(
     }
     
     /**
-     * Parse catalog JSON to create PhotoS3 objects
-     * TODO: Implement based on catalog format
+     * Parse catalog CSV to create PhotoS3 objects
+     * Format: md5,filename,size,photodate,modified,width,height,applephotoid
      */
-    private fun parseCatalog(catalogData: ByteArray?): List<PhotoS3> {
+    private fun parseCatalog(catalogData: ByteArray?, userId: String): List<PhotoS3> {
         if (catalogData == null) return emptyList()
         
-        // TODO: Parse JSON catalog
-        // For now, return empty list
-        return emptyList()
+        return try {
+            val content = String(catalogData)
+            val lines = content.lines()
+            
+            if (lines.isEmpty()) return emptyList()
+            
+            // Skip header line and parse remaining entries
+            lines.drop(1)
+                .filter { it.isNotBlank() }
+                .mapNotNull { line ->
+                    parseCatalogLine(line, userId)
+                }
+        } catch (e: Exception) {
+            Log.e("S3PhotoProvider", "Failed to parse catalog", e)
+            emptyList()
+        }
+    }
+    
+    /**
+     * Parse a single catalog CSV line
+     */
+    private fun parseCatalogLine(line: String, userId: String): PhotoS3? {
+        return try {
+            val parts = line.split(",")
+            if (parts.size < 7) return null
+            
+            val md5 = parts[0]
+            val filename = parts[1]
+            val size = parts[2].toLongOrNull() ?: 0L
+            val width = parts[5].toIntOrNull() ?: 0
+            val height = parts[6].toIntOrNull() ?: 0
+            
+            PhotoS3(
+                id = md5,
+                photoKey = "users/$userId/photos/$md5.jpg",
+                thumbnailKey = "users/$userId/thumbnails/$md5.jpg",
+                filename = filename,
+                fileSize = size,
+                width = width,
+                height = height,
+                creationDate = Date(),
+                modificationDate = Date(),
+                md5Hash = md5,
+                archiveStatus = ArchiveStatus.STANDARD
+            )
+        } catch (e: Exception) {
+            Log.e("S3PhotoProvider", "Failed to parse catalog line: $line", e)
+            null
+        }
     }
     
     /**

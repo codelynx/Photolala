@@ -10,6 +10,7 @@ import com.electricwoods.photolala.models.BackupState
 import com.electricwoods.photolala.models.PhotoMediaStore
 import com.electricwoods.photolala.repositories.PhotoRepository
 import com.electricwoods.photolala.utils.MD5Calculator
+import com.electricwoods.photolala.utils.ThumbnailGenerator
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
@@ -29,12 +30,15 @@ class BackupQueueManager @Inject constructor(
 	private val photoRepository: PhotoRepository,
 	private val identityManager: IdentityManager,
 	private val mediaStoreService: MediaStoreService,
+	private val catalogService: CatalogService,
+	private val thumbnailGenerator: ThumbnailGenerator,
 	@IoDispatcher private val ioDispatcher: CoroutineDispatcher
 ) {
 	companion object {
 		private const val TAG = "BackupQueueManager"
 		private const val BATCH_SIZE = 10
-		private const val INACTIVITY_DELAY_MS = 5 * 60 * 1000L // 5 minutes
+		// For now, use 1 minute for all builds until we can access BuildConfig
+		private const val INACTIVITY_DELAY_MS = 60 * 1000L // 1 minute
 		private const val RETRY_DELAY_MS = 30 * 1000L // 30 seconds
 	}
 	
@@ -63,10 +67,17 @@ class BackupQueueManager @Inject constructor(
 		// Monitor starred photos and start backup after inactivity
 		scope.launch {
 			photoRepository.getStarredPhotos()
+				.map { photos -> 
+					// Only track photo IDs to detect actual star/unstar changes
+					photos.map { it.id }.toSet()
+				}
 				.distinctUntilChanged()
-				.collect { starredPhotos ->
-					Log.d(TAG, "Starred photos changed: ${starredPhotos.size} photos")
-					resetInactivityTimer()
+				.collect { photoIds ->
+					Log.d(TAG, "Starred photos changed: ${photoIds.size} photos")
+					// Don't reset timer if backup is already running
+					if (!_isUploading.value) {
+						resetInactivityTimer()
+					}
 				}
 		}
 	}
@@ -200,11 +211,54 @@ class BackupQueueManager @Inject constructor(
 		Log.d(TAG, "Uploaded photo to: $photoUrl")
 		
 		// Generate and upload thumbnail
-		// TODO: Implement thumbnail generation
-		// For now, we'll skip thumbnail upload
+		try {
+			Log.d(TAG, "Generating thumbnail for: ${photoEntity.filename}")
+			val thumbnailData = thumbnailGenerator.generateThumbnail(uri)
+			
+			if (thumbnailData != null) {
+				Log.d(TAG, "Uploading thumbnail (${thumbnailData.size} bytes)")
+				val thumbnailUrl = s3Service.uploadData(thumbnailData, thumbnailKey, "image/jpeg")
+				if (thumbnailUrl.isSuccess) {
+					Log.d(TAG, "Uploaded thumbnail to: $thumbnailKey")
+				} else {
+					Log.e(TAG, "Failed to upload thumbnail", thumbnailUrl.exceptionOrNull())
+				}
+			} else {
+				Log.e(TAG, "Failed to generate thumbnail")
+			}
+		} catch (e: Exception) {
+			Log.e(TAG, "Error during thumbnail generation/upload", e)
+			// Don't fail the main upload if thumbnail fails
+		}
 		
 		// Update local database
 		updatePhotoBackupState(photoEntity.id, BackupState.UPLOADED, photoKey, thumbnailKey)
+		
+		// Update catalog with the new photo
+		// Launch in a separate coroutine to avoid cancellation issues
+		scope.launch {
+			try {
+				// Get photo details from MediaStore
+				// Extract MediaStore ID from the photo entity ID (format: "gmp#123")
+				val mediaStoreId = photoEntity.id.substringAfter('#').toLongOrNull()
+				if (mediaStoreId != null) {
+					val photoDetails = mediaStoreService.getPhotoById(mediaStoreId)
+					if (photoDetails != null) {
+						catalogService.addPhotoToCatalog(
+							userId = userId,
+							photo = photoDetails,
+							md5 = md5Hash,
+							width = photoEntity.width ?: 0,
+							height = photoEntity.height ?: 0
+						)
+						Log.d(TAG, "Added photo to catalog: $md5Hash")
+					}
+				}
+			} catch (e: Exception) {
+				Log.e(TAG, "Failed to update catalog", e)
+				// Don't fail the upload if catalog update fails
+			}
+		}
 	}
 	
 	/**

@@ -111,12 +111,17 @@ class S3Service @Inject constructor(
      * Upload raw data to S3
      * @param data The byte array to upload
      * @param key The S3 key (path) for the data
+     * @param contentType Optional content type (defaults to "application/octet-stream")
      */
-    suspend fun uploadData(data: ByteArray, key: String): Result<Unit> = withContext(Dispatchers.IO) {
+    suspend fun uploadData(
+        data: ByteArray, 
+        key: String,
+        contentType: String = "application/octet-stream"
+    ): Result<Unit> = withContext(Dispatchers.IO) {
         try {
             val metadata = ObjectMetadata().apply {
                 contentLength = data.size.toLong()
-                contentType = "text/plain"
+                this.contentType = contentType
             }
             
             val putRequest = PutObjectRequest(

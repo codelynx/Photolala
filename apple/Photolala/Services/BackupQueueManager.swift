@@ -41,7 +41,7 @@ class BackupQueueManager: ObservableObject {
 	#if DEBUG
 	private let inactivityInterval: TimeInterval = 15 // 15 seconds for development
 	#else
-	private let inactivityInterval: TimeInterval = 300 // 5 minutes for production
+	private let inactivityInterval: TimeInterval = 60 // 1 minute for production
 	#endif
 
 	// Queue persistence
