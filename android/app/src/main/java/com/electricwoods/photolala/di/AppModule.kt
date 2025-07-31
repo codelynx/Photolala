@@ -8,6 +8,8 @@ import androidx.room.Room
 import com.electricwoods.photolala.data.local.PhotolalaDatabase
 import com.electricwoods.photolala.services.MediaStoreService
 import com.electricwoods.photolala.services.MediaStoreServiceImpl
+import com.electricwoods.photolala.services.GooglePhotosService
+import com.electricwoods.photolala.services.GooglePhotosServiceImpl
 import dagger.Binds
 import dagger.Module
 import dagger.Provides
@@ -74,6 +76,11 @@ abstract class ServiceModule {
 	abstract fun bindMediaStoreService(
 		mediaStoreServiceImpl: MediaStoreServiceImpl
 	): MediaStoreService
+	
+	@Binds
+	abstract fun bindGooglePhotosService(
+		googlePhotosServiceImpl: GooglePhotosServiceImpl
+	): GooglePhotosService
 }
 
 // Qualifiers for different dispatchers

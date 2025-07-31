@@ -46,6 +46,21 @@ android {
 	kotlinOptions {
 		jvmTarget = "17"
 	}
+	packaging {
+		resources {
+			excludes += "/META-INF/{AL2.0,LGPL2.1}"
+			excludes += "/META-INF/DEPENDENCIES"
+			excludes += "/META-INF/LICENSE"
+			excludes += "/META-INF/LICENSE.txt"
+			excludes += "/META-INF/license.txt"
+			excludes += "/META-INF/NOTICE"
+			excludes += "/META-INF/NOTICE.txt"
+			excludes += "/META-INF/notice.txt"
+			excludes += "/META-INF/ASL2.0"
+			excludes += "/META-INF/INDEX.LIST"
+			excludes += "/META-INF/*.kotlin_module"
+		}
+	}
 }
 
 dependencies {
@@ -128,6 +143,10 @@ dependencies {
 	
 	// Logging
 	implementation("com.jakewharton.timber:timber:5.0.1")
+	
+	// Google Photos API
+	implementation("com.google.photos.library:google-photos-library-client:1.7.3")
+	implementation("com.google.auth:google-auth-library-oauth2-http:1.19.0")
 	
 	// Testing
 	testImplementation(libs.junit)

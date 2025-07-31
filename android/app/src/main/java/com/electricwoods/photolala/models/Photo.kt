@@ -8,7 +8,8 @@ import java.util.Date
 enum class PhotoSource {
 	LOCAL,
 	MEDIA_STORE, // Android's MediaStore (equivalent to Apple Photos)
-	S3_CLOUD
+	S3_CLOUD,
+	GOOGLE_PHOTOS // Google Photos Library
 }
 
 /**

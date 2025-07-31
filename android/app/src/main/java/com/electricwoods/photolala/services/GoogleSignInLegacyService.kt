@@ -11,6 +11,7 @@ import com.google.android.gms.auth.api.signin.GoogleSignInAccount
 import com.google.android.gms.auth.api.signin.GoogleSignInClient
 import com.google.android.gms.auth.api.signin.GoogleSignInOptions
 import com.google.android.gms.common.api.ApiException
+import com.google.android.gms.common.api.Scope
 import com.google.android.gms.tasks.Task
 import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
@@ -27,6 +28,8 @@ class GoogleSignInLegacyService @Inject constructor(
 		private const val TAG = "GoogleSignInLegacy"
 		// Web Client ID from photolala project (Project ID: photolala)
 		private const val WEB_CLIENT_ID = "105828093997-qmr9jdj3h4ia0tt2772cnrejh4k0p609.apps.googleusercontent.com"
+		// Google Photos Library scope
+		private val GOOGLE_PHOTOS_SCOPE = Scope("https://www.googleapis.com/auth/photoslibrary.readonly")
 	}
 	
 	private val googleSignInClient: GoogleSignInClient by lazy {
@@ -34,6 +37,7 @@ class GoogleSignInLegacyService @Inject constructor(
 			.requestIdToken(WEB_CLIENT_ID)
 			.requestEmail()
 			.requestProfile()
+			.requestScopes(GOOGLE_PHOTOS_SCOPE)
 			.build()
 		
 		GoogleSignIn.getClient(context, gso)
@@ -91,5 +95,33 @@ class GoogleSignInLegacyService @Inject constructor(
 	 */
 	fun getLastSignedInAccount(): GoogleSignInAccount? {
 		return GoogleSignIn.getLastSignedInAccount(context)
+	}
+	
+	/**
+	 * Check if Google Photos scope is granted
+	 */
+	fun hasGooglePhotosScope(): Boolean {
+		val account = getLastSignedInAccount()
+		return account?.grantedScopes?.contains(GOOGLE_PHOTOS_SCOPE) ?: false
+	}
+	
+	/**
+	 * Request additional scope if needed
+	 */
+	fun requestGooglePhotosScope(): Intent? {
+		val account = getLastSignedInAccount() ?: return null
+		
+		if (!hasGooglePhotosScope()) {
+			// Request additional scope
+			val signInOptions = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
+				.requestEmail()
+				.requestScopes(GOOGLE_PHOTOS_SCOPE)
+				.build()
+			
+			val client = GoogleSignIn.getClient(context, signInOptions)
+			return client.signInIntent
+		}
+		
+		return null
 	}
 }

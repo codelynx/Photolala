@@ -16,6 +16,7 @@ import com.electricwoods.photolala.ui.screens.CloudBrowserScreen
 import com.electricwoods.photolala.ui.screens.PhotoGridScreen
 import com.electricwoods.photolala.ui.screens.PhotoViewerScreen
 import com.electricwoods.photolala.ui.screens.WelcomeScreen
+import com.electricwoods.photolala.ui.screens.GooglePhotosScreen
 import com.electricwoods.photolala.ui.viewmodels.AuthenticationViewModel
 import com.electricwoods.photolala.ui.viewmodels.PhotoGridViewModel
 import com.electricwoods.photolala.viewmodels.AccountSettingsViewModel
@@ -65,6 +66,9 @@ fun PhotolalaNavigation(
 				},
 				onCloudBrowserClick = {
 					navController.navigate(PhotolalaRoute.CloudBrowser.route)
+				},
+				onGooglePhotosClick = {
+					navController.navigate(PhotolalaRoute.GooglePhotos.route)
 				},
 				onSignInClick = {
 					navController.navigate(PhotolalaRoute.SignIn.route)
@@ -210,6 +214,18 @@ fun PhotolalaNavigation(
 			)
 		}
 		
+		composable(PhotolalaRoute.GooglePhotos.route) {
+			GooglePhotosScreen(
+				onPhotoClick = { photo, index ->
+					// TODO: Navigate to photo viewer for Google Photos
+					// For now, just handle locally
+				},
+				onBackClick = {
+					navController.popBackStack()
+				}
+			)
+		}
+		
 		composable(PhotolalaRoute.AccountSettings.route) {
 			val viewModel: AccountSettingsViewModel = hiltViewModel()
 			val uiState by viewModel.uiState.collectAsState()
@@ -249,5 +265,6 @@ sealed class PhotolalaRoute(val route: String) {
 	object SignIn : PhotolalaRoute("sign_in")
 	object CreateAccount : PhotolalaRoute("create_account")
 	object CloudBrowser : PhotolalaRoute("cloud_browser")
+	object GooglePhotos : PhotolalaRoute("google_photos")
 	object AccountSettings : PhotolalaRoute("account_settings")
 }

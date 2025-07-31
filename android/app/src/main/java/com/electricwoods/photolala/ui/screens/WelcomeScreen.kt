@@ -13,6 +13,7 @@ import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.Cloud
+import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -35,6 +36,7 @@ import com.electricwoods.photolala.ui.viewmodels.WelcomeViewModel
 fun WelcomeScreen(
 	onBrowsePhotosClick: () -> Unit = {},
 	onCloudBrowserClick: () -> Unit = {},
+	onGooglePhotosClick: () -> Unit = {},
 	onSignInClick: () -> Unit = {},
 	onCreateAccountClick: () -> Unit = {},
 	onAccountSettingsClick: () -> Unit = {},
@@ -155,6 +157,32 @@ fun WelcomeScreen(
 			Spacer(modifier = Modifier.width(8.dp))
 			Text(
 				text = if (isSignedIn) "Cloud Browser" else "Cloud Browser (Sign In Required)",
+				fontSize = 16.sp
+			)
+		}
+		
+		Spacer(modifier = Modifier.height(16.dp))
+		
+		// Google Photos button (enabled if signed in with Google)
+		OutlinedButton(
+			onClick = onGooglePhotosClick,
+			modifier = Modifier
+				.fillMaxWidth()
+				.height(56.dp),
+			enabled = isSignedIn && viewModel.hasGoogleAccount.collectAsStateWithLifecycle().value
+		) {
+			Icon(
+				imageVector = Icons.Default.PhotoLibrary,
+				contentDescription = null,
+				modifier = Modifier.size(20.dp)
+			)
+			Spacer(modifier = Modifier.width(8.dp))
+			Text(
+				text = if (isSignedIn && viewModel.hasGoogleAccount.collectAsStateWithLifecycle().value) {
+					"Google Photos"
+				} else {
+					"Google Photos (Google Sign In Required)"
+				},
 				fontSize = 16.sp
 			)
 		}

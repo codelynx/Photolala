@@ -219,3 +219,17 @@ For detailed pricing strategy and tiers, see: `docs/planning/final-pricing-strat
 ## Memories
 
 - 1, question is semi-real user id or sphedo user id?
+
+## TODO/Reminders
+
+### Google Cloud Project Setup (Added: Jan 31, 2025)
+- **REMINDER**: Recreate "photolala" Google Cloud project under kyoshikawa@electricwoods.com
+- The project was deleted from personal account (kaz.yoshikawa@gmail.com) and needs to be recreated
+- Project ID should be available ~1 hour after deletion
+- Steps:
+  1. `gcloud config set account kyoshikawa@electricwoods.com`
+  2. `gcloud projects create photolala --name="Photolala"`
+  3. Configure OAuth consent screen and add test users
+  4. Enable Photos Library API
+  5. Create Android OAuth client with SHA-1: `9B:E2:5F:F5:0A:1D:B9:3F:18:99:D0:FF:E2:3A:80:EF:5A:A7:FB:89`
+  6. Download new google-services.json and replace in android/app/
