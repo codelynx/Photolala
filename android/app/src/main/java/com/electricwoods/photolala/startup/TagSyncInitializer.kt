@@ -43,13 +43,17 @@ class TagSyncInitializer : Initializer<Unit> {
 				
 				if (!hasMigrated) {
 					// Migrate existing tags to backup service
+					android.util.Log.d("TagBackup", "MIGRATION: Starting migration from Room to Backup Service")
 					repository.migrateToBackupService()
 					prefs.edit().putBoolean("tags_migrated_to_backup", true).apply()
+					android.util.Log.d("TagBackup", "MIGRATION: Completed")
 				}
 				
 				// Always sync from backup service on startup
 				// This restores tags from backup if this is a fresh install
+				android.util.Log.d("TagBackup", "SYNC: Starting sync from Backup Service")
 				repository.syncFromBackupService()
+				android.util.Log.d("TagBackup", "SYNC: Completed")
 			} catch (e: Exception) {
 				// Log error but don't crash the app
 				e.printStackTrace()

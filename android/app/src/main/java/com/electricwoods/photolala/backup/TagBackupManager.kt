@@ -37,6 +37,9 @@ class TagBackupManager @Inject constructor(
 			.putString(photoId, flagsString)
 			.apply()
 		
+		// Log for testing
+		android.util.Log.d("TagBackup", "SAVED: $photoId -> $flagsString (flags: ${flags.map { it.name }})")
+		
 		// Notify backup service that data has changed
 		backupManager.dataChanged()
 	}
@@ -70,7 +73,7 @@ class TagBackupManager @Inject constructor(
 	 * Load all tags from SharedPreferences
 	 */
 	fun loadAllTags(): Map<String, Set<ColorFlag>> {
-		return prefs.all.mapNotNull { (key, value) ->
+		val allTags = prefs.all.mapNotNull { (key, value) ->
 			// Only process entries that look like photo IDs
 			if (key.startsWith("md5#") && value is String) {
 				val flags = value.split(",")
@@ -89,6 +92,14 @@ class TagBackupManager @Inject constructor(
 				null
 			}
 		}.toMap()
+		
+		// Log all loaded tags
+		android.util.Log.d("TagBackup", "LOADED ${allTags.size} tags from backup:")
+		allTags.forEach { (photoId, flags) ->
+			android.util.Log.d("TagBackup", "  - $photoId -> ${flags.map { it.name }}")
+		}
+		
+		return allTags
 	}
 	
 	/**

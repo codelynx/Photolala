@@ -1,5 +1,6 @@
 package com.electricwoods.photolala.models
 
+import com.electricwoods.photolala.utils.MD5Utils
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.Transient

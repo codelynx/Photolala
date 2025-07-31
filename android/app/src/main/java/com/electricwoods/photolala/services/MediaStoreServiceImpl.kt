@@ -275,15 +275,28 @@ class MediaStoreServiceImpl @Inject constructor(
 	): List<PhotoMediaStore> {
 		val photos = mutableListOf<PhotoMediaStore>()
 		
+		// Debug logging
+		android.util.Log.d("MediaStoreService", "Querying photos with limit=$limit, offset=$offset")
+		android.util.Log.d("MediaStoreService", "Permission status: ${hasPermission()}")
+		
 		// Query all and manually paginate - LIMIT/OFFSET not reliably supported across all devices
 		var count = 0
-		contentResolver.query(
+		val cursor = contentResolver.query(
 			MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
 			projection,
 			selection,
 			selectionArgs,
 			sortOrder
-		)?.use { cursor ->
+		)
+		
+		if (cursor == null) {
+			android.util.Log.e("MediaStoreService", "Cursor is null! No access to MediaStore")
+			return photos
+		}
+		
+		cursor.use {
+			android.util.Log.d("MediaStoreService", "Total photos in cursor: ${cursor.count}")
+			
 			// Skip to offset
 			if (offset > 0) {
 				cursor.moveToPosition(offset - 1)
@@ -291,11 +304,16 @@ class MediaStoreServiceImpl @Inject constructor(
 			
 			// Read up to limit items
 			while (cursor.moveToNext() && count < limit) {
-				photos.add(cursorToPhoto(cursor))
-				count++
+				try {
+					photos.add(cursorToPhoto(cursor))
+					count++
+				} catch (e: Exception) {
+					android.util.Log.e("MediaStoreService", "Error parsing photo at position ${cursor.position}", e)
+				}
 			}
 		}
 		
+		android.util.Log.d("MediaStoreService", "Returning ${photos.size} photos")
 		return photos
 	}
 	

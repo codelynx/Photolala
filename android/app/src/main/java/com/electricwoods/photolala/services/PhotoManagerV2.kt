@@ -120,7 +120,7 @@ class PhotoManagerV2(private val context: Context) {
 	 * Gets PhotoDigest for a MediaStore photo
 	 */
 	suspend fun getPhotoDigestForMediaStore(photo: PhotoMediaStore): PhotoDigest? {
-		val uri = Uri.parse(photo.uri)
+		val uri = photo.uri
 		
 		// For MediaStore, we use URI as path since we don't have file access
 		// This is similar to Apple Photos approach - fast browsing without MD5
@@ -130,8 +130,8 @@ class PhotoManagerV2(private val context: Context) {
 		val cachedMD5 = pathToMD5Cache.getMD5(
 			FileIdentityKey(
 				pathMD5 = MD5Utils.md5(cacheKey),
-				fileSize = photo.size,
-				modificationTimestamp = photo.dateModified / 1000
+				fileSize = photo.fileSize ?: 0L,
+				modificationTimestamp = photo.modificationDate?.time?.div(1000) ?: 0L
 			)
 		)
 		
@@ -150,8 +150,8 @@ class PhotoManagerV2(private val context: Context) {
 				metadata = mapOf(
 					"id" to photo.id,
 					"displayName" to photo.displayName,
-					"size" to photo.size,
-					"dateModified" to photo.dateModified
+					"size" to (photo.fileSize ?: 0L),
+					"dateModified" to (photo.modificationDate?.time ?: 0L)
 				)
 			)
 		)
@@ -162,7 +162,7 @@ class PhotoManagerV2(private val context: Context) {
 	 */
 	suspend fun getPhotoDigestForS3(photo: PhotoS3): PhotoDigest? {
 		// S3 photos already have MD5 from catalog
-		val md5 = photo.md5Hash
+		val md5 = photo.md5Hash ?: return null
 		
 		// Check Level 2 cache directly
 		photoDigestCache.get(md5)?.let { return it }

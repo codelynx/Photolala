@@ -79,7 +79,7 @@ class PhotoDigestViewModel(application: Application) : AndroidViewModel(applicat
 					BitmapFactory.decodeByteArray(it.thumbnailData, 0, it.thumbnailData.size)
 				}
 			} catch (e: Exception) {
-				Timber.e(e, "Failed to get thumbnail for S3: ${photo.key}")
+				Timber.e(e, "Failed to get thumbnail for S3: ${photo.photoKey}")
 				null
 			}
 		}

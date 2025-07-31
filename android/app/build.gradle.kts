@@ -126,6 +126,9 @@ dependencies {
 	implementation("io.ktor:ktor-client-content-negotiation:2.3.7")
 	implementation("io.ktor:ktor-serialization-kotlinx-json:2.3.7")
 	
+	// Logging
+	implementation("com.jakewharton.timber:timber:5.0.1")
+	
 	// Testing
 	testImplementation(libs.junit)
 	testImplementation("org.mockito:mockito-core:5.5.0")

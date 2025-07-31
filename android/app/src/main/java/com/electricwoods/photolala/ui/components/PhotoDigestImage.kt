@@ -126,7 +126,7 @@ fun PhotoDigestImageMediaStore(
 @Composable
 fun PhotoDigestImageFile(
 	photo: PhotoFile,
-	contentDescription: String? = photo.name,
+	contentDescription: String? = photo.filename,
 	modifier: Modifier = Modifier,
 	contentScale: ContentScale = ContentScale.Fit,
 	placeholder: Color = Color.LightGray,

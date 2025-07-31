@@ -199,4 +199,17 @@ class PhotoTagRepository @Inject constructor(
 		return allTags.groupBy { it.photoId }
 			.mapValues { (_, tags) -> tags.map { it.colorFlag }.toSet() }
 	}
+	
+	/**
+	 * Debug method to log all current tags
+	 */
+	suspend fun logAllTags() {
+		val allTags = getAllTags()
+		android.util.Log.d("TagBackup", "=== CURRENT TAGS IN DATABASE ===")
+		android.util.Log.d("TagBackup", "Total photos with tags: ${allTags.size}")
+		allTags.forEach { (photoId, flags) ->
+			android.util.Log.d("TagBackup", "$photoId -> ${flags.map { it.name }}")
+		}
+		android.util.Log.d("TagBackup", "================================")
+	}
 }
