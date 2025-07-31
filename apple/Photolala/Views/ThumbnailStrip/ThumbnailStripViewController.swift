@@ -280,7 +280,7 @@ extension ThumbnailStripViewController: XCollectionViewDelegate {
 			// Prefetch thumbnails for upcoming cells
 			let photos = indexPaths.map { self.photos[$0.item] }
 			Task {
-				await PhotoManager.shared.prefetchThumbnails(for: photos)
+				await PhotoManagerV2.shared.prefetchThumbnails(for: photos)
 			}
 		}
 

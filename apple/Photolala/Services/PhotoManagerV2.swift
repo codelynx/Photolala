@@ -16,7 +16,7 @@ class PhotoManagerV2 {
 	static let shared = PhotoManagerV2()
 	
 	private let pathToMD5Cache = PathToMD5Cache.shared
-	private let photoDigestCache = PhotoDigestCache.shared
+	let photoDigestCache = PhotoDigestCache.shared  // Made internal for PhotoManagerV2+Sources
 	private let processingQueue = DispatchQueue(label: "com.photolala.photo-processing", qos: .userInitiated)
 	
 	private init() {}
@@ -242,6 +242,119 @@ class PhotoManagerV2 {
 			creationDate: creationDate,
 			modificationTimestamp: Int(modificationDate.timeIntervalSince1970)
 		)
+	}
+	
+	// MARK: - Additional Methods for UI Compatibility
+	
+	/// Group photos by specified grouping option
+	func groupPhotos(_ photos: [any PhotoItem], by grouping: PhotoGroupingOption) -> [PhotoGroup] {
+		// Convert to PhotoFile array for compatibility
+		let photoFiles = photos.compactMap { $0 as? PhotoFile }
+		return PhotoManager.shared.groupPhotos(photoFiles, by: grouping)
+	}
+	
+	/// Prefetch thumbnails for given photos
+	func prefetchThumbnails(for photos: [any PhotoItem]) async {
+		// Use priority loader for batch prefetching
+		for photo in photos {
+			PriorityThumbnailLoaderV2.shared.requestThumbnail(for: photo, priority: .prefetch)
+		}
+	}
+	
+	/// Load full image for a photo
+	func loadFullImage(for photo: any PhotoItem) async throws -> XImage? {
+		// Handle different photo types
+		switch photo {
+		case let photoFile as PhotoFile:
+			return try await PhotoManager.shared.loadFullImage(for: photoFile)
+		case let photoApple as PhotoApple:
+			// Load full image data and convert to image
+			let data = try await photoApple.loadImageData()
+			return XImage(data: data)
+		case let photoS3 as PhotoS3:
+			// Load from S3
+			let data = try await S3DownloadService.shared.downloadPhoto(for: photoS3)
+			return XImage(data: data)
+		default:
+			return nil
+		}
+	}
+	
+	/// Get metadata for a photo
+	func metadata(for photo: any PhotoItem) async throws -> PhotoMetadata? {
+		// Try to get from PhotoDigest first
+		if let photoFile = photo as? PhotoFile,
+		   let digest = try? await photoDigest(for: photoFile) {
+			// Convert PhotoDigestMetadata to PhotoMetadata
+			return PhotoMetadata(
+				dateTaken: digest.metadata.creationDate,
+				fileModificationDate: Date(timeIntervalSince1970: TimeInterval(digest.metadata.modificationTimestamp)),
+				fileSize: digest.metadata.fileSize,
+				pixelWidth: digest.metadata.pixelWidth,
+				pixelHeight: digest.metadata.pixelHeight
+			)
+		}
+		
+		// For other photo types, handle appropriately
+		switch photo {
+		case let photoApple as PhotoApple:
+			// Create metadata from PhotoApple properties
+			let fileSize = try await photoApple.loadFileSize()
+			return PhotoMetadata(
+				dateTaken: photoApple.creationDate,
+				fileModificationDate: photoApple.modificationDate ?? photoApple.creationDate ?? Date(),
+				fileSize: fileSize,
+				pixelWidth: photoApple.width,
+				pixelHeight: photoApple.height
+			)
+		case let photoS3 as PhotoS3:
+			// Create metadata from S3 photo properties
+			return PhotoMetadata(
+				dateTaken: photoS3.photoDate,
+				fileModificationDate: photoS3.modified,
+				fileSize: photoS3.size,
+				pixelWidth: photoS3.width,
+				pixelHeight: photoS3.height
+			)
+		default:
+			return nil
+		}
+	}
+	
+	/// Prefetch images with priority
+	func prefetchImages(for photos: [any PhotoItem], priority: TaskPriority) async {
+		// Convert to PhotoFile array if possible for compatibility
+		let photoFiles = photos.compactMap { $0 as? PhotoFile }
+		if !photoFiles.isEmpty {
+			await PhotoManager.shared.prefetchImages(for: photoFiles, priority: priority)
+		}
+		// For other photo types, prefetch thumbnails instead
+		for photo in photos where !(photo is PhotoFile) {
+			PriorityThumbnailLoaderV2.shared.requestThumbnail(for: photo, priority: .prefetch)
+		}
+	}
+	
+	// MARK: - Statistics (Delegate to PhotoManager for now)
+	
+	func printCacheStatistics() {
+		PhotoManager.shared.printCacheStatistics()
+	}
+	
+	func resetStatistics() {
+		PhotoManager.shared.resetStatistics()
+	}
+	
+	func getCacheStatistics() -> PhotoManager.CacheStatisticsReport {
+		PhotoManager.shared.getCacheStatistics()
+	}
+	
+	func getMemoryUsageInfo() -> PhotoManager.MemoryUsageInfo {
+		PhotoManager.shared.getMemoryUsageInfo()
+	}
+	
+	func loadArchiveStatus(for catalogEntries: [CatalogEntry], userId: String) async {
+		// PhotoManagerV2 doesn't need this for now
+		// Archive status is handled differently in the new architecture
 	}
 }
 

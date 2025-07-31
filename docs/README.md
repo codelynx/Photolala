@@ -45,7 +45,7 @@ Documentation for implemented features.
 - [Queue Management](./features/backup/queue-management.md) - Backup queue handling
 
 #### UI Components
-- [Thumbnail System](./features/ui-components/thumbnail-system.md) - Thumbnail generation
+- [PhotoDigest System](./current/photodigest-system.md) - Two-level cache architecture
 - [Selection System](./features/ui-components/selection-system.md) - Multi-selection
 - [Bookmark System](./features/ui-components/bookmark-system.md) - Photo bookmarking
 
@@ -135,4 +135,4 @@ See [PROJECT_STATUS.md](./PROJECT_STATUS.md) for the latest implementation updat
 
 ---
 
-Last updated: July 29, 2025
+Last updated: July 31, 2025

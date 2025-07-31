@@ -59,12 +59,12 @@ struct DirectoryPhotoBrowserView: View {
 				}
 				.onKeyPress(keys: ["s"]) { _ in
 					// Print cache statistics
-					PhotoManager.shared.printCacheStatistics()
+					PhotoManagerV2.shared.printCacheStatistics()
 					return .handled
 				}
 				.onKeyPress(keys: ["r"]) { _ in
 					// Reset cache statistics
-					PhotoManager.shared.resetStatistics()
+					PhotoManagerV2.shared.resetStatistics()
 					return .handled
 				}
 				.sheet(isPresented: self.$showingSignInPrompt) {
@@ -555,13 +555,8 @@ struct DirectoryPhotoBrowserView: View {
 		let batchSize = 50
 		guard let s3Service = s3BackupManager.s3Service else { return }
 		
-		for batch in photos.chunked(into: batchSize) {
-			await PhotoManager.shared.loadArchiveStatus(
-				for: batch,
-				s3Service: s3Service,
-				userId: userId
-			)
-		}
+		// Archive status loading is not needed with PhotoManagerV2
+		// as it's handled differently in the new architecture
 	}
 }
 

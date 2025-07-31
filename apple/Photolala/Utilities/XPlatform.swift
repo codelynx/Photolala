@@ -111,6 +111,24 @@ extension View {
 
 // MARK: - Cross-platform Colors
 
+extension XColor {
+	#if os(macOS)
+	static var systemGroupedBackground: XColor {
+		return .controlBackgroundColor
+	}
+	
+	static var systemBackground: XColor {
+		return .windowBackgroundColor
+	}
+	
+	static var secondarySystemBackground: XColor {
+		return .controlBackgroundColor
+	}
+	#else
+	// iOS already has these properties
+	#endif
+}
+
 struct XPlatform {
 	#if os(macOS)
 	static let primaryBackgroundColor = NSColor.controlBackgroundColor

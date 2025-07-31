@@ -286,7 +286,7 @@ class PhotoCollectionViewController: XViewController {
 
 				// Apply grouping based on current settings
 				let groupingOption = self.settings?.groupingOption ?? .none
-				self.photoGroups = PhotoManager.shared.groupPhotos(sortedPhotos, by: groupingOption)
+				self.photoGroups = PhotoManagerV2.shared.groupPhotos(sortedPhotos, by: groupingOption)
 
 				self.reloadData()
 
@@ -886,7 +886,7 @@ extension PhotoCollectionViewController: XCollectionViewDelegate {
 			}
 
 			Task {
-				await PhotoManager.shared.prefetchThumbnails(for: photos)
+				await PhotoManagerV2.shared.prefetchThumbnails(for: photos)
 			}
 		}
 
@@ -904,7 +904,7 @@ extension PhotoCollectionViewController: XCollectionViewDelegate {
 			}
 
 			Task {
-				await PhotoManager.shared.prefetchThumbnails(for: photos)
+				await PhotoManagerV2.shared.prefetchThumbnails(for: photos)
 			}
 		}
 
@@ -1150,7 +1150,7 @@ extension PhotoCollectionViewController: XCollectionViewDelegate {
 			Task {
 				do {
 					// Load thumbnail (runs on background queue)
-					if let thumbnail = try await PhotoManager.shared.thumbnail(for: photoRep) {
+					if let thumbnail = try await PhotoManagerV2.shared.thumbnail(for: photoRep) {
 						// Switch to main actor only for UI updates
 						await MainActor.run {
 							// Update if we're still showing the same photo
@@ -1461,7 +1461,7 @@ extension PhotoCollectionViewController: XCollectionViewDelegate {
 			Task {
 				do {
 					// Load thumbnail (runs on background queue)
-					if let thumbnail = try await PhotoManager.shared.thumbnail(for: photoRep) {
+					if let thumbnail = try await PhotoManagerV2.shared.thumbnail(for: photoRep) {
 						// Switch to main actor only for UI updates
 						await MainActor.run {
 							// Update if we're still showing the same photo

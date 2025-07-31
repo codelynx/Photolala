@@ -137,7 +137,7 @@ import SwiftUI
 				// Check for cancellation
 				if Task.isCancelled { return }
 
-				if let thumbnail = try await PhotoManager.shared.thumbnail(for: photo) {
+				if let thumbnail = try await PhotoManagerV2.shared.thumbnail(for: photo) {
 					// Check if still showing same photo
 					guard self.currentPhoto === photo else { return }
 
@@ -283,7 +283,7 @@ import SwiftUI
 				// Check for cancellation
 				if Task.isCancelled { return }
 
-				if let thumbnail = try await PhotoManager.shared.thumbnail(for: photo) {
+				if let thumbnail = try await PhotoManagerV2.shared.thumbnail(for: photo) {
 					// Check if still showing same photo
 					guard self.currentPhoto === photo else { return }
 

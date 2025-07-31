@@ -8,6 +8,22 @@ The application now supports linking multiple authentication providers (Apple ID
 
 ## 🆕 Recent Updates
 
+### July 31, 2025: PhotoDigest Two-Level Cache Architecture (iOS/macOS)
+- ✅ Complete rewrite of thumbnail caching system
+- ✅ Two-level cache design:
+  - Level 1: PathToMD5Cache - Maps file identity to content MD5
+  - Level 2: PhotoDigestCache - Maps MD5 to thumbnail + metadata
+- ✅ PhotoManagerV2 replaces PhotoManager with new architecture
+- ✅ Performance improvements:
+  - Concurrent loads increased from 4 to 12
+  - Cross-source photo deduplication
+  - Sharded disk storage (256 directories)
+- ✅ Smart Apple Photos handling:
+  - Fast browsing without MD5 computation
+  - Full PhotoDigest only when needed for backup
+- ✅ Automatic migration from old cache format
+- ✅ NSCache memory management with 500 items / 100MB limits
+
 ### July 30, 2025: Account Linking Feature (iOS/macOS/Android)
 - ✅ Multi-provider authentication - link Apple ID and Google to same account
 - ✅ Web-based OAuth fallback for Google Sign-In keychain errors (iOS/macOS)

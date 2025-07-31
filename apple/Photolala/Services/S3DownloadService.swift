@@ -105,6 +105,48 @@ actor S3DownloadService {
 		}
 	}
 	
+	/// Download thumbnail data from S3 (returns raw data instead of image)
+	func downloadThumbnailData(key: String, userId: String) async throws -> Data? {
+		// Check if already downloading
+		if let existingTask = downloadTasks[key] {
+			return try await existingTask.value
+		}
+		
+		// Extract MD5 from key (format: thumbnails/userId/md5.dat)
+		let components = key.split(separator: "/")
+		guard components.count >= 3,
+			  let md5Component = components.last?.split(separator: ".").first else {
+			return nil
+		}
+		let md5 = String(md5Component)
+		
+		// Check cache first
+		let cacheFile = CacheManager.shared.cloudThumbnailURL(service: .s3, userId: userId, md5: md5)
+		if FileManager.default.fileExists(atPath: cacheFile.path) {
+			return try? Data(contentsOf: cacheFile)
+		}
+		
+		// Start download task
+		let task = Task<Data, Error> {
+			try await downloadFromS3(key: key)
+		}
+		downloadTasks[key] = task
+		
+		do {
+			let data = try await task.value
+			downloadTasks.removeValue(forKey: key)
+			
+			// Save to cache
+			try data.write(to: cacheFile)
+			cleanupCacheIfNeeded()
+			
+			return data
+		} catch {
+			downloadTasks.removeValue(forKey: key)
+			throw error
+		}
+	}
+	
 	/// Download a full photo from S3
 	func downloadPhoto(for photo: PhotoS3) async throws -> Data {
 		let key = photo.photoKey

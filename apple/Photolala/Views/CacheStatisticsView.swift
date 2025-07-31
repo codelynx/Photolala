@@ -8,8 +8,8 @@
 import SwiftUI
 
 struct CacheStatisticsView: View {
-	@State private var stats: PhotoManager.CacheStatisticsReport = PhotoManager.shared.getCacheStatistics()
-	@State private var memoryUsage = PhotoManager.shared.getMemoryUsageInfo()
+	@State private var stats: PhotoManager.CacheStatisticsReport = PhotoManagerV2.shared.getCacheStatistics()
+	@State private var memoryUsage = PhotoManagerV2.shared.getMemoryUsageInfo()
 	@Environment(\.dismiss) private var dismiss
 
 	var body: some View {
@@ -103,16 +103,16 @@ struct CacheStatisticsView: View {
 			// Actions
 			HStack {
 				Button("Reset Statistics") {
-					PhotoManager.shared.resetStatistics()
-					self.stats = PhotoManager.shared.getCacheStatistics()
+					PhotoManagerV2.shared.resetStatistics()
+					self.stats = PhotoManagerV2.shared.getCacheStatistics()
 				}
 				.buttonStyle(.bordered)
 
 				Spacer()
 
 				Button("Refresh") {
-					self.stats = PhotoManager.shared.getCacheStatistics()
-					self.memoryUsage = PhotoManager.shared.getMemoryUsageInfo()
+					self.stats = PhotoManagerV2.shared.getCacheStatistics()
+					self.memoryUsage = PhotoManagerV2.shared.getMemoryUsageInfo()
 				}
 				.buttonStyle(.bordered)
 			}

@@ -277,7 +277,7 @@ struct PhotoPreviewView: View {
 		Task {
 			do {
 				// Load image
-				if let image = try await PhotoManager.shared.loadFullImage(for: photo) {
+				if let image = try await PhotoManagerV2.shared.loadFullImage(for: photo) {
 					print("[PhotoPreviewView] Successfully loaded image: \(photo.filename)")
 					await MainActor.run {
 						self.currentImage = image
@@ -295,7 +295,7 @@ struct PhotoPreviewView: View {
 
 				// Load metadata (don't block on this)
 				Task {
-					if let metadata = try? await PhotoManager.shared.metadata(for: photo) {
+					if let metadata = try? await PhotoManagerV2.shared.metadata(for: photo) {
 						await MainActor.run {
 							self.currentMetadata = metadata
 						}
@@ -403,7 +403,7 @@ struct PhotoPreviewView: View {
 		let photosToPreload = indicesToPreload.map { self.photos[$0] }
 
 		Task {
-			await PhotoManager.shared.prefetchImages(for: photosToPreload, priority: .low)
+			await PhotoManagerV2.shared.prefetchImages(for: photosToPreload, priority: .low)
 		}
 	}
 }
@@ -594,7 +594,7 @@ struct ThumbnailView: View {
 			// Check for cancellation
 			if Task.isCancelled { return }
 
-			if let thumb = try await PhotoManager.shared.thumbnail(for: photo) {
+			if let thumb = try await PhotoManagerV2.shared.thumbnail(for: photo) {
 				// Check for cancellation again after async operation
 				if Task.isCancelled { return }
 
