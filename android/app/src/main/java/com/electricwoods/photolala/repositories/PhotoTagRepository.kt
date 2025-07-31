@@ -1,5 +1,6 @@
 package com.electricwoods.photolala.repositories
 
+import com.electricwoods.photolala.backup.TagBackupManager
 import com.electricwoods.photolala.data.local.dao.TagDao
 import com.electricwoods.photolala.data.local.entities.TagEntity
 import com.electricwoods.photolala.models.ColorFlag
@@ -11,10 +12,12 @@ import javax.inject.Singleton
 /**
  * Repository for photo tag operations
  * Manages color flag tags for photos (replacing the bookmark system)
+ * Now integrated with Android Backup Service for cross-device sync
  */
 @Singleton
 class PhotoTagRepository @Inject constructor(
-	private val tagDao: TagDao
+	private val tagDao: TagDao,
+	private val tagBackupManager: TagBackupManager
 ) {
 	
 	/**
@@ -61,6 +64,10 @@ class PhotoTagRepository @Inject constructor(
 			)
 			tagDao.insertTag(tag)
 		}
+		
+		// Sync with backup service
+		val currentTags = tagDao.getTagsForPhoto(photoId).map { it.colorFlag }.toSet()
+		tagBackupManager.saveTag(photoId, currentTags)
 	}
 	
 	/**
@@ -79,6 +86,9 @@ class PhotoTagRepository @Inject constructor(
 			)
 			tagDao.insertTag(tag)
 		}
+		
+		// Sync with backup service
+		tagBackupManager.saveTag(photoId, colorFlags)
 	}
 	
 	/**
@@ -105,6 +115,8 @@ class PhotoTagRepository @Inject constructor(
 	 */
 	suspend fun removeAllTags(photoId: String) {
 		tagDao.deleteAllTagsForPhoto(photoId)
+		// Remove from backup service
+		tagBackupManager.removeTag(photoId)
 	}
 	
 	/**
@@ -137,5 +149,54 @@ class PhotoTagRepository @Inject constructor(
 		photoIds.forEach { photoId ->
 			toggleTag(photoId, colorFlag)
 		}
+	}
+	
+	/**
+	 * Migrate all tags from Room to backup service
+	 * This should be called once after update
+	 */
+	suspend fun migrateToBackupService() {
+		val allTags = tagDao.getAllTags()
+		val tagsByPhoto = allTags.groupBy { it.photoId }
+			.mapValues { (_, tags) -> tags.map { it.colorFlag }.toSet() }
+		
+		tagBackupManager.importTags(tagsByPhoto)
+	}
+	
+	/**
+	 * Load tags from backup service and sync with Room
+	 * This is called on app startup to restore backed up tags
+	 */
+	suspend fun syncFromBackupService() {
+		val backupTags = tagBackupManager.loadAllTags()
+		
+		// For each photo in backup
+		backupTags.forEach { (photoId, flags) ->
+			// Get current tags from Room
+			val currentTags = tagDao.getTagsForPhoto(photoId).map { it.colorFlag }.toSet()
+			
+			// Find tags to add (in backup but not in Room)
+			val tagsToAdd = flags - currentTags
+			tagsToAdd.forEach { flag ->
+				val tag = TagEntity(
+					photoId = photoId,
+					colorFlag = flag,
+					timestamp = System.currentTimeMillis()
+				)
+				tagDao.insertTag(tag)
+			}
+			
+			// We don't remove tags that are in Room but not in backup
+			// This preserves any local changes made before backup
+		}
+	}
+	
+	/**
+	 * Get all tags from the database (for migration purposes)
+	 */
+	suspend fun getAllTags(): Map<String, Set<ColorFlag>> {
+		val allTags = tagDao.getAllTags()
+		return allTags.groupBy { it.photoId }
+			.mapValues { (_, tags) -> tags.map { it.colorFlag }.toSet() }
 	}
 }

@@ -28,6 +28,7 @@
     <application
         android:name=".PhotolalaApplication"
         android:allowBackup="true"
+        android:backupAgent=".backup.TagBackupAgent"
         android:dataExtractionRules="@xml/data_extraction_rules"
         android:fullBackupContent="@xml/backup_rules"
         android:icon="@mipmap/ic_launcher"
@@ -60,6 +61,17 @@
             </intent-filter>
         </activity>
         
+        <!-- App Startup Initializers -->
+        <provider
+            android:name="androidx.startup.InitializationProvider"
+            android:authorities="${applicationId}.androidx-startup"
+            android:exported="false"
+            tools:node="merge">
+            <!-- Tag sync initializer -->
+            <meta-data
+                android:name="com.electricwoods.photolala.startup.TagSyncInitializer"
+                android:value="androidx.startup" />
+        </provider>
         
     </application>
 

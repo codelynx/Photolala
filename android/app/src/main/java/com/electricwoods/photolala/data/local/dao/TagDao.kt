@@ -27,4 +27,7 @@ interface TagDao {
 
 	@Query("DELETE FROM tags WHERE photoId = :photoId")
 	suspend fun deleteAllTagsForPhoto(photoId: String)
+	
+	@Query("SELECT * FROM tags")
+	suspend fun getAllTags(): List<TagEntity>
 }

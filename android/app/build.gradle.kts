@@ -92,6 +92,9 @@ dependencies {
 	// WorkManager
 	implementation(libs.androidx.work.runtime.ktx)
 	
+	// App Startup for initializers
+	implementation("androidx.startup:startup-runtime:1.1.1")
+	
 	// AWS SDK
 	implementation(libs.aws.android.sdk.s3)
 	implementation(libs.aws.android.sdk.auth.userpools)
