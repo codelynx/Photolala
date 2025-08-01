@@ -220,16 +220,31 @@ For detailed pricing strategy and tiers, see: `docs/planning/final-pricing-strat
 
 - 1, question is semi-real user id or sphedo user id?
 
-## TODO/Reminders
+## Google Cloud Project Configuration
 
-### Google Cloud Project Setup (Added: Jan 31, 2025)
-- **REMINDER**: Recreate "photolala" Google Cloud project under kyoshikawa@electricwoods.com
-- The project was deleted from personal account (kaz.yoshikawa@gmail.com) and needs to be recreated
-- Project ID should be available ~1 hour after deletion
-- Steps:
-  1. `gcloud config set account kyoshikawa@electricwoods.com`
-  2. `gcloud projects create photolala --name="Photolala"`
-  3. Configure OAuth consent screen and add test users
-  4. Enable Photos Library API
-  5. Create Android OAuth client with SHA-1: `9B:E2:5F:F5:0A:1D:B9:3F:18:99:D0:FF:E2:3A:80:EF:5A:A7:FB:89`
-  6. Download new google-services.json and replace in android/app/
+### Android OAuth Setup (Completed: Jan 31, 2025)
+- **Project Created**: `photolala-android` under kyoshikawa@electricwoods.com
+- **OAuth Configuration**:
+  - Web Client ID: `521726419018-5229b406ioc7m1513kqrnosb67vnm2oo.apps.googleusercontent.com`
+  - Android Client ID: `521726419018-gbg0fj8bvedell0rk0vem3r7uokjuho3.apps.googleusercontent.com`
+  - Debug package: `com.electricwoods.photolala.debug`
+  - Release package: `com.electricwoods.photolala`
+- **API Keys**:
+  - Current API key: `AIzaSyCaebnnLz93e5H-_n5oHeoZkavg5z37Ngs`
+- **Google Photos Library API**: Enabled
+- **OAuth Consent Screen**: Configured with test users
+- **Note**: The original "photolala" project was created under personal account and deleted
+
+### Build Variants
+Android uses different package names for debug/release to support multiple OAuth clients:
+```kotlin
+buildTypes {
+    debug {
+        applicationIdSuffix = ".debug"
+        versionNameSuffix = "-DEBUG"
+    }
+    release {
+        // No suffix
+    }
+}
+```

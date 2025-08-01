@@ -314,66 +314,70 @@ when (currentScreen) {
   - Refresh expired URLs on demand
   - Show loading state during refresh
 
-### 2. No MD5 Hash
-- **Challenge**: Cannot calculate MD5 for deduplication
-- **Solution**:
-  - Use Google Photos mediaItemId as unique identifier
-  - Cannot participate in cross-source deduplication
-  - Tags stored by mediaItemId
+### 2. MD5 Hash Strategy (Similar to Apple Photos)
+- **Browsing Phase**: Use mediaItemId as unique identifier (like Apple Photo ID)
+  - Fast browsing without downloading original data
+  - Thumbnails cached by mediaItemId
+  - Tags/selections tracked by mediaItemId
+  
+- **Star/Backup Phase**: Download original and compute MD5
+  - When user stars a photo, download full data
+  - Compute MD5 hash for cross-source deduplication
+  - Upload to S3 with MD5-based naming
+  - Maintain mediaItemId → MD5 mapping for future reference
 
-**Alternative Identifiers Available**:
+- **Implementation Pattern**:
+  ```kotlin
+  // Browsing: Use mediaItemId
+  PhotoGooglePhotos(
+      id = "ggp#$mediaItemId",  // For UI/browsing
+      mediaItemId = mediaItemId,
+      baseUrl = baseUrl         // Temporary thumbnail URL
+  )
+  
+  // Starring: Download and compute MD5
+  suspend fun starGooglePhoto(photo: PhotoGooglePhotos) {
+      val originalData = downloadPhotoData(photo)
+      val md5 = computeMD5(originalData)
+      
+      // Save mediaItemId → MD5 mapping persistently
+      photoRepository.saveGooglePhotoMD5(mediaItemId, md5)
+      
+      // Upload with MD5-based naming
+      s3Service.uploadPhoto(md5, originalData)
+  }
+  ```
 
-1. **mediaItem.id** (Primary identifier)
-   - Permanent, unique ID assigned by Google Photos
-   - Stable across sessions and devices
-   - Format: Long alphanumeric string (e.g., "AGj1epU9...")
-   - ✅ Best option for persistent identification
+- **Future Benefits of Storing MD5 Mapping**:
+  - Can show MD5-based tags for previously starred photos
+  - Enables incremental tag sync (starred photos first)
+  - Avoids recomputing MD5 if photo is unstarred/restarred
+  - Foundation for v2 features (cross-source tag display)
+  - Could pre-compute MD5s in background for frequently viewed photos
+  
+- **Opportunistic MD5 Computation** (Future):
+  ```kotlin
+  // During slideshow or full-screen viewing
+  suspend fun displayFullPhoto(photo: PhotoGooglePhotos) {
+      // Download original for display
+      val originalData = downloadPhotoData(photo)
+      
+      // Display the photo
+      showFullScreenImage(originalData)
+      
+      // Opportunistically compute and cache MD5
+      if (!hasStoredMD5(photo.mediaItemId)) {
+          val md5 = computeMD5(originalData)
+          photoRepository.saveGooglePhotoMD5(photo.mediaItemId, md5)
+          // Now tags can be displayed for this photo
+      }
+  }
+  ```
 
-2. **mediaItem.productUrl**
-   - Permanent URL to view photo in Google Photos web
-   - Format: `https://photos.google.com/lr/photo/{photoId}`
-   - Stable and shareable
-   - Can extract photoId portion as additional identifier
-
-3. **Combination Approach for Pseudo-Hash**:
-   ```kotlin
-   // Create a stable identifier combining multiple fields
-   fun generateStableId(item: MediaItem): String {
-       val components = listOf(
-           item.filename,
-           item.mediaMetadata.creationTime,
-           item.mediaMetadata.width.toString(),
-           item.mediaMetadata.height.toString()
-       )
-       return components.joinToString("|").toMD5()
-   }
-   ```
-
-4. **Metadata-based Matching**:
-   - filename + creationTime + dimensions
-   - Not guaranteed unique but highly probable
-   - Can help with cross-source matching
-
-5. **Google Photos Specific Metadata**:
-   ```json
-   {
-     "id": "AGj1epU9...",  // Stable ID
-     "productUrl": "https://photos.google.com/lr/photo/AGj1epU9",
-     "filename": "IMG_1234.jpg",
-     "mediaMetadata": {
-       "creationTime": "2023-07-20T10:15:30Z",
-       "width": "4032",
-       "height": "3024",
-       "photo": {
-         "cameraMake": "Apple",
-         "cameraModel": "iPhone 13",
-         "focalLength": 5.1,
-         "apertureFNumber": 1.6,
-         "isoEquivalent": 50
-       }
-     }
-   }
-   ```
+**Other Available Identifiers** (summary):
+- `mediaItem.productUrl` - Permanent web URL
+- `filename + creationTime + dimensions` - Metadata combination
+- Camera EXIF data - Additional matching hints
 
 ### 3. Performance
 - **Challenge**: API calls required for each page of photos
@@ -413,44 +417,127 @@ suspend fun requestAuthorization() {
 }
 ```
 
-### 3. Caching Strategy
-- Cache mediaItem metadata locally
-- Store URL with expiration timestamp
-- Refresh URLs proactively before display
-- Use Coil for image loading with custom fetcher
+### 3. Thumbnail Strategy
 
-### 4. Tag Support
+Google Photos provides server-side thumbnail generation via URL parameters:
+
 ```kotlin
-// Tags stored by mediaItem.id
-suspend fun getTagsForGooglePhoto(mediaItemId: String): Set<ColorFlag> {
-    return photoTagRepository.getTagsForPhoto("ggp#$mediaItemId")
+// Base URL from API: https://lh3.googleusercontent.com/...
+val baseUrl = mediaItem.baseUrl
+
+// Thumbnail sizes (server-generated, no download needed)
+val thumbnail128 = "$baseUrl=w128-h128-c"   // 128x128 cropped
+val thumbnail256 = "$baseUrl=w256-h256-c"   // 256x256 cropped
+val thumbnail512 = "$baseUrl=w512-h512-c"   // 512x512 cropped
+
+// Other options:
+val fitImage = "$baseUrl=w512-h512"         // Fit within bounds
+val widthOnly = "$baseUrl=w512"             // Constrain width only
+val original = "$baseUrl=d"                 // Download original (full resolution)
+
+// Smart crop with face detection
+val smartCrop = "$baseUrl=w256-h256-c-pp"   // Portrait preference
+
+// For MD5 computation - use the =d parameter
+val downloadUrl = "$baseUrl=d"              // Gets original file exactly as uploaded
+```
+
+Benefits:
+- No need to download full images for browsing
+- Server-side processing (fast)
+- Multiple sizes available instantly
+- Face-aware cropping available
+- Bandwidth efficient
+
+Caching:
+- Cache URLs with expiration timestamp
+- Coil handles image caching automatically
+- Refresh URLs when expired (55 minutes)
+
+### 4. Tag Support (Progressive Enhancement)
+
+Phase 1 (Current):
+- Tags stored by MD5 (for cross-source consistency)
+- Google Photos can only show tags after starring (MD5 computed)
+- Acceptable limitation for v1
+
+Phase 2 (Future):
+- Background MD5 computation for viewed photos
+- Gradual tag visibility improvement
+- Optional user-triggered "sync tags" for albums
+
+```kotlin
+// Tags retrieved via MD5 (if available)
+suspend fun getTagsForGooglePhoto(photo: PhotoGooglePhotos): Set<ColorFlag> {
+    val md5 = photoRepository.getGooglePhotoMD5(photo.mediaItemId)
+    return if (md5 != null) {
+        photoTagRepository.getTagsForPhoto("md5#$md5")
+    } else {
+        emptySet()  // No tags until MD5 computed
+    }
 }
 ```
 
 ## Implementation Phases
 
-### Phase 1: Basic Integration (MVP)
+### Phase 1: Basic Integration (MVP) ✅ COMPLETED
 - [x] Planning document
-- [ ] Add Google Photos scope to sign-in
-- [ ] Create GooglePhotosService interface
-- [ ] Implement PhotoGooglePhotos model
-- [ ] Create GooglePhotosProvider ViewModel
-- [ ] Build GooglePhotosScreen UI
-- [ ] Add navigation integration
+- [x] Add Google Photos scope to sign-in
+- [x] Create GooglePhotosService interface
+- [x] Implement PhotoGooglePhotos model
+- [x] Create GooglePhotosProvider ViewModel
+- [x] Build GooglePhotosScreen UI
+- [x] Add navigation integration
 
-### Phase 2: Core Features
+### Phase 2: Core Features 🚧 IN PROGRESS
+- [ ] Actual Google Photos API implementation (currently stub)
 - [ ] Album browsing with picker
 - [ ] Pagination support
 - [ ] URL refresh mechanism
 - [ ] Error handling for expired tokens
 - [ ] Loading states and placeholders
 
-### Phase 3: Advanced Features
+### Phase 3: Advanced Features ❌ NOT STARTED
 - [ ] Search functionality
 - [ ] Download to local storage
 - [ ] Tag synchronization
 - [ ] Thumbnail caching
 - [ ] Batch operations
+
+## Implementation Status (January 31, 2025)
+
+### Completed Items:
+1. **OAuth Configuration**:
+   - Created new Google Cloud project: `photolala-android`
+   - Set up OAuth 2.0 clients (Android + Web)
+   - Configured debug/release build variants
+   - Added Google Photos scope to sign-in flow
+
+2. **Code Implementation**:
+   - `GooglePhotosService.kt` - Service interface
+   - `GooglePhotosServiceImpl.kt` - Stub implementation
+   - `PhotoGooglePhotos.kt` - Photo model with stable IDs
+   - `GooglePhotosProvider.kt` - ViewModel
+   - `GooglePhotosScreen.kt` - UI implementation
+   - Updated `GoogleSignInLegacyService.kt` with Photos scope
+
+3. **Navigation Integration**:
+   - Added to WelcomeScreen menu
+   - Integrated with PhotolalaNavigation
+   - Back navigation support
+
+### Current State:
+- ✅ OAuth authentication working
+- ✅ Google Photos permission granted
+- ✅ UI and navigation functional
+- ⚠️ Stub implementation returns empty results
+- ❌ Actual API calls not implemented
+
+### Next Steps:
+1. Implement actual Google Photos Library API calls
+2. Handle OAuth2 credentials from Google Sign-In
+3. Add pagination and URL refresh logic
+4. Implement album browsing
 
 ## Benefits
 

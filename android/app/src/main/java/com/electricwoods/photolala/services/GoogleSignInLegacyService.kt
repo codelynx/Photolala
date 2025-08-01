@@ -26,8 +26,8 @@ class GoogleSignInLegacyService @Inject constructor(
 ) {
 	companion object {
 		private const val TAG = "GoogleSignInLegacy"
-		// Web Client ID from photolala project (Project ID: photolala)
-		private const val WEB_CLIENT_ID = "105828093997-qmr9jdj3h4ia0tt2772cnrejh4k0p609.apps.googleusercontent.com"
+		// Web Client ID from photolala-android project
+		private const val WEB_CLIENT_ID = "521726419018-5229b406ioc7m1513kqrnosb67vnm2oo.apps.googleusercontent.com"
 		// Google Photos Library scope
 		private val GOOGLE_PHOTOS_SCOPE = Scope("https://www.googleapis.com/auth/photoslibrary.readonly")
 	}
@@ -102,7 +102,11 @@ class GoogleSignInLegacyService @Inject constructor(
 	 */
 	fun hasGooglePhotosScope(): Boolean {
 		val account = getLastSignedInAccount()
-		return account?.grantedScopes?.contains(GOOGLE_PHOTOS_SCOPE) ?: false
+		Log.d(TAG, "Checking Google Photos scope - Account: ${account?.email}")
+		Log.d(TAG, "Granted scopes: ${account?.grantedScopes?.map { it.scopeUri }}")
+		val hasScope = account?.grantedScopes?.contains(GOOGLE_PHOTOS_SCOPE) ?: false
+		Log.d(TAG, "Has Google Photos scope: $hasScope")
+		return hasScope
 	}
 	
 	/**
