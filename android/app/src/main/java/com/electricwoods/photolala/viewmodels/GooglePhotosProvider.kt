@@ -76,7 +76,8 @@ class GooglePhotosProvider @Inject constructor(
 	private var isLoadingMore = false
 	
 	// URL cache with timestamps
-	private val urlCache = mutableMapOf<String, Pair<String, Long>>()
+	private val thumbnailUrlCache = mutableMapOf<String, String>()
+	private val urlExpirationTime = mutableMapOf<String, Long>()
 	
 	// Grid preferences (reuse from PhotoGridViewModel)
 	val thumbnailSize: StateFlow<Int> = preferencesManager.gridThumbnailSize
@@ -186,8 +187,9 @@ class GooglePhotosProvider @Inject constructor(
 			
 			result.onSuccess { page ->
 				val photosWithUrls = page.photos.map { photo ->
-					// Cache URLs with timestamp
-					urlCache[photo.id] = photo.baseUrl to System.currentTimeMillis()
+					// Cache URLs with expiration time (60 minutes from now)
+					thumbnailUrlCache[photo.id] = photo.baseUrl
+					urlExpirationTime[photo.id] = System.currentTimeMillis() + (60 * 60 * 1000)
 					photo
 				}
 				
@@ -222,7 +224,9 @@ class GooglePhotosProvider @Inject constructor(
 				
 				result.onSuccess { page ->
 					val photosWithUrls = page.photos.map { photo ->
-						urlCache[photo.id] = photo.baseUrl to System.currentTimeMillis()
+						// Cache URLs with expiration time (60 minutes from now)
+						thumbnailUrlCache[photo.id] = photo.baseUrl
+						urlExpirationTime[photo.id] = System.currentTimeMillis() + (60 * 60 * 1000)
 						photo
 					}
 					
@@ -259,29 +263,56 @@ class GooglePhotosProvider @Inject constructor(
 	}
 	
 	/**
-	 * Get photo URL (with refresh if expired)
+	 * Get thumbnail URL with size parameter
 	 */
-	suspend fun getPhotoUrl(photo: PhotoGooglePhotos): String {
-		val cached = urlCache[photo.id]
+	fun getThumbnailUrl(photo: PhotoGooglePhotos, size: ThumbnailSize = ThumbnailSize.MEDIUM): String {
+		val cached = thumbnailUrlCache[photo.id]
+		val expiration = urlExpirationTime[photo.id] ?: 0
 		
 		// Check if URL is expired
-		if (cached != null && !photo.isUrlExpired(cached.second)) {
-			return cached.first
+		if (cached != null && System.currentTimeMillis() < expiration) {
+			return "$cached=${size.urlParam}"
 		}
 		
-		// Refresh URL
-		Log.d(TAG, "Refreshing expired URL for ${photo.id}")
+		// Return original URL with size parameter as fallback
+		// The UI should trigger a refresh if needed
+		return "${photo.baseUrl}=${size.urlParam}"
+	}
+	
+	/**
+	 * Refresh expired URLs for visible photos
+	 */
+	suspend fun refreshExpiredUrls(photoIds: List<String>) {
+		val expiredIds = photoIds.filter { id ->
+			val expiration = urlExpirationTime[id] ?: 0
+			System.currentTimeMillis() >= expiration
+		}
 		
-		val result = googlePhotosService.refreshPhotoUrls(listOf(photo.mediaItemId))
+		if (expiredIds.isEmpty()) return
+		
+		Log.d(TAG, "Refreshing ${expiredIds.size} expired URLs")
+		
+		val photos = _photos.value.filter { expiredIds.contains(it.id) }
+		val mediaItemIds = photos.map { it.mediaItemId }
+		
+		val result = googlePhotosService.refreshPhotoUrls(mediaItemIds)
 		result.onSuccess { urlMap ->
-			urlMap[photo.mediaItemId]?.let { newUrl ->
-				urlCache[photo.id] = newUrl to System.currentTimeMillis()
-				return newUrl
+			photos.forEach { photo ->
+				urlMap[photo.mediaItemId]?.let { newUrl ->
+					thumbnailUrlCache[photo.id] = newUrl
+					urlExpirationTime[photo.id] = System.currentTimeMillis() + (60 * 60 * 1000)
+				}
 			}
 		}
-		
-		// Return original URL as fallback
-		return photo.baseUrl
+	}
+	
+	/**
+	 * Thumbnail size options
+	 */
+	enum class ThumbnailSize(val urlParam: String) {
+		SMALL("w256-h256-c"),
+		MEDIUM("w512-h512-c"),
+		LARGE("w1024-h1024-c")
 	}
 	
 	// Selection methods (similar to PhotoGridViewModel)

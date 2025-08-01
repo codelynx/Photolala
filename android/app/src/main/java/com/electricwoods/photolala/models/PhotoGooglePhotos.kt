@@ -11,14 +11,14 @@ import java.util.Date
 data class PhotoGooglePhotos(
 	val mediaItemId: String, // Stable Google Photos ID (like PHAsset.localIdentifier)
 	override val filename: String,
-	override val fileSize: Long? = null, // Not available from API
-	override val width: Int?,
-	override val height: Int?,
-	override val creationDate: Date?,
-	override val modificationDate: Date?,
+	val mimeType: String?,
 	val baseUrl: String, // Temporary URL (expires ~60 min)
 	val productUrl: String, // Permanent link to Google Photos
-	val mimeType: String?,
+	override val width: Int?,
+	override val height: Int?,
+	val creationTime: Date, // From Google Photos API
+	val modifiedTime: Date, // Google Photos doesn't provide this, use creationTime
+	override val fileSize: Long? = null, // Not available from API without downloading
 	// Additional metadata for identification
 	val pseudoHash: String? = null, // Generated from metadata combination
 	val cameraMake: String? = null,
@@ -29,6 +29,12 @@ data class PhotoGooglePhotos(
 	
 	override val displayName: String 
 		get() = filename.substringBeforeLast('.')
+	
+	override val creationDate: Date?
+		get() = creationTime
+	
+	override val modificationDate: Date?
+		get() = modifiedTime
 	
 	val uri: Uri
 		get() = Uri.parse(baseUrl) // Temporary URL for image loading
@@ -49,7 +55,7 @@ data class PhotoGooglePhotos(
 	fun generatePseudoHash(): String {
 		val components = listOf(
 			filename,
-			creationDate?.time?.toString() ?: "",
+			creationTime.time.toString(),
 			width?.toString() ?: "",
 			height?.toString() ?: "",
 			cameraMake ?: "",
@@ -107,14 +113,14 @@ data class PhotoGooglePhotos(
 			return PhotoGooglePhotos(
 				mediaItemId = "temp-id",
 				filename = "temp.jpg",
-				fileSize = null,
-				width = null,
-				height = null,
-				creationDate = null,
-				modificationDate = null,
+				mimeType = "image/jpeg",
 				baseUrl = "",
 				productUrl = "",
-				mimeType = null
+				width = null,
+				height = null,
+				creationTime = Date(),
+				modifiedTime = Date(),
+				fileSize = null
 			)
 		}
 		

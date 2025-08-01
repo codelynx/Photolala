@@ -4,6 +4,9 @@ import android.content.Context
 import android.util.Log
 import com.electricwoods.photolala.di.IoDispatcher
 import com.electricwoods.photolala.models.PhotoGooglePhotos
+import com.electricwoods.photolala.auth.GoogleAuthTokenProvider
+import com.electricwoods.photolala.network.GooglePhotosApiClient
+import com.google.android.gms.auth.api.signin.GoogleSignIn
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.withContext
@@ -13,9 +16,7 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
- * Implementation of GooglePhotosService
- * Note: This is a stub implementation. The actual Google Photos Library API
- * integration will need to be implemented with proper authentication and API calls.
+ * Implementation of GooglePhotosService using Google Photos Library API
  */
 @Singleton
 class GooglePhotosServiceImpl @Inject constructor(
@@ -26,6 +27,33 @@ class GooglePhotosServiceImpl @Inject constructor(
 	
 	companion object {
 		private const val TAG = "GooglePhotosService"
+	}
+	
+	private val tokenProvider = GoogleAuthTokenProvider(context)
+	private var apiClient: GooglePhotosApiClient? = null
+	private var cachedToken: String? = null
+	
+	private suspend fun getApiClient(): GooglePhotosApiClient = withContext(ioDispatcher) {
+		// Check if signed in
+		val account = GoogleSignIn.getLastSignedInAccount(context)
+			?: throw GooglePhotosException.NotSignedIn
+		
+		// Check if has Google Photos scope
+		if (!googleSignInLegacyService.hasGooglePhotosScope()) {
+			throw GooglePhotosException.AuthorizationRequired
+		}
+		
+		// For initial testing, we'll need to implement proper OAuth2 flow
+		// This requires either:
+		// 1. Server-side token exchange (recommended for production)
+		// 2. Direct OAuth2 flow using GoogleAuthUtil (for testing)
+		// 3. Using Google Photos API key (limited functionality)
+		
+		// For now, throw a clear error message
+		throw GooglePhotosException.ApiError(
+			"Google Photos API access requires OAuth2 token exchange. " +
+			"Please implement server-side token exchange or use GoogleAuthUtil for testing."
+		)
 	}
 	
 	override suspend fun isAuthorized(): Boolean = withContext(ioDispatcher) {
@@ -49,16 +77,21 @@ class GooglePhotosServiceImpl @Inject constructor(
 	
 	override suspend fun listAlbums(): Result<List<GooglePhotosService.GooglePhotosAlbum>> = withContext(ioDispatcher) {
 		try {
-			// Stub implementation - return empty list for now
-			Log.d(TAG, "listAlbums called - stub implementation")
+			Log.d(TAG, "Listing albums from Google Photos")
+			val client = getApiClient()
 			
-			// In a real implementation, this would:
-			// 1. Get OAuth2 credentials from Google Sign-In
-			// 2. Create PhotosLibraryClient
-			// 3. Call listAlbums API
-			// 4. Convert response to our data model
+			// Get all albums (might need pagination for large libraries)
+			val allAlbums = mutableListOf<GooglePhotosService.GooglePhotosAlbum>()
+			var pageToken: String? = null
 			
-			Result.success(emptyList())
+			do {
+				val response = client.listAlbums(pageToken = pageToken)
+				allAlbums.addAll(response.albums)
+				pageToken = response.nextPageToken
+			} while (pageToken != null && allAlbums.size < 1000) // Limit to prevent infinite loops
+			
+			Log.d(TAG, "Found ${allAlbums.size} albums")
+			Result.success(allAlbums)
 		} catch (e: Exception) {
 			Log.e(TAG, "Failed to list albums", e)
 			Result.failure(e)
@@ -71,18 +104,19 @@ class GooglePhotosServiceImpl @Inject constructor(
 		pageSize: Int
 	): Result<GooglePhotosService.PhotosPage> = withContext(ioDispatcher) {
 		try {
-			// Stub implementation - return empty page for now
-			Log.d(TAG, "listPhotos called - stub implementation")
+			Log.d(TAG, "Listing photos - albumId: $albumId, pageToken: $pageToken, pageSize: $pageSize")
+			val client = getApiClient()
 			
-			// In a real implementation, this would:
-			// 1. Get OAuth2 credentials
-			// 2. Create PhotosLibraryClient
-			// 3. Call listMediaItems or searchMediaItems API
-			// 4. Convert MediaItems to PhotoGooglePhotos
+			val response = client.listMediaItems(
+				albumId = albumId,
+				pageToken = pageToken,
+				pageSize = pageSize
+			)
 			
+			Log.d(TAG, "Retrieved ${response.photos.size} photos")
 			Result.success(GooglePhotosService.PhotosPage(
-				photos = emptyList(),
-				nextPageToken = null
+				photos = response.photos,
+				nextPageToken = response.nextPageToken
 			))
 		} catch (e: Exception) {
 			Log.e(TAG, "Failed to list photos", e)
@@ -92,9 +126,10 @@ class GooglePhotosServiceImpl @Inject constructor(
 	
 	override suspend fun getPhoto(mediaItemId: String): Result<PhotoGooglePhotos?> = withContext(ioDispatcher) {
 		try {
-			// Stub implementation
-			Log.d(TAG, "getPhoto called for $mediaItemId - stub implementation")
-			Result.success(null)
+			Log.d(TAG, "Getting photo: $mediaItemId")
+			val client = getApiClient()
+			val photo = client.getMediaItem(mediaItemId)
+			Result.success(photo)
 		} catch (e: Exception) {
 			Log.e(TAG, "Failed to get photo: $mediaItemId", e)
 			Result.failure(e)
@@ -105,9 +140,17 @@ class GooglePhotosServiceImpl @Inject constructor(
 		mediaItemIds: List<String>
 	): Result<Map<String, String>> = withContext(ioDispatcher) {
 		try {
-			// Stub implementation
-			Log.d(TAG, "refreshPhotoUrls called for ${mediaItemIds.size} items - stub implementation")
-			Result.success(emptyMap())
+			Log.d(TAG, "Refreshing URLs for ${mediaItemIds.size} items")
+			val client = getApiClient()
+			
+			val refreshedPhotos = client.batchGetMediaItems(mediaItemIds)
+			val urlMap = refreshedPhotos.mapValues { (_, photo) ->
+				// Return base URL for thumbnail generation
+				photo.baseUrl
+			}
+			
+			Log.d(TAG, "Refreshed ${urlMap.size} URLs")
+			Result.success(urlMap)
 		} catch (e: Exception) {
 			Log.e(TAG, "Failed to refresh URLs", e)
 			Result.failure(e)
@@ -120,11 +163,19 @@ class GooglePhotosServiceImpl @Inject constructor(
 		pageSize: Int
 	): Result<GooglePhotosService.PhotosPage> = withContext(ioDispatcher) {
 		try {
-			// Stub implementation
-			Log.d(TAG, "searchPhotos called - stub implementation")
+			Log.d(TAG, "Searching photos with filters")
+			val client = getApiClient()
+			
+			val response = client.searchMediaItems(
+				filters = filters,
+				pageToken = pageToken,
+				pageSize = pageSize
+			)
+			
+			Log.d(TAG, "Search returned ${response.photos.size} photos")
 			Result.success(GooglePhotosService.PhotosPage(
-				photos = emptyList(),
-				nextPageToken = null
+				photos = response.photos,
+				nextPageToken = response.nextPageToken
 			))
 		} catch (e: Exception) {
 			Log.e(TAG, "Failed to search photos", e)

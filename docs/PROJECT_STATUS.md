@@ -1659,3 +1659,30 @@ The Android app now has a Google Photos browser feature similar to the iOS Apple
      - MD5-based file naming in S3
      - Proper S3 path structure: `users/{userId}/photos/{md5}.jpg`
      - Complete error handling and validation
+
+### January 31, 2025
+
+1. **Google Photos Browser Planning (Android)**
+   - Created comprehensive planning document for Google Photos Library API integration
+   - Configured OAuth 2.0 with Google Sign-In
+   - Added Google Photos API dependencies
+   - Implemented debug/release build configurations to handle OAuth conflicts
+   - Created stub implementation for initial testing
+   - Documented dual-ID strategy: mediaItemId for browsing, MD5 for backup
+   - Planned minimal implementation matching iOS Apple Photos browser
+   - Status: Phase 1 (Planning & Setup) completed
+
+### February 1, 2025
+
+1. **Google Photos Browser Implementation (Android)**
+   - Implemented actual Google Photos API client with REST API calls
+   - Added full API methods: listAlbums, listPhotos, searchPhotos, refreshUrls
+   - Implemented pagination support for large photo libraries
+   - Added URL caching with 60-minute expiration handling
+   - Created GoogleAuthTokenProvider for OAuth2 token management
+   - Updated GooglePhotosProvider with proper URL cache management
+   - Added thumbnail size options (Small/Medium/Large) matching iOS
+   - Fixed PhotoGooglePhotos model to match API response structure
+   - Status: Implementation complete except OAuth2 token exchange
+   - Created documentation for OAuth2 implementation options
+   - Next step: Implement OAuth2 token exchange (server-side or GoogleAuthUtil)

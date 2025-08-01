@@ -128,4 +128,11 @@ class GoogleSignInLegacyService @Inject constructor(
 		
 		return null
 	}
+	
+	/**
+	 * Get the server auth code for exchanging with access token
+	 */
+	fun getServerAuthCode(): String? {
+		return getLastSignedInAccount()?.serverAuthCode
+	}
 }
