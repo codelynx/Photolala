@@ -9,6 +9,7 @@ import Foundation
 import Combine
 import SwiftUI
 import OSLog
+import XPlatform
 
 @MainActor
 class DirectoryPhotoProvider: ObservableObject, PhotoProvider {

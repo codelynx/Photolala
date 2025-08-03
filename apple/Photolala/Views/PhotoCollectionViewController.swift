@@ -7,6 +7,7 @@
 
 import Observation
 import SwiftUI
+import XPlatform
 #if os(macOS)
 	import AppKit
 	import Quartz

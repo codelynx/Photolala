@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import XPlatform
 
 struct ComingSoonBadge: View {
 	var body: some View {

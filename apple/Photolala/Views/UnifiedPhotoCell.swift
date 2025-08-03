@@ -11,6 +11,7 @@ import AppKit
 import UIKit
 #endif
 import SwiftUI
+import XPlatform
 
 #if os(macOS)
 /// NSCollectionViewItem for displaying any PhotoItem
@@ -47,7 +48,7 @@ class UnifiedPhotoCell: NSCollectionViewItem {
 		photoImageView.translatesAutoresizingMaskIntoConstraints = false
 		photoImageView.scaleMode = .scaleToFit // Default to fit
 		photoImageView.wantsLayer = true
-		photoImageView.layer?.backgroundColor = NSColor.secondarySystemFill.cgColor
+		photoImageView.layer?.backgroundColor = XColor.secondarySystemBackground.cgColor
 		photoImageView.layer?.cornerRadius = 8
 		photoImageView.layer?.masksToBounds = true
 		photoImageView.layer?.borderWidth = 1.0

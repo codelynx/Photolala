@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import XPlatform
 
 struct AccountSettingsView: View {
 	@EnvironmentObject private var identityManager: IdentityManager
@@ -62,7 +63,7 @@ struct AccountSettingsView: View {
 					.padding(.bottom, 30)
 				}
 			}
-			.background(Color(NSColor.controlBackgroundColor).opacity(0.3))
+			.background(Color(XColor.secondarySystemBackground).opacity(0.3))
 		} else {
 			VStack(spacing: 20) {
 				Image(systemName: "person.slash")
@@ -183,7 +184,7 @@ struct AccountSettingsView: View {
 			LinkedProvidersView()
 		}
 		.padding()
-		.background(Color(NSColor.controlBackgroundColor))
+		.background(Color(XColor.secondarySystemBackground))
 		.clipShape(RoundedRectangle(cornerRadius: 12))
 		.shadow(color: Color.black.opacity(0.05), radius: 5, x: 0, y: 2)
 	}
@@ -250,7 +251,7 @@ struct AccountSettingsView: View {
 			}
 		}
 		.padding()
-		.background(Color(NSColor.controlBackgroundColor))
+		.background(Color(XColor.secondarySystemBackground))
 		.clipShape(RoundedRectangle(cornerRadius: 12))
 		.shadow(color: Color.black.opacity(0.05), radius: 5, x: 0, y: 2)
 	}
@@ -315,7 +316,7 @@ struct AccountSettingsView: View {
 			}
 		}
 		.padding()
-		.background(Color(NSColor.controlBackgroundColor))
+		.background(Color(XColor.secondarySystemBackground))
 		.clipShape(RoundedRectangle(cornerRadius: 12))
 		.shadow(color: Color.black.opacity(0.05), radius: 5, x: 0, y: 2)
 	}
@@ -386,7 +387,7 @@ struct AccountSettingsView: View {
 			}
 		}
 		.padding()
-		.background(Color(NSColor.controlBackgroundColor))
+		.background(Color(XColor.secondarySystemBackground))
 		.overlay(
 			RoundedRectangle(cornerRadius: 12)
 				.stroke(Color.red.opacity(0.3), lineWidth: 1)

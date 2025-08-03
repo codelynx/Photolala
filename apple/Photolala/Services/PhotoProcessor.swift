@@ -9,6 +9,7 @@ import Foundation
 import SwiftUI
 import CryptoKit
 import ImageIO
+import XPlatform
 
 /// Processes photos efficiently by reading the file once for all operations
 @MainActor

@@ -7,6 +7,7 @@
 
 import Foundation
 import SwiftUI
+import XPlatform
 
 /// Unified representation of a photo's thumbnail and metadata
 struct PhotoDigest: Codable {

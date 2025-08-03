@@ -7,6 +7,7 @@
 
 import Foundation
 import SwiftUI
+import XPlatform
 
 /// Manages thumbnail loading with priorities using PhotoManagerV2
 @MainActor

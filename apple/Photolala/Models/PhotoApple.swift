@@ -8,6 +8,7 @@
 import Foundation
 import Photos
 import SwiftUI
+import XPlatform
 
 // File size cache for Apple Photos
 private actor ApplePhotoFileSizeCache {

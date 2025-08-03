@@ -1,4 +1,5 @@
 import SwiftUI
+import XPlatform
 
 
 struct S3PhotoThumbnailView: View {

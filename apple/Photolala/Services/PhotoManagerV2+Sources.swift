@@ -8,6 +8,7 @@
 import Foundation
 import SwiftUI
 import Photos
+import XPlatform
 import CryptoKit
 
 extension PhotoManagerV2 {

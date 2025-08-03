@@ -7,6 +7,7 @@
 
 import Observation
 import SwiftUI
+import XPlatform
 
 struct DirectoryPhotoBrowserView: View {
 	let directoryPath: NSString

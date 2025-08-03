@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import XPlatform
 
 /// Common toolbar items shared between photo browsers
 struct PhotoBrowserCoreToolbar: ToolbarContent {

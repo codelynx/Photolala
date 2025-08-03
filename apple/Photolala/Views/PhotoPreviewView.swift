@@ -1,4 +1,5 @@
 import SwiftUI
+import XPlatform
 
 struct PhotoPreviewView: View {
 	// Constants

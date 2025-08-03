@@ -1,6 +1,7 @@
 import Foundation
 import AWSS3
 import SwiftUI
+import XPlatform
 
 /// Service for downloading photos and thumbnails from S3
 actor S3DownloadService {

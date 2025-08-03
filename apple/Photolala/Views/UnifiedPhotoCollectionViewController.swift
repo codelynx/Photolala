@@ -12,6 +12,7 @@ import UIKit
 #endif
 import SwiftUI
 import Combine
+import XPlatform
 
 /// Delegate protocol for UnifiedPhotoCollectionViewController
 protocol UnifiedPhotoCollectionViewControllerDelegate: AnyObject {

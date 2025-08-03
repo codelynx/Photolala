@@ -1,5 +1,6 @@
 import SwiftUI
 import UniformTypeIdentifiers
+import XPlatform
 
 struct S3PhotoDetailView: View {
 	let photo: PhotoS3

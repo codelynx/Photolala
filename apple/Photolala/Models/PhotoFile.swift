@@ -8,6 +8,7 @@
 import Foundation
 import Observation
 import SwiftUI
+import XPlatform
 
 @Observable
 class PhotoFile: Identifiable, Hashable {

@@ -1,4 +1,5 @@
 import SwiftUI
+import XPlatform
 import CryptoKit
 
 struct PhotoRetrievalView: View {

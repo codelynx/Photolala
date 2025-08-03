@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import XPlatform
 
 struct LinkedProvidersView: View {
 	@EnvironmentObject private var identityManager: IdentityManager
@@ -235,7 +236,7 @@ struct LinkProviderSheet: View {
 									.foregroundColor(.secondary)
 							}
 							.padding()
-							.background(Color(NSColor.controlBackgroundColor))
+							.background(Color(XColor.secondarySystemBackground))
 							.clipShape(RoundedRectangle(cornerRadius: 12))
 						}
 						.buttonStyle(.plain)
@@ -278,7 +279,7 @@ struct ProviderRow: View {
 			// Provider icon
 			ZStack {
 				Circle()
-					.fill(Color(NSColor.controlBackgroundColor))
+					.fill(Color(XColor.secondarySystemBackground))
 					.frame(width: 44, height: 44)
 				
 				Image(systemName: provider.iconName)
@@ -322,7 +323,7 @@ struct ProviderRow: View {
 		}
 		.padding(.vertical, 8)
 		.padding(.horizontal, 12)
-		.background(Color(NSColor.controlBackgroundColor).opacity(0.5))
+		.background(Color(XColor.secondarySystemBackground).opacity(0.5))
 		.clipShape(RoundedRectangle(cornerRadius: 10))
 	}
 }

@@ -10,6 +10,7 @@ import SwiftUI
 import Photos
 import ImageIO
 import CryptoKit
+import XPlatform
 
 @MainActor
 class PhotoManagerV2 {

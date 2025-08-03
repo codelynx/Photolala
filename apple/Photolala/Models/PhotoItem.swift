@@ -7,6 +7,7 @@
 
 import Foundation
 import SwiftUI
+import XPlatform
 
 /// Common protocol for both local and S3 photos
 protocol PhotoItem: Identifiable, Hashable {

@@ -1,4 +1,5 @@
 import SwiftUI
+import XPlatform
 
 struct SignInPromptView: View {
 	@Environment(\.dismiss) private var dismiss

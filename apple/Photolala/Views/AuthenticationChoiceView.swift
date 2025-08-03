@@ -1,4 +1,5 @@
 import SwiftUI
+import XPlatform
 import AuthenticationServices
 
 struct AuthenticationChoiceView: View {
@@ -297,7 +298,7 @@ struct AuthenticationChoiceView: View {
 			.padding(.bottom, 40)
 		}
 		.frame(maxWidth: .infinity, maxHeight: .infinity)
-		.background(Color(XPlatform.systemBackgroundColor))
+		.background(Color(XColor.systemBackground))
 		.alert("Authentication Error", isPresented: $showError) {
 			Button("OK") {
 				showError = false

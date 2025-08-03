@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import XPlatform
 
 struct InspectorView: View {
 	let selection: [any PhotoItem]

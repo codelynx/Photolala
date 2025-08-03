@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import XPlatform
 
 struct BackupStatusBar: View {
 	@ObservedObject var status = BackupStatusManager.shared

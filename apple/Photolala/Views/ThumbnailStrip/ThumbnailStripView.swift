@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import XPlatform
 
 struct ThumbnailStripView: XViewControllerRepresentable {
 	let photos: [PhotoFile]
