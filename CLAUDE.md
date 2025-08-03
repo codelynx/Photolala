@@ -231,9 +231,9 @@ For detailed pricing strategy and tiers, see: `docs/planning/final-pricing-strat
   - Release package: `com.electricwoods.photolala`
 - **API Keys**:
   - Current API key: `AIzaSyCaebnnLz93e5H-_n5oHeoZkavg5z37Ngs`
-- **Google Photos Library API**: Enabled
 - **OAuth Consent Screen**: Configured with test users
 - **Note**: The original "photolala" project was created under personal account and deleted
+- **Important**: Google Photos Library API support was removed (March 31, 2025 restrictions)
 
 ### Build Variants
 Android uses different package names for debug/release to support multiple OAuth clients:

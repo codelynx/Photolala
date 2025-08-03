@@ -22,8 +22,8 @@ class GoogleAuthService @Inject constructor(
 ) {
 	companion object {
 		private const val TAG = "GoogleAuthService"
-		// Web Application OAuth 2.0 Client ID from Google Cloud Console
-		private const val WEB_CLIENT_ID = "663233468053-2g2it4le41amcvcven8jv7b7t2kd7795.apps.googleusercontent.com"
+		// Web Application OAuth 2.0 Client ID from Google Cloud Console (photolala-android project)
+		private const val WEB_CLIENT_ID = "521726419018-5229b406ioc7m1513kqrnosb67vnm2oo.apps.googleusercontent.com"
 	}
 	
 	private val credentialManager = CredentialManager.create(context)
