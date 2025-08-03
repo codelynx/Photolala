@@ -7,7 +7,7 @@ import androidx.lifecycle.viewModelScope
 import com.electricwoods.photolala.models.AuthProvider
 import com.electricwoods.photolala.models.PhotolalaUser
 import com.electricwoods.photolala.services.AuthException
-import com.electricwoods.photolala.services.GoogleSignInLegacyService
+import com.electricwoods.photolala.services.GoogleSignInService
 import com.electricwoods.photolala.services.IdentityManager
 import com.electricwoods.photolala.services.AppleAuthService
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -28,7 +28,7 @@ data class AccountSettingsUiState(
 @HiltViewModel
 class AccountSettingsViewModel @Inject constructor(
 	private val identityManager: IdentityManager,
-	private val googleSignInLegacyService: GoogleSignInLegacyService,
+	private val googleSignInService: GoogleSignInService,
 	private val appleAuthService: AppleAuthService
 ) : ViewModel() {
 	
@@ -112,7 +112,7 @@ class AccountSettingsViewModel @Inject constructor(
 	// For Google Sign-In
 	fun getGoogleSignInIntent(): Intent? {
 		return if (_uiState.value.pendingLinkProvider == AuthProvider.GOOGLE) {
-			googleSignInLegacyService.getSignInIntent()
+			googleSignInService.getSignInIntent()
 		} else {
 			null
 		}

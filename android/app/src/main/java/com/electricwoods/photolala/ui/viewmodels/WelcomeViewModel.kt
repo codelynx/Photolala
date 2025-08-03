@@ -3,7 +3,6 @@ package com.electricwoods.photolala.ui.viewmodels
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.electricwoods.photolala.models.AuthProvider
-import com.electricwoods.photolala.services.GoogleSignInLegacyService
 import com.electricwoods.photolala.services.IdentityManager
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.SharingStarted
@@ -14,8 +13,7 @@ import javax.inject.Inject
 
 @HiltViewModel
 class WelcomeViewModel @Inject constructor(
-	private val identityManager: IdentityManager,
-	private val googleSignInLegacyService: GoogleSignInLegacyService
+	private val identityManager: IdentityManager
 ) : ViewModel() {
 	
 	val currentUser = identityManager.currentUser
@@ -25,8 +23,7 @@ class WelcomeViewModel @Inject constructor(
 	val hasGoogleAccount: StateFlow<Boolean> = identityManager.currentUser
 		.map { user ->
 			user?.linkedProviders?.any { it.provider == AuthProvider.GOOGLE } == true ||
-			user?.primaryProvider == AuthProvider.GOOGLE ||
-			googleSignInLegacyService.hasGooglePhotosScope()
+			user?.primaryProvider == AuthProvider.GOOGLE
 		}
 		.stateIn(
 			scope = viewModelScope,

@@ -72,6 +72,7 @@ dependencies {
 	implementation(libs.androidx.core.ktx)
 	implementation(libs.androidx.activity.compose)
 	implementation(libs.kotlinx.coroutines.android)
+	implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.7.3")
 	
 	// Compose
 	implementation(platform(libs.androidx.compose.bom))
@@ -132,6 +133,9 @@ dependencies {
 	// Chrome Custom Tabs for Apple Sign-In
 	implementation("androidx.browser:browser:1.7.0")
 	
+	// Accompanist permissions for runtime permission handling
+	implementation("com.google.accompanist:accompanist-permissions:0.32.0")
+	
 	// Apple Sign-In dependencies
 	implementation("com.squareup.okhttp3:okhttp:4.11.0")
 	implementation("com.google.code.gson:gson:2.10.1")
@@ -148,9 +152,6 @@ dependencies {
 	// Logging
 	implementation("com.jakewharton.timber:timber:5.0.1")
 	
-	// Google Photos API
-	implementation("com.google.photos.library:google-photos-library-client:1.7.3")
-	implementation("com.google.auth:google-auth-library-oauth2-http:1.19.0")
 	
 	// Testing
 	testImplementation(libs.junit)

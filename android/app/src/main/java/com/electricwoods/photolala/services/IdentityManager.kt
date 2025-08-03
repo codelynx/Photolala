@@ -25,7 +25,8 @@ class IdentityManager @Inject constructor(
 	@ApplicationContext private val context: Context,
 	private val s3Service: S3Service,
 	private val preferencesManager: PreferencesManager,
-	private val googleSignInLegacyService: GoogleSignInLegacyService,
+	private val googleAuthService: GoogleAuthService,
+	private val googleSignInService: GoogleSignInService,
 	private val appleAuthService: AppleAuthService,
 	private val authEventBus: AuthenticationEventBus,
 	private val catalogService: CatalogService
@@ -239,7 +240,7 @@ class IdentityManager @Inject constructor(
 	
 	// Create Google Sign-In intent and store auth intent
 	fun prepareGoogleSignIn(authIntent: AuthIntent): Intent {
-		val signInIntent = googleSignInLegacyService.getSignInIntent()
+		val signInIntent = googleSignInService.getSignInIntent()
 		pendingGoogleAuth = PendingGoogleAuth(signInIntent, authIntent)
 		return signInIntent
 	}
@@ -254,14 +255,14 @@ class IdentityManager @Inject constructor(
 		
 		return try {
 			// Get the credential from the sign-in result
-			val credentialResult = googleSignInLegacyService.handleSignInResult(data)
+			val credentialResult = googleSignInService.handleSignInResult(data)
 			
 			if (credentialResult.isFailure) {
 				val error = credentialResult.exceptionOrNull()
 				val authException = when (error) {
-					is GoogleAuthException.UserCancelled -> AuthException.UserCancelled
-					is GoogleAuthException.ConfigurationError -> AuthException.ConfigurationError(error.message)
-					is GoogleAuthException.NetworkError -> AuthException.NetworkError
+					is GoogleSignInException.UserCancelled -> AuthException.UserCancelled
+					is GoogleSignInException.SignInFailed -> AuthException.AuthenticationFailed(error.message)
+					is GoogleSignInException.UnknownError -> AuthException.AuthenticationFailed(error.message)
 					else -> AuthException.AuthenticationFailed(error?.message ?: "Google Sign-In failed")
 				}
 				
@@ -875,14 +876,14 @@ class IdentityManager @Inject constructor(
 		
 		return try {
 			// Get the credential from the sign-in result
-			val credentialResult = googleSignInLegacyService.handleSignInResult(data)
+			val credentialResult = googleSignInService.handleSignInResult(data)
 			
 			if (credentialResult.isFailure) {
 				val error = credentialResult.exceptionOrNull()
 				val authException = when (error) {
-					is GoogleAuthException.UserCancelled -> AuthException.UserCancelled
-					is GoogleAuthException.ConfigurationError -> AuthException.ConfigurationError(error.message)
-					is GoogleAuthException.NetworkError -> AuthException.NetworkError
+					is GoogleSignInException.UserCancelled -> AuthException.UserCancelled
+					is GoogleSignInException.SignInFailed -> AuthException.AuthenticationFailed(error.message)
+					is GoogleSignInException.UnknownError -> AuthException.AuthenticationFailed(error.message)
 					else -> AuthException.AuthenticationFailed(error?.message ?: "Google Sign-In failed")
 				}
 				

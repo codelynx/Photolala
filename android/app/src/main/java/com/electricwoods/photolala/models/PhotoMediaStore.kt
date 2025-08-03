@@ -4,7 +4,7 @@ import android.net.Uri
 import java.util.Date
 
 /**
- * Represents a photo from Android's MediaStore (Google Photos, Gallery, etc.)
+ * Represents a photo from Android's MediaStore (Gallery, etc.)
  * Equivalent to iOS PhotoApple
  */
 data class PhotoMediaStore(
