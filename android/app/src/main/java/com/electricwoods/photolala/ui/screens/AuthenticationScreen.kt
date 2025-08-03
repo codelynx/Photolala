@@ -2,6 +2,7 @@ package com.electricwoods.photolala.ui.screens
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -62,22 +63,27 @@ fun AuthenticationScreen(
 		}
 	}
 	
-	Column(
-		modifier = Modifier
-			.fillMaxSize()
-			.padding(24.dp),
-		horizontalAlignment = Alignment.CenterHorizontally,
-		verticalArrangement = Arrangement.Center
+	Box(
+		modifier = Modifier.fillMaxSize(),
+		contentAlignment = Alignment.Center
 	) {
-		// Logo or icon (placeholder for now)
+		Column(
+			modifier = Modifier
+				.widthIn(max = 400.dp)
+				.padding(horizontal = 32.dp, vertical = 24.dp),
+			horizontalAlignment = Alignment.CenterHorizontally
+		) {
+		// Top spacer to push content down from top
+		Spacer(modifier = Modifier.weight(1f))
+		// Logo or icon
 		Icon(
-			painter = painterResource(id = R.drawable.ic_launcher_foreground),
+			painter = painterResource(id = R.drawable.app_icon),
 			contentDescription = null,
 			modifier = Modifier.size(80.dp),
-			tint = MaterialTheme.colorScheme.primary
+			tint = Color.Unspecified
 		)
 		
-		Spacer(modifier = Modifier.height(32.dp))
+		Spacer(modifier = Modifier.height(24.dp))
 		
 		// Title
 		Text(
@@ -101,7 +107,7 @@ fun AuthenticationScreen(
 			modifier = Modifier.padding(horizontal = 32.dp)
 		)
 		
-		Spacer(modifier = Modifier.height(48.dp))
+		Spacer(modifier = Modifier.height(32.dp))
 		
 		// Google Sign In Button
 		ElevatedButton(
@@ -114,7 +120,8 @@ fun AuthenticationScreen(
 			},
 			modifier = Modifier
 				.fillMaxWidth()
-				.height(56.dp),
+				.height(48.dp),
+			shape = RoundedCornerShape(24.dp),
 			enabled = !isLoading,
 			colors = ButtonDefaults.elevatedButtonColors(
 				containerColor = MaterialTheme.colorScheme.surface
@@ -138,7 +145,7 @@ fun AuthenticationScreen(
 			}
 		}
 		
-		Spacer(modifier = Modifier.height(16.dp))
+		Spacer(modifier = Modifier.height(12.dp))
 		
 		// Apple Sign In Button
 		Button(
@@ -151,7 +158,8 @@ fun AuthenticationScreen(
 			},
 			modifier = Modifier
 				.fillMaxWidth()
-				.height(56.dp),
+				.height(48.dp),
+			shape = RoundedCornerShape(24.dp),
 			enabled = !isLoading,
 			colors = ButtonDefaults.buttonColors(
 				containerColor = Color.Black,
@@ -220,7 +228,8 @@ fun AuthenticationScreen(
 			}
 		}
 		
-		Spacer(modifier = Modifier.weight(1f))
+		// Bottom spacer - slightly larger to account for cancel button
+		Spacer(modifier = Modifier.weight(1.5f))
 		
 		// Cancel button
 		TextButton(
@@ -229,13 +238,13 @@ fun AuthenticationScreen(
 		) {
 			Text("Cancel")
 		}
+		}
 		
 		// Loading indicator
 		if (isLoading) {
 			Box(
 				modifier = Modifier
-					.fillMaxSize()
-					.padding(24.dp),
+					.fillMaxSize(),
 				contentAlignment = Alignment.Center
 			) {
 				CircularProgressIndicator()

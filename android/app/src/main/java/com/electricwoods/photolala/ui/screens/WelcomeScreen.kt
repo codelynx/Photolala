@@ -68,23 +68,24 @@ fun WelcomeScreen(
 	}
 	
 	Box(
-		modifier = Modifier.fillMaxSize()
+		modifier = Modifier.fillMaxSize(),
+		contentAlignment = Alignment.Center
 	) {
 		Column(
 			modifier = Modifier
-				.fillMaxSize()
-				.padding(24.dp),
+				.widthIn(max = 400.dp)
+				.padding(horizontal = 32.dp),
 			verticalArrangement = Arrangement.Center,
 			horizontalAlignment = Alignment.CenterHorizontally
 		) {
 		// App icon
 		Image(
-			painter = painterResource(id = R.drawable.ic_launcher_foreground),
+			painter = painterResource(id = R.drawable.app_icon),
 			contentDescription = "Photolala",
-			modifier = Modifier.size(120.dp)
+			modifier = Modifier.size(100.dp)
 		)
 		
-		Spacer(modifier = Modifier.height(24.dp))
+		Spacer(modifier = Modifier.height(16.dp))
 		
 		// Welcome text
 		Text(
@@ -93,7 +94,7 @@ fun WelcomeScreen(
 			textAlign = TextAlign.Center
 		)
 		
-		Spacer(modifier = Modifier.height(16.dp))
+		Spacer(modifier = Modifier.height(8.dp))
 		
 		Text(
 			text = if (isSignedIn) {
@@ -116,14 +117,15 @@ fun WelcomeScreen(
 			)
 		}
 		
-		Spacer(modifier = Modifier.height(48.dp))
+		Spacer(modifier = Modifier.height(32.dp))
 		
 		// Local browser button
 		Button(
 			onClick = onBrowsePhotosClick,
 			modifier = Modifier
 				.fillMaxWidth()
-				.height(56.dp),
+				.height(48.dp),
+			shape = RoundedCornerShape(24.dp),
 			colors = ButtonDefaults.buttonColors(
 				containerColor = MaterialTheme.colorScheme.primary
 			)
@@ -137,14 +139,15 @@ fun WelcomeScreen(
 			Text("Local Browser", fontSize = 16.sp)
 		}
 		
-		Spacer(modifier = Modifier.height(16.dp))
+		Spacer(modifier = Modifier.height(12.dp))
 		
 		// Cloud browser button (enabled if signed in)
 		OutlinedButton(
 			onClick = onCloudBrowserClick,
 			modifier = Modifier
 				.fillMaxWidth()
-				.height(56.dp),
+				.height(48.dp),
+			shape = RoundedCornerShape(24.dp),
 			enabled = isSignedIn
 		) {
 			Icon(
@@ -159,18 +162,16 @@ fun WelcomeScreen(
 			)
 		}
 		
-		Spacer(modifier = Modifier.height(16.dp))
-		
 		// Sign in/Create account section
 		if (!isSignedIn) {
-			Spacer(modifier = Modifier.height(32.dp))
+			Spacer(modifier = Modifier.height(24.dp))
 			
-			Divider(
+			HorizontalDivider(
 				modifier = Modifier.padding(horizontal = 32.dp),
 				color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f)
 			)
 			
-			Spacer(modifier = Modifier.height(24.dp))
+			Spacer(modifier = Modifier.height(16.dp))
 			
 			Text(
 				text = "Backup and sync your photos",
@@ -179,17 +180,20 @@ fun WelcomeScreen(
 				color = MaterialTheme.colorScheme.onSurfaceVariant
 			)
 			
-			Spacer(modifier = Modifier.height(16.dp))
+			Spacer(modifier = Modifier.height(12.dp))
 			
 			// Sign In button
 			Button(
 				onClick = onSignInClick,
-				modifier = Modifier.fillMaxWidth(),
+				modifier = Modifier
+					.fillMaxWidth()
+					.height(48.dp),
+				shape = RoundedCornerShape(24.dp),
 				colors = ButtonDefaults.buttonColors(
 					containerColor = MaterialTheme.colorScheme.primary
 				)
 			) {
-				Text("Sign In")
+				Text("Sign In", fontSize = 16.sp)
 			}
 			
 			Spacer(modifier = Modifier.height(8.dp))
