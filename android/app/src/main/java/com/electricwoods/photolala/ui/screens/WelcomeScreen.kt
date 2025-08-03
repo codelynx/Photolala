@@ -148,7 +148,11 @@ fun WelcomeScreen(
 				.fillMaxWidth()
 				.height(48.dp),
 			shape = RoundedCornerShape(24.dp),
-			enabled = isSignedIn
+			enabled = isSignedIn,
+			border = BorderStroke(
+				width = 1.dp,
+				color = if (isSignedIn) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline.copy(alpha = 0.12f)
+			)
 		) {
 			Icon(
 				imageVector = Icons.Default.Cloud,
@@ -312,7 +316,8 @@ fun SignedInCard(
 		) {
 			// Account Settings Button
 			OutlinedButton(
-				onClick = onAccountSettings
+				onClick = onAccountSettings,
+				border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary)
 			) {
 				Text("Account Settings")
 			}

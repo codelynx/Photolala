@@ -1,5 +1,6 @@
 package com.electricwoods.photolala.ui.screens
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -125,7 +126,8 @@ fun AuthenticationScreen(
 			enabled = !isLoading,
 			colors = ButtonDefaults.elevatedButtonColors(
 				containerColor = MaterialTheme.colorScheme.surface
-			)
+			),
+			border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.3f))
 		) {
 			Row(
 				verticalAlignment = Alignment.CenterVertically,
