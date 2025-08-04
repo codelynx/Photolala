@@ -1349,7 +1349,35 @@ Implementing new sign-in/sign-up UX across all platforms with the popular "Don't
      - Cross-device authentication prepared
      - Consistent with iOS/macOS implementation
 
-54. **Google Sign-In Integration for iOS/macOS (July 3)**:
+54. **AppIconImage Asset Implementation (August 4)**:
+   - **Asset Configuration**:
+     - Created AppIconImage.imageset in Assets.xcassets
+     - Regular image asset (not .appiconset) for UI display
+     - Named "AppIconImage" to distinguish from app's actual AppIcon
+     - Recommended size: 256x256px for optimal display quality
+   
+   - **Implementation Updates**:
+     - AuthenticationChoiceView: Shows app icon in sign-in/create account screen
+     - WelcomeView: Displays app icon above "Photolala" text
+     - Both views use conditional loading with photo.stack fallback
+     - Consistent 80x80pt display size with 16pt corner radius
+   
+   - **Code Pattern**:
+     ```swift
+     if let appIcon = XImage(named: "AppIconImage") {
+         Image(appIcon)
+             .resizable()
+             .aspectRatio(contentMode: .fit)
+             .frame(width: 80, height: 80)
+             .cornerRadius(16)
+     } else {
+         Image(systemName: "photo.stack")
+             .font(.system(size: 80))
+             .foregroundStyle(.tint)
+     }
+     ```
+
+55. **Google Sign-In Integration for iOS/macOS (July 3)**:
    - **SDK Integration**:
      - Added GoogleSignIn SDK v8.0.0 via Swift Package Manager
      - Manually linked GoogleSignIn and GoogleSignInSwift frameworks to Photolala target

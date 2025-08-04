@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import XPlatform
 
 struct WelcomeView: View {
 	@State private var selectedFolder: URL?
@@ -36,9 +37,17 @@ struct WelcomeView: View {
 		VStack(spacing: 30) {
 			// App icon and name
 			VStack(spacing: 16) {
-				Image(systemName: "photo.stack")
-					.font(.system(size: 80))
-					.foregroundStyle(.tint)
+				if let appIcon = XImage(named: "AppIconImage") {
+					Image(appIcon)
+						.resizable()
+						.aspectRatio(contentMode: .fit)
+						.frame(width: 80, height: 80)
+						.cornerRadius(16)
+				} else {
+					Image(systemName: "photo.stack")
+						.font(.system(size: 80))
+						.foregroundStyle(.tint)
+				}
 
 				Text("Photolala")
 					.font(.largeTitle)

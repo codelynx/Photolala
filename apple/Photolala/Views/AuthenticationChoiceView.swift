@@ -24,9 +24,17 @@ struct AuthenticationChoiceView: View {
 		VStack(spacing: 0) {
 			// Header
 			VStack(spacing: 16) {
-				Image(systemName: "photo.stack")
-					.font(.system(size: 80))
-					.foregroundColor(.accentColor)
+				if let appIcon = XImage(named: "AppIconImage") {
+					Image(appIcon)
+						.resizable()
+						.aspectRatio(contentMode: .fit)
+						.frame(width: 80, height: 80)
+						.cornerRadius(16)
+				} else {
+					Image(systemName: "photo.stack")
+						.font(.system(size: 80))
+						.foregroundColor(.accentColor)
+				}
 				
 				Text(authMode == .signIn ? "Welcome to Photolala" : "Create Your Account")
 					.font(.largeTitle)
