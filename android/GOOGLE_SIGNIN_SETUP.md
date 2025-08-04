@@ -1,14 +1,26 @@
 # Google Sign-In Setup for Photolala Android
 
+## Current Configuration (Updated: Feb 4, 2025)
+
+Photolala Android uses the unified Google Cloud project shared with iOS/macOS:
+
+- **Project Name**: `Photolala` (project ID: photolala)
+- **Project Number**: `75309194504`
+- **Web Client ID**: `75309194504-p2sfktq2ju97ataogb1e5fkl70cj2jg3.apps.googleusercontent.com`
+- **Android Client ID**: `75309194504-imt63lddcdanccn2e2dsvdfbq5id9rn2.apps.googleusercontent.com`
+- **Package Name**: `com.electricwoods.photolala`
+- **SHA-1**: `9B:E2:5F:F5:0A:1D:B9:3F:18:99:D0:FF:E2:3A:80:EF:5A:A7:FB:89`
+- **API Key**: `AIzaSyAMbZ_Y8_0jENZachFsJQBrBfmYuGAb3Uk`
+
 ## Prerequisites
 
 1. **Google Cloud Console Access**
    - Go to https://console.cloud.google.com/
-   - Create a new project or select existing one
+   - Select the `Photolala` project
 
-2. **Firebase Console** (Alternative)
+2. **Firebase Console** (for google-services.json)
    - Go to https://console.firebase.google.com/
-   - Create a new project or select existing one
+   - Use the same `Photolala` project
 
 ## Setup Steps
 
@@ -16,12 +28,11 @@
 
 #### In Google Cloud Console:
 1. Go to APIs & Services → Credentials
-2. Click "Create Credentials" → "OAuth client ID"
-3. Select "Android" as application type
-4. Enter:
+2. The Android OAuth client should already exist:
    - Name: Photolala Android
    - Package name: `com.electricwoods.photolala`
-   - SHA-1 certificate fingerprint (see below)
+   - SHA-1: `9B:E2:5F:F5:0A:1D:B9:3F:18:99:D0:FF:E2:3A:80:EF:5A:A7:FB:89`
+3. If creating a new client, use the values above
 
 #### Get SHA-1 Certificate:
 ```bash
@@ -46,18 +57,24 @@ You'll need the **Web client ID** (not the Android client ID) for Google Sign-In
 2. Create another OAuth 2.0 Client ID of type "Web application"
 3. Copy the client ID (looks like: `XXXXXX.apps.googleusercontent.com`)
 
-### 3. Update Code Configuration
+### 3. Code Configuration
 
-In `GoogleAuthService.kt`, update:
+The Web Client ID is already configured in both:
+- `GoogleAuthService.kt`
+- `GoogleSignInService.kt`
+
 ```kotlin
-private const val WEB_CLIENT_ID = "YOUR_WEB_CLIENT_ID.apps.googleusercontent.com"
+private const val WEB_CLIENT_ID = "75309194504-p2sfktq2ju97ataogb1e5fkl70cj2jg3.apps.googleusercontent.com"
 ```
 
-### 4. Add google-services.json
+### 4. google-services.json
 
-1. Copy `android/app/google-services.json.example` to `android/app/google-services.json`
-2. Fill in the actual values from Firebase/Google Cloud Console
-3. **IMPORTANT**: Add `google-services.json` to `.gitignore`
+The `google-services.json` file is already configured and committed to the repository at `android/app/google-services.json`. It contains:
+- OAuth client configurations
+- API key
+- Project information
+
+Note: The Google Services Gradle plugin is not used (commented out in build.gradle.kts), but the configuration file is still required by the Google Sign-In SDK.
 
 ### 5. Test Configuration
 

@@ -33,8 +33,8 @@ class GoogleSignInService @Inject constructor(
 ) {
 	companion object {
 		private const val TAG = "GoogleSignInService"
-		// Web Client ID for Google Sign-In (from photolala-android project)
-		private const val WEB_CLIENT_ID = "521726419018-5229b406ioc7m1513kqrnosb67vnm2oo.apps.googleusercontent.com"
+		// Web Client ID for Google Sign-In (from unified Photolala project)
+		private const val WEB_CLIENT_ID = "75309194504-p2sfktq2ju97ataogb1e5fkl70cj2jg3.apps.googleusercontent.com"
 	}
 	
 	private val googleSignInClient: GoogleSignInClient by lazy {

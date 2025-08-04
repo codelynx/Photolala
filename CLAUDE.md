@@ -234,29 +234,15 @@ For detailed pricing strategy and tiers, see: `docs/planning/final-pricing-strat
   - Configuration is centralized in `GoogleOAuthConfiguration` struct
 - **Note**: The iOS client ID works better with ASWebAuthenticationSession on macOS than the Desktop client type
 
-### Android OAuth Setup (Completed: Jan 31, 2025)
-- **Project Created**: `photolala-android` under kyoshikawa@electricwoods.com
+### Android OAuth Setup (Updated: Feb 4, 2025)
+- **Project**: Uses the same unified `Photolala` project as Apple platforms
 - **OAuth Configuration**:
-  - Web Client ID: `521726419018-5229b406ioc7m1513kqrnosb67vnm2oo.apps.googleusercontent.com`
-  - Android Client ID: `521726419018-gbg0fj8bvedell0rk0vem3r7uokjuho3.apps.googleusercontent.com`
-  - Debug package: `com.electricwoods.photolala.debug`
-  - Release package: `com.electricwoods.photolala`
+  - Web Client ID: `75309194504-p2sfktq2ju97ataogb1e5fkl70cj2jg3.apps.googleusercontent.com` (same as Apple platforms)
+  - Android Client ID: `75309194504-imt63lddcdanccn2e2dsvdfbq5id9rn2.apps.googleusercontent.com`
+  - Package name: `com.electricwoods.photolala` (no debug suffix)
+  - SHA-1 fingerprint: `9B:E2:5F:F5:0A:1D:B9:3F:18:99:D0:FF:E2:3A:80:EF:5A:A7:FB:89`
 - **API Keys**:
-  - Current API key: `AIzaSyCaebnnLz93e5H-_n5oHeoZkavg5z37Ngs`
-- **OAuth Consent Screen**: Configured with test users
-- **Note**: The original "photolala" project was created under personal account and deleted
+  - Current API key: `AIzaSyAMbZ_Y8_0jENZachFsJQBrBfmYuGAb3Uk`
+- **Implementation**: Uses Google Sign-In SDK with google-services.json configuration
 - **Important**: Google Photos Library API support was removed (March 31, 2025 restrictions)
 
-### Build Variants
-Android uses different package names for debug/release to support multiple OAuth clients:
-```kotlin
-buildTypes {
-    debug {
-        applicationIdSuffix = ".debug"
-        versionNameSuffix = "-DEBUG"
-    }
-    release {
-        // No suffix
-    }
-}
-```

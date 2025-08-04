@@ -10,7 +10,7 @@ The Android app now has a Google Photos browser feature similar to the iOS Apple
 
 ### January 31, 2025: Android Google Photos Browser Implementation (Phase 1)
 - ✅ OAuth configuration with Google Cloud Console
-- ✅ Created new project `photolala-android` under electricwoods.com
+- ✅ Created unified project `photolala` for all platforms
 - ✅ Configured debug/release build variants with different package names
 - ✅ Added Google Photos scope to GoogleSignInLegacyService
 - ✅ Created GooglePhotosService interface and stub implementation

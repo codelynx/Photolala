@@ -5,8 +5,8 @@ plugins {
 	alias(libs.plugins.kotlin.serialization)
 	alias(libs.plugins.hilt)
 	alias(libs.plugins.ksp)
-	// Google Services plugin
-	alias(libs.plugins.google.services)
+	// Google Services plugin (removed - not using Firebase)
+	// alias(libs.plugins.google.services)
 }
 
 android {
@@ -32,7 +32,8 @@ android {
 
 	buildTypes {
 		debug {
-			applicationIdSuffix = ".debug"
+			// No suffix - using same package name for debug and release
+			// applicationIdSuffix = ".debug"
 			versionNameSuffix = "-DEBUG"
 		}
 		release {
