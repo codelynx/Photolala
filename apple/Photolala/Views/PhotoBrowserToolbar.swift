@@ -20,93 +20,60 @@ struct PhotoBrowserCoreToolbar: ToolbarContent {
 		ToolbarItemGroup(placement: .automatic) {
 			// Unified View Menu for both platforms
 			Menu {
-				// Display section
-				Section("Display") {
-					Button {
-						settings.displayMode = .scaleToFit
+				// Display submenu
+				Menu("Display") {
+					Picker(selection: $settings.displayMode) {
+						Text("Scale to Fit").tag(ThumbnailDisplayMode.scaleToFit)
+						Text("Scale to Fill").tag(ThumbnailDisplayMode.scaleToFill)
 					} label: {
-						Label("Scale to Fit", systemImage: settings.displayMode == .scaleToFit ? "checkmark" : "")
-							.labelStyle(.titleAndIcon)
+						EmptyView()
 					}
-					
-					Button {
-						settings.displayMode = .scaleToFill
-					} label: {
-						Label("Scale to Fill", systemImage: settings.displayMode == .scaleToFill ? "checkmark" : "")
-							.labelStyle(.titleAndIcon)
-					}
-					
-					Divider()
-					
-					Button {
-						settings.showItemInfo.toggle()
-					} label: {
-						Label(settings.showItemInfo ? "Hide Item Info" : "Show Item Info", 
-							  systemImage: settings.showItemInfo ? "checkmark" : "")
-							.labelStyle(.titleAndIcon)
-					}
+					.pickerStyle(.inline)
+				}
+				
+				// Show Item Info toggle
+				Button {
+					settings.showItemInfo.toggle()
+				} label: {
+					Label("Show Item Info", systemImage: settings.showItemInfo ? "checkmark" : "")
+						.labelStyle(.titleAndIcon)
 				}
 				
 				Divider()
 				
-				// Thumbnail size section
-				Section("Thumbnail Size") {
-					Button {
-						settings.thumbnailOption = .small
+				// Thumbnail size submenu
+				Menu("Thumbnail Size") {
+					Picker(selection: $settings.thumbnailOption) {
+						Text("Small").tag(ThumbnailOption.small)
+						Text("Medium").tag(ThumbnailOption.medium)
+						Text("Large").tag(ThumbnailOption.large)
 					} label: {
-						Label("Small", systemImage: settings.thumbnailOption == .small ? "checkmark" : "")
-							.labelStyle(.titleAndIcon)
+						EmptyView()
 					}
-					
-					Button {
-						settings.thumbnailOption = .medium
-					} label: {
-						Label("Medium", systemImage: settings.thumbnailOption == .medium ? "checkmark" : "")
-							.labelStyle(.titleAndIcon)
-					}
-					
-					Button {
-						settings.thumbnailOption = .large
-					} label: {
-						Label("Large", systemImage: settings.thumbnailOption == .large ? "checkmark" : "")
-							.labelStyle(.titleAndIcon)
-					}
+					.pickerStyle(.inline)
 				}
 				
-				// Group by section (only show if we have a grouping change handler)
+				// Group by picker (only show if we have a grouping change handler)
 				if let onGroupingChange = onGroupingChange {
 					Divider()
 					
 					Section("Group By") {
-						Button {
-							settings.groupingOption = .none
-							Task {
-								await onGroupingChange(.none)
+						Picker(selection: Binding(
+							get: { settings.groupingOption },
+							set: { newValue in
+								settings.groupingOption = newValue
+								Task {
+									await onGroupingChange(newValue)
+								}
 							}
+						)) {
+							Text("None").tag(PhotoGroupingOption.none)
+							Text("Year").tag(PhotoGroupingOption.year)
+							Text("Year/Month").tag(PhotoGroupingOption.yearMonth)
 						} label: {
-							Label("None", systemImage: settings.groupingOption == .none ? "checkmark" : "")
-								.labelStyle(.titleAndIcon)
+							EmptyView()
 						}
-						
-						Button {
-							settings.groupingOption = .year
-							Task {
-								await onGroupingChange(.year)
-							}
-						} label: {
-							Label("Year", systemImage: settings.groupingOption == .year ? "checkmark" : "")
-								.labelStyle(.titleAndIcon)
-						}
-						
-						Button {
-							settings.groupingOption = .yearMonth
-							Task {
-								await onGroupingChange(.yearMonth)
-							}
-						} label: {
-							Label("Year/Month", systemImage: settings.groupingOption == .yearMonth ? "checkmark" : "")
-								.labelStyle(.titleAndIcon)
-						}
+						.pickerStyle(.inline)
 					}
 				}
 			} label: {
