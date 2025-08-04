@@ -76,12 +76,6 @@ struct AuthCredential {
 			return nil
 		}
 		
-		print("[AuthCredential] Extracted Apple JWT sub: \(sub)")
-		
-		// Also log email if available for debugging
-		if let email = json["email"] as? String {
-			print("[AuthCredential] Apple ID email: \(email)")
-		}
 		
 		return sub
 	}

@@ -27,7 +27,6 @@ import GoogleSignIn
 		
 		func applicationDidFinishLaunching(_ notification: Notification) {
 			// The welcome window should open automatically from the main WindowGroup
-			print("[AppDelegate] applicationDidFinishLaunching - Windows count: \(NSApp.windows.count)")
 		}
 		
 		func applicationSupportsSecureRestorableState(_ app: NSApplication) -> Bool {
@@ -66,7 +65,6 @@ struct PhotolalaApp: App {
 	#endif
 
 	init() {
-		print("[photolalaApp] App initialized")
 
 		// Initialize managers
 		_ = IdentityManager.shared
@@ -77,10 +75,6 @@ struct PhotolalaApp: App {
 		// from UserDefaults on init. Apple Photo backup status is now
 		// stored in the SwiftData catalog.
 		
-		// Print cache root directory for debugging
-		let cacheRoot = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)[0]
-			.appendingPathComponent("com.electricwoods.photolala")
-		print("[CacheManager] Cache root directory: \(cacheRoot.path)")
 		
 		// Perform cache migration if needed
 		CacheManager.shared.performMigrationIfNeeded()
@@ -91,28 +85,9 @@ struct PhotolalaApp: App {
 	
 	private func configureGoogleSignIn() {
 		#if canImport(GoogleSignIn)
-		// Web Client ID for server-side verification (same as Android)
-		let webClientID = "105828093997-qmr9jdj3h4ia0tt2772cnrejh4k0p609.apps.googleusercontent.com"
-		
-		// Extract iOS client ID from Info.plist
-		guard let path = Bundle.main.path(forResource: "Info", ofType: "plist"),
-			  let plist = NSDictionary(contentsOfFile: path),
-			  let urlTypes = plist["CFBundleURLTypes"] as? [[String: Any]],
-			  let urlSchemes = urlTypes.first?["CFBundleURLSchemes"] as? [String],
-			  let reversedClientId = urlSchemes.first(where: { $0.hasPrefix("com.googleusercontent.apps.") }) else {
-			print("[GoogleSignIn] Warning: Google Sign-In client ID not found in Info.plist")
-			return
-		}
-		
-		// Extract client ID from reversed client ID
-		let components = reversedClientId.replacingOccurrences(of: "com.googleusercontent.apps.", with: "")
-		let clientId = components + ".apps.googleusercontent.com"
-		
-		print("[GoogleSignIn] Configuring with client ID: \(clientId)")
-		
 		GIDSignIn.sharedInstance.configuration = GIDConfiguration(
-			clientID: clientId,
-			serverClientID: webClientID
+			clientID: GoogleOAuthConfiguration.clientID,
+			serverClientID: GoogleOAuthConfiguration.webClientID
 		)
 		#endif
 	}
@@ -168,17 +143,27 @@ struct PhotolalaApp: App {
 	}
 	
 	private func handleOpenURL(_ url: URL) {
+		
 		#if canImport(GoogleSignIn)
-		// Try Google Sign-In first
-		Task {
-			if await GoogleAuthProvider.shared.handle(url: url) {
-				print("[GoogleSignIn] Handled URL callback")
-				return
+		// Check if this is a Google Sign-In callback
+		if url.scheme?.hasPrefix("com.googleusercontent.apps") == true {
+			
+			#if os(macOS)
+			// On macOS, we're using the web flow, so handle the callback manually
+			Task {
+				await GoogleAuthProvider.handleOAuthCallback(url)
 			}
+			return
+			#else
+			// On iOS, let the Google Sign-In SDK handle it
+			if GIDSignIn.sharedInstance.handle(url) {
+				return
+			} else {
+			}
+			#endif
 		}
 		#endif
 		
 		// Handle other URL schemes if needed
-		print("[PhotolalaApp] Unhandled URL: \(url)")
 	}
 }

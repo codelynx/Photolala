@@ -222,6 +222,18 @@ For detailed pricing strategy and tiers, see: `docs/planning/final-pricing-strat
 
 ## Google Cloud Project Configuration
 
+### Apple Platforms OAuth Setup (Completed: Feb 3, 2025)
+- **Project Created**: `Photolala` (unified project) under kyoshikawa@electricwoods.com
+- **OAuth Configuration**:
+  - Web Client ID: `75309194504-p2sfktq2ju97ataogb1e5fkl70cj2jg3.apps.googleusercontent.com` (for server-side verification)
+  - iOS Client ID: `75309194504-g1a4hr3pc68301vuh21tibauh9ar1nkv.apps.googleusercontent.com` (used for both iOS and macOS)
+  - Redirect URI: `com.googleusercontent.apps.75309194504-g1a4hr3pc68301vuh21tibauh9ar1nkv:/oauth2redirect`
+- **Implementation Details**:
+  - iOS: Uses Google Sign-In SDK with ASWebAuthenticationSession fallback
+  - macOS: Uses direct browser OAuth flow (ASWebAuthenticationSession has reliability issues on macOS)
+  - Configuration is centralized in `GoogleOAuthConfiguration` struct
+- **Note**: The iOS client ID works better with ASWebAuthenticationSession on macOS than the Desktop client type
+
 ### Android OAuth Setup (Completed: Jan 31, 2025)
 - **Project Created**: `photolala-android` under kyoshikawa@electricwoods.com
 - **OAuth Configuration**:
