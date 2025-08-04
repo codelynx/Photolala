@@ -1,12 +1,21 @@
 ## 📍 PROJECT STATUS REPORT
 
-Last Updated: January 31, 2025
+Last Updated: February 4, 2025
 
-### 🚀 Current Status: Android Google Photos Browser
+### 🚀 Current Status: Sign-In UX Update
 
-The Android app now has a Google Photos browser feature similar to the iOS Apple Photos Library browser. OAuth configuration is complete with Google Photos permission scope, and the UI/navigation are working. The actual Google Photos API integration is pending (currently using stub implementation).
+Implementing new sign-in/sign-up UX across all platforms with the popular "Don't have an account?" pattern. Apple platform implementation is complete, Android implementation is pending.
 
 ## 🆕 Recent Updates
+
+### February 4, 2025: Sign-In UX Redesign (Apple Platforms)
+- ✅ Updated AuthenticationChoiceView with new "Don't have an account?" pattern
+- ✅ Providers shown directly (no intermediate selection state)
+- ✅ Dynamic headers: "Welcome to Photolala" vs "Create Your Account"
+- ✅ Button text changes: "Sign in with" vs "Continue with" based on mode
+- ✅ Rounded button design (25pt corner radius)
+- ✅ Comprehensive UX design documentation created
+- ⚠️ Android implementation pending
 
 ### January 31, 2025: Android Google Photos Browser Implementation (Phase 1)
 - ✅ OAuth configuration with Google Cloud Console
@@ -1686,3 +1695,29 @@ The Android app now has a Google Photos browser feature similar to the iOS Apple
    - Status: Implementation complete except OAuth2 token exchange
    - Created documentation for OAuth2 implementation options
    - Next step: Implement OAuth2 token exchange (server-side or GoogleAuthUtil)
+
+## 🔧 Google Cloud Project Configuration
+
+### Apple Platforms OAuth Setup (Completed: Feb 3, 2025)
+- **Project Created**: `Photolala` (unified project) under kyoshikawa@electricwoods.com
+- **OAuth Configuration**:
+  - Web Client ID: `75309194504-p2sfktq2ju97ataogb1e5fkl70cj2jg3.apps.googleusercontent.com` (for server-side verification)
+  - iOS Client ID: `75309194504-g1a4hr3pc68301vuh21tibauh9ar1nkv.apps.googleusercontent.com` (used for both iOS and macOS)
+  - Redirect URI: `com.googleusercontent.apps.75309194504-g1a4hr3pc68301vuh21tibauh9ar1nkv:/oauth2redirect`
+- **Implementation Details**:
+  - iOS: Uses Google Sign-In SDK with ASWebAuthenticationSession fallback
+  - macOS: Uses direct browser OAuth flow (ASWebAuthenticationSession has reliability issues on macOS)
+  - Configuration is centralized in `GoogleOAuthConfiguration` struct
+- **Note**: The iOS client ID works better with ASWebAuthenticationSession on macOS than the Desktop client type
+
+### Android OAuth Setup (Updated: Feb 4, 2025)
+- **Project**: Uses the same unified `Photolala` project as Apple platforms
+- **OAuth Configuration**:
+  - Web Client ID: `75309194504-p2sfktq2ju97ataogb1e5fkl70cj2jg3.apps.googleusercontent.com` (same as Apple platforms)
+  - Android Client ID: `75309194504-imt63lddcdanccn2e2dsvdfbq5id9rn2.apps.googleusercontent.com`
+  - Package name: `com.electricwoods.photolala` (no debug suffix)
+  - SHA-1 fingerprint: `9B:E2:5F:F5:0A:1D:B9:3F:18:99:D0:FF:E2:3A:80:EF:5A:A7:FB:89`
+- **API Keys**:
+  - Current API key: `AIzaSyAMbZ_Y8_0jENZachFsJQBrBfmYuGAb3Uk`
+- **Implementation**: Uses Google Sign-In SDK with google-services.json configuration
+- **Important**: Google Photos Library API support was removed (March 31, 2025 restrictions)
