@@ -1277,7 +1277,7 @@ class PhotoManager {
 				group1.dateRepresentative > group2.dateRepresentative
 			}
 
-		case .month:
+		case .yearMonth:
 			let formatter = DateFormatter()
 			formatter.dateFormat = "MMMM yyyy" // e.g., "April 2024"
 
@@ -1292,26 +1292,6 @@ class PhotoManager {
 					title: formatter.string(from: monthDate),
 					photos: photos,
 					dateRepresentative: monthDate
-				)
-			}.sorted { (group1: PhotoGroup, group2: PhotoGroup) -> Bool in
-				group1.dateRepresentative > group2.dateRepresentative
-			}
-
-		case .day:
-			let formatter = DateFormatter()
-			formatter.dateFormat = "MMMM d, yyyy" // e.g., "April 15, 2024"
-
-			let grouped = Dictionary(grouping: sortedPhotos) { (photo: PhotoFile) -> Date in
-				let date = photo.fileCreationDate ?? Date()
-				let components = calendar.dateComponents([.year, .month, .day], from: date)
-				return calendar.date(from: components) ?? date
-			}
-
-			return grouped.map { dayDate, photos in
-				PhotoGroup(
-					title: formatter.string(from: dayDate),
-					photos: photos,
-					dateRepresentative: dayDate
 				)
 			}.sorted { (group1: PhotoGroup, group2: PhotoGroup) -> Bool in
 				group1.dateRepresentative > group2.dateRepresentative
