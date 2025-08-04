@@ -31,16 +31,6 @@ struct PhotoBrowserCoreToolbar: ToolbarContent {
 					.pickerStyle(.inline)
 				}
 				
-				// Show Item Info toggle
-				Button {
-					settings.showItemInfo.toggle()
-				} label: {
-					Label("Show Item Info", systemImage: settings.showItemInfo ? "checkmark" : "")
-						.labelStyle(.titleAndIcon)
-				}
-				
-				Divider()
-				
 				// Thumbnail size submenu
 				Menu("Thumbnail Size") {
 					Picker(selection: $settings.thumbnailOption) {
@@ -75,6 +65,16 @@ struct PhotoBrowserCoreToolbar: ToolbarContent {
 						}
 						.pickerStyle(.inline)
 					}
+				}
+				
+				Divider()
+				
+				// Show Item Info toggle (at the end)
+				Button {
+					settings.showItemInfo.toggle()
+				} label: {
+					Label("Show Item Info", systemImage: settings.showItemInfo ? "checkmark" : "")
+						.labelStyle(.titleAndIcon)
 				}
 			} label: {
 				#if os(iOS)

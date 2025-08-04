@@ -52,24 +52,24 @@ These items remain in the main toolbar for quick access:
 
 ### View Menu Structure
 
-Accessed via gear icon or "View" label:
+Accessed via gear icon (iOS) or "View" label (macOS):
 
 ```
 View
-├── Display
+├── Display ▶ (submenu)
 │   ├── ✓ Scale to Fit
-│   ├── ✓ Scale to Fill
-│   └── ✓ Show Item Info
-├── ─────────────────
-├── Thumbnail Size
-│   ├── ✓ Small
+│   └── Scale to Fill
+├── Thumbnail Size ▶ (submenu)
+│   ├── Small
 │   ├── ✓ Medium
-│   └── ✓ Large
+│   └── Large
 ├── ─────────────────
-└── Group By
-    ├── ✓ None
-    ├── ✓ Year
-    └── ✓ Year/Month
+├── Group By (inline picker)
+│   ├── ✓ None
+│   ├── Year
+│   └── Year/Month
+├── ─────────────────
+└── ✓ Show Item Info (toggle)
 ```
 
 Note: Photos without dates will be placed in an "Unknown" section when grouping is enabled.
@@ -82,20 +82,28 @@ By removing sort options and limiting grouping choices, we:
 - Eliminate rarely-used options
 - Make the interface more approachable
 
-## Implementation Considerations
+## Implementation Details
+
+### Technical Approach
+
+- **Submenus**: Display and Thumbnail Size use `Menu` containing `Picker` with `.pickerStyle(.inline)`
+- **Inline Picker**: Group By uses `Picker` directly in the menu for flat selection
+- **Toggle Button**: Show Item Info uses `Button` with conditional checkmark
+- **Automatic Checkmarks**: SwiftUI `Picker` handles checkmark display automatically
 
 ### Platform Differences
 
-- **iOS**: Already uses menu approach for some items
-- **macOS**: Currently exposes all controls directly
-- **Unified Approach**: Both platforms should use the same menu structure
+- **iOS**: Menu accessed via gear icon (`gearshape`)
+- **macOS**: Menu accessed via "View" button with chevron
+- **Unified Implementation**: Same menu structure and behavior on both platforms
 
 ### Menu Behavior
 
-- Checkmarks indicate current selection
-- Radio button behavior within groups (one selection per group)
-- Immediate apply on selection (no "OK" button needed)
-- Keyboard shortcuts preserved on macOS
+- Checkmarks automatically managed by SwiftUI Picker
+- Radio button behavior within picker groups
+- Immediate apply on selection
+- No console warnings (unlike manual checkmark approach)
+- Submenus show arrow indicators (▶) automatically
 
 ### Visual Design
 
