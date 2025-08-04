@@ -50,7 +50,12 @@ import com.electricwoods.photolala.models.PhotoMediaStore
 import com.electricwoods.photolala.models.ColorFlag
 import com.electricwoods.photolala.ui.viewmodels.PhotoGridViewModel
 import com.electricwoods.photolala.ui.components.TagSelectionDialog
-import com.electricwoods.photolala.ui.components.GridViewOptionsMenu
+import com.electricwoods.photolala.ui.components.menu.ViewOptionsMenu
+import com.electricwoods.photolala.ui.components.menu.ViewOptionsMenuButton
+import com.electricwoods.photolala.ui.components.menu.ViewSettings
+import com.electricwoods.photolala.models.DisplayMode
+import com.electricwoods.photolala.models.ThumbnailSize
+import com.electricwoods.photolala.models.GroupingOption
 import com.electricwoods.photolala.ui.components.BackupStatusIndicator
 import com.electricwoods.photolala.utils.DeviceUtils
 
@@ -198,13 +203,35 @@ fun PhotoGridScreen(
 								contentDescription = "Refresh"
 							)
 						}
-						GridViewOptionsMenu(
-							currentThumbnailSize = thumbnailSize,
-							currentScaleMode = gridScaleMode,
-							showInfoBar = showInfoBar,
-							onThumbnailSizeChange = viewModel::updateThumbnailSize,
-							onScaleModeChange = viewModel::updateGridScaleMode,
-							onShowInfoBarChange = viewModel::updateShowInfoBar
+						// Convert current values to ViewSettings
+						val viewSettings = ViewSettings(
+							displayMode = if (gridScaleMode == "fit") DisplayMode.FIT else DisplayMode.FILL,
+							thumbnailSize = when {
+								thumbnailSize <= 80 -> ThumbnailSize.SMALL
+								thumbnailSize <= 120 -> ThumbnailSize.MEDIUM
+								else -> ThumbnailSize.LARGE
+							},
+							showItemInfo = showInfoBar,
+							groupingOption = GroupingOption.NONE // TODO: Implement grouping
+						)
+						
+						ViewOptionsMenuButton(
+							viewSettings = viewSettings,
+							onViewSettingsChange = { newSettings ->
+								// Convert back to view model values
+								viewModel.updateGridScaleMode(
+									if (newSettings.displayMode == DisplayMode.FIT) "fit" else "fill"
+								)
+								viewModel.updateThumbnailSize(
+									when (newSettings.thumbnailSize) {
+										ThumbnailSize.SMALL -> 80
+										ThumbnailSize.MEDIUM -> 100
+										ThumbnailSize.LARGE -> 150
+									}
+								)
+								viewModel.updateShowInfoBar(newSettings.showItemInfo)
+								// TODO: Handle grouping changes
+							}
 						)
 					}
 				)
