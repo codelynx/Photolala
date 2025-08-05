@@ -8,6 +8,17 @@ Implementing new sign-in/sign-up UX across all platforms with the popular "Don't
 
 ## 🆕 Recent Updates
 
+### February 5, 2025: Toolbar Reorganization & Android Fixes
+- ✅ Reorganized toolbar across all platforms to reduce clutter
+- ✅ Implemented unified View menu with submenus for Display and Thumbnail Size
+- ✅ iOS/macOS: Used SwiftUI Picker with .pickerStyle(.inline) for automatic checkmarks
+- ✅ Android: Created reusable Material3 menu components (RadioButtonMenuItem, CheckboxMenuItem)
+- ✅ Fixed Android image decoding issues:
+  - Disabled hardware bitmaps in Coil configuration
+  - Added explicit BitmapFactoryDecoder
+  - Note: Sample TestPhotos (100x100 JPEGs) too small for Android decoder
+- ✅ Added push-sample-photos.sh script for Android testing
+
 ### February 4, 2025: Sign-In UX Redesign (Apple Platforms)
 - ✅ Updated AuthenticationChoiceView with new "Don't have an account?" pattern
 - ✅ Providers shown directly (no intermediate selection state)
