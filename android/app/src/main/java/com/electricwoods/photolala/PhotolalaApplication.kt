@@ -6,6 +6,8 @@ import coil.ImageLoaderFactory
 import coil.disk.DiskCache
 import coil.memory.MemoryCache
 import coil.request.CachePolicy
+import coil.decode.BitmapFactoryDecoder
+import android.os.Build
 import dagger.hilt.android.HiltAndroidApp
 
 @HiltAndroidApp
@@ -32,6 +34,11 @@ class PhotolalaApplication : Application(), ImageLoaderFactory {
 			.crossfade(true) // Enable crossfade animations
 			.memoryCachePolicy(CachePolicy.ENABLED)
 			.diskCachePolicy(CachePolicy.ENABLED)
+			.allowHardware(false) // Disable hardware bitmaps which can cause decoder issues
+			.components {
+				// Add decoder to handle various image formats
+				add(BitmapFactoryDecoder.Factory())
+			}
 			.build()
 	}
 }
