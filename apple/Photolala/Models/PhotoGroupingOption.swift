@@ -10,15 +10,13 @@ import Foundation
 enum PhotoGroupingOption: String, CaseIterable {
 	case none = "None"
 	case year = "Year"
-	case month = "Month"
-	case day = "Day"
+	case yearMonth = "Year/Month"
 
 	var systemImage: String {
 		switch self {
 		case .none: "square.grid.3x3"
 		case .year: "calendar"
-		case .month: "calendar.badge.clock"
-		case .day: "calendar.circle"
+		case .yearMonth: "calendar.badge.clock"
 		}
 	}
 
@@ -26,8 +24,15 @@ enum PhotoGroupingOption: String, CaseIterable {
 		switch self {
 		case .none: nil
 		case .year: "yyyy"
-		case .month: "MMMM yyyy"
-		case .day: "MMMM d, yyyy"
+		case .yearMonth: "MMMM yyyy"
+		}
+	}
+	
+	var description: String {
+		switch self {
+		case .none: "None"
+		case .year: "Year"
+		case .yearMonth: "Year/Month"
 		}
 	}
 }

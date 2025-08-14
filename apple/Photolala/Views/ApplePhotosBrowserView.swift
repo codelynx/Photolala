@@ -171,7 +171,8 @@ struct AlbumPickerView: View {
 						}
 						Spacer()
 						if selectedAlbum == nil {
-							Image(systemName: "checkmark")
+							Label("Selected", systemImage: "checkmark")
+								.labelStyle(.iconOnly)
 								.foregroundColor(.accentColor)
 						}
 					}
@@ -198,7 +199,8 @@ struct AlbumPickerView: View {
 							}
 							Spacer()
 							if selectedAlbum?.localIdentifier == album.localIdentifier {
-								Image(systemName: "checkmark")
+								Label("Selected", systemImage: "checkmark")
+									.labelStyle(.iconOnly)
 									.foregroundColor(.accentColor)
 							}
 						}

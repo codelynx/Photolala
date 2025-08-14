@@ -230,6 +230,9 @@ struct DirectoryPhotoBrowserView: View {
 				isRefreshing: isRefreshing,
 				onRefresh: {
 					try? await photoProvider.refresh()
+				},
+				onGroupingChange: { grouping in
+					await photoProvider.applyGrouping(grouping)
 				}
 			) {
 				ToolbarItemGroup(placement: .automatic) {
@@ -277,129 +280,6 @@ struct DirectoryPhotoBrowserView: View {
 					}
 				}
 				
-				// Sort picker - separate toolbar group for placement
-				ToolbarItemGroup(placement: .automatic) {
-					#if os(iOS)
-						Menu {
-							ForEach(PhotoSortOption.allCases, id: \.self) { option in
-								Button(action: {
-									self.settings.sortOption = option
-									Task {
-										await photoProvider.applySorting(option)
-									}
-								}) {
-									Label(option.rawValue, systemImage: option.systemImage)
-									if option == self.settings.sortOption {
-										Image(systemName: "checkmark")
-									}
-								}
-							}
-						} label: {
-							Label("Sort", systemImage: self.settings.sortOption.systemImage)
-						}
-					#else
-						// macOS: Use a picker with menu style
-						Picker("Sort", selection: Binding(
-							get: { self.settings.sortOption },
-							set: { newValue in
-								self.settings.sortOption = newValue
-								Task {
-									await photoProvider.applySorting(newValue)
-								}
-							}
-						)) {
-							ForEach(PhotoSortOption.allCases, id: \.self) { option in
-								Text(option.rawValue)
-									.tag(option)
-							}
-						}
-						.pickerStyle(.menu)
-						.frame(width: 150)
-						.help("Sort photos by")
-					#endif
-
-					// Grouping picker
-					#if os(iOS)
-						Menu {
-							Button(action: {
-								self.settings.groupingOption = .year
-								Task {
-									await photoProvider.applyGrouping(.year)
-								}
-							}) {
-								Label("Year", systemImage: "calendar")
-								if self.settings.groupingOption == .year {
-									Image(systemName: "checkmark")
-								}
-							}
-							Button(action: {
-								self.settings.groupingOption = .month
-								Task {
-									await photoProvider.applyGrouping(.month)
-								}
-							}) {
-								Label("Month", systemImage: "calendar.badge.clock")
-								if self.settings.groupingOption == .month {
-									Image(systemName: "checkmark")
-								}
-							}
-							Button(action: {
-								self.settings.groupingOption = .day
-								Task {
-									await photoProvider.applyGrouping(.day)
-								}
-							}) {
-								Label("Day", systemImage: "calendar.circle")
-								if self.settings.groupingOption == .day {
-									Image(systemName: "checkmark")
-								}
-							}
-
-							Divider()
-
-							Button(action: {
-								self.settings.groupingOption = .none
-								Task {
-									await photoProvider.applyGrouping(.none)
-								}
-							}) {
-								Label("None", systemImage: "square.grid.3x3")
-								if self.settings.groupingOption == .none {
-									Image(systemName: "checkmark")
-								}
-							}
-						} label: {
-							if self.settings.groupingOption != .none {
-								Label(
-									self.settings.groupingOption.rawValue,
-									systemImage: self.settings.groupingOption.systemImage
-								)
-							} else {
-								Image(systemName: "calendar")
-							}
-						}
-					#else
-						// macOS: Use a picker with menu style
-						Picker("Group by", selection: Binding(
-							get: { self.settings.groupingOption },
-							set: { newValue in
-								self.settings.groupingOption = newValue
-								Task {
-									await photoProvider.applyGrouping(newValue)
-								}
-							}
-						)) {
-							Text("Year").tag(PhotoGroupingOption.year)
-							Text("Month").tag(PhotoGroupingOption.month)
-							Text("Day").tag(PhotoGroupingOption.day)
-							Divider()
-							Text("None").tag(PhotoGroupingOption.none)
-						}
-						.pickerStyle(.menu)
-						.frame(width: 120)
-						.help("Group photos by date")
-					#endif
-				}
 				
 				// S3 Backup button - separate group
 				ToolbarItemGroup(placement: .automatic) {

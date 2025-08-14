@@ -14,107 +14,76 @@ struct PhotoBrowserCoreToolbar: ToolbarContent {
 	@Binding var showingInspector: Bool
 	let isRefreshing: Bool
 	let onRefresh: () async -> Void
+	var onGroupingChange: ((PhotoGroupingOption) async -> Void)?
 	
 	var body: some ToolbarContent {
 		ToolbarItemGroup(placement: .automatic) {
-			#if os(iOS)
-			// Combined view options menu for iOS
+			// Unified View Menu for both platforms
 			Menu {
-				// Thumbnail size section
-				Section("Thumbnail Size") {
-					Button {
-						settings.thumbnailOption = .small
+				// Display submenu
+				Menu("Display") {
+					Picker(selection: $settings.displayMode) {
+						Text("Scale to Fit").tag(ThumbnailDisplayMode.scaleToFit)
+						Text("Scale to Fill").tag(ThumbnailDisplayMode.scaleToFill)
 					} label: {
-						if settings.thumbnailOption == .small {
-							Label("Small", systemImage: "checkmark")
-						} else {
-							Text("Small")
-						}
+						EmptyView()
 					}
-					Button {
-						settings.thumbnailOption = .medium
+					.pickerStyle(.inline)
+				}
+				
+				// Thumbnail size submenu
+				Menu("Thumbnail Size") {
+					Picker(selection: $settings.thumbnailOption) {
+						Text("Small").tag(ThumbnailOption.small)
+						Text("Medium").tag(ThumbnailOption.medium)
+						Text("Large").tag(ThumbnailOption.large)
 					} label: {
-						if settings.thumbnailOption == .medium {
-							Label("Medium", systemImage: "checkmark")
-						} else {
-							Text("Medium")
-						}
+						EmptyView()
 					}
-					Button {
-						settings.thumbnailOption = .large
-					} label: {
-						if settings.thumbnailOption == .large {
-							Label("Large", systemImage: "checkmark")
-						} else {
-							Text("Large")
+					.pickerStyle(.inline)
+				}
+				
+				// Group by picker (only show if we have a grouping change handler)
+				if let onGroupingChange = onGroupingChange {
+					Divider()
+					
+					Section("Group By") {
+						Picker(selection: Binding(
+							get: { settings.groupingOption },
+							set: { newValue in
+								settings.groupingOption = newValue
+								Task {
+									await onGroupingChange(newValue)
+								}
+							}
+						)) {
+							Text("None").tag(PhotoGroupingOption.none)
+							Text("Year").tag(PhotoGroupingOption.year)
+							Text("Year/Month").tag(PhotoGroupingOption.yearMonth)
+						} label: {
+							EmptyView()
 						}
+						.pickerStyle(.inline)
 					}
 				}
 				
 				Divider()
 				
-				// Display options section
-				Section("Display Options") {
-					Button {
-						settings.displayMode = settings.displayMode == .scaleToFit ? .scaleToFill : .scaleToFit
-					} label: {
-						Label(
-							settings.displayMode == .scaleToFit ? "Scale to Fill" : "Scale to Fit",
-							systemImage: settings.displayMode == .scaleToFit ? "aspectratio.fill" : "aspectratio"
-						)
-					}
-					
-					Button {
-						settings.showItemInfo.toggle()
-					} label: {
-						if settings.showItemInfo {
-							Label("Hide Info Bar", systemImage: "squares.below.rectangle")
-								.labelStyle(.titleAndIcon)
-								.padding(.horizontal, 4)
-								.background(Color.primary)
-								.foregroundColor(Color(XPlatform.primaryBackgroundColor))
-								.cornerRadius(4)
-						} else {
-							Label("Show Info Bar", systemImage: "squares.below.rectangle")
-						}
-					}
+				// Show Item Info toggle (at the end)
+				Button {
+					settings.showItemInfo.toggle()
+				} label: {
+					Label("Show Item Info", systemImage: settings.showItemInfo ? "checkmark" : "")
+						.labelStyle(.titleAndIcon)
 				}
 			} label: {
+				#if os(iOS)
 				Image(systemName: "gearshape")
+				#else
+				Label("View", systemImage: "chevron.down")
+					.labelStyle(.titleAndIcon)
+				#endif
 			}
-			#else
-			// Keep separate controls for macOS
-			// Display mode toggle
-			Button(action: {
-				settings.displayMode = settings
-					.displayMode == .scaleToFit ? .scaleToFill : .scaleToFit
-			}) {
-				Image(systemName: settings.displayMode == .scaleToFit ? "aspectratio" : "aspectratio.fill")
-			}
-			.help(settings.displayMode == .scaleToFit ? "Switch to Fill" : "Switch to Fit")
-			
-			// Item info toggle
-			Button(action: {
-				settings.showItemInfo.toggle()
-			}) {
-				Image(systemName: "squares.below.rectangle")
-					.padding(4)
-					.background(settings.showItemInfo ? Color.primary : Color.clear)
-					.foregroundColor(settings.showItemInfo ? Color(XPlatform.primaryBackgroundColor) : .primary)
-					.cornerRadius(4)
-			}
-			.buttonStyle(.plain)
-			.help(settings.showItemInfo ? "Hide item info" : "Show item info")
-			
-			// Size picker for macOS
-			Picker("Size", selection: $settings.thumbnailOption) {
-				Text("S").tag(ThumbnailOption.small)
-				Text("M").tag(ThumbnailOption.medium)
-				Text("L").tag(ThumbnailOption.large)
-			}
-			.pickerStyle(.segmented)
-			.help("Thumbnail size")
-			#endif
 			
 			// Refresh button
 			Button(action: {
@@ -151,6 +120,7 @@ extension View {
 		showingInspector: Binding<Bool>,
 		isRefreshing: Bool,
 		onRefresh: @escaping () async -> Void,
+		onGroupingChange: ((PhotoGroupingOption) async -> Void)? = nil,
 		@ToolbarContentBuilder additionalItems: () -> some ToolbarContent = { EmptyToolbarContent() }
 	) -> some View {
 		self.toolbar {
@@ -159,7 +129,8 @@ extension View {
 				settings: settings,
 				showingInspector: showingInspector,
 				isRefreshing: isRefreshing,
-				onRefresh: onRefresh
+				onRefresh: onRefresh,
+				onGroupingChange: onGroupingChange
 			)
 			
 			// Additional browser-specific items
