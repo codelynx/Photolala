@@ -1,217 +1,144 @@
 package com.electricwoods.photolala.ui.components
 
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.*
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxWithConstraints
-import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.unit.IntSize
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import kotlinx.coroutines.launch
-import kotlin.math.abs
-import kotlin.math.max
-import kotlin.math.min
 
 /**
  * A zoomable image component with iOS-like zoom/pan behavior.
+ * 
+ * This refactored version uses:
+ * - ZoomState for state management
+ * - PhotoViewerConstants for configuration
+ * - ZoomAnimations for consistent animations
+ * 
  * Features:
  * - Configurable min/max zoom levels
  * - Double-tap to zoom
  * - Boundary constraints to prevent image disappearing
  * - Smooth animations
- * - Delta-based scaling to prevent jumps
+ * - Single-finger pan when zoomed
+ * - Pinch to zoom
  */
 @Composable
 fun PhotoZoomableImage(
 	imageUri: Any?,
 	contentDescription: String?,
 	modifier: Modifier = Modifier,
-	minZoomScale: Float = 1f,
-	maxZoomScale: Float = 5f,
-	doubleTapZoomScale: Float = 2f,
+	minZoomScale: Float = PhotoViewerConstants.MIN_ZOOM_SCALE,
+	maxZoomScale: Float = PhotoViewerConstants.MAX_ZOOM_SCALE,
+	doubleTapZoomScale: Float = PhotoViewerConstants.DOUBLE_TAP_ZOOM_SCALE,
 	contentScale: ContentScale = ContentScale.Fit,
-	onZoomStateChanged: ((Boolean) -> Unit)? = null  // Callback to notify parent about zoom state
+	onZoomStateChanged: ((Boolean) -> Unit)? = null
 ) {
-	var scale by remember { mutableStateOf(minZoomScale) }
-	var offsetX by remember { mutableStateOf(0f) }
-	var offsetY by remember { mutableStateOf(0f) }
-	
-	// Track gesture state for delta calculations (like iOS steadyState)
-	var lastScale by remember { mutableStateOf(1f) }
-	var lastOffset by remember { mutableStateOf(Offset.Zero) }
-	
-	// Notify parent when zoom state changes
-	LaunchedEffect(scale) {
-		onZoomStateChanged?.invoke(scale > minZoomScale)
-	}
-	
-	// Track image size for boundary calculations
-	var imageSize by remember { mutableStateOf(IntSize.Zero) }
+	// Use the extracted state management
+	val zoomState = rememberZoomState(
+		minScale = minZoomScale,
+		maxScale = maxZoomScale,
+		doubleTapScale = doubleTapZoomScale
+	)
 	
 	val coroutineScope = rememberCoroutineScope()
 	
-	// Animated values for smooth transitions
+	// Notify parent when zoom state changes
+	LaunchedEffect(zoomState.isZoomed) {
+		onZoomStateChanged?.invoke(zoomState.isZoomed)
+	}
+	
+	// Animated values using shared animation specs
 	val animatedScale by animateFloatAsState(
-		targetValue = scale,
-		animationSpec = spring(
-			dampingRatio = 0.8f,
-			stiffness = 300f
-		),
+		targetValue = zoomState.scale,
+		animationSpec = ZoomAnimations.defaultSpring,
 		label = "scale"
 	)
 	
 	val animatedOffsetX by animateFloatAsState(
-		targetValue = offsetX,
-		animationSpec = spring(
-			dampingRatio = 0.8f,
-			stiffness = 300f
-		),
+		targetValue = zoomState.offsetX,
+		animationSpec = ZoomAnimations.defaultSpring,
 		label = "offsetX"
 	)
 	
 	val animatedOffsetY by animateFloatAsState(
-		targetValue = offsetY,
-		animationSpec = spring(
-			dampingRatio = 0.8f,
-			stiffness = 300f
-		),
+		targetValue = zoomState.offsetY,
+		animationSpec = ZoomAnimations.defaultSpring,
 		label = "offsetY"
 	)
 	
-	// Use BoxWithConstraints to get actual container size
 	BoxWithConstraints(
 		modifier = modifier
 			.fillMaxSize()
 			.background(Color.Black),
 		contentAlignment = Alignment.Center
 	) {
-		// Get the actual container size from constraints
 		val containerWidth = constraints.maxWidth.toFloat()
 		val containerHeight = constraints.maxHeight.toFloat()
-		
-		// Calculate max offset based on zoom scale (same formula as iOS)
-		fun calculateMaxOffset(): Pair<Float, Float> {
-			if (containerWidth == 0f || containerHeight == 0f) {
-				return Pair(0f, 0f)
-			}
-			
-			val maxX = max(0f, (containerWidth * (scale - 1)) / 2)
-			val maxY = max(0f, (containerHeight * (scale - 1)) / 2)
-			return Pair(maxX, maxY)
-		}
-		
-		// Constrain offset to boundaries
-		fun constrainOffset() {
-			val (maxX, maxY) = calculateMaxOffset()
-			offsetX = offsetX.coerceIn(-maxX, maxX)
-			offsetY = offsetY.coerceIn(-maxY, maxY)
-		}
-	
-		// Reset zoom and position
-		fun reset() {
-			scale = minZoomScale
-			offsetX = 0f
-			offsetY = 0f
-			lastScale = 1f
-			lastOffset = Offset.Zero
-		}
 		
 		Box(
 			modifier = Modifier
 				.fillMaxSize()
-			.pointerInput(Unit) {
-				detectTransformGestures { _, pan, zoom, _ ->
-					// Handle zoom with simple multiplication
-					scale = (scale * zoom).coerceIn(minZoomScale, maxZoomScale)
-					
-					// Handle pan when zoomed (this works with 2-finger pan during pinch)
-					if (scale > minZoomScale) {
-						// Direct pan application
-						offsetX += pan.x
-						offsetY += pan.y
+				.pointerInput(Unit) {
+					// Pinch to zoom and two-finger pan
+					detectTransformGestures { _, pan, zoom, _ ->
+						zoomState.updateScale(zoomState.scale * zoom)
 						
-						// Constrain to boundaries
-						constrainOffset()
-					}
-					
-					// Reset when at minimum zoom
-					if (scale <= minZoomScale) {
-						scale = minZoomScale
-						offsetX = 0f
-						offsetY = 0f
-					}
-				}
-			}
-			.pointerInput(scale) {  // Re-compose when scale changes
-				// Single finger drag for panning when zoomed
-				if (scale > minZoomScale) {
-					detectDragGestures { _, dragAmount ->
-						offsetX += dragAmount.x
-						offsetY += dragAmount.y
-						constrainOffset()
-					}
-				}
-			}
-			.pointerInput(Unit) {
-				detectTapGestures(
-					onDoubleTap = {
-						coroutineScope.launch {
-							if (scale > minZoomScale) {
-								// Reset to minimum zoom
-								reset()
-							} else {
-								// Zoom to double-tap scale
-								scale = doubleTapZoomScale
-								// Reset offsets when zooming in
-								offsetX = 0f
-								offsetY = 0f
-							}
+						if (zoomState.isZoomed) {
+							zoomState.updateOffset(pan.x, pan.y)
+							zoomState.constrainOffset(containerWidth, containerHeight)
 						}
 					}
-				)
-			},
-		contentAlignment = Alignment.Center
-	) {
-		AsyncImage(
-			model = ImageRequest.Builder(LocalContext.current)
-				.data(imageUri)
-				.crossfade(true)
-				.build(),
-			contentDescription = contentDescription,
-			contentScale = contentScale,
-			modifier = Modifier
-				.fillMaxSize()
-				.graphicsLayer {
-					scaleX = animatedScale
-					scaleY = animatedScale
-					translationX = animatedOffsetX
-					translationY = animatedOffsetY
 				}
-				.clip(RectangleShape),
-			onSuccess = { state ->
-				// Store image size for boundary calculations
-				state.result.drawable.intrinsicWidth.let { width ->
-					state.result.drawable.intrinsicHeight.let { height ->
-						imageSize = IntSize(width, height)
+				.pointerInput(zoomState.scale) {
+					// Single finger drag when zoomed
+					if (zoomState.isZoomed) {
+						detectDragGestures { _, dragAmount ->
+							zoomState.updateOffset(dragAmount.x, dragAmount.y)
+							zoomState.constrainOffset(containerWidth, containerHeight)
+						}
 					}
 				}
-			}
-		)
+				.pointerInput(Unit) {
+					// Double tap to toggle zoom
+					detectTapGestures(
+						onDoubleTap = {
+							coroutineScope.launch {
+								zoomState.toggleZoom()
+							}
+						}
+					)
+				},
+			contentAlignment = Alignment.Center
+		) {
+			AsyncImage(
+				model = ImageRequest.Builder(LocalContext.current)
+					.data(imageUri)
+					.crossfade(true)
+					.build(),
+				contentDescription = contentDescription,
+				contentScale = contentScale,
+				modifier = Modifier
+					.fillMaxSize()
+					.graphicsLayer {
+						scaleX = animatedScale
+						scaleY = animatedScale
+						translationX = animatedOffsetX
+						translationY = animatedOffsetY
+					}
+					.clip(RectangleShape)
+			)
 		}
 	}
 }

@@ -5,11 +5,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
-import androidx.compose.material.icons.filled.ChevronLeft
-import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -25,6 +22,7 @@ import coil.request.ImageRequest
 import com.electricwoods.photolala.models.PhotoMediaStore
 import com.electricwoods.photolala.ui.components.UnlockOrientationEffect
 import com.electricwoods.photolala.ui.components.PhotoZoomableImage
+import com.electricwoods.photolala.ui.components.PhotoNavigationButtons
 import com.electricwoods.photolala.ui.components.ViewOptionsMenu
 import com.electricwoods.photolala.ui.viewmodels.PhotoViewerViewModel
 import kotlinx.coroutines.launch
@@ -129,68 +127,21 @@ fun PhotoViewerScreen(
 			}
 			
 			// Navigation buttons (always visible, more prominent)
-			Row(
-				modifier = Modifier
-					.fillMaxWidth()
-					.align(Alignment.CenterStart),
-				horizontalArrangement = Arrangement.SpaceBetween
-			) {
-				// Previous button
-				if (pagerState.currentPage > 0) {
-					IconButton(
-						onClick = {
-							coroutineScope.launch {
-								pagerState.animateScrollToPage(pagerState.currentPage - 1)
-							}
-						},
-						modifier = Modifier
-							.padding(start = 8.dp)
-							.size(48.dp)
-							.background(
-								Color.Black.copy(alpha = 0.5f),
-								CircleShape
-							)
-					) {
-						Icon(
-							imageVector = Icons.Default.ChevronLeft,
-							contentDescription = "Previous photo",
-							tint = Color.White,
-							modifier = Modifier.size(32.dp)
-						)
+			PhotoNavigationButtons(
+				currentPage = pagerState.currentPage,
+				totalPages = photos.size,
+				onPreviousClick = {
+					coroutineScope.launch {
+						pagerState.animateScrollToPage(pagerState.currentPage - 1)
 					}
-				} else {
-					Spacer(modifier = Modifier.width(48.dp))
-				}
-				
-				Spacer(modifier = Modifier.weight(1f))
-				
-				// Next button
-				if (pagerState.currentPage < photos.size - 1) {
-					IconButton(
-						onClick = {
-							coroutineScope.launch {
-								pagerState.animateScrollToPage(pagerState.currentPage + 1)
-							}
-						},
-						modifier = Modifier
-							.padding(end = 8.dp)
-							.size(48.dp)
-							.background(
-								Color.Black.copy(alpha = 0.5f),
-								CircleShape
-							)
-					) {
-						Icon(
-							imageVector = Icons.Default.ChevronRight,
-							contentDescription = "Next photo",
-							tint = Color.White,
-							modifier = Modifier.size(32.dp)
-						)
+				},
+				onNextClick = {
+					coroutineScope.launch {
+						pagerState.animateScrollToPage(pagerState.currentPage + 1)
 					}
-				} else {
-					Spacer(modifier = Modifier.width(48.dp))
-				}
-			}
+				},
+				modifier = Modifier.align(Alignment.Center)
+			)
 			
 			// Photo info overlay
 			if (showInfo && currentPhoto != null) {

@@ -3,13 +3,13 @@ import XPlatform
 
 struct PhotoPreviewView: View {
 	// Constants
-	private let controlStripHeight: CGFloat = 44
+	private let controlStripHeight = PhotoViewerConstants.controlStripHeight
 	private let useNativeThumbnailStrip = true // Feature flag for testing
 	
 	// Configurable zoom parameters
-	private let minZoomScale: CGFloat = 1.0
-	private let maxZoomScale: CGFloat = 5.0
-	private let doubleTapZoomScale: CGFloat = 2.0
+	private let minZoomScale = PhotoViewerConstants.minZoomScale
+	private let maxZoomScale = PhotoViewerConstants.maxZoomScale
+	private let doubleTapZoomScale = PhotoViewerConstants.doubleTapZoomScale
 
 	let photos: [PhotoFile]
 	let initialIndex: Int
@@ -87,7 +87,7 @@ struct PhotoPreviewView: View {
 										// Reset steady state multiplier
 										self.steadyStateZoomScale = 1.0
 										
-										withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+										withAnimation(.spring(response: PhotoViewerConstants.springResponse, dampingFraction: PhotoViewerConstants.springDamping)) {
 											// Clamp to min/max
 											if self.zoomScale < self.minZoomScale {
 												self.zoomScale = self.minZoomScale
@@ -131,7 +131,7 @@ struct PhotoPreviewView: View {
 										// Reset last translation
 										self.lastTranslation = .zero
 										
-										withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+										withAnimation(.spring(response: PhotoViewerConstants.springResponse, dampingFraction: PhotoViewerConstants.springDamping)) {
 											// Calculate bounds
 											let maxX = (geometry.size.width * (self.zoomScale - 1)) / 2
 											let maxY = (geometry.size.height * (self.zoomScale - 1)) / 2
@@ -152,7 +152,7 @@ struct PhotoPreviewView: View {
 							.gesture(
 								TapGesture(count: 2)
 									.onEnded { _ in
-										withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+										withAnimation(.spring(response: PhotoViewerConstants.springResponse, dampingFraction: PhotoViewerConstants.springDamping)) {
 											if self.zoomScale > self.minZoomScale {
 												// Reset to minimum zoom
 												self.zoomScale = self.minZoomScale
@@ -220,7 +220,7 @@ struct PhotoPreviewView: View {
 							ThumbnailStripView(
 								photos: self.photos,
 								currentIndex: self.$currentIndex,
-								thumbnailSize: CGSize(width: 60, height: 60),
+								thumbnailSize: PhotoViewerConstants.thumbnailSize,
 								onTimerExtend: self.extendControlsTimer
 							)
 							.frame(height: 84) // 60 + 24 for padding
@@ -229,7 +229,7 @@ struct PhotoPreviewView: View {
 							ThumbnailStrip(
 								photos: self.photos,
 								currentIndex: self.$currentIndex,
-								thumbnailSize: CGSize(width: 60, height: 60),
+								thumbnailSize: PhotoViewerConstants.thumbnailSize,
 								onTimerExtend: self.extendControlsTimer
 							)
 						}
@@ -292,7 +292,7 @@ struct PhotoPreviewView: View {
 			// Reset timer when toggling
 			if self.showThumbnailStrip {
 				self.controlsTimer?.invalidate()
-				self.controlsTimer = Timer.scheduledTimer(withTimeInterval: 30.0, repeats: false) { _ in
+				self.controlsTimer = Timer.scheduledTimer(withTimeInterval: PhotoViewerConstants.controlHideDelay, repeats: false) { _ in
 					withAnimation(.easeInOut(duration: 0.3)) {
 						self.showThumbnailStrip = false
 					}
@@ -323,8 +323,8 @@ struct PhotoPreviewView: View {
 			DragGesture()
 				.onEnded { value in
 					// Only allow swipe navigation when NOT zoomed
-					if self.zoomScale <= 1.0 {
-						let threshold: CGFloat = 50
+					if self.zoomScale <= PhotoViewerConstants.minZoomScale {
+						let threshold = PhotoViewerConstants.swipeThreshold
 						if value.translation.width > threshold, self.currentIndex > 0 {
 							self.navigateToPrevious()
 						} else if value.translation.width < -threshold, self.currentIndex < self.photos.count - 1 {
@@ -422,7 +422,7 @@ struct PhotoPreviewView: View {
 
 	private func handleTapGesture(at location: CGPoint, in geometry: GeometryProxy) {
 		let width = geometry.size.width
-		let quarterWidth = width * 0.25
+		let quarterWidth = width * PhotoViewerConstants.tapZoneWidth
 
 		// Define tap zones
 		if location.x < quarterWidth {
@@ -444,7 +444,7 @@ struct PhotoPreviewView: View {
 			// Reset timer if showing controls
 			if self.showThumbnailStrip {
 				self.controlsTimer?.invalidate()
-				self.controlsTimer = Timer.scheduledTimer(withTimeInterval: 30.0, repeats: false) { _ in
+				self.controlsTimer = Timer.scheduledTimer(withTimeInterval: PhotoViewerConstants.controlHideDelay, repeats: false) { _ in
 					withAnimation(.easeInOut(duration: 0.3)) {
 						self.showThumbnailStrip = false
 					}
@@ -459,7 +459,7 @@ struct PhotoPreviewView: View {
 		// Reset the timer when user interacts with thumbnails
 		if self.showThumbnailStrip {
 			self.controlsTimer?.invalidate()
-			self.controlsTimer = Timer.scheduledTimer(withTimeInterval: 30.0, repeats: false) { _ in
+			self.controlsTimer = Timer.scheduledTimer(withTimeInterval: PhotoViewerConstants.controlHideDelay, repeats: false) { _ in
 				withAnimation(.easeInOut(duration: 0.3)) {
 					self.showThumbnailStrip = false
 				}
