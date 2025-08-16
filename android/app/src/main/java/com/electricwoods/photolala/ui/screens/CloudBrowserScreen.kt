@@ -27,6 +27,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.electricwoods.photolala.models.PhotoS3
+import com.electricwoods.photolala.ui.components.UnlockOrientationEffect
 import com.electricwoods.photolala.ui.viewmodels.CloudBrowserViewModel
 import kotlinx.coroutines.launch
 
@@ -40,6 +41,9 @@ fun CloudBrowserScreen(
     onBackClick: () -> Unit,
     viewModel: CloudBrowserViewModel = hiltViewModel()
 ) {
+    // Allow free rotation for photo browsing
+    UnlockOrientationEffect()
+    
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val photos by viewModel.filteredPhotos.collectAsStateWithLifecycle()
     val selectedPhotos by viewModel.selectedPhotos.collectAsStateWithLifecycle()
