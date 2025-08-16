@@ -5,6 +5,11 @@ struct PhotoPreviewView: View {
 	// Constants
 	private let controlStripHeight: CGFloat = 44
 	private let useNativeThumbnailStrip = true // Feature flag for testing
+	
+	// Configurable zoom parameters
+	private let minZoomScale: CGFloat = 1.0
+	private let maxZoomScale: CGFloat = 5.0
+	private let doubleTapZoomScale: CGFloat = 2.0
 
 	let photos: [PhotoFile]
 	let initialIndex: Int
@@ -13,6 +18,8 @@ struct PhotoPreviewView: View {
 	@State private var currentIndex: Int
 	@State private var zoomScale: CGFloat = 1.0
 	@State private var offset: CGSize = .zero
+	@State private var steadyStateZoomScale: CGFloat = 1.0  // For delta calculation
+	@State private var lastTranslation: CGSize = .zero  // Track drag translation
 	@State private var controlsTimer: Timer?
 	@State private var currentImage: XImage?
 	@State private var isLoadingImage = false
@@ -60,44 +67,109 @@ struct PhotoPreviewView: View {
 
 				// Image display
 				if let image = currentImage {
-					self.imageView(for: image)
-						.scaleEffect(self.zoomScale)
-						.offset(self.offset)
-						.gesture(
-							MagnificationGesture()
-								.onChanged { value in
-									self.zoomScale = value
-								}
-								.onEnded { value in
-									withAnimation(.spring()) {
-										self.zoomScale = min(max(value, 0.5), 5.0)
+					GeometryReader { geometry in
+						self.imageView(for: image)
+							.scaleEffect(self.zoomScale, anchor: .center)
+							.offset(self.offset)
+							.frame(width: geometry.size.width, height: geometry.size.height)
+							.clipped()
+							.gesture(
+								MagnificationGesture()
+									.onChanged { value in
+										// Simple scaling like the library but with steady state
+										let delta = value / self.steadyStateZoomScale
+										self.steadyStateZoomScale = value
+										
+										// Apply delta to current scale (prevents jumps)
+										self.zoomScale = self.zoomScale * delta
 									}
-								}
-						)
-						.simultaneousGesture(
-							DragGesture()
-								.onChanged { value in
-									if self.zoomScale > 1 {
-										self.offset = CGSize(
-											width: self.offset.width + value.translation.width,
-											height: self.offset.height + value.translation.height
-										)
-									}
-								}
-						)
-						.gesture(
-							TapGesture(count: 2)
-								.onEnded { _ in
-									withAnimation(.spring()) {
-										if self.zoomScale > 1 {
-											self.zoomScale = 1
-											self.offset = .zero
-										} else {
-											self.zoomScale = 2
+									.onEnded { _ in
+										// Reset steady state multiplier
+										self.steadyStateZoomScale = 1.0
+										
+										withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+											// Clamp to min/max
+											if self.zoomScale < self.minZoomScale {
+												self.zoomScale = self.minZoomScale
+												self.offset = .zero
+											} else if self.zoomScale > self.maxZoomScale {
+												self.zoomScale = self.maxZoomScale
+											}
+											
+											// Adjust offset if out of bounds
+											let maxX = (geometry.size.width * (self.zoomScale - 1)) / 2
+											let maxY = (geometry.size.height * (self.zoomScale - 1)) / 2
+											
+											if abs(self.offset.width) > maxX {
+												self.offset.width = self.offset.width > 0 ? maxX : -maxX
+											}
+											if abs(self.offset.height) > maxY {
+												self.offset.height = self.offset.height > 0 ? maxY : -maxY
+											}
 										}
 									}
-								}
-						)
+							)
+							.simultaneousGesture(
+								DragGesture()
+									.onChanged { value in
+										if self.zoomScale > self.minZoomScale {
+											// Calculate the difference from last translation
+											let diff = CGSize(
+												width: value.translation.width - self.lastTranslation.width,
+												height: value.translation.height - self.lastTranslation.height
+											)
+											
+											// Update offset by the difference
+											self.offset.width += diff.width
+											self.offset.height += diff.height
+											
+											// Store current translation for next calculation
+											self.lastTranslation = value.translation
+										}
+									}
+									.onEnded { _ in
+										// Reset last translation
+										self.lastTranslation = .zero
+										
+										withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+											// Calculate bounds
+											let maxX = (geometry.size.width * (self.zoomScale - 1)) / 2
+											let maxY = (geometry.size.height * (self.zoomScale - 1)) / 2
+											
+											// Clamp offset to bounds
+											var newOffset = self.offset
+											if abs(newOffset.width) > maxX {
+												newOffset.width = newOffset.width > 0 ? maxX : -maxX
+											}
+											if abs(newOffset.height) > maxY {
+												newOffset.height = newOffset.height > 0 ? maxY : -maxY
+											}
+											
+											self.offset = newOffset
+										}
+									}
+							)
+							.gesture(
+								TapGesture(count: 2)
+									.onEnded { _ in
+										withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+											if self.zoomScale > self.minZoomScale {
+												// Reset to minimum zoom
+												self.zoomScale = self.minZoomScale
+												self.offset = .zero
+											} else {
+												// Zoom to double-tap scale
+												self.zoomScale = self.doubleTapZoomScale
+												self.offset = .zero
+											}
+											// Reset tracking variables
+											self.steadyStateZoomScale = 1.0
+											self.lastTranslation = .zero
+										}
+									}
+							)
+							.frame(maxWidth: .infinity, maxHeight: .infinity)
+					}
 				} else if self.isLoadingImage {
 					ProgressView()
 						.progressViewStyle(CircularProgressViewStyle(tint: .white))
@@ -250,12 +322,16 @@ struct PhotoPreviewView: View {
 		.gesture(
 			DragGesture()
 				.onEnded { value in
-					let threshold: CGFloat = 50
-					if value.translation.width > threshold, self.currentIndex > 0 {
-						self.navigateToPrevious()
-					} else if value.translation.width < -threshold, self.currentIndex < self.photos.count - 1 {
-						self.navigateToNext()
+					// Only allow swipe navigation when NOT zoomed
+					if self.zoomScale <= 1.0 {
+						let threshold: CGFloat = 50
+						if value.translation.width > threshold, self.currentIndex > 0 {
+							self.navigateToPrevious()
+						} else if value.translation.width < -threshold, self.currentIndex < self.photos.count - 1 {
+							self.navigateToNext()
+						}
 					}
+					// When zoomed (zoomScale > 1.0), the drag is handled by the pan gesture on the image
 				}
 		)
 		.statusBarHidden(true)
@@ -327,9 +403,11 @@ struct PhotoPreviewView: View {
 	}
 
 	private func resetZoom() {
-		withAnimation(.spring()) {
-			self.zoomScale = 1.0
+		withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+			self.zoomScale = self.minZoomScale
 			self.offset = .zero
+			self.steadyStateZoomScale = 1.0
+			self.lastTranslation = .zero
 		}
 	}
 

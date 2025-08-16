@@ -46,6 +46,7 @@ Documentation for implemented features.
 
 #### UI Components
 - [PhotoDigest System](./current/photodigest-system.md) - Two-level cache architecture
+- [Photo Preview System](./current/photo-preview-system.md) - Full-screen photo viewer
 - [Selection System](./features/ui-components/selection-system.md) - Multi-selection
 - [Bookmark System](./features/ui-components/bookmark-system.md) - Photo bookmarking
 

@@ -8,6 +8,22 @@ Implementing new sign-in/sign-up UX across all platforms with the popular "Don't
 
 ## 🆕 Recent Updates
 
+### August 16, 2025: Photo Preview System Documentation
+- 📝 **Documented photo preview architecture**:
+  - Created comprehensive photo-preview-system.md documentation
+  - Analyzed navigation methods across all platforms
+  - Documented entry points and trigger mechanisms
+- 🔴 **Identified critical iOS bug**:
+  - Swipe navigation conflicts with zoom pan gesture
+  - Navigation impossible when photo is zoomed in
+  - Affects PhotoPreviewView.swift lines 250-260
+- 🎨 **Proposed unified UI/UX design**:
+  - Added navigation buttons for all platforms
+  - Unified control timer (3-second auto-hide)
+  - Consistent thumbnail strip implementation
+  - Enhanced keyboard support across platforms
+- 📋 **Created implementation roadmap** with prioritized fixes
+
 ### August 16, 2025: Apple Sign-In Email Extraction from JWT
 - ✅ **Fixed blank username display for Apple Sign-In**:
   - Apple only provides name/email on first authorization
