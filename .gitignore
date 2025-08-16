@@ -3,6 +3,7 @@
 
 # Xcode
 apple/build/
+apple/build-test/
 apple/DerivedData/
 apple/*.xcodeproj/xcuserdata/
 apple/*.xcodeproj/project.xcworkspace/xcuserdata/
