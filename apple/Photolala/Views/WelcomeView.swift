@@ -178,14 +178,32 @@ struct WelcomeView: View {
 								.font(.caption)
 								.foregroundStyle(.secondary)
 							
-							Text(identityManager.currentUser?.displayName ?? "User")
+							let displayName = identityManager.currentUser?.displayName ?? "User"
+							Text(displayName)
 								.font(.headline)
 								.foregroundStyle(.primary)
 							
-							if let email = identityManager.currentUser?.email {
+							// Show email if different from display name
+							if let email = identityManager.currentUser?.email,
+							   email != displayName {
 								Text(email)
 									.font(.caption)
 									.foregroundStyle(.secondary)
+							}
+							
+							// If no name or email, show a button to add profile info
+							if let user = identityManager.currentUser,
+							   (user.fullName?.isEmpty ?? true) && (user.email?.isEmpty ?? true) {
+								Button(action: {
+									// TODO: Show profile edit sheet
+									print("[WelcomeView] User needs to add profile information")
+								}) {
+									Label("Add Profile Info", systemImage: "pencil.circle")
+										.font(.caption)
+										.foregroundColor(.accentColor)
+								}
+								.buttonStyle(.plain)
+								.padding(.top, 4)
 							}
 						}
 					}

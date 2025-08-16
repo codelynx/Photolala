@@ -24,7 +24,16 @@ struct PhotolalaUser: Codable {
 	
 	// Computed properties
 	var displayName: String {
-		fullName ?? email ?? "Photolala User"
+		// Check for non-empty fullName first
+		if let fullName = fullName, !fullName.isEmpty {
+			return fullName
+		}
+		// Fall back to email (preferred over generic "User" label)
+		if let email = email, !email.isEmpty {
+			return email
+		}
+		// Last resort: use provider info
+		return "\(primaryProvider.displayName) User"
 	}
 	
 	// Check if a provider is linked (either primary or in linkedProviders)

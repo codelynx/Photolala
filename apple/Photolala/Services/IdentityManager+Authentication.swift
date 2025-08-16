@@ -42,16 +42,22 @@ extension IdentityManager {
 			// Sign in successful - user exists
 			var updatedUser = user
 			
-			// Update user info from fresh JWT data
-			if let email = credential.email {
+			// Update user info from fresh JWT data (Apple only provides these on first sign-in)
+			// Only update if we have non-empty values
+			if let email = credential.email, !email.isEmpty {
 				updatedUser.email = email
 			}
-			if let fullName = credential.fullName {
+			if let fullName = credential.fullName, !fullName.isEmpty {
 				updatedUser.fullName = fullName
 			}
-			if let photoURL = credential.photoURL {
+			if let photoURL = credential.photoURL, !photoURL.isEmpty {
 				updatedUser.photoURL = photoURL
 			}
+			
+			// Log what we have for debugging
+			print("[IdentityManager] Sign in - existing user data: fullName=\(user.fullName ?? "nil"), email=\(user.email ?? "nil")")
+			print("[IdentityManager] Sign in - credential data: fullName=\(credential.fullName ?? "nil"), email=\(credential.email ?? "nil")")
+			print("[IdentityManager] Sign in - updated user: fullName=\(updatedUser.fullName ?? "nil"), email=\(updatedUser.email ?? "nil")")
 			
 			updatedUser.lastUpdated = Date()
 			try await saveUser(updatedUser)
@@ -86,6 +92,9 @@ extension IdentityManager {
 			// Create account successful - create new user
 			let serviceUserID = UUID().uuidString.lowercased()
 			
+			// Log what we're getting from Apple on first sign-in
+			print("[IdentityManager] Create account - credential data: fullName=\(credential.fullName ?? "nil"), email=\(credential.email ?? "nil")")
+			
 			let newUser = PhotolalaUser(
 				serviceUserID: serviceUserID,
 				provider: provider,
@@ -95,6 +104,8 @@ extension IdentityManager {
 				photoURL: credential.photoURL,
 				subscription: Subscription.freeTrial()
 			)
+			
+			print("[IdentityManager] Create account - new user: fullName=\(newUser.fullName ?? "nil"), email=\(newUser.email ?? "nil")")
 			
 			try await saveUser(newUser)
 			try await createS3UserFolders(for: newUser)
@@ -270,8 +281,14 @@ extension IdentityManager {
 		
 		let appleIDProvider = ASAuthorizationAppleIDProvider()
 		let request = appleIDProvider.createRequest()
+		
+		// Always request full scopes - Apple will provide them on first authorization
+		// On subsequent sign-ins, these will be nil even if requested
 		request.requestedScopes = [.fullName, .email]
 		request.nonce = Self.sha256(currentNonce!)
+		
+		// Note: We could check credential state first to see if user has authorized before
+		// but this would require knowing the user ID beforehand
 		
 		#if os(macOS)
 			let authorization = try await performSignInMacOS(request: request)
@@ -282,6 +299,10 @@ extension IdentityManager {
 		guard let appleIDCredential = authorization.credential as? ASAuthorizationAppleIDCredential else {
 			throw AuthError.invalidCredentials
 		}
+		
+		// Log what Apple provided
+		print("[IdentityManager] Apple provided - email: \(appleIDCredential.email ?? "nil"), fullName: \(appleIDCredential.fullName?.debugDescription ?? "nil")")
+		print("[IdentityManager] Apple provided - realUserStatus: \(appleIDCredential.realUserStatus.rawValue)")
 		
 		return AuthCredential(appleCredential: appleIDCredential)
 	}
