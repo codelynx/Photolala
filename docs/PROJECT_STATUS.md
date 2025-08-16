@@ -8,6 +8,21 @@ Implementing new sign-in/sign-up UX across all platforms with the popular "Don't
 
 ## 🆕 Recent Updates
 
+### August 16, 2025: Portrait Orientation Lock for Authentication
+- ✅ **iOS Implementation**:
+  - Added iOS-specific AppDelegate for orientation management
+  - Created OrientationHelper with device-specific logic (iPhone only)
+  - WelcomeView locked to portrait on iPhone (iPad unaffected)
+  - Supports iOS 16+ with fallbacks for older versions
+- ✅ **Android Implementation**:
+  - Created OrientationManager with content-fit detection (600dp threshold)
+  - Implemented LockToPortraitEffect and UnlockOrientationEffect composables
+  - Fixed race condition during navigation by removing onDispose unlock
+  - Added findActivity() extension for proper Context traversal
+  - WelcomeScreen, AuthenticationScreen, AccountSettingsScreen locked to portrait on phones
+  - PhotoGridScreen explicitly unlocked for free rotation
+- ✅ Both platforms now prevent UI clipping on smaller screens while allowing rotation on tablets
+
 ### August 5, 2025: Toolbar Reorganization & Android Fixes
 - ✅ Reorganized toolbar across all platforms to reduce clutter
 - ✅ Implemented unified View menu with submenus for Display and Thumbnail Size

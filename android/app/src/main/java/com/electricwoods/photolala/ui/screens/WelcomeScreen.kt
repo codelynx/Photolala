@@ -28,6 +28,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.electricwoods.photolala.R
 import com.electricwoods.photolala.models.PhotolalaUser
+import com.electricwoods.photolala.ui.components.LockToPortraitEffect
 import com.electricwoods.photolala.ui.theme.PhotolalaTheme
 import com.electricwoods.photolala.ui.viewmodels.WelcomeViewModel
 
@@ -40,6 +41,9 @@ fun WelcomeScreen(
 	onAccountSettingsClick: () -> Unit = {},
 	viewModel: WelcomeViewModel = hiltViewModel()
 ) {
+	// Lock to portrait on smaller screens to prevent content clipping
+	LockToPortraitEffect()
+	
 	val currentUser by viewModel.currentUser.collectAsStateWithLifecycle()
 	val isSignedIn by viewModel.isSignedIn.collectAsStateWithLifecycle()
 	

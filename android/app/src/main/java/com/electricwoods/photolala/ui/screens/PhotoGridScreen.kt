@@ -57,6 +57,7 @@ import com.electricwoods.photolala.models.DisplayMode
 import com.electricwoods.photolala.models.ThumbnailSize
 import com.electricwoods.photolala.models.GroupingOption
 import com.electricwoods.photolala.ui.components.BackupStatusIndicator
+import com.electricwoods.photolala.ui.components.UnlockOrientationEffect
 import com.electricwoods.photolala.utils.DeviceUtils
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
@@ -67,6 +68,9 @@ fun PhotoGridScreen(
 	onPhotoClick: (PhotoMediaStore, Int) -> Unit = { _, _ -> },
 	onBackClick: (() -> Unit)? = null
 ) {
+	// Unlock orientation for photo browsing - users should be able to rotate freely
+	UnlockOrientationEffect()
+	
 	val photos by viewModel.photos.collectAsState()
 	val isLoading by viewModel.isLoading.collectAsState()
 	val error by viewModel.error.collectAsState()

@@ -20,6 +20,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.electricwoods.photolala.models.PhotoMediaStore
+import com.electricwoods.photolala.ui.components.UnlockOrientationEffect
 import com.electricwoods.photolala.ui.components.ViewOptionsMenu
 import com.electricwoods.photolala.ui.viewmodels.PhotoViewerViewModel
 import net.engawapg.lib.zoomable.rememberZoomState
@@ -32,6 +33,9 @@ fun PhotoViewerScreen(
 	onBackClick: () -> Unit,
 	viewModel: PhotoViewerViewModel = hiltViewModel()
 ) {
+	// Allow free rotation for photo viewing - users should be able to view photos in landscape
+	UnlockOrientationEffect()
+	
 	val photos by viewModel.photos.collectAsState()
 	val currentPhoto by viewModel.currentPhoto.collectAsState()
 	val showInfo by viewModel.showInfo.collectAsState()

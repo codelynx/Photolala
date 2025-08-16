@@ -62,6 +62,8 @@ struct PhotolalaApp: App {
 
 	#if os(macOS)
 		@NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
+	#elseif os(iOS)
+		@UIApplicationDelegateAdaptor(AppDelegateiOS.self) var appDelegateiOS
 	#endif
 
 	init() {

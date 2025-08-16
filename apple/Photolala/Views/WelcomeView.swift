@@ -332,6 +332,7 @@ struct WelcomeView: View {
 			AuthenticationChoiceView()
 				.environmentObject(identityManager)
 		}
+		.portraitOnlyForiPhone() // Lock to portrait on iPhone only
 	}
 
 	private func selectFolder() {
