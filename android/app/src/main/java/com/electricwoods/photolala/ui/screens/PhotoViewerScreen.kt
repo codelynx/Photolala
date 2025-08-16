@@ -21,10 +21,12 @@ import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.electricwoods.photolala.models.PhotoMediaStore
 import com.electricwoods.photolala.ui.components.UnlockOrientationEffect
+import com.electricwoods.photolala.ui.components.PhotoZoomableImage
 import com.electricwoods.photolala.ui.components.ViewOptionsMenu
 import com.electricwoods.photolala.ui.viewmodels.PhotoViewerViewModel
-import net.engawapg.lib.zoomable.rememberZoomState
-import net.engawapg.lib.zoomable.zoomable
+// Removed zoomable library imports - using custom implementation
+// import net.engawapg.lib.zoomable.rememberZoomState
+// import net.engawapg.lib.zoomable.zoomable
 
 @OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class)
 @Composable
@@ -157,18 +159,15 @@ private fun PhotoPage(
 		return
 	}
 	
-	val zoomState = rememberZoomState()
-	
-	AsyncImage(
-		model = ImageRequest.Builder(LocalContext.current)
-			.data(photo.uri)
-			.crossfade(true)
-			.build(),
+	// Use our custom zoomable implementation with iOS-like behavior
+	PhotoZoomableImage(
+		imageUri = photo.uri,
 		contentDescription = photo.filename,
 		contentScale = if (scaleMode == "fill") ContentScale.Crop else ContentScale.Fit,
+		minZoomScale = 1f,
+		maxZoomScale = 5f,
+		doubleTapZoomScale = 2f,
 		modifier = modifier
-			.fillMaxSize()
-			.zoomable(zoomState)
 	)
 }
 
