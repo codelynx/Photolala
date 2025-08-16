@@ -30,6 +30,7 @@ import com.electricwoods.photolala.models.AuthProvider
 import com.electricwoods.photolala.models.PhotolalaUser
 import com.electricwoods.photolala.models.ProviderLink
 import com.electricwoods.photolala.models.SubscriptionTier
+import com.electricwoods.photolala.ui.components.LockToPortraitEffect
 import com.electricwoods.photolala.viewmodels.AccountSettingsViewModel
 import java.text.SimpleDateFormat
 import java.util.*
@@ -40,6 +41,9 @@ fun AccountSettingsScreen(
 	onNavigateBack: () -> Unit,
 	viewModel: AccountSettingsViewModel = hiltViewModel()
 ) {
+	// Lock to portrait on smaller screens to prevent content clipping
+	LockToPortraitEffect()
+	
 	val uiState by viewModel.uiState.collectAsState()
 	val user = uiState.user
 	

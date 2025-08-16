@@ -25,6 +25,7 @@ import com.electricwoods.photolala.models.AuthCredential
 import com.electricwoods.photolala.models.AuthProvider
 import com.electricwoods.photolala.services.AuthException
 import com.electricwoods.photolala.services.IdentityManager
+import com.electricwoods.photolala.ui.components.LockToPortraitEffect
 import com.electricwoods.photolala.ui.viewmodels.AuthenticationViewModel
 
 @Composable
@@ -34,6 +35,9 @@ fun AuthenticationScreen(
 	onCancel: () -> Unit,
 	viewModel: AuthenticationViewModel = hiltViewModel()
 ) {
+	// Lock to portrait on smaller screens to prevent content clipping
+	LockToPortraitEffect()
+	
 	val identityManager = viewModel.identityManager
 	val isLoading by identityManager.isLoading.collectAsStateWithLifecycle()
 	val errorMessage by identityManager.errorMessage.collectAsStateWithLifecycle()
@@ -56,10 +60,8 @@ fun AuthenticationScreen(
 	// Monitor authentication state changes - but only for Google Sign-In
 	// Apple Sign-In uses the event bus mechanism in AuthenticationViewModel
 	LaunchedEffect(currentUser) {
-		android.util.Log.d("AuthenticationScreen", "LaunchedEffect triggered, currentUser: $currentUser")
 		// Only handle Google Sign-In success here, Apple Sign-In is handled via event bus
 		if (currentUser != null && currentUser!!.primaryProvider == AuthProvider.GOOGLE) {
-			android.util.Log.d("AuthenticationScreen", "Google user authenticated, calling onAuthSuccess")
 			onAuthSuccess()
 		}
 	}
