@@ -21,7 +21,20 @@ data class PhotolalaUser(
 	val preferences: UserPreferences? = null
 ) {
 	val displayName: String
-		get() = fullName ?: email ?: "Photolala User"
+		get() {
+			// Check for non-empty fullName first
+			val name = fullName
+			if (!name.isNullOrBlank()) {
+				return name
+			}
+			// Fall back to email (preferred over generic "User" label)
+			val emailAddress = email
+			if (!emailAddress.isNullOrBlank()) {
+				return emailAddress
+			}
+			// Last resort: use provider info
+			return "${primaryProvider.displayName} User"
+		}
 }
 
 @Serializable

@@ -152,12 +152,19 @@ class IdentityManager @Inject constructor(
 			return when {
 				intent == AuthIntent.SIGN_IN && existingUser != null -> {
 					// Sign in successful - user exists
+					// Only update with non-empty values
 					val updatedUser = existingUser.copy(
-						email = credential.email ?: existingUser.email,
-						fullName = credential.fullName ?: existingUser.fullName,
-						photoURL = credential.photoURL ?: existingUser.photoURL,
+						email = credential.email?.takeIf { it.isNotBlank() } ?: existingUser.email,
+						fullName = credential.fullName?.takeIf { it.isNotBlank() } ?: existingUser.fullName,
+						photoURL = credential.photoURL?.takeIf { it.isNotBlank() } ?: existingUser.photoURL,
 						lastUpdated = Date()
 					)
+					
+					// Log what we're updating for debugging
+					android.util.Log.d("IdentityManager", "Sign in - existing user: email=${existingUser.email}, fullName=${existingUser.fullName}")
+					android.util.Log.d("IdentityManager", "Sign in - credential: email=${credential.email}, fullName=${credential.fullName}")
+					android.util.Log.d("IdentityManager", "Sign in - updated: email=${updatedUser.email}, fullName=${updatedUser.fullName}")
+					
 					saveUser(updatedUser)
 					_currentUser.value = updatedUser
 					_isSignedIn.value = true
