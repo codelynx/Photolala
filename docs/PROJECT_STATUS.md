@@ -1,12 +1,24 @@
 ## 📍 PROJECT STATUS REPORT
 
-Last Updated: August 5, 2025
+Last Updated: August 16, 2025
 
 ### 🚀 Current Status: Sign-In UX Update
 
 Implementing new sign-in/sign-up UX across all platforms with the popular "Don't have an account?" pattern. Apple platform implementation is complete, Android implementation is pending.
 
 ## 🆕 Recent Updates
+
+### August 16, 2025: Apple Sign-In Email Extraction from JWT
+- ✅ **Fixed blank username display for Apple Sign-In**:
+  - Apple only provides name/email on first authorization
+  - Implemented JWT payload decoder to extract email from identity token
+  - Email in JWT is available on all sign-ins (if user granted permission)
+  - Display name now falls back to email when full name unavailable
+  - Handles empty strings and nil values gracefully
+- ✅ **Technical improvements**:
+  - Added generic JWT payload decoder for future use
+  - Enhanced debug logging to diagnose Apple Sign-In issues
+  - Smart fallback chain: fullName → email → "Apple User"
 
 ### August 16, 2025: Portrait Orientation Lock for Authentication
 - ✅ **iOS Implementation**:

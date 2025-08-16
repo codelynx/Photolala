@@ -237,6 +237,9 @@ class AppleAuthService @Inject constructor(
         // Decode payload (middle part)
         val payload = String(Base64.getUrlDecoder().decode(parts[1]))
         
+        // Log JWT payload for debugging
+        android.util.Log.d("AppleAuthService", "JWT payload keys: ${extractAllJsonKeys(payload)}")
+        
         // Parse JSON (simplified - use proper JSON parser in production)
         val sub = extractJsonValue(payload, "sub") 
             ?: throw IllegalArgumentException("Missing user ID")
@@ -244,9 +247,21 @@ class AppleAuthService @Inject constructor(
         val nonce = extractJsonValue(payload, "nonce")
         val isPrivateEmail = extractJsonValue(payload, "is_private_email")?.toBoolean() ?: false
         
+        // Log what we extracted
+        android.util.Log.d("AppleAuthService", "JWT extracted - email: $email (from JWT)")
+        if (email != null) {
+            android.util.Log.d("AppleAuthService", "Successfully extracted email from JWT")
+        } else {
+            android.util.Log.d("AppleAuthService", "No email found in JWT")
+        }
+        
         // Extract name if provided
         val fullName = if (payload.contains("\"name\"")) {
-            "${extractJsonValue(payload, "given_name") ?: ""} ${extractJsonValue(payload, "family_name") ?: ""}".trim()
+            val givenName = extractJsonValue(payload, "given_name") ?: ""
+            val familyName = extractJsonValue(payload, "family_name") ?: ""
+            val combined = "$givenName $familyName".trim()
+            // Return null if the combined name is empty
+            combined.ifBlank { null }
         } else null
         
         val tokenData = AppleIdTokenData(
@@ -267,6 +282,15 @@ class AppleAuthService @Inject constructor(
     private fun extractJsonValue(json: String, key: String): String? {
         val pattern = "\"$key\"\\s*:\\s*\"([^\"]+)\"".toRegex()
         return pattern.find(json)?.groupValues?.get(1)
+    }
+    
+    /**
+     * Extract all JSON keys for debugging
+     */
+    private fun extractAllJsonKeys(json: String): String {
+        val pattern = "\"([^\"]+)\"\\s*:".toRegex()
+        val keys = pattern.findAll(json).map { it.groupValues[1] }.toList()
+        return keys.joinToString(", ")
     }
     
     /**

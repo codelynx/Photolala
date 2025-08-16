@@ -34,13 +34,41 @@ struct AuthCredential {
 			self.providerID = appleCredential.user
 		}
 		
-		self.email = appleCredential.email
-		self.fullName = appleCredential.fullName?.formatted()
+		// Apple only provides email and name on first authorization
+		// On subsequent sign-ins, these will be nil in the credential
+		// BUT we can extract email from the JWT identity token
+		
+		// Try to get email from credential first, then from JWT
+		var extractedEmail = appleCredential.email
+		if let identityToken = appleCredential.identityToken,
+		   let jwtString = String(data: identityToken, encoding: .utf8) {
+			// Log JWT payload for debugging
+			if let payload = Self.decodeJWTPayload(jwtString) {
+				print("[AuthCredential] JWT payload contains: \(payload.keys.joined(separator: ", "))")
+				if let jwtEmail = payload["email"] as? String {
+					print("[AuthCredential] JWT contains email: \(jwtEmail)")
+					if extractedEmail == nil {
+						extractedEmail = jwtEmail
+						print("[AuthCredential] Using email from JWT since credential.email is nil")
+					}
+				}
+			}
+		}
+		self.email = extractedEmail
+		
+		// Format the name, but treat empty strings as nil
+		let formattedName = appleCredential.fullName?.formatted()
+		self.fullName = (formattedName?.isEmpty ?? true) ? nil : formattedName
+		
 		self.photoURL = nil
 		self.identityToken = appleCredential.identityToken
 		self.authorizationCode = appleCredential.authorizationCode
 		self.idToken = nil
 		self.accessToken = nil
+		
+		// Debug logging
+		print("[AuthCredential] Apple Sign In - email: \(self.email ?? "nil"), fullName: \(self.fullName ?? "nil")")
+		print("[AuthCredential] Apple Sign In - fullName components: \(appleCredential.fullName?.debugDescription ?? "nil")")
 	}
 	
 	// For Google Sign In
@@ -58,6 +86,18 @@ struct AuthCredential {
 	
 	// Helper method to extract sub field from JWT
 	private static func extractSubFromJWT(_ jwt: String) -> String? {
+		let payload = decodeJWTPayload(jwt)
+		return payload?["sub"] as? String
+	}
+	
+	// Helper method to extract email from JWT
+	private static func extractEmailFromJWT(_ jwt: String) -> String? {
+		let payload = decodeJWTPayload(jwt)
+		return payload?["email"] as? String
+	}
+	
+	// Generic JWT payload decoder
+	private static func decodeJWTPayload(_ jwt: String) -> [String: Any]? {
 		// Split JWT into parts
 		let parts = jwt.split(separator: ".")
 		guard parts.count == 3 else { return nil }
@@ -71,12 +111,10 @@ struct AuthCredential {
 		                                    startingAt: 0)
 		
 		guard let payloadData = Data(base64Encoded: paddedPayload),
-		      let json = try? JSONSerialization.jsonObject(with: payloadData) as? [String: Any],
-		      let sub = json["sub"] as? String else {
+		      let json = try? JSONSerialization.jsonObject(with: payloadData) as? [String: Any] else {
 			return nil
 		}
 		
-		
-		return sub
+		return json
 	}
 }
