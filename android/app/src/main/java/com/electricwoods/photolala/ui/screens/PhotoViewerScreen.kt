@@ -5,8 +5,11 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.ChevronLeft
+import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -24,6 +27,7 @@ import com.electricwoods.photolala.ui.components.UnlockOrientationEffect
 import com.electricwoods.photolala.ui.components.PhotoZoomableImage
 import com.electricwoods.photolala.ui.components.ViewOptionsMenu
 import com.electricwoods.photolala.ui.viewmodels.PhotoViewerViewModel
+import kotlinx.coroutines.launch
 // Removed zoomable library imports - using custom implementation
 // import net.engawapg.lib.zoomable.rememberZoomState
 // import net.engawapg.lib.zoomable.zoomable
@@ -48,9 +52,16 @@ fun PhotoViewerScreen(
 		pageCount = { photos.size }
 	)
 	
+	val coroutineScope = rememberCoroutineScope()
+	
+	// Track if any photo is currently zoomed
+	var isAnyPhotoZoomed by remember { mutableStateOf(false) }
+	
 	// Update current photo when page changes
 	LaunchedEffect(pagerState.currentPage) {
 		viewModel.setCurrentIndex(pagerState.currentPage)
+		// Reset zoom state when changing pages
+		isAnyPhotoZoomed = false
 	}
 	
 	Scaffold(
@@ -101,13 +112,84 @@ fun PhotoViewerScreen(
 			// Photo pager
 			HorizontalPager(
 				state = pagerState,
-				modifier = Modifier.fillMaxSize()
+				modifier = Modifier.fillMaxSize(),
+				userScrollEnabled = !isAnyPhotoZoomed  // Disable swipe when zoomed
 			) { page ->
 				PhotoPage(
 					photo = photos.getOrNull(page),
 					scaleMode = scaleMode,
-					modifier = Modifier.fillMaxSize()
+					modifier = Modifier.fillMaxSize(),
+					onZoomStateChanged = { isZoomed ->
+						// Only update if this is the current page
+						if (page == pagerState.currentPage) {
+							isAnyPhotoZoomed = isZoomed
+						}
+					}
 				)
+			}
+			
+			// Navigation buttons (always visible, more prominent)
+			Row(
+				modifier = Modifier
+					.fillMaxWidth()
+					.align(Alignment.CenterStart),
+				horizontalArrangement = Arrangement.SpaceBetween
+			) {
+				// Previous button
+				if (pagerState.currentPage > 0) {
+					IconButton(
+						onClick = {
+							coroutineScope.launch {
+								pagerState.animateScrollToPage(pagerState.currentPage - 1)
+							}
+						},
+						modifier = Modifier
+							.padding(start = 8.dp)
+							.size(48.dp)
+							.background(
+								Color.Black.copy(alpha = 0.5f),
+								CircleShape
+							)
+					) {
+						Icon(
+							imageVector = Icons.Default.ChevronLeft,
+							contentDescription = "Previous photo",
+							tint = Color.White,
+							modifier = Modifier.size(32.dp)
+						)
+					}
+				} else {
+					Spacer(modifier = Modifier.width(48.dp))
+				}
+				
+				Spacer(modifier = Modifier.weight(1f))
+				
+				// Next button
+				if (pagerState.currentPage < photos.size - 1) {
+					IconButton(
+						onClick = {
+							coroutineScope.launch {
+								pagerState.animateScrollToPage(pagerState.currentPage + 1)
+							}
+						},
+						modifier = Modifier
+							.padding(end = 8.dp)
+							.size(48.dp)
+							.background(
+								Color.Black.copy(alpha = 0.5f),
+								CircleShape
+							)
+					) {
+						Icon(
+							imageVector = Icons.Default.ChevronRight,
+							contentDescription = "Next photo",
+							tint = Color.White,
+							modifier = Modifier.size(32.dp)
+						)
+					}
+				} else {
+					Spacer(modifier = Modifier.width(48.dp))
+				}
 			}
 			
 			// Photo info overlay
@@ -147,7 +229,8 @@ fun PhotoViewerScreen(
 private fun PhotoPage(
 	photo: PhotoMediaStore?,
 	scaleMode: String,
-	modifier: Modifier = Modifier
+	modifier: Modifier = Modifier,
+	onZoomStateChanged: ((Boolean) -> Unit)? = null
 ) {
 	if (photo == null) {
 		Box(
@@ -167,7 +250,8 @@ private fun PhotoPage(
 		minZoomScale = 1f,
 		maxZoomScale = 5f,
 		doubleTapZoomScale = 2f,
-		modifier = modifier
+		modifier = modifier,
+		onZoomStateChanged = onZoomStateChanged
 	)
 }
 

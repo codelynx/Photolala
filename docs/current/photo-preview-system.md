@@ -79,12 +79,12 @@ onPhotoClick = { photo, index ->
 
 | Feature | iOS | macOS | Android |
 |---------|-----|-------|---------|
-| **Swipe left/right** | ⚠️ Conflicts with zoom | N/A | ✅ Works |
+| **Swipe left/right** | ✅ When not zoomed | N/A | ✅ When not zoomed |
 | **Arrow keys** | ❌ No | ✅ Yes | ❌ No |
 | **Tap zones (edges)** | ✅ Yes (25% edges) | ✅ Yes | ❌ No |
 | **Thumbnail strip** | ✅ Yes | ✅ Yes | ❌ No |
 | **Page indicator** | ✅ Top (1/10) | ✅ Top | ✅ Bottom |
-| **Previous/Next buttons** | ❌ No | ❌ No | ❌ No |
+| **Previous/Next buttons** | ❌ No | ❌ No | ✅ Yes (always visible) |
 | **Auto-hide controls** | ✅ 30s timer | ✅ 30s timer | ❌ Always visible |
 
 ## Preview Mode Confusion
@@ -126,7 +126,9 @@ Preview Mode: Selection (3 of 5 selected)
 
 ## Recent Fixes ✅
 
-### Fixed: iOS Gesture Conflicts (August 16, 2025)
+### Cross-Platform Zoom/Pan Implementation (August 16, 2025)
+
+#### iOS Fixes
 
 1. **Swipe/Zoom Conflict Resolution**
    - Swipe navigation now only works when `zoomScale <= 1.0`
@@ -134,11 +136,39 @@ Preview Mode: Selection (3 of 5 selected)
    - Clear UX: "Zoom in to examine, zoom out to navigate"
    - Matches iOS Photos app behavior
 
-2. **Pan Safety Boundaries**
-   - Added `constrainedOffset` function to prevent image loss
-   - Minimum 25% of image must remain visible
-   - Spring-back animation when hitting boundaries
-   - Auto-centering when image fits within view
+2. **Simplified Gesture Handling**
+   - Removed complex rubber band and momentum features
+   - Implemented delta-based scaling to prevent jumps
+   - Direct pan application for predictable movement
+   - Boundary formula: `maxOffset = (size * (scale - 1)) / 2`
+
+#### Android Implementation
+
+1. **Custom PhotoZoomableImage Component**
+   - Created custom implementation replacing `net.engawapg.lib.zoomable`
+   - Matches iOS zoom parameters exactly (1x-5x range)
+   - Same boundary constraints and formulas
+   - Double-tap toggles between 1x and 2x zoom
+
+2. **Navigation Buttons (August 16, 2025)**
+   - Added visible `<` and `>` buttons on left/right edges
+   - Semi-transparent circular buttons (48dp size)
+   - Always visible to solve zoom navigation issue
+   - Buttons hide at first/last photo boundaries
+   - Work regardless of zoom state
+
+3. **Fixed Drag Gesture for Pan (August 16, 2025)**
+   - Added separate `detectDragGestures` for single-finger pan when zoomed
+   - `detectTransformGestures` handles pinch-zoom and two-finger pan
+   - HorizontalPager's `userScrollEnabled` disabled when zoomed
+   - Zoom state tracked and communicated to parent via callback
+   - Prevents swipe-to-navigate conflict when panning zoomed image
+
+4. **Cross-Platform Consistency**
+   - Both platforms use identical zoom limits
+   - Same boundary calculation formula
+   - Consistent gesture behavior
+   - Position resets when zoomed to 1x
 
 ## Known Issues
 
@@ -152,10 +182,10 @@ Preview Mode: Selection (3 of 5 selected)
 
 ### Major Issues ⚠️
 
-1. **Missing Navigation Buttons**
-   - No visible prev/next buttons on any platform
-   - Users don't discover tap zones without instructions
-   - No visual feedback for navigation areas
+1. ~~**Missing Navigation Buttons**~~ **PARTIALLY FIXED**
+   - ✅ Android: Now has visible prev/next buttons
+   - ❌ iOS/macOS: Still rely on tap zones/gestures
+   - Users on iOS/macOS don't discover tap zones without instructions
 
 2. **Android Feature Gaps**
    - No thumbnail strip for quick navigation

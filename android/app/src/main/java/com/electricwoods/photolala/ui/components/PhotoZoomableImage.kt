@@ -5,6 +5,7 @@ import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.*
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -43,9 +44,10 @@ fun PhotoZoomableImage(
 	minZoomScale: Float = 1f,
 	maxZoomScale: Float = 5f,
 	doubleTapZoomScale: Float = 2f,
-	contentScale: ContentScale = ContentScale.Fit
+	contentScale: ContentScale = ContentScale.Fit,
+	onZoomStateChanged: ((Boolean) -> Unit)? = null  // Callback to notify parent about zoom state
 ) {
-	var scale by remember { mutableStateOf(1f) }
+	var scale by remember { mutableStateOf(minZoomScale) }
 	var offsetX by remember { mutableStateOf(0f) }
 	var offsetY by remember { mutableStateOf(0f) }
 	
@@ -53,9 +55,13 @@ fun PhotoZoomableImage(
 	var lastScale by remember { mutableStateOf(1f) }
 	var lastOffset by remember { mutableStateOf(Offset.Zero) }
 	
+	// Notify parent when zoom state changes
+	LaunchedEffect(scale) {
+		onZoomStateChanged?.invoke(scale > minZoomScale)
+	}
+	
 	// Track image size for boundary calculations
 	var imageSize by remember { mutableStateOf(IntSize.Zero) }
-	var containerSize by remember { mutableStateOf(IntSize.Zero) }
 	
 	val coroutineScope = rememberCoroutineScope()
 	
@@ -87,43 +93,53 @@ fun PhotoZoomableImage(
 		label = "offsetY"
 	)
 	
-	// Calculate max offset based on zoom scale (same formula as iOS)
-	fun calculateMaxOffset(): Pair<Float, Float> {
-		if (containerSize.width == 0 || containerSize.height == 0) {
-			return Pair(0f, 0f)
-		}
-		
-		val maxX = max(0f, (containerSize.width * (scale - 1)) / 2)
-		val maxY = max(0f, (containerSize.height * (scale - 1)) / 2)
-		return Pair(maxX, maxY)
-	}
-	
-	// Constrain offset to boundaries
-	fun constrainOffset() {
-		val (maxX, maxY) = calculateMaxOffset()
-		offsetX = offsetX.coerceIn(-maxX, maxX)
-		offsetY = offsetY.coerceIn(-maxY, maxY)
-	}
-	
-	// Reset zoom and position
-	fun reset() {
-		scale = minZoomScale
-		offsetX = 0f
-		offsetY = 0f
-		lastScale = 1f
-		lastOffset = Offset.Zero
-	}
-	
-	Box(
+	// Use BoxWithConstraints to get actual container size
+	BoxWithConstraints(
 		modifier = modifier
 			.fillMaxSize()
-			.background(Color.Black)
+			.background(Color.Black),
+		contentAlignment = Alignment.Center
+	) {
+		// Get the actual container size from constraints
+		val containerWidth = constraints.maxWidth.toFloat()
+		val containerHeight = constraints.maxHeight.toFloat()
+		
+		// Calculate max offset based on zoom scale (same formula as iOS)
+		fun calculateMaxOffset(): Pair<Float, Float> {
+			if (containerWidth == 0f || containerHeight == 0f) {
+				return Pair(0f, 0f)
+			}
+			
+			val maxX = max(0f, (containerWidth * (scale - 1)) / 2)
+			val maxY = max(0f, (containerHeight * (scale - 1)) / 2)
+			return Pair(maxX, maxY)
+		}
+		
+		// Constrain offset to boundaries
+		fun constrainOffset() {
+			val (maxX, maxY) = calculateMaxOffset()
+			offsetX = offsetX.coerceIn(-maxX, maxX)
+			offsetY = offsetY.coerceIn(-maxY, maxY)
+		}
+	
+		// Reset zoom and position
+		fun reset() {
+			scale = minZoomScale
+			offsetX = 0f
+			offsetY = 0f
+			lastScale = 1f
+			lastOffset = Offset.Zero
+		}
+		
+		Box(
+			modifier = Modifier
+				.fillMaxSize()
 			.pointerInput(Unit) {
 				detectTransformGestures { _, pan, zoom, _ ->
 					// Handle zoom with simple multiplication
 					scale = (scale * zoom).coerceIn(minZoomScale, maxZoomScale)
 					
-					// Handle pan when zoomed
+					// Handle pan when zoomed (this works with 2-finger pan during pinch)
 					if (scale > minZoomScale) {
 						// Direct pan application
 						offsetX += pan.x
@@ -138,6 +154,16 @@ fun PhotoZoomableImage(
 						scale = minZoomScale
 						offsetX = 0f
 						offsetY = 0f
+					}
+				}
+			}
+			.pointerInput(scale) {  // Re-compose when scale changes
+				// Single finger drag for panning when zoomed
+				if (scale > minZoomScale) {
+					detectDragGestures { _, dragAmount ->
+						offsetX += dragAmount.x
+						offsetY += dragAmount.y
+						constrainOffset()
 					}
 				}
 			}
@@ -186,5 +212,6 @@ fun PhotoZoomableImage(
 				}
 			}
 		)
+		}
 	}
 }
