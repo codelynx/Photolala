@@ -163,6 +163,14 @@ Before implementing major features:
 4. After implementation, move docs to `history/` and update `current/`
 5. Update PROJECT_STATUS.md with implementation details
 
+### Review Changes Process
+When asked to "review changes", this means:
+1. Review the implementation and summarize what was done
+2. Update PROJECT_STATUS.md with recent changes
+3. Update or create relevant documentation in `docs/`
+4. Ensure planning documents reflect the final implementation
+5. Commit any documentation updates along with the review
+
 ## Code Style
 
 - **Indentation**: Use tabs (not spaces) with tab width of 4
