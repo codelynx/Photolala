@@ -49,7 +49,9 @@ struct DirectoryPhotoBrowserView: View {
 						.navigationDestination(for: PreviewNavigation.self) { navigation in
 							PhotoPreviewView(
 								photos: navigation.photos,
-								initialIndex: navigation.initialIndex
+								initialIndex: navigation.initialIndex,
+								mode: navigation.mode,
+								totalPhotosCount: navigation.totalPhotosCount
 							)
 							.navigationBarBackButtonHidden(true)
 						}
@@ -101,7 +103,9 @@ struct DirectoryPhotoBrowserView: View {
 				.navigationDestination(item: self.$selectedPhotoNavigation) { navigation in
 					PhotoPreviewView(
 						photos: navigation.photos,
-						initialIndex: navigation.initialIndex
+						initialIndex: navigation.initialIndex,
+						mode: navigation.mode,
+						totalPhotosCount: navigation.totalPhotosCount
 					)
 					.navigationBarBackButtonHidden(true)
 				}
@@ -269,15 +273,34 @@ struct DirectoryPhotoBrowserView: View {
 						#endif
 					}
 					
-					// Preview selected photos button
-					if !self.selectedPhotos.isEmpty {
-						Button(action: self.previewSelectedPhotos) {
-							Label("Preview", systemImage: "eye")
+					// Preview button - shows selected photos if any, otherwise all
+					Button(action: {
+						if !self.selectedPhotos.isEmpty {
+							self.previewSelectedPhotos()
+						} else if !self.allPhotos.isEmpty {
+							// Preview all photos when no selection
+							let navigation = PreviewNavigation(
+								photos: self.allPhotos,
+								initialIndex: 0,
+								mode: .all,
+								totalPhotosCount: nil
+							)
+							#if os(macOS)
+								self.navigationPath.append(navigation)
+							#else
+								self.selectedPhotoNavigation = navigation
+							#endif
 						}
-						#if os(macOS)
-						.help("Preview selected photos")
-						#endif
+					}) {
+						Label(
+							self.selectedPhotos.isEmpty ? "Preview All" : "Preview",
+							systemImage: "eye"
+						)
 					}
+					.disabled(self.allPhotos.isEmpty && self.selectedPhotos.isEmpty)
+					#if os(macOS)
+					.help(self.selectedPhotos.isEmpty ? "Preview all photos" : "Preview selected photos")
+					#endif
 				}
 				
 				
@@ -303,26 +326,34 @@ struct DirectoryPhotoBrowserView: View {
 		// If we don't have photos yet, return
 		guard !self.allPhotos.isEmpty else { return }
 
-		// Always show all photos, but start from selected if any
-		let photosToShow = self.allPhotos
-		let initialIndex: Int = if !self.selectedPhotos.isEmpty {
-			// Find the first selected photo in the full list
-			if let firstSelected = selectedPhotos.first,
-			   let index = allPhotos.firstIndex(of: firstSelected)
-			{
-				index
-			} else {
-				0
-			}
+		let photosToShow: [PhotoFile]
+		let initialIndex: Int
+		let mode: PreviewMode
+		
+		if !self.selectedPhotos.isEmpty {
+			// Show selected photos only
+			photosToShow = self.selectedPhotos.sorted { $0.filename < $1.filename }
+			initialIndex = 0 // Start from first selected
+			mode = .selection
+			print(
+				"[PhotoBrowserView] Space key: Showing \(photosToShow.count) selected photos"
+			)
 		} else {
-			0
+			// Show all photos
+			photosToShow = self.allPhotos
+			initialIndex = 0
+			mode = .all
+			print(
+				"[PhotoBrowserView] Space key: Showing all \(photosToShow.count) photos"
+			)
 		}
 
-		print(
-			"[PhotoBrowserView] Space key: Showing all \(photosToShow.count) photos, starting at index \(initialIndex)"
+		let navigation = PreviewNavigation(
+			photos: photosToShow, 
+			initialIndex: initialIndex,
+			mode: mode,
+			totalPhotosCount: mode == .all ? nil : self.allPhotos.count
 		)
-
-		let navigation = PreviewNavigation(photos: photosToShow, initialIndex: initialIndex)
 
 		#if os(macOS)
 			self.navigationPath.append(navigation)
@@ -337,25 +368,20 @@ struct DirectoryPhotoBrowserView: View {
 		// Store all photos for space key navigation
 		self.allPhotos = allPhotos
 
-		// If there's an active selection, show only selected photos
-		let photosToShow: [PhotoFile]
-		let initialIndex: Int
+		// Double-click always shows all photos, starting from the clicked one
+		let photosToShow = allPhotos
+		let initialIndex = allPhotos.firstIndex(of: photo) ?? 0
+		let mode = PreviewMode.all
 
-		if !self.selectedPhotos.isEmpty {
-			// Convert selection to array maintaining order
-			photosToShow = allPhotos.filter { self.selectedPhotos.contains($0) }
-			initialIndex = photosToShow.firstIndex(of: photo) ?? 0
-			print("[PhotoBrowserView] Showing \(photosToShow.count) selected photos")
-		} else {
-			// Show all photos
-			photosToShow = allPhotos
-			initialIndex = allPhotos.firstIndex(of: photo) ?? 0
-			print("[PhotoBrowserView] Showing all \(photosToShow.count) photos")
-		}
+		print("[PhotoBrowserView] Showing all \(photosToShow.count) photos from index \(initialIndex)")
 
 		// Navigate to preview
-		print("[PhotoBrowserView] Navigating to preview with index: \(initialIndex)")
-		let navigation = PreviewNavigation(photos: photosToShow, initialIndex: initialIndex)
+		let navigation = PreviewNavigation(
+			photos: photosToShow, 
+			initialIndex: initialIndex,
+			mode: mode,
+			totalPhotosCount: nil
+		)
 
 		#if os(macOS)
 			self.navigationPath.append(navigation)
@@ -376,7 +402,12 @@ struct DirectoryPhotoBrowserView: View {
 		print("[PhotoBrowserView] Previewing \(sortedPhotos.count) selected photos")
 
 		// Start preview from the first selected photo
-		let navigation = PreviewNavigation(photos: sortedPhotos, initialIndex: 0)
+		let navigation = PreviewNavigation(
+			photos: sortedPhotos, 
+			initialIndex: 0,
+			mode: .selection,
+			totalPhotosCount: self.allPhotos.count
+		)
 
 		#if os(macOS)
 			self.navigationPath.append(navigation)
@@ -445,6 +476,8 @@ struct DirectoryPhotoBrowserView: View {
 struct PreviewNavigation: Hashable {
 	let photos: [PhotoFile]
 	let initialIndex: Int
+	let mode: PreviewMode
+	let totalPhotosCount: Int? // For showing "3 of 250" in all mode
 }
 
 

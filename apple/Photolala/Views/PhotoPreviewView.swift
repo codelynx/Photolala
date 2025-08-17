@@ -4,7 +4,6 @@ import XPlatform
 struct PhotoPreviewView: View {
 	// Constants
 	private let controlStripHeight = PhotoViewerConstants.controlStripHeight
-	private let useNativeThumbnailStrip = true // Feature flag for testing
 	
 	// Configurable zoom parameters
 	private let minZoomScale = PhotoViewerConstants.minZoomScale
@@ -13,6 +12,8 @@ struct PhotoPreviewView: View {
 
 	let photos: [PhotoFile]
 	let initialIndex: Int
+	let mode: PreviewMode
+	let totalPhotosCount: Int?
 	@Binding var isPresented: Bool
 
 	@State private var currentIndex: Int
@@ -24,7 +25,8 @@ struct PhotoPreviewView: View {
 	@State private var currentImage: XImage?
 	@State private var isLoadingImage = false
 	@State private var imageLoadError: String?
-	@State private var showThumbnailStrip = false
+	@State private var showControls = true  // Master control for all UI elements
+	@State private var showThumbnailStrip = false  // Deprecated - will use showControls
 	@State private var isFullscreen = false
 	@State private var showMetadataHUD = false
 	@State private var currentMetadata: PhotoMetadata?
@@ -45,9 +47,11 @@ struct PhotoPreviewView: View {
 		#endif
 	}
 
-	init(photos: [PhotoFile], initialIndex: Int, isPresented: Binding<Bool> = .constant(false)) {
+	init(photos: [PhotoFile], initialIndex: Int, mode: PreviewMode = .all, totalPhotosCount: Int? = nil, isPresented: Binding<Bool> = .constant(false)) {
 		self.photos = photos
 		self.initialIndex = initialIndex
+		self.mode = mode
+		self.totalPhotosCount = totalPhotosCount
 		self._isPresented = isPresented
 		self._currentIndex = State(initialValue: initialIndex)
 	}
@@ -82,6 +86,11 @@ struct PhotoPreviewView: View {
 										
 										// Apply delta to current scale (prevents jumps)
 										self.zoomScale = self.zoomScale * delta
+										
+										// Show controls during zoom
+										if !self.showControls {
+											self.showControlsWithTimer()
+										}
 									}
 									.onEnded { _ in
 										// Reset steady state multiplier
@@ -188,12 +197,14 @@ struct PhotoPreviewView: View {
 				}
 
 				// Control strip at top
-				if self.showThumbnailStrip {
+				if self.showControls {
 					VStack(spacing: 0) {
 						ControlStrip(
 							currentIndex: self.currentIndex,
 							totalCount: self.photos.count,
 							filename: self.photos[self.currentIndex].filename,
+							mode: self.mode,
+							totalPhotosCount: self.totalPhotosCount,
 							controlStripHeight: self.controlStripHeight,
 							onClose: { self.dismiss() },
 							onToggleFullscreen: self.toggleFullscreen,
@@ -211,28 +222,17 @@ struct PhotoPreviewView: View {
 				}
 
 				// Thumbnail strip at bottom
-				if self.showThumbnailStrip {
+				if self.showControls {
 					VStack {
 						Spacer()
 
-						if self.useNativeThumbnailStrip {
-							// Native collection view implementation
-							ThumbnailStripView(
-								photos: self.photos,
-								currentIndex: self.$currentIndex,
-								thumbnailSize: PhotoViewerConstants.thumbnailSize,
-								onTimerExtend: self.extendControlsTimer
-							)
-							.frame(height: 84) // 60 + 24 for padding
-						} else {
-							// Original SwiftUI implementation
-							ThumbnailStrip(
-								photos: self.photos,
-								currentIndex: self.$currentIndex,
-								thumbnailSize: PhotoViewerConstants.thumbnailSize,
-								onTimerExtend: self.extendControlsTimer
-							)
-						}
+						ThumbnailStripView(
+							photos: self.photos,
+							currentIndex: self.$currentIndex,
+							thumbnailSize: PhotoViewerConstants.thumbnailSize,
+							onTimerExtend: self.extendControlsTimer
+						)
+						.frame(height: 84) // 60 + 24 for padding
 					}
 					.transition(.move(edge: .bottom).combined(with: .opacity))
 				}
@@ -254,6 +254,8 @@ struct PhotoPreviewView: View {
 		}
 		.onAppear {
 			self.loadCurrentImage()
+			// Start controls timer on appear
+			self.startControlsTimer()
 			// Add a small delay to ensure the view is fully loaded
 			DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
 				self.isFocused = true
@@ -284,21 +286,16 @@ struct PhotoPreviewView: View {
 		}
 		.onKeyPress(keys: ["t"]) { _ in
 			print(
-				"[PhotoPreviewView] Toggle thumbnail strip: \(!self.showThumbnailStrip), photos count: \(self.photos.count)"
+				"[PhotoPreviewView] Toggle controls: \(!self.showControls), photos count: \(self.photos.count)"
 			)
-			withAnimation(.easeInOut(duration: 0.3)) {
-				self.showThumbnailStrip.toggle()
-			}
-			// Reset timer when toggling
-			if self.showThumbnailStrip {
-				self.controlsTimer?.invalidate()
-				self.controlsTimer = Timer.scheduledTimer(withTimeInterval: PhotoViewerConstants.controlHideDelay, repeats: false) { _ in
-					withAnimation(.easeInOut(duration: 0.3)) {
-						self.showThumbnailStrip = false
-					}
+			// Toggle controls visibility
+			if self.showControls {
+				withAnimation(.easeInOut(duration: 0.3)) {
+					self.showControls = false
 				}
-			} else {
 				self.controlsTimer?.invalidate()
+			} else {
+				self.showControlsWithTimer()
 			}
 			return .handled
 		}
@@ -311,6 +308,11 @@ struct PhotoPreviewView: View {
 			withAnimation(.easeInOut(duration: 0.2)) {
 				self.showMetadataHUD.toggle()
 			}
+			// Show controls when toggling metadata
+			if self.showMetadataHUD && !self.showControls {
+				self.showControlsWithTimer()
+			}
+			self.extendControlsTimer()
 			return .handled
 		}
 		.onKeyPress(keys: ["?"]) { _ in
@@ -392,6 +394,7 @@ struct PhotoPreviewView: View {
 		if self.currentIndex > 0 {
 			self.currentIndex -= 1
 			self.resetZoom()
+			self.extendControlsTimer()  // Keep controls visible during navigation
 		}
 	}
 
@@ -399,6 +402,7 @@ struct PhotoPreviewView: View {
 		if self.currentIndex < self.photos.count - 1 {
 			self.currentIndex += 1
 			self.resetZoom()
+			self.extendControlsTimer()  // Keep controls visible during navigation
 		}
 	}
 
@@ -437,33 +441,44 @@ struct PhotoPreviewView: View {
 			}
 		} else {
 			// Center area (middle 50%) - toggle controls
-			withAnimation(.easeInOut(duration: 0.3)) {
-				self.showThumbnailStrip.toggle()
-			}
-
-			// Reset timer if showing controls
-			if self.showThumbnailStrip {
-				self.controlsTimer?.invalidate()
-				self.controlsTimer = Timer.scheduledTimer(withTimeInterval: PhotoViewerConstants.controlHideDelay, repeats: false) { _ in
-					withAnimation(.easeInOut(duration: 0.3)) {
-						self.showThumbnailStrip = false
-					}
+			if self.showControls {
+				// Hide controls
+				withAnimation(.easeInOut(duration: 0.3)) {
+					self.showControls = false
 				}
-			} else {
 				self.controlsTimer?.invalidate()
+			} else {
+				// Show controls with timer
+				self.showControlsWithTimer()
 			}
 		}
 	}
 
-	private func extendControlsTimer() {
-		// Reset the timer when user interacts with thumbnails
-		if self.showThumbnailStrip {
-			self.controlsTimer?.invalidate()
-			self.controlsTimer = Timer.scheduledTimer(withTimeInterval: PhotoViewerConstants.controlHideDelay, repeats: false) { _ in
-				withAnimation(.easeInOut(duration: 0.3)) {
-					self.showThumbnailStrip = false
-				}
+	private func startControlsTimer() {
+		// Cancel any existing timer
+		self.controlsTimer?.invalidate()
+		
+		// Start new timer to hide controls
+		self.controlsTimer = Timer.scheduledTimer(withTimeInterval: PhotoViewerConstants.controlHideDelay, repeats: false) { _ in
+			withAnimation(.easeInOut(duration: 0.3)) {
+				self.showControls = false
 			}
+		}
+	}
+	
+	private func showControlsWithTimer() {
+		// Show controls
+		withAnimation(.easeInOut(duration: 0.3)) {
+			self.showControls = true
+		}
+		// Start timer to hide them
+		self.startControlsTimer()
+	}
+	
+	private func extendControlsTimer() {
+		// Reset the timer when user interacts
+		if self.showControls {
+			self.startControlsTimer()
 		}
 	}
 
@@ -493,11 +508,23 @@ struct ControlStrip: View {
 	let currentIndex: Int
 	let totalCount: Int
 	let filename: String
+	let mode: PreviewMode
+	let totalPhotosCount: Int?
 	let controlStripHeight: CGFloat
 	let onClose: () -> Void
 	let onToggleFullscreen: () -> Void
 	let onToggleMetadata: () -> Void
 	@Binding var showMetadata: Bool
+	
+	private var progressText: String {
+		switch mode {
+		case .all:
+			return "\(self.currentIndex + 1) / \(self.totalCount)"
+		case .selection:
+			let totalText = totalPhotosCount != nil ? " of \(totalPhotosCount!)" : ""
+			return "\(self.currentIndex + 1) / \(self.totalCount) (selected\(totalText))"
+		}
+	}
 
 	var body: some View {
 		HStack(spacing: 16) {
@@ -510,11 +537,11 @@ struct ControlStrip: View {
 			}
 			.buttonStyle(.plain)
 
-			// Progress indicator
-			Text("\(self.currentIndex + 1) / \(self.totalCount)")
+			// Progress indicator with mode
+			Text(progressText)
 				.font(.system(size: 14, weight: .medium))
 				.foregroundColor(.white.opacity(0.8))
-				.frame(minWidth: 60)
+				.frame(minWidth: 100)
 
 			// Filename
 			Text(self.filename)
@@ -544,151 +571,6 @@ struct ControlStrip: View {
 		.padding(.horizontal, 16)
 		.frame(height: self.controlStripHeight)
 		.background(Color.black.opacity(0.8))
-	}
-}
-
-// MARK: - Thumbnail Strip
-
-// TODO: For large photo collections (1000+ photos), this LazyHStack approach
-// still has performance limitations. Should be replaced with a native
-// NSCollectionView (macOS) / UICollectionView (iOS) implementation with
-// proper cell recycling, similar to PhotoCollectionViewController.
-// This would require:
-// - Creating a NSViewRepresentable/UIViewRepresentable wrapper
-// - Implementing collection view with horizontal flow layout
-// - Reusing cells for efficient memory usage
-// - Proper prefetching delegates for smooth scrolling
-// Current LazyHStack solution works well for moderate collections (<1000 photos)
-
-struct ThumbnailStrip: View {
-	let photos: [PhotoFile]
-	@Binding var currentIndex: Int
-	let thumbnailSize: CGSize
-	let onTimerExtend: (() -> Void)?
-
-	@State private var thumbnails: [Int: XImage] = [:]
-	@Namespace private var namespace
-
-	var body: some View {
-		ScrollViewReader { proxy in
-			ScrollView(.horizontal, showsIndicators: false) {
-				LazyHStack(spacing: 8) { // Changed from HStack to LazyHStack
-					ForEach(self.photos.indices, id: \.self) { index in
-						ThumbnailView(
-							photo: self.photos[index],
-							isSelected: index == self.currentIndex,
-							size: self.thumbnailSize
-						)
-						.id(index)
-						.onTapGesture {
-							withAnimation(.easeInOut(duration: 0.3)) {
-								self.currentIndex = index
-							}
-							self.onTimerExtend?()
-						}
-					}
-				}
-				.padding(.horizontal, 16)
-				.padding(.vertical, 12)
-			}
-			.frame(height: self.thumbnailSize.height + 24)
-			.background(Color.black.opacity(0.8))
-			.onChange(of: self.currentIndex) {
-				withAnimation {
-					proxy.scrollTo(self.currentIndex, anchor: .center)
-				}
-			}
-			.onAppear {
-				print("[ThumbnailStrip] onAppear with \(self.photos.count) photos")
-				// Scroll to current photo on appear
-				DispatchQueue.main.async {
-					proxy.scrollTo(self.currentIndex, anchor: .center)
-				}
-			}
-		}
-	}
-}
-
-struct ThumbnailView: View {
-	let photo: PhotoFile
-	let isSelected: Bool
-	let size: CGSize
-
-	@State private var thumbnail: XImage?
-	@State private var loadTask: Task<Void, Never>?
-
-	var body: some View {
-		ZStack {
-			if let thumbnail {
-				#if os(macOS)
-					Image(nsImage: thumbnail)
-						.resizable()
-						.aspectRatio(contentMode: .fill)
-				#else
-					Image(uiImage: thumbnail)
-						.resizable()
-						.aspectRatio(contentMode: .fill)
-				#endif
-			} else {
-				// Placeholder
-				Rectangle()
-					.fill(Color.gray.opacity(0.3))
-
-				ProgressView()
-					.scaleEffect(0.5)
-			}
-		}
-		.frame(width: self.size.width, height: self.size.height)
-		.clipShape(RoundedRectangle(cornerRadius: 4))
-		.overlay(
-			RoundedRectangle(cornerRadius: 4)
-				.stroke(
-					self.isSelected ? Color.white : Color.gray.opacity(0.5),
-					lineWidth: self.isSelected ? 3 : 1
-				)
-		)
-		.scaleEffect(self.isSelected ? 1.1 : 1.0)
-		.animation(.easeInOut(duration: 0.2), value: self.isSelected)
-		.onAppear {
-			// Check if thumbnail is already cached in the photo object
-			if let cached = photo.thumbnail {
-				self.thumbnail = cached
-			} else {
-				// Load thumbnail
-				self.loadTask = Task {
-					await self.loadThumbnail()
-				}
-			}
-		}
-		.onDisappear {
-			// Cancel loading task when view disappears
-			self.loadTask?.cancel()
-			self.loadTask = nil
-		}
-	}
-
-	private func loadThumbnail() async {
-		print("[ThumbnailView] Loading thumbnail for: \(self.photo.filename)")
-		do {
-			// Check for cancellation
-			if Task.isCancelled { return }
-
-			if let thumb = try await PhotoManagerV2.shared.thumbnail(for: photo) {
-				// Check for cancellation again after async operation
-				if Task.isCancelled { return }
-
-				print("[ThumbnailView] Loaded thumbnail for: \(self.photo.filename)")
-				await MainActor.run {
-					if !Task.isCancelled {
-						self.thumbnail = thumb
-					}
-				}
-			}
-		} catch {
-			if !Task.isCancelled {
-				print("[ThumbnailView] Failed to load thumbnail for: \(self.photo.filename)")
-			}
-		}
 	}
 }
 

@@ -1,6 +1,12 @@
 import Foundation
 import CoreGraphics
 
+/// Preview modes for photo viewer
+enum PreviewMode: String, Hashable {
+	case all = "all"
+	case selection = "selection"
+}
+
 /// Shared constants for photo viewer
 enum PhotoViewerConstants {
 	// Zoom limits
@@ -13,7 +19,7 @@ enum PhotoViewerConstants {
 	static let springDamping: Double = 0.8
 	
 	// Control timers
-	static let controlHideDelay: TimeInterval = 30.0
+	static let controlHideDelay: TimeInterval = 6.0  // Hide controls after 6 seconds of inactivity
 	
 	// Gesture thresholds
 	static let swipeThreshold: CGFloat = 50
