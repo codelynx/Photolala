@@ -6,7 +6,6 @@ struct AuthenticationChoiceView: View {
 	@EnvironmentObject var identityManager: IdentityManager
 	@Environment(\.dismiss) private var dismiss
 	
-	@State private var authMode: AuthMode = .signIn
 	@State private var showError = false
 	@State private var errorMessage = ""
 	@State private var showAccountLinking = false
@@ -14,11 +13,6 @@ struct AuthenticationChoiceView: View {
 	@State private var showCreateAccountPrompt = false
 	@State private var pendingProvider: AuthProvider?
 	@State private var pendingCredential: AuthCredential?
-	
-	enum AuthMode {
-		case signIn
-		case createAccount
-	}
 	
 	var body: some View {
 		VStack(spacing: 0) {
@@ -36,11 +30,11 @@ struct AuthenticationChoiceView: View {
 						.foregroundColor(.accentColor)
 				}
 				
-				Text(authMode == .signIn ? "Welcome to Photolala" : "Create Your Account")
+				Text("Welcome to Photolala")
 					.font(.largeTitle)
 					.fontWeight(.bold)
 				
-				Text(authMode == .signIn ? "Backup and browse your photos" : "Join millions backing up their memories")
+				Text("Backup and browse your photos securely")
 					.font(.headline)
 					.foregroundColor(.secondary)
 			}
@@ -118,7 +112,7 @@ struct AuthenticationChoiceView: View {
 						}) {
 							HStack {
 								Image(systemName: "applelogo")
-								Text(authMode == .signIn ? "Sign in with Apple" : "Continue with Apple")
+								Text("Continue with Apple")
 									.font(.headline)
 							}
 							#if os(iOS)
@@ -147,7 +141,7 @@ struct AuthenticationChoiceView: View {
 							HStack {
 								Image(systemName: "globe")
 									.font(.title3)
-								Text(authMode == .signIn ? "Sign in with Google" : "Continue with Google")
+								Text("Continue with Google")
 									.font(.headline)
 							}
 							#if os(iOS)
@@ -177,29 +171,23 @@ struct AuthenticationChoiceView: View {
 						.cornerRadius(25)
 						#endif
 						
-						// Divider
-						Rectangle()
-							.fill(Color.secondary.opacity(0.3))
-							.frame(height: 1)
-							.frame(maxWidth: 350)
-							.padding(.vertical, 16)
-						
-						// Sign up / Sign in toggle
-						HStack(spacing: 4) {
-							Text(authMode == .signIn ? "Don't have an account?" : "Already have an account?")
-								.font(.callout)
-								.foregroundColor(.secondary)
+						// Helpful text
+						VStack(spacing: 8) {
+							Rectangle()
+								.fill(Color.secondary.opacity(0.3))
+								.frame(height: 1)
+								.frame(maxWidth: 350)
+								.padding(.vertical, 16)
 							
-							Button(action: {
-								withAnimation(.easeInOut(duration: 0.3)) {
-									authMode = authMode == .signIn ? .createAccount : .signIn
-								}
-							}) {
-								Text(authMode == .signIn ? "Create Account" : "Sign In")
-									.font(.callout)
-									.fontWeight(.medium)
-									.foregroundColor(.accentColor)
-							}
+							Text("Sign in to your existing account or create a new one")
+								.font(.caption)
+								.foregroundColor(.secondary)
+								.multilineTextAlignment(.center)
+							
+							Text("We'll automatically detect if you have an account")
+								.font(.caption2)
+								.foregroundColor(.secondary.opacity(0.8))
+								.multilineTextAlignment(.center)
 						}
 					}
 				}
@@ -258,9 +246,13 @@ struct AuthenticationChoiceView: View {
 					}
 				} else if let provider = pendingProvider {
 					// Fallback to re-authentication if no credential is available
-					authMode = .createAccount
-					DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-						handleProviderSelection(provider)
+					Task {
+						do {
+							_ = try await identityManager.createAccount(with: provider)
+							dismiss()
+						} catch {
+							handleError(error)
+						}
 					}
 				}
 			}
@@ -317,15 +309,20 @@ struct AuthenticationChoiceView: View {
 	private func handleProviderSelection(_ provider: AuthProvider) {
 		Task {
 			do {
-				switch authMode {
-				case .signIn:
-					_ = try await identityManager.signIn(with: provider)
-				case .createAccount:
-					_ = try await identityManager.createAccount(with: provider)
-				}
+				// Try to sign in first (auto-detection)
+				_ = try await identityManager.signIn(with: provider)
 				dismiss()
 			} catch {
-				handleError(error)
+				// Handle specific error cases
+				if case AuthError.noAccountFound(let provider, let credential) = error {
+					// No account exists - offer to create one
+					pendingProvider = provider
+					pendingCredential = credential
+					showCreateAccountPrompt = true
+				} else {
+					// Other errors (like account already exists when trying to create)
+					handleError(error)
+				}
 			}
 		}
 	}
