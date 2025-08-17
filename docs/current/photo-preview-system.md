@@ -11,32 +11,35 @@ The photo preview system provides a full-screen, immersive viewing experience fo
 The preview system supports two distinct modes for viewing photos:
 
 #### 1. Preview All Photos
-- **Trigger**: Double-click on any photo or press Space with no selection
+- **Trigger**: Double-click on any photo, or press Space/Preview button with no selection
 - **Behavior**: Shows ALL photos in the current folder/album
 - **Starting Point**: The clicked/focused photo
 - **Use Case**: Browse entire collection from a specific starting point
+- **Visual Indicator**: Shows "3 / 250" in control strip
 
 #### 2. Preview Selected Photos Only
-- **Trigger**: Select photos, then press Space or use "Preview" menu option
+- **Trigger**: Press Space or Preview button when photos are selected
 - **Behavior**: Shows ONLY the selected photos
-- **Starting Point**: First selected photo or the one clicked
+- **Starting Point**: First selected photo
 - **Use Case**: Review specific photos without distraction
+- **Visual Indicator**: Shows "3 / 5 (selected)" in control strip
 
 **Implementation (DirectoryPhotoBrowserView.swift):**
 ```swift
-// handlePhotoSelection (lines 334-365)
+// handleSpaceKeyPress - NOW RESPECTS SELECTION
 if !self.selectedPhotos.isEmpty {
-    // Show only selected photos
-    photosToShow = allPhotos.filter { self.selectedPhotos.contains($0) }
+    // Show selected photos only
+    photosToShow = self.selectedPhotos.sorted { $0.filename < $1.filename }
+    mode = .selection
 } else {
     // Show all photos
-    photosToShow = allPhotos
+    photosToShow = self.allPhotos
+    mode = .all
 }
 
-// handleSpaceKeyPress (lines 302-332)
-// Always shows all photos, but starts from selected if any
-let photosToShow = self.allPhotos
-let initialIndex = selectedPhotos.first's index or 0
+// handlePhotoSelection (double-click) - ALWAYS SHOWS ALL
+let photosToShow = allPhotos
+let mode = PreviewMode.all
 ```
 
 **Platform Differences:**
@@ -83,28 +86,29 @@ onPhotoClick = { photo, index ->
 | **Arrow keys** | ❌ No | ✅ Yes | ❌ No |
 | **Tap zones (edges)** | ✅ Yes (25% edges) | ✅ Yes | ❌ No |
 | **Thumbnail strip** | ✅ Yes | ✅ Yes | ❌ No |
-| **Page indicator** | ✅ Top (1/10) | ✅ Top | ✅ Bottom |
+| **Page indicator** | ✅ Top (with mode) | ✅ Top (with mode) | ✅ Bottom |
 | **Previous/Next buttons** | ❌ No | ❌ No | ✅ Yes (always visible) |
-| **Auto-hide controls** | ✅ 30s timer | ✅ 30s timer | ❌ Always visible |
+| **Auto-hide controls** | ✅ 6s timer | ✅ 6s timer | ❌ Always visible |
+| **Preview button** | ✅ Always visible | ✅ Always visible | ❌ No button |
 
-## Preview Mode Confusion
+## Preview Mode System (FIXED ✅)
 
-### Current Behavior Issues
+### Current Behavior (After Fix)
 
-1. **Inconsistent Space Key Behavior**
-   - Space key ALWAYS shows all photos (line 307: `let photosToShow = self.allPhotos`)
-   - This ignores selection, confusing users who selected specific photos
-   - Expected: Space should preview selected photos when selection exists
+1. **Consistent Space Key Behavior**
+   - Space key respects selection: shows selected photos when selection exists
+   - Shows all photos when no selection
+   - Matches user expectations
 
-2. **Double-click Ambiguity**
-   - Double-clicking a selected photo shows ONLY selected photos
-   - Double-clicking an unselected photo shows ALL photos
-   - Users can't predict which mode will activate
+2. **Predictable Double-click**
+   - Double-click ALWAYS shows all photos from clicked photo
+   - Consistent behavior regardless of selection state
+   - No ambiguity
 
-3. **Missing Visual Indicators**
-   - No indication in preview whether viewing "All" or "Selected"
-   - Users get lost when navigating beyond their selection
-   - No way to switch modes while in preview
+3. **Clear Visual Indicators**
+   - Shows "3 / 250" when viewing all photos
+   - Shows "3 / 5 (selected)" when viewing selection only
+   - Users always know which mode they're in
 
 ### Recommended Preview Mode Design
 
