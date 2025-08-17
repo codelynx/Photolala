@@ -291,136 +291,36 @@ extension KeychainManager {
 }
 ```
 
-### Step 6: Create Identity Mapping and S3 Folder Structure
+### Step 6: Create Identity Mappings in S3
 
 ```swift
-func createIdentityMapping(provider: AuthProvider, providerID: String, serviceUserID: String) async throws {
-    let s3Client = try await S3Manager.shared.getClient()
-    let bucket = "photolala"
+func createS3IdentityMappings(for user: PhotolalaUser) async throws {
+    let s3Service = try await S3BackupService()
     
-    // Create identity mapping
-    let identityPath = "identities/\(provider.rawValue)/\(providerID)"
-    let putRequest = PutObjectRequest(
-        bucket: bucket,
-        key: identityPath,
-        body: .data(serviceUserID.data(using: .utf8)!),
-        contentType: "text/plain",
-        metadata: [
-            "created-at": ISO8601DateFormatter().string(from: Date()),
-            "service-user-id": serviceUserID
-        ]
-    )
+    // Create provider ID mapping
+    let identityKey = "\(user.primaryProvider.rawValue):\(user.primaryProviderID)"
+    let identityPath = "identities/\(identityKey)"
     
-    _ = try await s3Client.putObject(putRequest)
-}
-
-func createS3UserFolders(for user: PhotolalaUser) async throws {
-    let s3Client = try await S3Manager.shared.getClient()
-    let bucket = "photolala"
+    // Store the UUID as content of the identity file
+    let uuidData = user.serviceUserID.data(using: .utf8)!
+    try await s3Service.uploadData(uuidData, to: identityPath)
     
-    // Create identity mapping first
-    try await createIdentityMapping(
-        provider: user.primaryProvider,
-        providerID: user.primaryProviderID,
-        serviceUserID: user.serviceUserID
-    )
-    
-    // Create folder structure by uploading placeholder files
-    let folders = [
-        "users/\(user.serviceUserID)/",
-        "users/\(user.serviceUserID)/photos/",
-        "users/\(user.serviceUserID)/thumbnails/",
-        "users/\(user.serviceUserID)/metadata/",
-        "users/\(user.serviceUserID)/account/"
-    ]
-    
-    for folder in folders {
-        // S3 doesn't have real folders, so we create a zero-byte object
-        let putRequest = PutObjectRequest(
-            bucket: bucket,
-            key: folder,
-            body: .empty,
-            contentType: "application/x-directory"
-        )
-        
-        _ = try await s3Client.putObject(putRequest)
+    // Also create email mapping if email is available
+    if let email = user.email, !email.isEmpty {
+        let hashedEmail = hashEmail(email)
+        let emailPath = "emails/\(hashedEmail)"
+        try await s3Service.uploadData(uuidData, to: emailPath)
     }
-    
-    // Upload initial user profile
-    try await uploadUserProfile(user, to: s3Client)
-    
-    // Upload providers.json for reverse lookup
-    try await uploadProvidersInfo(user, to: s3Client)
 }
 
-private func uploadUserProfile(_ user: PhotolalaUser, to s3Client: S3Client) async throws {
-    let encoder = JSONEncoder()
-    encoder.dateEncodingStrategy = .iso8601
-    encoder.outputFormatting = .prettyPrinted
-    
-    let profileData = try encoder.encode(user)
-    
-    let putRequest = PutObjectRequest(
-        bucket: "photolala",
-        key: "users/\(user.serviceUserID)/account/profile.json",
-        body: .data(profileData),
-        contentType: "application/json",
-        metadata: [
-            "created-at": ISO8601DateFormatter().string(from: user.createdAt),
-            "provider": user.primaryProvider.rawValue
-        ]
-    )
-    
-    _ = try await s3Client.putObject(putRequest)
-}
+// Note: No folders are pre-created during signup.
+// S3 will automatically create the folder structure when content is uploaded:
+// - photos/{userId}/{md5}.dat → Deep Archive after 180 days
+// - thumbnails/{userId}/{md5}_thumb.dat → Intelligent-Tiering
+// - metadata/{userId}/{md5}.json → Standard
 
-private func uploadProvidersInfo(_ user: PhotolalaUser, to s3Client: S3Client) async throws {
-    struct ProvidersInfo: Codable {
-        let version: Int = 1
-        let primaryProvider: String
-        let providers: [ProviderInfo]
-        
-        struct ProviderInfo: Codable {
-            let type: String
-            let id: String
-            let email: String?
-            let displayName: String?
-            let linkedAt: Date
-            let lastUsed: Date
-            let isPrimary: Bool
-        }
-    }
-    
-    let providersInfo = ProvidersInfo(
-        primaryProvider: user.primaryProvider.rawValue,
-        providers: [
-            ProvidersInfo.ProviderInfo(
-                type: user.primaryProvider.rawValue,
-                id: user.primaryProviderID,
-                email: user.email,
-                displayName: user.fullName,
-                linkedAt: user.createdAt,
-                lastUsed: user.lastUpdated,
-                isPrimary: true
-            )
-        ]
-    )
-    
-    let encoder = JSONEncoder()
-    encoder.dateEncodingStrategy = .iso8601
-    encoder.outputFormatting = .prettyPrinted
-    
-    let data = try encoder.encode(providersInfo)
-    
-    let putRequest = PutObjectRequest(
-        bucket: "photolala",
-        key: "users/\(user.serviceUserID)/account/providers.json",
-        body: .data(data),
-        contentType: "application/json"
-    )
-    
-    _ = try await s3Client.putObject(putRequest)
-}
+// Profile and provider information are no longer stored in S3 during signup.
+// The identity mapping is sufficient for sign-in, and user data is stored locally.
 ```
 
 ### Step 7: Complete Signup Flow
@@ -446,8 +346,8 @@ class SignupManager {
             // 4. Store in Keychain
             try KeychainManager.shared.saveUser(newUser)
             
-            // 5. Create S3 folders
-            try await createS3UserFolders(for: newUser)
+            // 5. Create S3 identity mappings
+            try await createS3IdentityMappings(for: newUser)
             
             // 6. Update app state
             await MainActor.run {

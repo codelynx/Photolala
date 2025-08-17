@@ -59,6 +59,71 @@ class IdentityManager: NSObject, ObservableObject {
 		
 		print("User signed out - all local state cleared")
 	}
+	
+	// MARK: - Debug Functions
+	
+	/// Test S3 write to verify credentials and permissions
+	@MainActor
+	func testS3Write() async -> (success: Bool, message: String, s3Path: String?) {
+		print("[S3 Test] Starting S3 write test...")
+		
+		let s3Manager = S3BackupManager.shared
+		await s3Manager.ensureInitialized()
+		
+		guard let s3Service = s3Manager.s3Service else {
+			let message = "S3 service not initialized - no credentials available"
+			print("[S3 Test] ❌ \(message)")
+			return (false, message, nil)
+		}
+		
+		// Get credential source info
+		let credentialSource = await s3Service.getCredentialSource()
+		print("[S3 Test] Using credentials from: \(credentialSource)")
+		
+		// Create test content
+		let timestamp = ISO8601DateFormatter().string(from: Date())
+		let testContent = """
+		S3 Test Write - Photolala
+		========================
+		Timestamp: \(timestamp)
+		Credential Source: \(credentialSource)
+		Platform: \(getPlatformName())
+		User ID: \(currentUser?.serviceUserID ?? "Not signed in")
+		App Version: \(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "Unknown")
+		
+		This is a test file to verify S3 credentials and permissions.
+		If you can see this file, the app has successfully written to S3.
+		"""
+		
+		let testData = testContent.data(using: .utf8)!
+		let testPath = "test/debug-\(Date().timeIntervalSince1970).txt"
+		
+		do {
+			print("[S3 Test] Writing to: s3://photolala/\(testPath)")
+			try await s3Service.uploadData(testData, to: testPath)
+			
+			let successMessage = "Successfully wrote test file to S3"
+			print("[S3 Test] ✅ \(successMessage)")
+			print("[S3 Test] Path: s3://photolala/\(testPath)")
+			print("[S3 Test] Credential source: \(credentialSource)")
+			
+			return (true, "\(successMessage)\nPath: \(testPath)\nCredentials: \(credentialSource)", testPath)
+		} catch {
+			let errorMessage = "Failed to write to S3: \(error.localizedDescription)"
+			print("[S3 Test] ❌ \(errorMessage)")
+			return (false, errorMessage, nil)
+		}
+	}
+	
+	private func getPlatformName() -> String {
+		#if os(iOS)
+		return "iOS"
+		#elseif os(macOS)
+		return "macOS"
+		#else
+		return "Unknown"
+		#endif
+	}
 
 	// MARK: - Private Methods
 

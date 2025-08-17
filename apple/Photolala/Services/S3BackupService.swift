@@ -73,6 +73,8 @@ class S3BackupService: ObservableObject {
 	var s3Client: S3Client? {
 		return client
 	}
+	
+	private var credentialSource: String = "Unknown"
 
 	// Convenience init that reads from Keychain, environment, or encrypted credentials
 	convenience init() async throws {
@@ -80,6 +82,7 @@ class S3BackupService: ObservableObject {
 		if let credentials = try? KeychainManager.shared.loadAWSCredentials() {
 			print("Using AWS credentials from Keychain")
 			try await self.init(accessKey: credentials.accessKey, secretKey: credentials.secretKey)
+			self.credentialSource = "Keychain (custom credentials)"
 			return
 		}
 
@@ -90,6 +93,7 @@ class S3BackupService: ObservableObject {
 		{
 			print("Using AWS credentials from environment variables")
 			try await self.init(accessKey: accessKey, secretKey: secretKey)
+			self.credentialSource = "Environment Variables"
 			return
 		}
 
@@ -100,6 +104,7 @@ class S3BackupService: ObservableObject {
 		{
 			print("Using AWS credentials from encrypted storage")
 			try await self.init(accessKey: accessKey, secretKey: secretKey)
+			self.credentialSource = "Encrypted (built-in)"
 			return
 		}
 
@@ -228,6 +233,12 @@ class S3BackupService: ObservableObject {
 		self.backupStats.photoSize += photoSize
 
 		return md5
+	}
+	
+	// MARK: - Debug Info
+	
+	func getCredentialSource() -> String {
+		return credentialSource
 	}
 	
 	// MARK: - Generic Upload/Download

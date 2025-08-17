@@ -108,7 +108,7 @@ extension IdentityManager {
 			print("[IdentityManager] Create account - new user: fullName=\(newUser.fullName ?? "nil"), email=\(newUser.email ?? "nil")")
 			
 			try await saveUser(newUser)
-			try await createS3UserFolders(for: newUser)
+			try await createS3IdentityMappings(for: newUser)
 			
 			// Create email mapping if email exists
 			if let email = credential.email {
@@ -176,7 +176,7 @@ extension IdentityManager {
 		)
 		
 		try await saveUser(newUser)
-		try await createS3UserFolders(for: newUser)
+		try await createS3IdentityMappings(for: newUser)
 		
 		// Create email mapping if email exists
 		if let email = credential.email {
@@ -207,7 +207,7 @@ extension IdentityManager {
 		)
 		
 		try await saveUser(newUser)
-		try await createS3UserFolders(for: newUser)
+		try await createS3IdentityMappings(for: newUser)
 		
 		// Don't create email mapping for forced accounts to avoid conflicts
 		
@@ -384,41 +384,52 @@ extension IdentityManager {
 		}
 	}
 	
-	private func createS3UserFolders(for user: PhotolalaUser) async throws {
-		print("[IdentityManager] Creating S3 folders for user: \(user.serviceUserID)")
+	private func createS3IdentityMappings(for user: PhotolalaUser) async throws {
+		print("[IdentityManager] Creating S3 identity mappings for user: \(user.serviceUserID)")
 		
 		let s3Manager = S3BackupManager.shared
 		
 		// Ensure S3 service is initialized
 		await s3Manager.ensureInitialized()
 		
-		guard s3Manager.s3Service != nil else {
-			print("[IdentityManager] ERROR: S3 service is not initialized, cannot create user folders")
-			print("[IdentityManager] Attempting to continue without S3 folders...")
+		guard let s3Service = s3Manager.s3Service else {
+			print("[IdentityManager] ERROR: S3 service is not initialized, cannot create identity mappings")
+			print("[IdentityManager] Attempting to continue without S3 identity mappings...")
 			// Don't throw - allow account creation to continue
-			// User folders will be created on first backup
+			// Identity mappings can be created later if needed
 			return
 		}
 		
 		do {
-			// Create user directory
-			let userPath = "users/\(user.serviceUserID)/"
-			print("[IdentityManager] Creating user directory: \(userPath)")
-			try await s3Manager.createFolder(at: userPath)
-			print("[IdentityManager] Successfully created user directory")
-			
-			// Create provider ID mapping in /identities/
+			// Create provider ID mapping in /identities/ first (most important)
 			let identityKey = "\(user.primaryProvider.rawValue):\(user.primaryProviderID)"
 			let identityPath = "identities/\(identityKey)"
 			
 			print("[IdentityManager] Creating identity mapping: \(identityPath)")
 			// Store the UUID as content of the identity file
 			let uuidData = user.serviceUserID.data(using: .utf8)!
-			try await s3Manager.uploadData(uuidData, to: identityPath)
-			
+			try await s3Service.uploadData(uuidData, to: identityPath)
 			print("[IdentityManager] Successfully created identity mapping: \(identityPath) -> \(user.serviceUserID)")
+			
+			// Note: We don't create any folders. S3 will automatically create
+			// the folder structure when the first file is uploaded:
+			// - photos/{userId}/{md5}.dat
+			// - thumbnails/{userId}/{md5}_thumb.dat  
+			// - metadata/{userId}/{md5}.json
+			// This allows proper lifecycle policies per content type
+			
+			// Also create email mapping if email is available
+			if let email = user.email, !email.isEmpty {
+				let hashedEmail = hashEmail(email)
+				let emailPath = "emails/\(hashedEmail)"
+				print("[IdentityManager] Creating email mapping: \(emailPath)")
+				try await s3Service.uploadData(uuidData, to: emailPath)
+				print("[IdentityManager] Successfully created email mapping")
+			}
+			
+			print("[IdentityManager] Successfully created identity mappings for user \(user.serviceUserID)")
 		} catch {
-			print("[IdentityManager] ERROR creating S3 folders: \(error)")
+			print("[IdentityManager] ERROR creating S3 identity mappings: \(error)")
 			print("[IdentityManager] Error type: \(type(of: error))")
 			print("[IdentityManager] Error details: \(error.localizedDescription)")
 			// Don't throw - allow account creation to continue

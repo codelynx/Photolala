@@ -24,7 +24,7 @@ class S3Service @Inject constructor(
         private const val BUCKET_NAME = "photolala"
         private const val PHOTOS_PREFIX = "photos/"
         private const val THUMBNAILS_PREFIX = "thumbnails/"
-        private const val USERS_PREFIX = "users/"
+        private const val METADATA_PREFIX = "metadata/"
     }
     
     /**

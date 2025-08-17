@@ -108,7 +108,7 @@ class IdentityManager @Inject constructor(
 			)
 			
 			saveUser(newUser)
-			createS3UserFolders(newUser)
+			createS3IdentityMappings(newUser)
 			
 			_currentUser.value = newUser
 			_isSignedIn.value = true
@@ -199,7 +199,7 @@ class IdentityManager @Inject constructor(
 					)
 					
 					saveUser(newUser)
-					createS3UserFolders(newUser)
+					createS3IdentityMappings(newUser)
 					
 					_currentUser.value = newUser
 					_isSignedIn.value = true
@@ -334,7 +334,7 @@ class IdentityManager @Inject constructor(
 					)
 					
 					saveUser(newUser)
-					createS3UserFolders(newUser)
+					createS3IdentityMappings(newUser)
 					
 					_currentUser.value = newUser
 					_isSignedIn.value = true
@@ -524,7 +524,7 @@ class IdentityManager @Inject constructor(
 				)
 				
 				saveUser(newUser)
-				createS3UserFolders(newUser)
+				createS3IdentityMappings(newUser)
 				
 				_currentUser.value = newUser
 				_isSignedIn.value = true
@@ -629,13 +629,9 @@ class IdentityManager @Inject constructor(
 		return null
 	}
 	
-	// Create S3 folders for new user
-	private suspend fun createS3UserFolders(user: PhotolalaUser) {
-		println("Creating S3 folders for user: ${user.serviceUserID}")
-		
-		// Create user directory
-		val userPath = "users/${user.serviceUserID}/"
-		s3Service.createFolder(userPath)
+	// Create S3 identity mappings for new user
+	private suspend fun createS3IdentityMappings(user: PhotolalaUser) {
+		println("Creating S3 identity mappings for user: ${user.serviceUserID}")
 		
 		// Create provider ID mapping
 		val identityKey = "${user.primaryProvider.value}:${user.primaryProviderID}"
@@ -647,8 +643,26 @@ class IdentityManager @Inject constructor(
 		
 		println("Created identity mapping: $identityPath -> ${user.serviceUserID}")
 		
-		// Create empty catalog for new user
-		catalogService.createEmptyCatalog(user.serviceUserID)
+		// Also create email mapping if email is available
+		user.email?.let { email ->
+			val hashedEmail = hashEmail(email)
+			val emailPath = "emails/$hashedEmail"
+			s3Service.uploadData(uuidData, emailPath, "text/plain")
+			println("Created email mapping: $emailPath -> ${user.serviceUserID}")
+		}
+		
+		// Note: We don't create any folders or catalog. S3 will automatically create
+		// the folder structure when the first file is uploaded:
+		// - photos/{userId}/{md5}.dat
+		// - thumbnails/{userId}/{md5}_thumb.dat
+		// - metadata/{userId}/{md5}.json
+	}
+	
+	// Hash email for privacy in S3 keys
+	private fun hashEmail(email: String): String {
+		val digest = java.security.MessageDigest.getInstance("SHA-256")
+		val hashBytes = digest.digest(email.lowercase().toByteArray())
+		return hashBytes.joinToString("") { "%02x".format(it) }
 	}
 	
 	// Save user to secure storage

@@ -6,6 +6,9 @@
 //
 
 import SwiftUI
+#if os(macOS)
+import AppKit
+#endif
 
 struct PhotolalaCommands: Commands {
 	#if os(macOS)
@@ -181,6 +184,60 @@ struct PhotolalaCommands: Commands {
 		}
 		#endif
 
+		// Debug menu
+		#if DEBUG
+		CommandMenu("Debug") {
+			Button("Test S3 Write") {
+				Task { @MainActor in
+					let result = await IdentityManager.shared.testS3Write()
+					
+					// Show alert with result
+					let alert = NSAlert()
+					alert.messageText = result.success ? "S3 Test Successful" : "S3 Test Failed"
+					alert.informativeText = result.message
+					alert.alertStyle = result.success ? .informational : .warning
+					alert.addButton(withTitle: "OK")
+					
+					if result.success, let path = result.s3Path {
+						alert.addButton(withTitle: "Copy Path")
+					}
+					
+					let response = alert.runModal()
+					if response == .alertSecondButtonReturn, let path = result.s3Path {
+						// Copy path to clipboard
+						let pasteboard = NSPasteboard.general
+						pasteboard.clearContents()
+						pasteboard.setString("s3://photolala/\(path)", forType: .string)
+					}
+				}
+			}
+			.keyboardShortcut("T", modifiers: [.command, .shift])
+			
+			Divider()
+			
+			Button("Show Credential Info") {
+				Task { @MainActor in
+					let s3Manager = S3BackupManager.shared
+					await s3Manager.ensureInitialized()
+					
+					let credentialSource = s3Manager.s3Service?.getCredentialSource() ?? "No credentials"
+					let userId = IdentityManager.shared.currentUser?.serviceUserID ?? "Not signed in"
+					
+					let alert = NSAlert()
+					alert.messageText = "S3 Credential Information"
+					alert.informativeText = """
+					Credential Source: \(credentialSource)
+					Current User ID: \(userId)
+					S3 Initialized: \(s3Manager.isConfigured ? "Yes" : "No")
+					"""
+					alert.alertStyle = .informational
+					alert.addButton(withTitle: "OK")
+					alert.runModal()
+				}
+			}
+		}
+		#endif
+		
 		// Help menu - Add to existing help menu
 		CommandGroup(replacing: .help) {
 			Button("Photolala Help") {

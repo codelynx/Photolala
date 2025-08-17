@@ -171,35 +171,41 @@ Store mappings in Keychain/UserDefaults:
 "provider_mapping:google:123456789012345678901" → "a3f4d5e6-b7c8..."
 ```
 
-### Option 2: S3-Based Lookup (No Backend)
+### Option 2: S3-Based Lookup (Current Implementation)
 
-Store mappings in S3 with clear directory structure:
+Store mappings in S3 with lifecycle-optimized structure:
 
 ```
 photolala/
-├── identities/                         # External provider ID → UUID lookups
-│   ├── apple/
-│   │   └── 001234.5678abcd.9012      # Plain text file containing UUID
-│   └── google/
-│       └── 123456789012345678901      # Plain text file containing UUID
+├── identities/                    # Provider ID → UUID lookups (no lifecycle)
+│   ├── apple:001234.5678...      # Plain text file containing UUID
+│   └── google:123456789...       # Plain text file containing UUID
 │
-└── users/                              # UUID-based user data storage
-    └── a3f4d5e6-b7c8-9d0e-1f2g-3h4i5j6k7l8m/
-        ├── photos/
-        │   └── {md5}.jpg
-        ├── thumbnails/
-        │   └── {md5}_thumb.jpg
-        ├── metadata/
-        │   └── catalog.json
-        └── account/
-            ├── profile.json            # User profile and subscription
-            └── providers.json          # Reverse lookup of linked providers
+├── emails/                        # Email → UUID lookups (no lifecycle)
+│   └── {sha256_hash}              # Plain text file containing UUID
+│
+├── photos/                        # Deep Archive after 180 days
+│   └── {userId}/
+│       └── {md5}.dat
+│
+├── thumbnails/                    # Intelligent-Tiering
+│   └── {userId}/
+│       └── {md5}_thumb.dat
+│
+└── metadata/                      # Standard (always fast access)
+    └── {userId}/
+        └── {md5}.json
 ```
 
 **Mapping File Format** (Plain text for efficiency):
-- File: `/identities/apple/001234.5678abcd.9012`
+- File: `/identities/apple:001234.5678abcd.9012`
 - Content: `a3f4d5e6-b7c8-9d0e-1f2g-3h4i5j6k7l8m` (just the UUID)
 - Size: ~36 bytes
+
+**Key Changes from Original Design:**
+- No `users/` prefix - enables different lifecycle policies per content type
+- Identity mappings use format `provider:id` instead of nested folders
+- No profile.json or providers.json in S3 (stored locally only)
 
 **Alternative JSON Format** (if metadata needed):
 ```json
@@ -265,26 +271,26 @@ Response:
 **Sign In Flow**:
 ```
 1. Authenticate with Apple → Get provider ID: 001234.5678abcd.9012
-2. S3 GET: /identities/apple/001234.5678abcd.9012
+2. S3 GET: /identities/apple:001234.5678abcd.9012
 3. Response: a3f4d5e6-b7c8-9d0e-1f2g-3h4i5j6k7l8m
-4. S3 LIST: /users/a3f4d5e6-b7c8-9d0e-1f2g-3h4i5j6k7l8m/photos/
+4. S3 LIST: /photos/a3f4d5e6-b7c8-9d0e-1f2g-3h4i5j6k7l8m/
 5. User sees their photos
 ```
 
 **Create Account Flow**:
 ```
 1. Authenticate with Apple → Get provider ID: 001234.5678abcd.9012
-2. S3 HEAD: /identities/apple/001234.5678abcd.9012 (check existence)
+2. S3 GET: /identities/apple:001234.5678abcd.9012 (check existence)
 3. 404 Not Found → Proceed with account creation
 4. Generate UUID: a3f4d5e6-b7c8-9d0e-1f2g-3h4i5j6k7l8m
-5. S3 PUT: /identities/apple/001234.5678abcd.9012 (content: UUID)
-6. S3 PUT: /users/a3f4d5e6-b7c8.../account/profile.json
-7. S3 PUT: /users/a3f4d5e6-b7c8.../account/providers.json
+5. S3 PUT: /identities/apple:001234.5678abcd.9012 (content: UUID)
+6. S3 PUT: /emails/{sha256_hash} (if email available, content: UUID)
+7. Done - folders created automatically on first upload
 ```
 
-### Providers.json Structure
+### Local User Data Structure (Not in S3)
 
-Located at `/users/{uuid}/account/providers.json` for reverse lookup:
+User data is stored locally in Keychain/encrypted storage:
 
 ```json
 {
