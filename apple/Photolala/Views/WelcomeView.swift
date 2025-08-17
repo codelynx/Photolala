@@ -125,6 +125,15 @@ struct WelcomeView: View {
 						.frame(minWidth: 200)
 				}
 				.controlSize(.large)
+				
+				// Cloud browser button - only show if signed in
+				if identityManager.isSignedIn {
+					NavigationLink(destination: S3PhotoBrowserView()) {
+						Label("Cloud Photos", systemImage: "cloud")
+							.frame(minWidth: 200)
+					}
+					.controlSize(.large)
+				}
 			}
 			#endif
 			
