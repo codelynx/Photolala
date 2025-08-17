@@ -69,14 +69,18 @@ struct PhotoPreviewView: View {
 						self.isFocused = true
 					}
 
-				// Image display
+				// Image display with tap zones for navigation and control toggle
 				if let image = currentImage {
-					GeometryReader { geometry in
+					GeometryReader { imageGeometry in
 						self.imageView(for: image)
 							.scaleEffect(self.zoomScale, anchor: .center)
 							.offset(self.offset)
-							.frame(width: geometry.size.width, height: geometry.size.height)
+							.frame(width: imageGeometry.size.width, height: imageGeometry.size.height)
 							.clipped()
+							.contentShape(Rectangle())
+							.onTapGesture { location in
+								self.handleTapGesture(at: location, in: imageGeometry)
+							}
 							.gesture(
 								MagnificationGesture()
 									.onChanged { value in
@@ -183,6 +187,19 @@ struct PhotoPreviewView: View {
 					ProgressView()
 						.progressViewStyle(CircularProgressViewStyle(tint: .white))
 						.scaleEffect(1.5)
+						.frame(maxWidth: .infinity, maxHeight: .infinity)
+						.contentShape(Rectangle())
+						.onTapGesture {
+							// Toggle controls when tapping loading state
+							if self.showControls {
+								withAnimation(.easeInOut(duration: 0.3)) {
+									self.showControls = false
+								}
+								self.controlsTimer?.invalidate()
+							} else {
+								self.showControlsWithTimer()
+							}
+						}
 				} else if let error = imageLoadError {
 					VStack(spacing: 16) {
 						Image(systemName: "exclamationmark.triangle")
@@ -193,6 +210,19 @@ struct PhotoPreviewView: View {
 						Text(error)
 							.font(.caption)
 							.foregroundColor(.gray)
+					}
+					.frame(maxWidth: .infinity, maxHeight: .infinity)
+					.contentShape(Rectangle())
+					.onTapGesture {
+						// Toggle controls when tapping error state
+						if self.showControls {
+							withAnimation(.easeInOut(duration: 0.3)) {
+								self.showControls = false
+							}
+							self.controlsTimer?.invalidate()
+						} else {
+							self.showControlsWithTimer()
+						}
 					}
 				}
 
@@ -246,10 +276,6 @@ struct PhotoPreviewView: View {
 					)
 					.transition(.opacity)
 				}
-			}
-			.contentShape(Rectangle())
-			.onTapGesture { location in
-				self.handleTapGesture(at: location, in: geometry)
 			}
 		}
 		.onAppear {
@@ -428,7 +454,8 @@ struct PhotoPreviewView: View {
 		let width = geometry.size.width
 		let quarterWidth = width * PhotoViewerConstants.tapZoneWidth
 
-		// Define tap zones
+		// Define tap zones for navigation and control toggle
+		// Since tap gesture is only on the image area now, we don't need to check for control areas
 		if location.x < quarterWidth {
 			// Left quarter - navigate to previous
 			if self.currentIndex > 0 {

@@ -1,10 +1,17 @@
 package com.electricwoods.photolala.ui.screens
 
+import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Info
@@ -12,6 +19,8 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -153,11 +162,11 @@ fun PhotoViewerScreen(
 				)
 			}
 			
-			// Page indicator
+			// Page indicator - moved up to make room for thumbnail strip
 			Row(
 				modifier = Modifier
 					.align(Alignment.BottomCenter)
-					.padding(bottom = if (showInfo) 120.dp else 16.dp),
+					.padding(bottom = if (showInfo) 120.dp else 100.dp), // Increased to make room for thumbnails
 				horizontalArrangement = Arrangement.Center
 			) {
 				Text(
@@ -170,6 +179,24 @@ fun PhotoViewerScreen(
 							MaterialTheme.shapes.small
 						)
 						.padding(horizontal = 12.dp, vertical = 4.dp)
+				)
+			}
+			
+			// Thumbnail strip at bottom
+			if (photos.isNotEmpty()) {
+				ThumbnailStrip(
+					photos = photos,
+					currentIndex = pagerState.currentPage,
+					onThumbnailClick = { index ->
+						coroutineScope.launch {
+							pagerState.animateScrollToPage(index)
+						}
+					},
+					modifier = Modifier
+						.align(Alignment.BottomCenter)
+						.fillMaxWidth()
+						.height(84.dp) // Same as iOS (60dp thumbnail + 24dp padding)
+						.background(Color.Black.copy(alpha = 0.8f))
 				)
 			}
 		}
@@ -281,6 +308,90 @@ private fun PhotoInfoOverlay(
 				}
 			}
 		}
+	}
+}
+
+/**
+ * Thumbnail strip for photo navigation
+ */
+@Composable
+private fun ThumbnailStrip(
+	photos: List<PhotoMediaStore>,
+	currentIndex: Int,
+	onThumbnailClick: (Int) -> Unit,
+	modifier: Modifier = Modifier
+) {
+	val listState = rememberLazyListState()
+	
+	// Scroll to current photo when it changes
+	LaunchedEffect(currentIndex) {
+		listState.animateScrollToItem(
+			index = currentIndex,
+			scrollOffset = -100 // Center the current item (approximate)
+		)
+	}
+	
+	LazyRow(
+		state = listState,
+		modifier = modifier,
+		horizontalArrangement = Arrangement.spacedBy(8.dp),
+		contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
+		verticalAlignment = Alignment.CenterVertically
+	) {
+		itemsIndexed(
+			items = photos,
+			key = { _, photo -> photo.id }
+		) { index, photo ->
+			ThumbnailItem(
+				photo = photo,
+				isSelected = index == currentIndex,
+				onClick = { onThumbnailClick(index) },
+				modifier = Modifier.size(60.dp) // Same as iOS
+			)
+		}
+	}
+}
+
+/**
+ * Individual thumbnail item
+ */
+@Composable
+private fun ThumbnailItem(
+	photo: PhotoMediaStore,
+	isSelected: Boolean,
+	onClick: () -> Unit,
+	modifier: Modifier = Modifier
+) {
+	Box(
+		modifier = modifier
+			.clip(RoundedCornerShape(4.dp))
+			.border(
+				width = if (isSelected) 3.dp else 1.dp,
+				color = if (isSelected) Color.White else Color.Gray.copy(alpha = 0.5f),
+				shape = RoundedCornerShape(4.dp)
+			)
+			.clickable { onClick() }
+			.animateContentSize()
+			.scale(if (isSelected) 1.1f else 1.0f)
+	) {
+		// Placeholder while loading
+		Box(
+			modifier = Modifier
+				.fillMaxSize()
+				.background(Color.Gray.copy(alpha = 0.3f))
+		)
+		
+		// Thumbnail image with Coil
+		AsyncImage(
+			model = ImageRequest.Builder(LocalContext.current)
+				.data(photo.uri)
+				.size(120, 120) // Load at 2x for retina displays
+				.crossfade(true)
+				.build(),
+			contentDescription = "Thumbnail for ${photo.filename}",
+			modifier = Modifier.fillMaxSize(),
+			contentScale = ContentScale.Crop
+		)
 	}
 }
 
