@@ -197,10 +197,23 @@ extension IdentityManager {
 		let data = serviceUserID.data(using: .utf8)!
 		
 		let s3Manager = S3BackupManager.shared
+		
+		// Ensure S3 service is initialized
+		await s3Manager.ensureInitialized()
+		
 		if let s3Service = s3Manager.s3Service {
-			try await s3Service.uploadData(data, to: emailPath)
+			do {
+				print("[IdentityManager] Creating email mapping: \(emailPath)")
+				try await s3Service.uploadData(data, to: emailPath)
+				print("[IdentityManager] Successfully created email mapping: \(email) -> \(serviceUserID)")
+			} catch {
+				print("[IdentityManager] ERROR creating email mapping: \(error)")
+				print("[IdentityManager] Will continue without email mapping")
+				// Don't throw - email mapping is not critical for account creation
+			}
+		} else {
+			print("[IdentityManager] WARNING: S3 service not available, skipping email mapping")
 		}
-		print("[IdentityManager] Updated email mapping: \(email) -> \(serviceUserID)")
 	}
 	
 	/// Hash email for privacy

@@ -233,6 +233,9 @@ class S3BackupService: ObservableObject {
 	// MARK: - Generic Upload/Download
 	
 	func uploadData(_ data: Data, to key: String) async throws {
+		print("[S3BackupService] Uploading data to bucket: \(bucketName), key: \(key)")
+		print("[S3BackupService] Data size: \(data.count) bytes")
+		
 		let putObjectInput = PutObjectInput(
 			body: .data(data),
 			bucket: bucketName,
@@ -241,23 +244,39 @@ class S3BackupService: ObservableObject {
 			storageClass: .standard
 		)
 		
-		_ = try await self.client.putObject(input: putObjectInput)
-		print("Uploaded data to: \(key)")
+		do {
+			let response = try await self.client.putObject(input: putObjectInput)
+			print("[S3BackupService] Successfully uploaded data to: \(key)")
+			print("[S3BackupService] Response ETag: \(response.eTag ?? "none")")
+		} catch {
+			print("[S3BackupService] ERROR uploading to \(key): \(error)")
+			throw error
+		}
 	}
 	
 	func downloadData(from key: String) async throws -> Data {
+		print("[S3BackupService] Downloading data from bucket: \(bucketName), key: \(key)")
+		
 		let getObjectInput = GetObjectInput(
 			bucket: bucketName,
 			key: key
 		)
 		
-		let response = try await self.client.getObject(input: getObjectInput)
-		
-		guard let body = response.body else {
-			throw S3BackupError.downloadFailed
+		do {
+			let response = try await self.client.getObject(input: getObjectInput)
+			
+			guard let body = response.body else {
+				print("[S3BackupService] ERROR: No body in response for key: \(key)")
+				throw S3BackupError.downloadFailed
+			}
+			
+			let data = try await body.readData() ?? Data()
+			print("[S3BackupService] Successfully downloaded \(data.count) bytes from: \(key)")
+			return data
+		} catch {
+			print("[S3BackupService] ERROR downloading from \(key): \(error)")
+			throw error
 		}
-		
-		return try await body.readData() ?? Data()
 	}
 
 	// MARK: - Upload Thumbnail

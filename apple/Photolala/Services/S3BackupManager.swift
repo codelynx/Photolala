@@ -75,13 +75,16 @@ class S3BackupManager: ObservableObject {
 	}
 	
 	// Add a method to ensure service is initialized before use
-	func ensureInitialized() async throws {
+	func ensureInitialized() async {
 		if self.s3Service == nil {
+			print("[S3BackupManager] S3 service not initialized, attempting initialization...")
 			await self.initializeServiceIfNeeded()
-		}
-		
-		guard self.s3Service != nil else {
-			throw S3BackupError.serviceNotConfigured
+			
+			if self.s3Service != nil {
+				print("[S3BackupManager] S3 service initialized successfully")
+			} else {
+				print("[S3BackupManager] Failed to initialize S3 service")
+			}
 		}
 	}
 

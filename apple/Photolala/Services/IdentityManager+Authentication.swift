@@ -385,23 +385,45 @@ extension IdentityManager {
 	}
 	
 	private func createS3UserFolders(for user: PhotolalaUser) async throws {
-		print("Creating S3 folders for user: \(user.serviceUserID)")
+		print("[IdentityManager] Creating S3 folders for user: \(user.serviceUserID)")
 		
 		let s3Manager = S3BackupManager.shared
 		
-		// Create user directory
-		let userPath = "users/\(user.serviceUserID)/"
-		try await s3Manager.createFolder(at: userPath)
+		// Ensure S3 service is initialized
+		await s3Manager.ensureInitialized()
 		
-		// Create provider ID mapping in /identities/
-		let identityKey = "\(user.primaryProvider.rawValue):\(user.primaryProviderID)"
-		let identityPath = "identities/\(identityKey)"
+		guard s3Manager.s3Service != nil else {
+			print("[IdentityManager] ERROR: S3 service is not initialized, cannot create user folders")
+			print("[IdentityManager] Attempting to continue without S3 folders...")
+			// Don't throw - allow account creation to continue
+			// User folders will be created on first backup
+			return
+		}
 		
-		// Store the UUID as content of the identity file
-		let uuidData = user.serviceUserID.data(using: .utf8)!
-		try await s3Manager.uploadData(uuidData, to: identityPath)
-		
-		print("Created identity mapping: \(identityPath) -> \(user.serviceUserID)")
+		do {
+			// Create user directory
+			let userPath = "users/\(user.serviceUserID)/"
+			print("[IdentityManager] Creating user directory: \(userPath)")
+			try await s3Manager.createFolder(at: userPath)
+			print("[IdentityManager] Successfully created user directory")
+			
+			// Create provider ID mapping in /identities/
+			let identityKey = "\(user.primaryProvider.rawValue):\(user.primaryProviderID)"
+			let identityPath = "identities/\(identityKey)"
+			
+			print("[IdentityManager] Creating identity mapping: \(identityPath)")
+			// Store the UUID as content of the identity file
+			let uuidData = user.serviceUserID.data(using: .utf8)!
+			try await s3Manager.uploadData(uuidData, to: identityPath)
+			
+			print("[IdentityManager] Successfully created identity mapping: \(identityPath) -> \(user.serviceUserID)")
+		} catch {
+			print("[IdentityManager] ERROR creating S3 folders: \(error)")
+			print("[IdentityManager] Error type: \(type(of: error))")
+			print("[IdentityManager] Error details: \(error.localizedDescription)")
+			// Don't throw - allow account creation to continue
+			// This way the user can still sign in even if S3 is temporarily unavailable
+		}
 	}
 	
 	// MARK: - Utility Methods (moved to be accessible)
