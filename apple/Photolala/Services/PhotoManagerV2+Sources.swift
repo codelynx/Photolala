@@ -22,8 +22,8 @@ extension PhotoManagerV2 {
 		
 		// Check if we have a full PhotoDigest (from previous star operation)
 		if let existingMD5 = await getExistingMD5(for: photoApple) {
-			if let digest = await photoDigestCache.getPhotoDigest(for: existingMD5) {
-				return digest.thumbnail
+			if let wrapper = PhotoManagerV2.shared.memoryCache.object(forKey: existingMD5 as NSString) {
+				return wrapper.digest.loadThumbnail()
 			}
 		}
 		
@@ -38,12 +38,15 @@ extension PhotoManagerV2 {
 		let md5Hash = computeMD5(from: imageData)
 		
 		// Check if we already have this PhotoDigest
-		if let existing = await photoDigestCache.getPhotoDigest(for: md5Hash) {
-			return existing
+		if let wrapper = PhotoManagerV2.shared.memoryCache.object(forKey: md5Hash as NSString) {
+			return wrapper.digest
 		}
 		
 		// Generate thumbnail from data
 		let thumbnailData = try generateThumbnailFromData(imageData)
+		
+		// Save thumbnail to disk
+		try PhotoDigest.saveThumbnail(thumbnailData, for: md5Hash)
 		
 		// Extract metadata
 		let metadata = PhotoDigestMetadata(
@@ -55,15 +58,15 @@ extension PhotoManagerV2 {
 			modificationTimestamp: Int((photoApple.modificationDate ?? Date()).timeIntervalSince1970)
 		)
 		
-		// Create PhotoDigest
+		// Create PhotoDigest (without thumbnail data)
 		let digest = PhotoDigest(
 			md5Hash: md5Hash,
-			thumbnailData: thumbnailData,
 			metadata: metadata
 		)
 		
 		// Cache it
-		await photoDigestCache.setPhotoDigest(digest, for: md5Hash)
+		let wrapper = PhotoDigestWrapper(digest)
+		PhotoManagerV2.shared.memoryCache.setObject(wrapper, forKey: md5Hash as NSString)
 		
 		// Also store Apple Photo ID → MD5 mapping for future lookups
 		await storeApplePhotoMapping(photoID: photoApple.id, md5: md5Hash)
@@ -78,8 +81,8 @@ extension PhotoManagerV2 {
 		let md5 = photoS3.md5
 		
 		// Check cache first
-		if let cached = await PhotoDigestCache.shared.getPhotoDigest(for: md5) {
-			return cached
+		if let wrapper = PhotoManagerV2.shared.memoryCache.object(forKey: md5 as NSString) {
+			return wrapper.digest
 		}
 		
 		// Download thumbnail from S3
@@ -100,15 +103,18 @@ extension PhotoManagerV2 {
 			modificationTimestamp: Int(photoS3.modified.timeIntervalSince1970)
 		)
 		
-		// Create PhotoDigest
+		// Save thumbnail to disk (S3 thumbnails are already downloaded)
+		try PhotoDigest.saveThumbnail(thumbnailData, for: md5)
+		
+		// Create PhotoDigest (without thumbnail data)
 		let digest = PhotoDigest(
 			md5Hash: md5,
-			thumbnailData: thumbnailData,
 			metadata: metadata
 		)
 		
 		// Cache in S3-specific location
-		await PhotoDigestCache.shared.setPhotoDigest(digest, for: md5)
+		let wrapper = PhotoDigestWrapper(digest)
+		PhotoManagerV2.shared.memoryCache.setObject(wrapper, forKey: md5 as NSString)
 		
 		return digest
 	}
@@ -126,7 +132,7 @@ extension PhotoManagerV2 {
 			
 		case let photoS3 as PhotoS3:
 			let digest = try await photoDigest(for: photoS3)
-			return digest?.thumbnail
+			return digest?.loadThumbnail()
 			
 		default:
 			return nil

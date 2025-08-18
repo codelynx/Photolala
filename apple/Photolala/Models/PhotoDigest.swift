@@ -9,15 +9,40 @@ import Foundation
 import SwiftUI
 import XPlatform
 
-/// Unified representation of a photo's thumbnail and metadata
+/// Unified representation of a photo's metadata (thumbnail stored separately on disk)
 struct PhotoDigest: Codable {
 	let md5Hash: String
-	let thumbnailData: Data
 	let metadata: PhotoDigestMetadata
 	
-	/// Get thumbnail image
-	var thumbnail: XImage? {
-		XImage(data: thumbnailData)
+	/// Load thumbnail image from disk cache
+	func loadThumbnail() -> XImage? {
+		let cacheURL = PhotoDigest.thumbnailURL(for: md5Hash)
+		guard let data = try? Data(contentsOf: cacheURL) else { return nil }
+		return XImage(data: data)
+	}
+	
+	/// Get thumbnail URL for an MD5 hash
+	static func thumbnailURL(for md5: String) -> URL {
+		let cacheDir = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first!
+		let photolalaDir = cacheDir.appendingPathComponent("com.electricwoods.photolala")
+		let thumbnailsDir = photolalaDir.appendingPathComponent("thumbnails")
+		
+		// Use first 2 characters for sharding
+		let shard = String(md5.prefix(2))
+		let shardDir = thumbnailsDir.appendingPathComponent(shard)
+		return shardDir.appendingPathComponent("\(md5).dat")
+	}
+	
+	/// Save thumbnail to disk cache
+	static func saveThumbnail(_ thumbnailData: Data, for md5: String) throws {
+		let url = thumbnailURL(for: md5)
+		
+		// Create shard directory if needed
+		let shardDir = url.deletingLastPathComponent()
+		try FileManager.default.createDirectory(at: shardDir, withIntermediateDirectories: true)
+		
+		// Write thumbnail data
+		try thumbnailData.write(to: url)
 	}
 }
 
@@ -40,19 +65,24 @@ struct PhotoDigestMetadata: Codable {
 
 /// File identity for Level 1 cache
 struct FileIdentityKey {
-	let pathMD5: String
+	let path: String
 	let fileSize: Int64
-	let modificationTimestamp: Int
 	
-	init(path: String, fileSize: Int64, modificationDate: Date) {
-		self.pathMD5 = path.normalizedPath.lowercased().md5Hash
+	init(path: String, fileSize: Int64, modificationDate: Date? = nil) {
+		self.path = path.normalizedPath
 		self.fileSize = fileSize
-		self.modificationTimestamp = Int(modificationDate.timeIntervalSince1970)
+		// modificationDate is ignored - we only use path + file size for caching
 	}
 	
-	/// Cache key for Level 1 lookup
+	/// Cache key for Level 1 lookup - uses path + file size only
 	var cacheKey: String {
-		"\(pathMD5)|\(fileSize)|\(modificationTimestamp)"
+		Self.buildKey(path: path, fileSize: fileSize)
+	}
+	
+	/// Build a cache key from components (centralized key generation)
+	static func buildKey(path: String, fileSize: Int64) -> String {
+		let normalizedPath = path.normalizedPath
+		return "\(normalizedPath):\(fileSize)"
 	}
 }
 

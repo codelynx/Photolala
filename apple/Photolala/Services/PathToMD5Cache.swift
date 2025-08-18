@@ -32,21 +32,21 @@ class PathToMD5Cache {
 	// MARK: - Public API
 	
 	/// Get cached MD5 for file identity
-	func getMD5(for path: String, fileSize: Int64, modificationDate: Date) -> String? {
-		let key = FileIdentityKey(path: path, fileSize: fileSize, modificationDate: modificationDate)
+	func getMD5(for path: String, fileSize: Int64) -> String? {
+		let key = FileIdentityKey(path: path, fileSize: fileSize)
 		return memoryCache[key.cacheKey]
 	}
 	
 	/// Store MD5 for file identity
-	func setMD5(_ md5: String, for path: String, fileSize: Int64, modificationDate: Date) {
-		let key = FileIdentityKey(path: path, fileSize: fileSize, modificationDate: modificationDate)
+	func setMD5(_ md5: String, for path: String, fileSize: Int64) {
+		let key = FileIdentityKey(path: path, fileSize: fileSize)
 		memoryCache[key.cacheKey] = md5
 		scheduleSave()
 	}
 	
 	/// Remove entry for path
-	func removeEntry(for path: String, fileSize: Int64, modificationDate: Date) {
-		let key = FileIdentityKey(path: path, fileSize: fileSize, modificationDate: modificationDate)
+	func removeEntry(for path: String, fileSize: Int64) {
+		let key = FileIdentityKey(path: path, fileSize: fileSize)
 		memoryCache.removeValue(forKey: key.cacheKey)
 		scheduleSave()
 	}

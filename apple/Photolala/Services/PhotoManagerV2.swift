@@ -12,15 +12,28 @@ import ImageIO
 import CryptoKit
 import XPlatform
 
+/// Wrapper class for PhotoDigest to work with NSCache
+class PhotoDigestWrapper {
+	let digest: PhotoDigest
+	
+	init(_ digest: PhotoDigest) {
+		self.digest = digest
+	}
+}
+
 @MainActor
 class PhotoManagerV2 {
 	static let shared = PhotoManagerV2()
 	
 	private let pathToMD5Cache = PathToMD5Cache.shared
-	let photoDigestCache = PhotoDigestCache.shared  // Made internal for PhotoManagerV2+Sources
+	let memoryCache = NSCache<NSString, PhotoDigestWrapper>()  // Made internal for PhotoManagerV2+Sources
 	private let processingQueue = DispatchQueue(label: "com.photolala.photo-processing", qos: .userInitiated)
 	
-	private init() {}
+	private init() {
+		// Configure memory cache
+		memoryCache.countLimit = 500  // Max items
+		memoryCache.totalCostLimit = 100 * 1024 * 1024  // 100MB
+	}
 	
 	// MARK: - Public API
 	
@@ -34,8 +47,7 @@ class PhotoManagerV2 {
 		let contentMD5: String
 		if let cachedMD5 = pathToMD5Cache.getMD5(
 			for: photoFile.filePath,
-			fileSize: fileSize,
-			modificationDate: modificationDate
+			fileSize: fileSize
 		) {
 			// Use cached MD5
 			contentMD5 = cachedMD5
@@ -47,14 +59,13 @@ class PhotoManagerV2 {
 			pathToMD5Cache.setMD5(
 				contentMD5,
 				for: photoFile.filePath,
-				fileSize: fileSize,
-				modificationDate: modificationDate
+				fileSize: fileSize
 			)
 		}
 		
 		// Level 2: Get PhotoDigest from MD5
-		if let digest = await photoDigestCache.getPhotoDigest(for: contentMD5) {
-			return digest.thumbnail
+		if let wrapper = memoryCache.object(forKey: contentMD5 as NSString) {
+			return wrapper.digest.loadThumbnail()
 		}
 		
 		// Generate new PhotoDigest
@@ -66,9 +77,10 @@ class PhotoManagerV2 {
 		)
 		
 		// Cache it
-		await photoDigestCache.setPhotoDigest(digest, for: contentMD5)
+		let wrapper = PhotoDigestWrapper(digest)
+		memoryCache.setObject(wrapper, forKey: contentMD5 as NSString)
 		
-		return digest.thumbnail
+		return digest.loadThumbnail()
 	}
 	
 	/// Get PhotoDigest for a file
@@ -81,8 +93,7 @@ class PhotoManagerV2 {
 		let contentMD5: String
 		if let cachedMD5 = pathToMD5Cache.getMD5(
 			for: photoFile.filePath,
-			fileSize: fileSize,
-			modificationDate: modificationDate
+			fileSize: fileSize
 		) {
 			contentMD5 = cachedMD5
 		} else {
@@ -90,14 +101,13 @@ class PhotoManagerV2 {
 			pathToMD5Cache.setMD5(
 				contentMD5,
 				for: photoFile.filePath,
-				fileSize: fileSize,
-				modificationDate: modificationDate
+				fileSize: fileSize
 			)
 		}
 		
 		// Level 2: Get PhotoDigest
-		if let digest = await photoDigestCache.getPhotoDigest(for: contentMD5) {
-			return digest
+		if let wrapper = memoryCache.object(forKey: contentMD5 as NSString) {
+			return wrapper.digest
 		}
 		
 		// Generate new
@@ -108,7 +118,8 @@ class PhotoManagerV2 {
 			modificationDate: modificationDate
 		)
 		
-		await photoDigestCache.setPhotoDigest(digest, for: contentMD5)
+		let wrapper = PhotoDigestWrapper(digest)
+		memoryCache.setObject(wrapper, forKey: contentMD5 as NSString)
 		
 		return digest
 	}
@@ -144,6 +155,9 @@ class PhotoManagerV2 {
 					// Generate thumbnail
 					let thumbnailData = try self.generateThumbnail(from: url)
 					
+					// Save thumbnail to disk
+					try PhotoDigest.saveThumbnail(thumbnailData, for: md5)
+					
 					// Extract metadata
 					let metadata = try self.extractMetadata(
 						from: url,
@@ -152,10 +166,9 @@ class PhotoManagerV2 {
 						modificationDate: modificationDate
 					)
 					
-					// Create PhotoDigest
+					// Create PhotoDigest (without thumbnail data)
 					let digest = PhotoDigest(
 						md5Hash: md5,
-						thumbnailData: thumbnailData,
 						metadata: metadata
 					)
 					
