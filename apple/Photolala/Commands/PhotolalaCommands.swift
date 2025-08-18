@@ -185,7 +185,7 @@ struct PhotolalaCommands: Commands {
 		#endif
 
 		// Debug menu
-		#if DEBUG
+		#if DEBUG && os(macOS)
 		CommandMenu("Debug") {
 			Button("Test S3 Write") {
 				Task { @MainActor in
