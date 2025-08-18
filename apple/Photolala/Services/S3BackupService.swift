@@ -265,12 +265,50 @@ class S3BackupService: ObservableObject {
 		}
 	}
 	
-	func downloadData(from key: String) async throws -> Data {
-		print("[S3BackupService] Downloading data from bucket: \(bucketName), key: \(key)")
+	/// Check if an object exists in S3 using HeadObject (no caching)
+	func objectExists(at key: String) async -> Bool {
+		let headInput = HeadObjectInput(
+			bucket: bucketName,
+			key: key,
+			responseCacheControl: "max-age=1"  // Bypass cache with 1 second max age
+		)
+		
+		do {
+			let _ = try await self.client.headObject(input: headInput)
+			print("[S3BackupService] Object exists: \(key)")
+			return true
+		} catch {
+			print("[S3BackupService] Object does not exist: \(key)")
+			return false
+		}
+	}
+	
+	func downloadData(from key: String, skipCache: Bool = false) async throws -> Data {
+		print("[S3BackupService] Downloading data from bucket: \(bucketName), key: \(key), skipCache: \(skipCache)")
+		
+		// For identity lookups, we should use HeadObject first to check existence
+		// This avoids any potential caching issues
+		if skipCache {
+			// First check if object exists using HeadObject
+			let headInput = HeadObjectInput(
+				bucket: bucketName,
+				key: key,
+				responseCacheControl: "max-age=1"  // Bypass cache
+			)
+			
+			do {
+				let headResponse = try await self.client.headObject(input: headInput)
+				print("[S3BackupService] HeadObject confirmed object exists: \(key), size: \(headResponse.contentLength ?? 0)")
+			} catch {
+				print("[S3BackupService] HeadObject failed - object does not exist: \(key)")
+				throw error
+			}
+		}
 		
 		let getObjectInput = GetObjectInput(
 			bucket: bucketName,
-			key: key
+			key: key,
+			responseCacheControl: skipCache ? "max-age=1" : nil  // Bypass cache if requested
 		)
 		
 		do {

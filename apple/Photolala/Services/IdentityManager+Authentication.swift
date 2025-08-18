@@ -27,19 +27,24 @@ extension IdentityManager {
 		
 		defer { isLoading = false }
 		
+		print("[IdentityManager] authenticateAndProcess - Starting with intent: \(intent), provider: \(provider.rawValue)")
+		
 		// Step 1: Always authenticate with provider first (same for signin/signup)
 		let credential = try await authenticate(with: provider)
+		print("[IdentityManager] authenticateAndProcess - Got credential for: \(credential.providerID)")
 		
 		// Step 2: Check if user exists with this provider ID
 		let existingUser = try await findUserByProviderID(
 			provider: credential.provider,
 			providerID: credential.providerID
 		)
+		print("[IdentityManager] authenticateAndProcess - User lookup result: \(existingUser != nil ? "Found user \(existingUser!.serviceUserID)" : "No user found")")
 		
 		// Step 3: Handle based on intent and existence
 		switch (intent, existingUser) {
 		case (.signIn, let user?):
 			// Sign in successful - user exists
+			print("[IdentityManager] authenticateAndProcess - Sign in successful, updating user info")
 			var updatedUser = user
 			
 			// Update user info from fresh JWT data (Apple only provides these on first sign-in)
@@ -71,6 +76,7 @@ extension IdentityManager {
 			
 		case (.signIn, nil):
 			// Sign in failed - no account exists
+			print("[IdentityManager] authenticateAndProcess - Sign in FAILED: No account found for \(provider.rawValue):\(credential.providerID)")
 			// Include the credential so it can be reused for account creation
 			throw AuthError.noAccountFound(provider: provider, credential: credential)
 			
@@ -331,15 +337,26 @@ extension IdentityManager {
 		
 		print("[IdentityManager] Checking S3 for identity mapping: \(identityPath)")
 		
+		// First check if the identity mapping exists using HeadObject (no cache)
+		let exists = await s3Service.objectExists(at: identityPath)
+		if !exists {
+			print("[IdentityManager] Identity mapping does not exist: \(identityPath)")
+			return nil
+		}
+		
 		do {
+			print("[IdentityManager] Identity exists, downloading from S3: \(identityPath)")
+			// Now download the actual data
 			let uuidData = try await s3Service.downloadData(from: identityPath)
-			guard let serviceUserID = String(data: uuidData, encoding: .utf8) else {
+			print("[IdentityManager] Downloaded \(uuidData.count) bytes from S3")
+			guard let serviceUserID = String(data: uuidData, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines) else {
+				print("[IdentityManager] Failed to decode UUID from downloaded data")
 				return nil
 			}
 			
 			// Found identity mapping! Create a basic user object
 			// In the future, we'll load full user data from S3
-			print("Found identity mapping: \(identityPath) -> \(serviceUserID)")
+			print("[IdentityManager] Found identity mapping: \(identityPath) -> \(serviceUserID)")
 			
 			// Reconstruct user from available data
 			let reconstructedUser = PhotolalaUser(
@@ -356,7 +373,7 @@ extension IdentityManager {
 			// This is just enough to indicate the account exists
 			return reconstructedUser
 		} catch {
-			print("No identity mapping found for \(identityPath)")
+			print("Error downloading identity mapping for \(identityPath): \(error)")
 			return nil
 		}
 	}
@@ -385,7 +402,9 @@ extension IdentityManager {
 	}
 	
 	private func createS3IdentityMappings(for user: PhotolalaUser) async throws {
-		print("[IdentityManager] Creating S3 identity mappings for user: \(user.serviceUserID)")
+		print("[IdentityManager] ⚠️ createS3IdentityMappings called for user: \(user.serviceUserID)")
+		print("[IdentityManager] ⚠️ This should ONLY be called during account creation!")
+		print("[IdentityManager] ⚠️ Provider: \(user.primaryProvider.rawValue):\(user.primaryProviderID)")
 		
 		let s3Manager = S3BackupManager.shared
 		

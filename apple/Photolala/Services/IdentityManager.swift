@@ -2,6 +2,7 @@ import AuthenticationServices
 import CryptoKit
 import Foundation
 import SwiftUI
+import AWSS3
 
 // MARK: - Identity Manager
 
@@ -124,6 +125,80 @@ class IdentityManager: NSObject, ObservableObject {
 		return "Unknown"
 		#endif
 	}
+	
+	/// Debug function to check if identity mapping exists in S3
+	@MainActor
+	func checkIdentityMapping(for provider: AuthProvider, providerID: String) async -> (exists: Bool, message: String) {
+		print("[S3 Test] Checking identity mapping...")
+		
+		let s3Manager = S3BackupManager.shared
+		await s3Manager.ensureInitialized()
+		
+		guard let s3Service = s3Manager.s3Service else {
+			let message = "S3 service not initialized"
+			print("[S3 Test] ❌ \(message)")
+			return (false, message)
+		}
+		
+		let identityKey = "\(provider.rawValue):\(providerID)"
+		let identityPath = "identities/\(identityKey)"
+		
+		do {
+			print("[S3 Test] Checking: s3://photolala/\(identityPath)")
+			// Skip cache to get real-time S3 state
+			let data = try await s3Service.downloadData(from: identityPath, skipCache: true)
+			if let uuid = String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines) {
+				let message = "Identity mapping EXISTS: \(identityPath) -> \(uuid)"
+				print("[S3 Test] ✅ \(message)")
+				return (true, message)
+			} else {
+				let message = "Identity mapping exists but cannot decode UUID"
+				print("[S3 Test] ⚠️ \(message)")
+				return (true, message)
+			}
+		} catch {
+			let message = "Identity mapping NOT found: \(identityPath)"
+			print("[S3 Test] ℹ️ \(message)")
+			return (false, message)
+		}
+	}
+	
+	/// Debug function to delete identity mapping from S3
+	@MainActor
+	func deleteIdentityMapping(for provider: AuthProvider, providerID: String) async -> (success: Bool, message: String) {
+		print("[S3 Test] Deleting identity mapping...")
+		
+		let s3Manager = S3BackupManager.shared
+		await s3Manager.ensureInitialized()
+		
+		guard let s3Service = s3Manager.s3Service else {
+			let message = "S3 service not initialized"
+			print("[S3 Test] ❌ \(message)")
+			return (false, message)
+		}
+		
+		let identityKey = "\(provider.rawValue):\(providerID)"
+		let identityPath = "identities/\(identityKey)"
+		
+		do {
+			print("[S3 Test] Deleting: s3://photolala/\(identityPath)")
+			
+			// Use the S3 client to delete
+			let deleteRequest = AWSS3.DeleteObjectInput(
+				bucket: "photolala",
+				key: identityPath
+			)
+			_ = try await s3Service.s3Client?.deleteObject(input: deleteRequest)
+			
+			let message = "Successfully deleted identity mapping: \(identityPath)"
+			print("[S3 Test] ✅ \(message)")
+			return (true, message)
+		} catch {
+			let message = "Failed to delete: \(error.localizedDescription)"
+			print("[S3 Test] ❌ \(message)")
+			return (false, message)
+		}
+	}
 
 	// MARK: - Private Methods
 
@@ -174,7 +249,12 @@ class IdentityManager: NSObject, ObservableObject {
 	}
 	
 	private func verifyStoredUserWithS3() async {
-		guard let user = self.currentUser else { return }
+		guard let user = self.currentUser else { 
+			print("[IdentityManager] verifyStoredUserWithS3 - No current user to verify")
+			return 
+		}
+		
+		print("[IdentityManager] verifyStoredUserWithS3 - Verifying user: \(user.serviceUserID)")
 		
 		do {
 			// Check if user exists in S3 by verifying identity mapping
@@ -182,27 +262,29 @@ class IdentityManager: NSObject, ObservableObject {
 			let identityKey = "\(user.primaryProvider.rawValue):\(user.primaryProviderID)"
 			let identityPath = "identities/\(identityKey)"
 			
+			print("[IdentityManager] verifyStoredUserWithS3 - Checking S3 path: \(identityPath)")
+			
 			let s3Manager = S3BackupManager.shared
 			guard let s3Service = s3Manager.s3Service else {
-				print("S3 service not available - keeping local user")
+				print("[IdentityManager] verifyStoredUserWithS3 - S3 service not available - keeping local user")
 				return
 			}
 			
-			do {
-				// Try to download the identity mapping
-				let _ = try await s3Service.downloadData(from: identityPath)
-				print("User verified in S3: \(user.displayName)")
+			// Check if identity mapping exists using HeadObject (no cache)
+			let exists = await s3Service.objectExists(at: identityPath)
+			if exists {
+				print("[IdentityManager] verifyStoredUserWithS3 - User verified in S3: \(user.displayName)")
 				// User exists - keep signed in state
-			} catch {
+			} else {
 				// User doesn't exist in S3 - clear local state
-				print("User not found in S3 (\(identityPath)), clearing local state")
+				print("[IdentityManager] verifyStoredUserWithS3 - User NOT found in S3 (\(identityPath)), clearing local state")
 				try? KeychainManager.shared.delete(key: self.keychainKey)
 				self.currentUser = nil
 				self.isSignedIn = false
 			}
 		} catch {
 			// Error verifying - clear local state to be safe
-			print("Error verifying user in S3: \(error). Clearing local state.")
+			print("[IdentityManager] verifyStoredUserWithS3 - Error verifying user in S3: \(error). Clearing local state.")
 			try? KeychainManager.shared.delete(key: self.keychainKey)
 			self.currentUser = nil
 			self.isSignedIn = false

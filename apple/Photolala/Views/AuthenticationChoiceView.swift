@@ -309,18 +309,23 @@ struct AuthenticationChoiceView: View {
 	private func handleProviderSelection(_ provider: AuthProvider) {
 		Task {
 			do {
+				print("[AuthenticationChoiceView] Attempting sign in with \(provider.rawValue)")
 				// Try to sign in first (auto-detection)
 				_ = try await identityManager.signIn(with: provider)
+				print("[AuthenticationChoiceView] Sign in successful, dismissing view")
 				dismiss()
 			} catch {
+				print("[AuthenticationChoiceView] Sign in failed with error: \(error)")
 				// Handle specific error cases
 				if case AuthError.noAccountFound(let provider, let credential) = error {
+					print("[AuthenticationChoiceView] No account found, showing create account prompt")
 					// No account exists - offer to create one
 					pendingProvider = provider
 					pendingCredential = credential
 					showCreateAccountPrompt = true
 				} else {
 					// Other errors (like account already exists when trying to create)
+					print("[AuthenticationChoiceView] Other error: \(error.localizedDescription)")
 					handleError(error)
 				}
 			}

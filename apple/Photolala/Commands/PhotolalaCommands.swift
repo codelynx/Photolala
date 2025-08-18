@@ -235,6 +235,67 @@ struct PhotolalaCommands: Commands {
 					alert.runModal()
 				}
 			}
+			
+			Divider()
+			
+			Button("Check Current Identity in S3") {
+				Task { @MainActor in
+					guard let user = IdentityManager.shared.currentUser else {
+						let alert = NSAlert()
+						alert.messageText = "No User"
+						alert.informativeText = "No user is currently signed in"
+						alert.alertStyle = .warning
+						alert.runModal()
+						return
+					}
+					
+					let result = await IdentityManager.shared.checkIdentityMapping(
+						for: user.primaryProvider,
+						providerID: user.primaryProviderID
+					)
+					
+					let alert = NSAlert()
+					alert.messageText = result.exists ? "Identity Exists" : "Identity Not Found"
+					alert.informativeText = result.message
+					alert.alertStyle = .informational
+					alert.runModal()
+				}
+			}
+			
+			Button("Delete Current Identity from S3") {
+				Task { @MainActor in
+					guard let user = IdentityManager.shared.currentUser else {
+						let alert = NSAlert()
+						alert.messageText = "No User"
+						alert.informativeText = "No user is currently signed in"
+						alert.alertStyle = .warning
+						alert.runModal()
+						return
+					}
+					
+					// Confirm deletion
+					let confirmAlert = NSAlert()
+					confirmAlert.messageText = "Delete Identity Mapping?"
+					confirmAlert.informativeText = "This will delete the S3 identity mapping for:\n\(user.primaryProvider.rawValue):\(user.primaryProviderID)\n\nYou will need to create a new account after signing out."
+					confirmAlert.alertStyle = .warning
+					confirmAlert.addButton(withTitle: "Delete")
+					confirmAlert.addButton(withTitle: "Cancel")
+					
+					if confirmAlert.runModal() == .alertFirstButtonReturn {
+						let result = await IdentityManager.shared.deleteIdentityMapping(
+							for: user.primaryProvider,
+							providerID: user.primaryProviderID
+						)
+						
+						let resultAlert = NSAlert()
+						resultAlert.messageText = result.success ? "Deleted" : "Failed"
+						resultAlert.informativeText = result.message
+						resultAlert.alertStyle = result.success ? .informational : .warning
+						resultAlert.runModal()
+					}
+				}
+			}
+			.keyboardShortcut("D", modifiers: [.command, .shift, .option])
 		}
 		#endif
 		
