@@ -131,7 +131,7 @@ class S3BackupManager: ObservableObject {
 		let md5 = try await s3Service.uploadPhoto(data: data, userId: userId)
 
 		// Generate and upload thumbnail
-		if let thumbnail = try? await PhotoManager.shared.thumbnail(for: photoRef) {
+		if let thumbnail = try? await PhotoManagerV2.shared.thumbnail(for: photoRef) {
 			// Convert to data on main actor to avoid sendable warnings
 			let thumbnailData = await MainActor.run {
 				thumbnail.jpegData(compressionQuality: 0.8)
@@ -142,7 +142,7 @@ class S3BackupManager: ObservableObject {
 		}
 		
 		// Extract and upload metadata
-		if let metadata = try? await PhotoManager.shared.metadata(for: photoRef) {
+		if let metadata = try? await PhotoManagerV2.shared.metadata(for: photoRef) {
 			try await s3Service.uploadMetadata(metadata, md5: md5, userId: userId)
 		}
 
@@ -189,7 +189,7 @@ class S3BackupManager: ObservableObject {
 		let md5 = try await s3Service.uploadPhoto(data: data, userId: userId)
 		
 		// Generate and upload thumbnail (using cached version if available)
-		if let thumbnail = try? await PhotoManager.shared.thumbnail(for: photo) {
+		if let thumbnail = try? await PhotoManagerV2.shared.thumbnail(for: photo) {
 			// Convert to data on main actor to avoid sendable warnings
 			let thumbnailData = await MainActor.run {
 				thumbnail.jpegData(compressionQuality: 0.8)
@@ -200,8 +200,9 @@ class S3BackupManager: ObservableObject {
 		}
 		
 		// Extract and upload metadata (using cached version if available)
-		let photoMetadata = try await PhotoManager.shared.metadata(for: photo)
-		try await s3Service.uploadMetadata(photoMetadata, md5: md5, userId: userId)
+		if let photoMetadata = try await PhotoManagerV2.shared.metadata(for: photo) {
+			try await s3Service.uploadMetadata(photoMetadata, md5: md5, userId: userId)
+		}
 		
 		print("Successfully uploaded Apple Photo: \(photo.filename) with ID: \(photo.asset.localIdentifier)")
 	}

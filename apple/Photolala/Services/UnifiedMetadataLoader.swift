@@ -8,6 +8,7 @@
 import Foundation
 import SwiftData
 import SwiftUI
+import CryptoKit
 
 @MainActor
 class UnifiedMetadataLoader {
@@ -25,19 +26,17 @@ class UnifiedMetadataLoader {
 			}
 			
 			// Try to get MD5 hash
-			let md5Hash: String?
-			if let existingHash = photoFile.md5Hash {
-				md5Hash = existingHash
-			} else {
+			var md5Hash: String? = photoFile.md5Hash
+			if md5Hash == nil {
 				// Load MD5 if not available
 				do {
 					let data = try Data(contentsOf: photoFile.fileURL)
-					let digest = PhotoManager.shared.md5Digest(of: data)
-					md5Hash = digest.map { String(format: "%02x", $0) }.joined()
-					photoFile.md5Hash = md5Hash
+					let md5Digest = Insecure.MD5.hash(data: data)
+					let md5String = md5Digest.map { String(format: "%02hhx", $0) }.joined()
+					photoFile.md5Hash = md5String
+					md5Hash = md5String
 				} catch {
 					print("[UnifiedMetadataLoader] Failed to compute MD5: \(error)")
-					md5Hash = nil
 				}
 			}
 			
@@ -64,7 +63,7 @@ class UnifiedMetadataLoader {
 			
 			// Fall back to PhotoManager cache
 			do {
-				let metadata = try await PhotoManager.shared.metadata(for: photoFile)
+				let metadata = try await PhotoManagerV2.shared.metadata(for: photoFile)
 				photoFile.metadata = metadata
 				return metadata
 			} catch {

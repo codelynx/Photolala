@@ -178,7 +178,7 @@
 
 			// Load thumbnail - PhotoManager will handle the sizing
 			do {
-				let thumbnail = try await PhotoManager.shared.thumbnail(for: photo)
+				let thumbnail = try await PhotoManagerV2.shared.thumbnail(for: photo)
 
 				// Load metadata if not already loaded
 				if photo.metadata == nil {

@@ -644,7 +644,9 @@ struct PhotolalaCommands: Commands {
 	private func clearAllCaches() {
 		do {
 			// Clear memory caches
-			PhotoManager.shared.clearAllCaches()
+			// Clear PhotoManagerV2 caches
+			PhotoManagerV2.shared.memoryCache.removeAllObjects()
+			PathToMD5Cache.shared.clearAll()
 			
 			// Clear all disk caches using CacheManager
 			try CacheManager.shared.clearAllCaches()
@@ -660,7 +662,9 @@ struct PhotolalaCommands: Commands {
 	private func clearLocalCaches() {
 		do {
 			// Clear memory caches
-			PhotoManager.shared.clearAllCaches()
+			// Clear PhotoManagerV2 caches
+			PhotoManagerV2.shared.memoryCache.removeAllObjects()
+			PathToMD5Cache.shared.clearAll()
 			
 			// Clear local disk caches using CacheManager
 			try CacheManager.shared.clearLocalCaches()
@@ -737,7 +741,10 @@ struct PhotolalaCommands: Commands {
 		
 		// Memory Cache Info
 		print("📱 MEMORY CACHES:")
-		print(PhotoManager.shared.getCacheInfo())
+		// Get cache statistics from PhotoManagerV2
+		let report = PhotoManagerV2.shared.getCacheStatistics()
+		print("Memory Cache: up to \(report.memoryCount) items")
+		print("Disk Cache: \(report.diskCount) thumbnails, \(formatBytes(report.diskUsage))")
 		
 		// Overall cache info
 		print("\n📊 CACHE SIZES:")

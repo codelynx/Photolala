@@ -58,7 +58,7 @@ import GoogleSignIn
 
 @main
 struct PhotolalaApp: App {
-	let photoManager = PhotoManager.shared
+	let photoManager = PhotoManagerV2.shared
 
 	#if os(macOS)
 		@NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate

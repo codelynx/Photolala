@@ -35,7 +35,7 @@ class PriorityThumbnailLoader: ObservableObject {
 	
 	// MARK: - Properties
 	
-	private let photoManager = PhotoManager.shared
+	private let photoManager = PhotoManagerV2.shared
 	private var loadingQueue: [LoadRequest] = []
 	private var activeLoads: Set<String> = [] // Track by filePath
 	private var loadingTask: Task<Void, Never>?
@@ -176,8 +176,8 @@ class PriorityThumbnailLoader: ObservableObject {
 		}
 		
 		do {
-			// Use the unified loader if available
-			if let thumbnail = try await photoManager.loadThumbnailUnified(for: photo) {
+			// Load thumbnail through PhotoManagerV2
+			if let thumbnail = try await photoManager.thumbnail(for: photo) {
 				await MainActor.run {
 					photo.thumbnail = thumbnail
 					photo.thumbnailLoadingState = .loaded

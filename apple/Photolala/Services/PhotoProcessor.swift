@@ -325,39 +325,3 @@ class PhotoProcessor {
 		)
 	}
 }
-
-// MARK: - Integration with PhotoManager
-
-extension PhotoManager {
-	/// Load thumbnail using the unified PhotoProcessor
-	func loadThumbnailUnified(for photo: PhotoFile) async throws -> XThumbnail? {
-		// Check if we already have MD5 and cached thumbnail
-		if let md5 = photo.md5Hash {
-			let identifier = PhotoManager.Identifier.md5(Insecure.MD5Digest(rawBytes: Data(hexadecimalString: md5)!)!)
-			// Check cache through PhotoManager
-			if let cached = self.getThumbnail(for: identifier) {
-				self.updateCacheHit()
-				return cached
-			}
-		}
-		
-		// Process the photo
-		let processed = try await PhotoProcessor.processPhoto(photo)
-		
-		// Update photo object
-		photo.md5Hash = processed.md5
-		photo.metadata = processed.metadata
-		
-		// Save thumbnail to disk
-		let identifier = PhotoManager.Identifier.md5(Insecure.MD5Digest(rawBytes: Data(hexadecimalString: processed.md5)!)!)
-		let thumbnailURL = self.thumbnailURL(for: identifier)
-		try processed.thumbnailData.write(to: thumbnailURL)
-		
-		// Cache in memory
-		// Cache through PhotoManager
-		self.cacheThumbnail(processed.thumbnail, for: identifier)
-		self.cacheMetadata(processed.metadata, for: photo.filePath)
-		
-		return processed.thumbnail
-	}
-}

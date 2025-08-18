@@ -8,8 +8,8 @@
 import SwiftUI
 
 struct CacheStatisticsView: View {
-	@State private var stats: PhotoManager.CacheStatisticsReport = PhotoManagerV2.shared.getCacheStatistics()
-	@State private var memoryUsage = PhotoManagerV2.shared.getMemoryUsageInfo()
+	@State private var stats: PhotoManagerV2.CacheStatisticsReport = PhotoManagerV2.shared.getCacheStatistics()
+	@State private var memoryUsage: PhotoManagerV2.MemoryUsageInfo = PhotoManagerV2.shared.getMemoryUsageInfo()
 	@Environment(\.dismiss) private var dismiss
 
 	var body: some View {
@@ -34,64 +34,38 @@ struct CacheStatisticsView: View {
 			// Statistics Content
 			ScrollView {
 				VStack(alignment: .leading, spacing: 20) {
-					// Images Section
+					// Memory Cache Section
 					StatisticSection(
-						title: "Images",
-						icon: "photo",
+						title: "Memory Cache",
+						icon: "memorychip",
 						color: .blue,
 						stats: [
-							("Cache hits", "\(self.stats.imageHits)"),
-							("Cache misses", "\(self.stats.imageMisses)"),
-							("Hit rate", String(format: "%.1f%%", self.stats.imageHitRate * 100)),
-							("Cache limit", "\(self.memoryUsage.imageCacheLimit) images"),
+							("Max items", "\(self.stats.memoryCount)"),
+							("Max size", "\(self.stats.memoryUsage / 1024 / 1024) MB"),
 						]
 					)
 
-					// Thumbnails Section
+					// Disk Cache Section
 					StatisticSection(
-						title: "Thumbnails",
-						icon: "square.grid.3x3",
+						title: "Disk Cache",
+						icon: "internaldrive",
 						color: .green,
 						stats: [
-							("Cache hits", "\(self.stats.thumbnailHits)"),
-							("Cache misses", "\(self.stats.thumbnailMisses)"),
-							("Hit rate", String(format: "%.1f%%", self.stats.thumbnailHitRate * 100)),
-							("Cache limit", "1000 thumbnails"),
+							("Thumbnails", "\(self.stats.diskCount)"),
+							("Total size", "\(self.stats.diskUsage / 1024 / 1024) MB"),
 						]
 					)
 
-					// Disk Operations Section
-					StatisticSection(
-						title: "Disk Operations",
-						icon: "internaldrive",
-						color: .orange,
-						stats: [
-							("Disk reads", "\(self.stats.diskReads)"),
-							("Disk writes", "\(self.stats.diskWrites)"),
-						]
-					)
-
-					// Performance Section
-					StatisticSection(
-						title: "Performance",
-						icon: "speedometer",
-						color: .purple,
-						stats: [
-							("Total operations", "\(self.stats.loadCount)"),
-							("Average load time", String(format: "%.3fs", self.stats.averageLoadTime)),
-							("Total time", String(format: "%.3fs", self.stats.totalLoadTime)),
-						]
-					)
 
 					// Memory Section
 					StatisticSection(
-						title: "Memory",
+						title: "System Memory",
 						icon: "memorychip",
 						color: .red,
 						stats: [
-							("Process memory", self.memoryUsage.processMemory),
-							("Cache budget", "\(self.memoryUsage.cacheBudget / 1_024 / 1_024)MB"),
-							("Physical RAM", "\(self.memoryUsage.totalMemory / 1_024 / 1_024 / 1_024)GB"),
+							("Used memory", "\(self.memoryUsage.usedMemory / 1_024 / 1_024) MB"),
+							("Available", "\(self.memoryUsage.availableMemory / 1_024 / 1_024) MB"),
+							("Total RAM", "\(self.memoryUsage.totalMemory / 1_024 / 1_024 / 1_024) GB"),
 						]
 					)
 				}

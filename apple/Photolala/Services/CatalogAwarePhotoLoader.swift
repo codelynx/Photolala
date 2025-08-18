@@ -183,10 +183,8 @@ class CatalogAwarePhotoLoader {
 					
 					try await catalogService.upsertEntry(entry)
 					
-					// Save thumbnail while we have it
-					let identifier = PhotoManager.Identifier.md5(Insecure.MD5Digest(rawBytes: Data(hexadecimalString: processed.md5)!)!)
-					let thumbnailURL = PhotoManager.shared.thumbnailURL(for: identifier)
-					try processed.thumbnailData.write(to: thumbnailURL)
+					// Save thumbnail using PhotoManagerV2's disk cache
+					try PhotoDigest.saveThumbnail(processed.thumbnailData, for: processed.md5)
 					
 				} catch {
 					logger.error("Failed to process photo \(photo.filename): \(error)")

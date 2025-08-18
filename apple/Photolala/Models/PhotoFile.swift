@@ -9,6 +9,7 @@ import Foundation
 import Observation
 import SwiftUI
 import XPlatform
+import CryptoKit
 
 @Observable
 class PhotoFile: Identifiable, Hashable {
@@ -97,7 +98,7 @@ class PhotoFile: Identifiable, Hashable {
 		self.metadataLoadingState = .loading
 
 		do {
-			self.metadata = try await PhotoManager.shared.metadata(for: self)
+			self.metadata = try await PhotoManagerV2.shared.metadata(for: self)
 			self.metadataLoadingState = .loaded
 			return self.metadata
 		} catch {
@@ -125,27 +126,18 @@ class PhotoFile: Identifiable, Hashable {
 			self.metadataLoadingState = .loading
 			
 			do {
-				// Try unified loading first
-				if let unifiedThumbnail = try? await PhotoManager.shared.loadThumbnailUnified(for: self) {
-					self.thumbnail = unifiedThumbnail
+				// Load thumbnail and metadata through PhotoManagerV2
+				let loadedThumbnail = try await PhotoManagerV2.shared.thumbnail(for: self)
+				let loadedMetadata = try await PhotoManagerV2.shared.metadata(for: self)
+				
+				if let loadedThumbnail {
+					self.thumbnail = loadedThumbnail
 					self.thumbnailLoadingState = .loaded
-					// Metadata should already be set by PhotoProcessor
-					if self.metadata != nil {
-						self.metadataLoadingState = .loaded
-					}
-				} else {
-					// Fall back to legacy method
-					let (loadedThumbnail, loadedMetadata) = try await PhotoManager.shared.loadPhotoData(for: self)
-					
-					if let loadedThumbnail {
-						self.thumbnail = loadedThumbnail
-						self.thumbnailLoadingState = .loaded
-					}
-					
-					if let loadedMetadata {
-						self.metadata = loadedMetadata
-						self.metadataLoadingState = .loaded
-					}
+				}
+				
+				if let loadedMetadata {
+					self.metadata = loadedMetadata
+					self.metadataLoadingState = .loaded
 				}
 			} catch {
 				self.thumbnailLoadingState = .failed(error)
@@ -171,42 +163,4 @@ class PhotoFile: Identifiable, Hashable {
 		self.loadingTask = nil
 	}
 
-	/*
-	 // Thumbnail loading
-	 func loadThumbnail() {
-	 	guard thumbnailLoadingState == .idle else { return }
-
-	 	thumbnailLoadingState = .loading
-
-	 	Task {
-	 		do {
-	 			// First check if thumbnail exists in cache
-	 			let data = try Data(contentsOf: fileURL)
-	 			let md5 = PhotoManager.shared.computeMD5(data)
-	 			let identifier = PhotoManager.Identifier.md5(md5, data.count)
-
-	 			// Try to load from cache first
-	 			if let cachedThumbnail = PhotoManager.shared.thumbnail(for: identifier) {
-	 				await MainActor.run {
-	 					self.thumbnail = cachedThumbnail
-	 					self.thumbnailLoadingState = .loaded
-	 				}
-	 				return
-	 			}
-
-	 			// Generate thumbnail if not cached
-	 			if let generatedThumbnail = try PhotoManager.shared.thumbnail(rawData: data) {
-	 				await MainActor.run {
-	 					self.thumbnail = generatedThumbnail
-	 					self.thumbnailLoadingState = .loaded
-	 				}
-	 			}
-	 		} catch {
-	 			await MainActor.run {
-	 				self.thumbnailLoadingState = .failed(error)
-	 			}
-	 		}
-	 	}
-	 }
-	 */
 }

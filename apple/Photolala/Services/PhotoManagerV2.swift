@@ -262,9 +262,65 @@ class PhotoManagerV2 {
 	
 	/// Group photos by specified grouping option
 	func groupPhotos(_ photos: [any PhotoItem], by grouping: PhotoGroupingOption) -> [PhotoGroup] {
-		// Convert to PhotoFile array for compatibility
+		guard grouping != .none else {
+			// For compatibility with PhotoGroup, we need PhotoFile array
+			// For now, only group PhotoFile items
+			let photoFiles = photos.compactMap { $0 as? PhotoFile }
+			return [PhotoGroup(title: "", photos: photoFiles, dateRepresentative: Date())]
+		}
+		
+		// Filter to PhotoFile for compatibility with PhotoGroup
 		let photoFiles = photos.compactMap { $0 as? PhotoFile }
-		return PhotoManager.shared.groupPhotos(photoFiles, by: grouping)
+		
+		// Load file dates for all photos that need it
+		for photo in photoFiles {
+			photo.loadFileCreationDateIfNeeded()
+		}
+		
+		let calendar = Calendar.current
+		let sortedPhotos = photoFiles.sorted { photo1, photo2 in
+			(photo1.fileCreationDate ?? Date()) > (photo2.fileCreationDate ?? Date())
+		}
+		
+		switch grouping {
+		case .year:
+			let grouped = Dictionary(grouping: sortedPhotos) { photo in
+				calendar.component(.year, from: photo.fileCreationDate ?? Date())
+			}
+			
+			return grouped.map { year, photos in
+				PhotoGroup(
+					title: "\(year)",
+					photos: photos,
+					dateRepresentative: calendar.date(from: DateComponents(year: year)) ?? Date()
+				)
+			}.sorted { group1, group2 in
+				group1.dateRepresentative > group2.dateRepresentative
+			}
+			
+		case .yearMonth:
+			let formatter = DateFormatter()
+			formatter.dateFormat = "MMMM yyyy"
+			
+			let grouped = Dictionary(grouping: sortedPhotos) { photo in
+				let date = photo.fileCreationDate ?? Date()
+				let components = calendar.dateComponents([.year, .month], from: date)
+				return calendar.date(from: components) ?? date
+			}
+			
+			return grouped.map { monthDate, photos in
+				PhotoGroup(
+					title: formatter.string(from: monthDate),
+					photos: photos,
+					dateRepresentative: monthDate
+				)
+			}.sorted { group1, group2 in
+				group1.dateRepresentative > group2.dateRepresentative
+			}
+			
+		default:
+			return [PhotoGroup(title: "", photos: photoFiles, dateRepresentative: Date())]
+		}
 	}
 	
 	/// Prefetch thumbnails for given photos
@@ -280,7 +336,9 @@ class PhotoManagerV2 {
 		// Handle different photo types
 		switch photo {
 		case let photoFile as PhotoFile:
-			return try await PhotoManager.shared.loadFullImage(for: photoFile)
+			// Load full image from file
+			let data = try Data(contentsOf: URL(fileURLWithPath: photoFile.filePath))
+			return XImage(data: data)
 		case let photoApple as PhotoApple:
 			// Load full image data and convert to image
 			let data = try await photoApple.loadImageData()
@@ -337,33 +395,106 @@ class PhotoManagerV2 {
 	
 	/// Prefetch images with priority
 	func prefetchImages(for photos: [any PhotoItem], priority: TaskPriority) async {
-		// Convert to PhotoFile array if possible for compatibility
-		let photoFiles = photos.compactMap { $0 as? PhotoFile }
-		if !photoFiles.isEmpty {
-			await PhotoManager.shared.prefetchImages(for: photoFiles, priority: priority)
-		}
-		// For other photo types, prefetch thumbnails instead
-		for photo in photos where !(photo is PhotoFile) {
+		// Use priority loader for all photo types
+		for photo in photos {
 			PriorityThumbnailLoaderV2.shared.requestThumbnail(for: photo, priority: .prefetch)
 		}
 	}
 	
-	// MARK: - Statistics (Delegate to PhotoManager for now)
+	// MARK: - Statistics
+	
+	struct CacheStatisticsReport {
+		let memoryCount: Int
+		let memoryUsage: Int
+		let diskCount: Int
+		let diskUsage: Int64
+	}
+	
+	struct MemoryUsageInfo {
+		let totalMemory: Int64
+		let availableMemory: Int64
+		let usedMemory: Int64
+	}
 	
 	func printCacheStatistics() {
-		PhotoManager.shared.printCacheStatistics()
+		print("=== PhotoManagerV2 Cache Statistics ===")
+		print("Memory Cache: \(memoryCache.countLimit) max items")
+		print("Path-to-MD5 Cache: Active")
+		
+		// Count disk thumbnails
+		let cacheDir = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first!
+		let photolalaCache = cacheDir.appendingPathComponent("com.electricwoods.photolala")
+		let thumbnailCache = photolalaCache.appendingPathComponent("thumbnails")
+		
+		do {
+			let files = try FileManager.default.contentsOfDirectory(at: thumbnailCache, includingPropertiesForKeys: [.fileSizeKey])
+			var totalSize: Int64 = 0
+			for file in files {
+				if let size = try? file.resourceValues(forKeys: [URLResourceKey.fileSizeKey]).fileSize {
+					totalSize += Int64(size)
+				}
+			}
+			print("Disk Thumbnails: \(files.count) files, \(totalSize / 1024 / 1024) MB")
+		} catch {
+			print("Unable to read disk cache")
+		}
 	}
 	
 	func resetStatistics() {
-		PhotoManager.shared.resetStatistics()
+		// Clear memory cache
+		memoryCache.removeAllObjects()
+		PathToMD5Cache.shared.clearAll()
+		print("Cache statistics reset")
 	}
 	
-	func getCacheStatistics() -> PhotoManager.CacheStatisticsReport {
-		PhotoManager.shared.getCacheStatistics()
+	func getCacheStatistics() -> CacheStatisticsReport {
+		var diskCount = 0
+		var diskUsage: Int64 = 0
+		
+		let cacheDir = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first!
+		let photolalaCache = cacheDir.appendingPathComponent("com.electricwoods.photolala")
+		let thumbnailCache = photolalaCache.appendingPathComponent("thumbnails")
+		
+		do {
+			let files = try FileManager.default.contentsOfDirectory(at: thumbnailCache, includingPropertiesForKeys: [.fileSizeKey])
+			diskCount = files.count
+			for file in files {
+				if let size = try? file.resourceValues(forKeys: [URLResourceKey.fileSizeKey]).fileSize {
+					diskUsage += Int64(size)
+				}
+			}
+		} catch {
+			// Ignore errors
+		}
+		
+		return CacheStatisticsReport(
+			memoryCount: memoryCache.countLimit,
+			memoryUsage: memoryCache.totalCostLimit,
+			diskCount: diskCount,
+			diskUsage: diskUsage
+		)
 	}
 	
-	func getMemoryUsageInfo() -> PhotoManager.MemoryUsageInfo {
-		PhotoManager.shared.getMemoryUsageInfo()
+	func getMemoryUsageInfo() -> MemoryUsageInfo {
+		var info = mach_task_basic_info()
+		var count = mach_msg_type_number_t(MemoryLayout.size(ofValue: info) / MemoryLayout<integer_t>.size)
+		
+		let result = withUnsafeMutablePointer(to: &info) { infoPtr in
+			infoPtr.withMemoryRebound(to: integer_t.self, capacity: Int(count)) { intPtr in
+				task_info(mach_task_self_, task_flavor_t(MACH_TASK_BASIC_INFO), intPtr, &count)
+			}
+		}
+		
+		let usedMemory = result == KERN_SUCCESS ? Int64(info.resident_size) : 0
+		
+		let totalMemory = Int64(ProcessInfo.processInfo.physicalMemory)
+		let availableMemory = totalMemory - usedMemory
+		
+		return MemoryUsageInfo(
+			totalMemory: totalMemory,
+			availableMemory: availableMemory,
+			usedMemory: usedMemory
+		)
 	}
 	
 	func loadArchiveStatus(for catalogEntries: [CatalogEntry], userId: String) async {

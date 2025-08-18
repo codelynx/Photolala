@@ -66,7 +66,17 @@ class ApplePhotosMetadataCache {
 		// Check if we already have MD5 mapping
 		if let md5 = photoIDToMD5[photoID] {
 			// Try to load from MD5-based cache
-			if let metadata = try? await PhotoManager.shared.getMetadataByMD5(md5) {
+			// Try to get metadata from PhotoManagerV2's cache
+			if let wrapper = PhotoManagerV2.shared.memoryCache.object(forKey: md5 as NSString) as? PhotoDigestWrapper {
+				let digest = wrapper.digest
+				let metadata = PhotoMetadata(
+					dateTaken: digest.metadata.creationDate,
+					fileModificationDate: Date(timeIntervalSince1970: TimeInterval(digest.metadata.modificationTimestamp)),
+					fileSize: digest.metadata.fileSize,
+					pixelWidth: digest.metadata.pixelWidth,
+					pixelHeight: digest.metadata.pixelHeight,
+					applePhotoID: photoID
+				)
 				return (md5, metadata)
 			}
 		}
@@ -82,7 +92,19 @@ class ApplePhotosMetadataCache {
 		defer { processingQueue.remove(photoID) }
 		
 		// Process the photo completely
-		let result = try await PhotoManager.shared.processApplePhoto(photo)
+		// Use PhotoManagerV2 to get PhotoDigest for backup
+		let digest = try await PhotoManagerV2.shared.photoDigestForBackup(for: photo)
+		let result = (
+			md5: digest.md5Hash,
+			metadata: PhotoMetadata(
+				dateTaken: digest.metadata.creationDate,
+				fileModificationDate: Date(timeIntervalSince1970: TimeInterval(digest.metadata.modificationTimestamp)),
+				fileSize: digest.metadata.fileSize,
+				pixelWidth: digest.metadata.pixelWidth,
+				pixelHeight: digest.metadata.pixelHeight,
+				applePhotoID: photoID
+			)
+		)
 		
 		// Store the mapping
 		photoIDToMD5[photoID] = result.md5
