@@ -47,6 +47,11 @@ class PriorityThumbnailLoader: ObservableObject {
 	// Stats
 	@Published var queueSize: Int = 0
 	@Published var activeLoadCount: Int = 0
+	@Published var cacheLoadCount: Int = 0
+	
+	// Track total cache hits for summary
+	private var totalCacheHits: Int = 0
+	private var hasLoggedCacheSummary = false
 	
 	// MARK: - Public Methods
 	
@@ -62,7 +67,28 @@ class PriorityThumbnailLoader: ObservableObject {
 			return
 		}
 		
-		// Add to queue
+		// Check if thumbnail exists in cache
+		if thumbnailExistsInCache(for: photo) {
+			// Load it asynchronously without queuing
+			cacheLoadCount += 1
+			totalCacheHits += 1
+			
+			Task {
+				await loadCachedThumbnail(for: photo)
+				await MainActor.run {
+					self.cacheLoadCount -= 1
+					
+					// Log summary when all cache loads are done
+					if self.cacheLoadCount == 0 && self.queueSize == 0 && !self.hasLoggedCacheSummary && self.totalCacheHits > 0 {
+						print("[PriorityLoader] Loaded \(self.totalCacheHits) thumbnails from cache")
+						self.hasLoggedCacheSummary = true
+					}
+				}
+			}
+			return
+		}
+		
+		// Add to queue only if not in cache
 		let request = LoadRequest(photo: photo, priority: priority, requestTime: Date())
 		loadingQueue.append(request)
 		
@@ -121,9 +147,25 @@ class PriorityThumbnailLoader: ObservableObject {
 		queueSize = 0
 		loadingTask?.cancel()
 		loadingTask = nil
+		totalCacheHits = 0
+		hasLoggedCacheSummary = false
 	}
 	
 	// MARK: - Private Methods
+	
+	/// Check if thumbnail exists in cache without loading it
+	private func thumbnailExistsInCache(for photo: PhotoFile) -> Bool {
+		// Check L1 cache for MD5
+		guard let attributes = try? FileManager.default.attributesOfItem(atPath: photo.filePath),
+		      let fileSize = attributes[.size] as? Int64,
+		      let md5 = PathToMD5Cache.shared.getMD5(for: photo.filePath, fileSize: fileSize) else {
+			return false
+		}
+		
+		// Check if thumbnail file exists on disk
+		let thumbnailURL = PhotoDigest.thumbnailURL(for: md5)
+		return FileManager.default.fileExists(atPath: thumbnailURL.path)
+	}
 	
 	private func startProcessing() {
 		loadingTask = Task {
@@ -187,6 +229,24 @@ class PriorityThumbnailLoader: ObservableObject {
 			print("[PriorityLoader] Failed to load thumbnail for \(photo.filename): \(error)")
 			await MainActor.run {
 				photo.thumbnailLoadingState = .failed(error)
+			}
+		}
+	}
+	
+	/// Load thumbnail from cache (disk to memory)
+	private func loadCachedThumbnail(for photo: PhotoFile) async {
+		do {
+			// This will load from cache, not generate
+			if let thumbnail = try await photoManager.thumbnail(for: photo) {
+				await MainActor.run {
+					photo.thumbnail = thumbnail
+					photo.thumbnailLoadingState = .loaded
+				}
+			}
+		} catch {
+			// If cache load fails, add to generation queue
+			await MainActor.run {
+				self.requestThumbnail(for: photo, priority: .background)
 			}
 		}
 	}

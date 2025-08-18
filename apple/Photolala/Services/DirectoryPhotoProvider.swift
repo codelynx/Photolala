@@ -83,10 +83,25 @@ class DirectoryPhotoProvider: ObservableObject, PhotoProvider {
 		
 		// Subscribe to priority loader stats
 		priorityLoader.$queueSize
-			.combineLatest(priorityLoader.$activeLoadCount)
-			.sink { [weak self] queueSize, activeCount in
+			.combineLatest(priorityLoader.$activeLoadCount, priorityLoader.$cacheLoadCount)
+			.throttle(for: .milliseconds(500), scheduler: DispatchQueue.main, latest: true)
+			.sink { [weak self] queueSize, activeCount, cacheCount in
+				// Only log if there's actual generation happening or items queued
 				if queueSize > 0 || activeCount > 0 {
-					self?.logger.debug("Thumbnail queue: \(queueSize), active: \(activeCount)")
+					var logParts: [String] = []
+					if queueSize > 0 {
+						logParts.append("queue: \(queueSize)")
+					}
+					if activeCount > 0 {
+						logParts.append("generating: \(activeCount)")
+					}
+					// Only mention cache loading if there's also generation happening
+					if cacheCount > 0 && (queueSize > 0 || activeCount > 0) {
+						logParts.append("cache loads: \(cacheCount)")
+					}
+					if !logParts.isEmpty {
+						self?.logger.debug("Thumbnails - \(logParts.joined(separator: ", "))")
+					}
 				}
 			}
 			.store(in: &cancellables)
