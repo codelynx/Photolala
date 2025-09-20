@@ -42,8 +42,8 @@ actor AthenaService {
 			accessKeyEnum = .AWS_ACCESS_KEY_ID_STAGE
 			secretKeyEnum = .AWS_SECRET_ACCESS_KEY_STAGE
 		default:
-			accessKeyEnum = .AWS_ACCESS_KEY_ID
-			secretKeyEnum = .AWS_SECRET_ACCESS_KEY
+			accessKeyEnum = .AWS_ACCESS_KEY_ID_PROD
+			secretKeyEnum = .AWS_SECRET_ACCESS_KEY_PROD
 		}
 
 		let credentials = await MainActor.run {

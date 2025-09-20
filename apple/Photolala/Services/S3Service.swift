@@ -20,7 +20,6 @@ actor S3Service {
 	private let logger = Logger(subsystem: "com.photolala", category: "S3Service")
 	private nonisolated(unsafe) var client: S3Client?
 	private var bucketName: String = ""
-	private let region = "us-east-1"
 
 	private init() {}
 
@@ -28,49 +27,28 @@ actor S3Service {
 	func initialize() async throws {
 		guard client == nil else { return }
 
-		// Get bucket based on environment
-		let bucket = await MainActor.run { EnvironmentHelper.getCurrentBucket() }
-		self.bucketName = bucket
-		logger.info("Using bucket: \(self.bucketName)")
+		// Get credentials and bucket from CredentialManager
+		let credentialManager = await CredentialManager.shared
 
-		// Get credentials based on environment
-		let accessKeyEnum: CredentialKey
-		let secretKeyEnum: CredentialKey
-
-		switch bucketName {
-		case "photolala-dev":
-			accessKeyEnum = .AWS_ACCESS_KEY_ID_DEV
-			secretKeyEnum = .AWS_SECRET_ACCESS_KEY_DEV
-		case "photolala-stage":
-			accessKeyEnum = .AWS_ACCESS_KEY_ID_STAGE
-			secretKeyEnum = .AWS_SECRET_ACCESS_KEY_STAGE
-		default: // production
-			accessKeyEnum = .AWS_ACCESS_KEY_ID
-			secretKeyEnum = .AWS_SECRET_ACCESS_KEY
-		}
-
-		let credentials = await MainActor.run {
-			(
-				accessKey: Credentials.decryptCached(accessKeyEnum),
-				secretKey: Credentials.decryptCached(secretKeyEnum)
-			)
-		}
-
-		guard let accessKey = credentials.accessKey,
-			  let secretKey = credentials.secretKey else {
+		guard let awsCredentials = await credentialManager.currentAWSCredentials else {
 			throw S3Error.credentialsNotFound
 		}
 
+		self.bucketName = await credentialManager.currentAWSBucket
+		let envDisplayName = await credentialManager.environmentDisplayName
+		logger.info("Using bucket: \(self.bucketName)")
+		logger.info("Environment: \(envDisplayName)")
+
 		// Create S3 client with credentials
 		let credentialIdentity = AWSCredentialIdentity(
-			accessKey: accessKey,
-			secret: secretKey
+			accessKey: awsCredentials.accessKey,
+			secret: awsCredentials.secretKey
 		)
 		let credentialResolver = StaticAWSCredentialIdentityResolver(credentialIdentity)
 
 		let config = try await S3Client.S3ClientConfiguration(
 			awsCredentialIdentityResolver: credentialResolver,
-			region: region
+			region: awsCredentials.region
 		)
 
 		self.client = S3Client(config: config)
