@@ -204,6 +204,182 @@ actor S3Service {
 	func getEnvironment() -> Environment {
 		return environment
 	}
+
+	// MARK: - Photo Upload Methods
+
+	/// Check if a photo exists in S3
+	func checkPhotoExists(md5: String, userID: String) async -> Bool {
+		try? await ensureInitialized()
+
+		// Check for .dat file (unified extension for deduplication)
+		let key = "photos/\(userID)/\(md5).dat"
+		do {
+			_ = try await client.headObject(input: HeadObjectInput(
+				bucket: bucketName,
+				key: key
+			))
+			return true
+		} catch {
+			return false
+		}
+	}
+
+	/// Upload photo with format preservation (using .dat extension)
+	func uploadPhoto(data: Data, md5: String, format: ImageFormat, userID: String) async throws {
+		try await ensureInitialized()
+
+		// Always use .dat for perfect deduplication
+		let key = "photos/\(userID)/\(md5).dat"
+
+		let input = PutObjectInput(
+			body: .data(data),
+			bucket: bucketName,
+			contentType: format.mimeType,
+			key: key,
+			metadata: ["original-format": format.rawValue],
+			tagging: "Format=\(format.rawValue)"
+		)
+
+		_ = try await client.putObject(input: input)
+		logger.info("Uploaded photo: \(key) with Format=\(format.rawValue)")
+	}
+
+	/// Upload PTM-256 thumbnail
+	func uploadThumbnail(data: Data, md5: String, userID: String) async throws {
+		try await ensureInitialized()
+
+		let key = "thumbnails/\(userID)/\(md5).jpg"
+
+		let input = PutObjectInput(
+			body: .data(data),
+			bucket: bucketName,
+			contentType: "image/jpeg",
+			key: key
+		)
+
+		_ = try await client.putObject(input: input)
+		logger.info("Uploaded thumbnail: \(key)")
+	}
+
+	/// Upload catalog CSV
+	func uploadCatalog(csvData: Data, catalogMD5: String, userID: String) async throws {
+		try await ensureInitialized()
+
+		let key = "catalogs/\(userID)/.photolala.\(catalogMD5).csv"
+
+		let input = PutObjectInput(
+			body: .data(csvData),
+			bucket: bucketName,
+			contentType: "text/csv",
+			key: key
+		)
+
+		_ = try await client.putObject(input: input)
+		logger.info("Uploaded catalog: \(key)")
+	}
+
+	/// Update catalog pointer
+	func updateCatalogPointer(catalogMD5: String, userID: String) async throws {
+		try await ensureInitialized()
+
+		let key = "catalogs/\(userID)/.photolala.md5"
+		let data = catalogMD5.data(using: .utf8)!
+
+		let input = PutObjectInput(
+			body: .data(data),
+			bucket: bucketName,
+			contentType: "text/plain",
+			key: key
+		)
+
+		_ = try await client.putObject(input: input)
+		logger.info("Updated catalog pointer to: \(catalogMD5)")
+	}
+
+	// MARK: - Photo Download Methods
+
+	/// Download catalog pointer
+	func downloadCatalogPointer(userID: String) async throws -> String {
+		try await ensureInitialized()
+
+		let key = "catalogs/\(userID)/.photolala.md5"
+
+		let input = GetObjectInput(
+			bucket: bucketName,
+			key: key
+		)
+
+		let response = try await client.getObject(input: input)
+		guard let data = try await response.body?.readData() else {
+			throw S3Error.downloadFailed
+		}
+
+		guard let pointer = String(data: data, encoding: .utf8)?
+			.trimmingCharacters(in: .whitespacesAndNewlines) else {
+			throw S3Error.invalidData
+		}
+
+		return pointer
+	}
+
+	/// Download catalog CSV
+	func downloadCatalog(catalogMD5: String, userID: String) async throws -> Data {
+		try await ensureInitialized()
+
+		let key = "catalogs/\(userID)/.photolala.\(catalogMD5).csv"
+
+		let input = GetObjectInput(
+			bucket: bucketName,
+			key: key
+		)
+
+		let response = try await client.getObject(input: input)
+		guard let data = try await response.body?.readData() else {
+			throw S3Error.downloadFailed
+		}
+
+		return data
+	}
+
+	/// Download thumbnail
+	func downloadThumbnail(md5: String, userID: String) async throws -> Data {
+		try await ensureInitialized()
+
+		let key = "thumbnails/\(userID)/\(md5).jpg"
+
+		let input = GetObjectInput(
+			bucket: bucketName,
+			key: key
+		)
+
+		let response = try await client.getObject(input: input)
+		guard let data = try await response.body?.readData() else {
+			throw S3Error.downloadFailed
+		}
+
+		return data
+	}
+
+	/// Download photo (always stored as .dat)
+	func downloadPhoto(md5: String, userID: String) async throws -> Data {
+		try await ensureInitialized()
+
+		// Photos are always stored as .dat
+		let key = "photos/\(userID)/\(md5).dat"
+
+		let input = GetObjectInput(
+			bucket: bucketName,
+			key: key
+		)
+
+		let response = try await client.getObject(input: input)
+		guard let data = try await response.body?.readData() else {
+			throw S3Error.downloadFailed
+		}
+
+		// Note: Format can be determined from object tags if needed
+		return data
+	}
 }
 
 // MARK: - Factory Methods and Helpers
@@ -265,6 +441,9 @@ enum S3Error: LocalizedError {
 	case clientNotInitialized
 	case noData
 	case urlGenerationFailed
+	case downloadFailed
+	case invalidData
+	case notFound
 
 	var errorDescription: String? {
 		switch self {
@@ -276,6 +455,12 @@ enum S3Error: LocalizedError {
 			return "No data returned from S3"
 		case .urlGenerationFailed:
 			return "Failed to generate presigned URL"
+		case .downloadFailed:
+			return "Failed to download from S3"
+		case .invalidData:
+			return "Invalid data format"
+		case .notFound:
+			return "Object not found in S3"
 		}
 	}
 }

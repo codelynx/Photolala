@@ -35,20 +35,12 @@ public actor ThumbnailCache {
 	// MARK: - Public API
 
 	/// Get thumbnail for photo, generating if needed
-	public func getThumbnail(for photoMD5: PhotoMD5, sourceURL: URL, cacheType: CacheType = .md5) async throws -> CGImage {
-		// Check memory cache
-		if let cached = memoryCache[photoMD5.value] {
-			logger.debug("Thumbnail found in memory cache: \(photoMD5.value)")
-			return cached
-		}
-
+	public func getThumbnail(for photoMD5: PhotoMD5, sourceURL: URL, cacheType: CacheType = .md5) async throws -> URL {
 		// Check disk cache
 		let cachePath = await cacheManager.getThumbnailPath(photoMD5: photoMD5, cacheType: cacheType)
 		if FileManager.default.fileExists(atPath: cachePath.path) {
-			let image = try await loadThumbnail(from: cachePath)
-			updateMemoryCache(photoMD5: photoMD5, image: image)
 			logger.debug("Thumbnail found in disk cache: \(photoMD5.value)")
-			return image
+			return cachePath
 		}
 
 		// Generate new thumbnail
@@ -59,6 +51,24 @@ public actor ThumbnailCache {
 		try await saveThumbnail(image, to: cachePath)
 
 		// Update memory cache
+		updateMemoryCache(photoMD5: photoMD5, image: image)
+
+		return cachePath
+	}
+
+	/// Get thumbnail as CGImage for display
+	public func getThumbnailImage(for photoMD5: PhotoMD5, sourceURL: URL, cacheType: CacheType = .md5) async throws -> CGImage {
+		// Check memory cache
+		if let cached = memoryCache[photoMD5.value] {
+			logger.debug("Thumbnail found in memory cache: \(photoMD5.value)")
+			return cached
+		}
+
+		// Get thumbnail URL
+		let thumbnailURL = try await getThumbnail(for: photoMD5, sourceURL: sourceURL, cacheType: cacheType)
+
+		// Load and cache image
+		let image = try await loadThumbnail(from: thumbnailURL)
 		updateMemoryCache(photoMD5: photoMD5, image: image)
 
 		return image

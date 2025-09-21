@@ -59,7 +59,7 @@ struct LocalPhotoItem: PhotoItem {
             sourceURL: url
         )
 
-        // Convert URL to Data for S3 upload
+        // Read JPEG data from cached file for S3 upload
         return try Data(contentsOf: thumbnailURL)
     }
 
@@ -73,9 +73,10 @@ struct LocalPhotoItem: PhotoItem {
     }
 }
 
-// Note: ThumbnailCache extension needed
-// ThumbnailCache.getThumbnail returns URL, not Data
-// Will need helper method to get JPEG data for S3 upload
+// Implementation Notes:
+// 1. ThumbnailCache.getThumbnail now returns URL to cached JPEG file
+// 2. loadThumbnail() reads Data from the cached file URL
+// 3. This avoids keeping large image data in memory
 }
 
 // Apple Photos implementation (future)
@@ -132,9 +133,11 @@ func checkPhotoExists(md5: String, userID: String) async -> Bool
 
 // Upload photo with format preservation
 func uploadPhoto(data: Data, md5: String, format: ImageFormat, userID: String) async throws
-// S3 Key: photos/{user-uuid}/{photo-md5}.{ext}  (e.g., .jpg, .heif, .png)
-// S3 Tag: Format=JPEG (additional metadata)
-// Note: Keep original extension for MIME type inference
+// Implementation:
+//   let key = "photos/{userID}/{md5}.dat"  // Always .dat for deduplication
+//   let contentType = format.mimeType      // e.g., "image/jpeg"
+//   let tag = "Format={format.rawValue}"   // e.g., "Format=JPEG"
+// S3 Tag enables format detection when downloading
 
 // Upload PTM-256 thumbnail
 func uploadThumbnail(data: Data, md5: String, userID: String) async throws
@@ -181,15 +184,15 @@ actor S3BackupService {
                 // 4. Generate PTM-256 thumbnail
                 let thumbnail = try await generatePTM256Thumbnail(from: photoData)
 
-                // 5. Upload photo with original extension and Format tag
-                let fileExtension = (item.format ?? .unknown).fileExtension
+                // 5. Upload photo as .dat with Format tag
+                let format = item.format ?? .unknown
                 try await s3Service.uploadPhoto(
                     data: photoData,
                     md5: md5,
-                    format: item.format ?? .unknown,
+                    format: format,  // Used for Format tag, not extension
                     userID: userID
                 )
-                // S3 Key will be: photos/{userID}/{md5}.{ext}
+                // S3Service will create key: photos/{userID}/{md5}.dat
 
                 // 6. Upload thumbnail
                 try await s3Service.uploadThumbnail(
@@ -240,20 +243,21 @@ actor S3CloudBrowser {
             userID: userID
         )
 
-        // 3. Import CSV to working database
-        // Note: Need to implement CSV importer
+        // 3. Write CSV to temporary file
         let tempCSVPath = FileManager.default.temporaryDirectory
             .appendingPathComponent("cloud-catalog.csv")
         try csvData.write(to: tempCSVPath)
 
-        // Create database from CSV file
+        // 4. Create read-only database from CSV
+        // CatalogDatabase is CSV-based (no SQLite)
+        // It reads the CSV and populates entries dictionary in memory
         return try await CatalogDatabase(path: tempCSVPath, readOnly: true)
     }
 
-    // TODO: Add CSV import method to CatalogDatabase
-    // - Parse CSV data
-    // - Populate entries dictionary
-    // - Update .photolala.md5 pointer after successful import
+    // Implementation Note:
+    // CatalogDatabase uses CSV exclusively - no SQLite involved
+    // The initializer reads CSV rows into memory for fast access
+    // This aligns with the CSV-only catalog system design
 
     // Progressive thumbnail loading
     func loadThumbnail(photoMD5: String, userID: String) async -> Data? {
@@ -346,7 +350,7 @@ Cloud photo browsing:
 
 ### Day 4: Cloud Browser
 - Implement S3CloudBrowser
-- Add CSV import to CatalogDatabase
+- Use existing CatalogDatabase CSV support
 - Progressive thumbnail loading
 - Local cache integration
 - On-demand photo downloads
@@ -371,11 +375,11 @@ Cloud photo browsing:
 - Report as "skipped" in progress
 
 ### Format Preservation
-- Upload photos with original extension (`.jpg`, `.heif`, `.png`, etc.)
-- S3 Key format: `photos/{user-uuid}/{photo-md5}.{ext}`
-- Add S3 object tag `Format=JPEG` as additional metadata
-- Extension allows downstream MIME type inference
-- Format tag provides redundant type information
+- Upload all photos with `.dat` extension for perfect deduplication
+- S3 Key format: `photos/{user-uuid}/{photo-md5}.dat`
+- Add S3 object tag `Format=JPEG` (or PNG, HEIF, etc.) for format identification
+- Same MD5 = same S3 key regardless of source format
+- Lambda/CloudFront can read Format tag to set correct Content-Type header
 
 ### Catalog Management
 - Local catalog: represents local directory state
@@ -383,11 +387,11 @@ Cloud photo browsing:
 - No automatic sync between them
 - User explicitly chooses what to backup
 
-### CSV Import/Export Flow
-- **Upload**: Generate CSV from current entries → Upload to S3
-- **Download**: Fetch CSV from S3 → Import to CatalogDatabase → Update pointer
+### CSV Catalog Flow
+- **Upload**: Export entries to CSV → Upload to S3 → Update pointer
+- **Download**: Fetch CSV from S3 → Load into CatalogDatabase (CSV-only, no SQLite)
 - **Pointer rule**: "Who writes .photolala.md5 last wins"
-- Need CSV import method in CatalogDatabase for hydration
+- **Storage**: All catalogs are CSV files, loaded into memory for fast access
 
 ### Apple Photos Considerations
 - MD5 not available until full image is loaded
