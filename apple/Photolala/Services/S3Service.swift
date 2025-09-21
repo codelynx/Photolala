@@ -2,7 +2,7 @@
 //  S3Service.swift
 //  Photolala
 //
-//  Simplified S3 service for apple-x
+//  S3 service with environment-based initialization
 //
 
 import Foundation
@@ -14,50 +14,105 @@ import Foundation
 @preconcurrency import SmithyIdentity
 import OSLog
 
-/// Simplified S3 service
+/// S3 service with explicit environment configuration
 actor S3Service {
-	static let shared = S3Service()
 	private let logger = Logger(subsystem: "com.photolala", category: "S3Service")
 	private nonisolated(unsafe) var client: S3Client?
-	private var bucketName: String = ""
+	private let environment: Environment
+	private var awsCredentials: AWSCredentials?
+	private let bucketName: String
+	private var isInitialized = false
 
-	private init() {}
+	/// Initialize S3Service with explicit environment and credentials
+	init(environment: Environment, credentials: AWSCredentials) {
+		self.environment = environment
+		self.awsCredentials = credentials
+		// Compute bucket name based on environment
+		switch environment {
+		case .development:
+			self.bucketName = "photolala-dev"
+		case .staging:
+			self.bucketName = "photolala-stage"
+		case .production:
+			self.bucketName = "photolala-prod"
+		}
+	}
 
-	/// Initialize the S3 client
-	func initialize() async throws {
-		guard client == nil else { return }
+	/// Initialize S3Service with environment (fetches credentials automatically)
+	init(environment: Environment) async throws {
+		self.environment = environment
+		// Compute bucket name based on environment
+		switch environment {
+		case .development:
+			self.bucketName = "photolala-dev"
+		case .staging:
+			self.bucketName = "photolala-stage"
+		case .production:
+			self.bucketName = "photolala-prod"
+		}
 
-		// Get credentials and bucket from CredentialManager
-		let credentialManager = await CredentialManager.shared
+		// Get credentials for the specified environment
+		guard let credentials = await S3Service.getCredentials(for: environment) else {
+			throw S3Error.credentialsNotFound
+		}
+		self.awsCredentials = credentials
+	}
 
-		guard let awsCredentials = await credentialManager.currentAWSCredentials else {
+	/// Initialize S3Service for lazy loading (backward compatibility)
+	private init(environment: Environment, lazy: Bool) {
+		self.environment = environment
+		// Compute bucket name based on environment
+		switch environment {
+		case .development:
+			self.bucketName = "photolala-dev"
+		case .staging:
+			self.bucketName = "photolala-stage"
+		case .production:
+			self.bucketName = "photolala-prod"
+		}
+		// Credentials will be loaded on first use
+		self.awsCredentials = nil
+	}
+
+	/// Initialize the S3 client connection
+	private func ensureInitialized() async throws {
+		guard !isInitialized else { return }
+
+		// Fetch credentials if not already loaded (for lazy initialization)
+		if awsCredentials == nil {
+			guard let credentials = await S3Service.getCredentials(for: environment) else {
+				throw S3Error.credentialsNotFound
+			}
+			self.awsCredentials = credentials
+		}
+
+		guard let credentials = awsCredentials else {
 			throw S3Error.credentialsNotFound
 		}
 
-		self.bucketName = await credentialManager.currentAWSBucket
-		let envDisplayName = await credentialManager.environmentDisplayName
+		logger.info("Initializing S3 client for environment: \(self.environment.rawValue)")
 		logger.info("Using bucket: \(self.bucketName)")
-		logger.info("Environment: \(envDisplayName)")
 
 		// Create S3 client with credentials
 		let credentialIdentity = AWSCredentialIdentity(
-			accessKey: awsCredentials.accessKey,
-			secret: awsCredentials.secretKey
+			accessKey: credentials.accessKey,
+			secret: credentials.secretKey
 		)
 		let credentialResolver = StaticAWSCredentialIdentityResolver(credentialIdentity)
 
 		let config = try await S3Client.S3ClientConfiguration(
 			awsCredentialIdentityResolver: credentialResolver,
-			region: awsCredentials.region
+			region: credentials.region
 		)
 
 		self.client = S3Client(config: config)
+		self.isInitialized = true
 		logger.info("S3 client initialized for \(self.bucketName)")
 	}
 
 	/// List objects in a prefix
 	func listObjects(prefix: String, maxKeys: Int = 1000) async throws -> [S3ClientTypes.Object] {
-		try await initialize()
+		try await ensureInitialized()
 		guard let client = client else { throw S3Error.clientNotInitialized }
 
 		let input = ListObjectsV2Input(
@@ -72,7 +127,7 @@ actor S3Service {
 
 	/// Get object data
 	func getObject(key: String) async throws -> Data {
-		try await initialize()
+		try await ensureInitialized()
 		guard let client = client else { throw S3Error.clientNotInitialized }
 
 		let input = GetObjectInput(
@@ -90,7 +145,7 @@ actor S3Service {
 
 	/// Put object data
 	func putObject(key: String, data: Data, contentType: String? = nil) async throws {
-		try await initialize()
+		try await ensureInitialized()
 		guard let client = client else { throw S3Error.clientNotInitialized }
 
 		let input = PutObjectInput(
@@ -106,7 +161,7 @@ actor S3Service {
 
 	/// Delete object
 	func deleteObject(key: String) async throws {
-		try await initialize()
+		try await ensureInitialized()
 		guard let client = client else { throw S3Error.clientNotInitialized }
 
 		let input = DeleteObjectInput(
@@ -120,7 +175,7 @@ actor S3Service {
 
 	/// Generate presigned URL for download
 	func presignedURLForGet(key: String, expiresIn: TimeInterval = 3600) async throws -> URL {
-		try await initialize()
+		try await ensureInitialized()
 		guard let client = client else { throw S3Error.clientNotInitialized }
 
 		let input = GetObjectInput(
@@ -139,6 +194,69 @@ actor S3Service {
 
 		return url
 	}
+
+	/// Get the current bucket name
+	func getBucketName() -> String {
+		return bucketName
+	}
+
+	/// Get the current environment
+	func getEnvironment() -> Environment {
+		return environment
+	}
+}
+
+// MARK: - Factory Methods and Helpers
+
+extension S3Service {
+	/// Create S3Service for the current app environment (reads from UserDefaults)
+	static func forCurrentEnvironment() async throws -> S3Service {
+		let credentialManager = await CredentialManager.shared
+		let environment = await credentialManager.currentEnvironment
+		return try await S3Service(environment: environment)
+	}
+
+	/// Create S3Service for a specific environment
+	static func forEnvironment(_ environment: Environment) async throws -> S3Service {
+		return try await S3Service(environment: environment)
+	}
+
+	/// Helper to get credentials for a specific environment
+	private static func getCredentials(for environment: Environment) async -> AWSCredentials? {
+		await MainActor.run {
+			let accessKeyEnum: CredentialKey
+			let secretKeyEnum: CredentialKey
+
+			switch environment {
+			case .development:
+				accessKeyEnum = .AWS_ACCESS_KEY_ID_DEV
+				secretKeyEnum = .AWS_SECRET_ACCESS_KEY_DEV
+			case .staging:
+				accessKeyEnum = .AWS_ACCESS_KEY_ID_STAGE
+				secretKeyEnum = .AWS_SECRET_ACCESS_KEY_STAGE
+			case .production:
+				accessKeyEnum = .AWS_ACCESS_KEY_ID_PROD
+				secretKeyEnum = .AWS_SECRET_ACCESS_KEY_PROD
+			}
+
+			guard let accessKey = Credentials.decryptCached(accessKeyEnum),
+				  let secretKey = Credentials.decryptCached(secretKeyEnum),
+				  let region = Credentials.decryptCached(.AWS_REGION) else {
+				return nil
+			}
+
+			return AWSCredentials(
+				accessKey: accessKey,
+				secretKey: secretKey,
+				region: region
+			)
+		}
+	}
+
+	/// Shared instance for the current app environment (backward compatibility)
+	/// Note: Uses lazy initialization - credentials fetched on first use
+	/// New code should use forEnvironment() or forCurrentEnvironment() instead
+	static let shared = S3Service(environment: .development, lazy: true)
 }
 
 // MARK: - Error Types

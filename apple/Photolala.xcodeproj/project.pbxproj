@@ -17,11 +17,27 @@
 		CCF20D902E7F1605005B0410 /* GoogleSignInSwift in Frameworks */ = {isa = PBXBuildFile; productRef = CCF20D8F2E7F1605005B0410 /* GoogleSignInSwift */; };
 /* End PBXBuildFile section */
 
+/* Begin PBXContainerItemProxy section */
+		CCBE0E382E7F666D002A7563 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = CCF20B882E7F13DB005B0410 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = CCF20B8F2E7F13DB005B0410;
+			remoteInfo = Photolala;
+		};
+/* End PBXContainerItemProxy section */
+
 /* Begin PBXFileReference section */
+		CCBE0E342E7F666D002A7563 /* PhotolalaTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = PhotolalaTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		CCF20B902E7F13DB005B0410 /* Photolala.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Photolala.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
+		CCBE0E352E7F666D002A7563 /* PhotolalaTests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = PhotolalaTests;
+			sourceTree = "<group>";
+		};
 		CCF20B922E7F13DB005B0410 /* Photolala */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			path = Photolala;
@@ -30,6 +46,13 @@
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
+		CCBE0E312E7F666D002A7563 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		CCF20B8D2E7F13DB005B0410 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
@@ -59,6 +82,7 @@
 			isa = PBXGroup;
 			children = (
 				CCF20B922E7F13DB005B0410 /* Photolala */,
+				CCBE0E352E7F666D002A7563 /* PhotolalaTests */,
 				CC33D67C2E7F2909000F9BDF /* Frameworks */,
 				CCF20B912E7F13DB005B0410 /* Products */,
 			);
@@ -68,6 +92,7 @@
 			isa = PBXGroup;
 			children = (
 				CCF20B902E7F13DB005B0410 /* Photolala.app */,
+				CCBE0E342E7F666D002A7563 /* PhotolalaTests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -75,6 +100,29 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
+		CCBE0E332E7F666D002A7563 /* PhotolalaTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = CCBE0E3A2E7F666D002A7563 /* Build configuration list for PBXNativeTarget "PhotolalaTests" */;
+			buildPhases = (
+				CCBE0E302E7F666D002A7563 /* Sources */,
+				CCBE0E312E7F666D002A7563 /* Frameworks */,
+				CCBE0E322E7F666D002A7563 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				CCBE0E392E7F666D002A7563 /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				CCBE0E352E7F666D002A7563 /* PhotolalaTests */,
+			);
+			name = PhotolalaTests;
+			packageProductDependencies = (
+			);
+			productName = PhotolalaTests;
+			productReference = CCBE0E342E7F666D002A7563 /* PhotolalaTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
 		CCF20B8F2E7F13DB005B0410 /* Photolala */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = CCF20B9B2E7F13DD005B0410 /* Build configuration list for PBXNativeTarget "Photolala" */;
@@ -115,6 +163,10 @@
 				LastSwiftUpdateCheck = 2600;
 				LastUpgradeCheck = 2600;
 				TargetAttributes = {
+					CCBE0E332E7F666D002A7563 = {
+						CreatedOnToolsVersion = 26.0;
+						TestTargetID = CCF20B8F2E7F13DB005B0410;
+					};
 					CCF20B8F2E7F13DB005B0410 = {
 						CreatedOnToolsVersion = 26.0;
 					};
@@ -140,11 +192,19 @@
 			projectRoot = "";
 			targets = (
 				CCF20B8F2E7F13DB005B0410 /* Photolala */,
+				CCBE0E332E7F666D002A7563 /* PhotolalaTests */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
+		CCBE0E322E7F666D002A7563 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		CCF20B8E2E7F13DB005B0410 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -155,6 +215,13 @@
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
+		CCBE0E302E7F666D002A7563 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		CCF20B8C2E7F13DB005B0410 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -164,7 +231,67 @@
 		};
 /* End PBXSourcesBuildPhase section */
 
+/* Begin PBXTargetDependency section */
+		CCBE0E392E7F666D002A7563 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = CCF20B8F2E7F13DB005B0410 /* Photolala */;
+			targetProxy = CCBE0E382E7F666D002A7563 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
 /* Begin XCBuildConfiguration section */
+		CCBE0E3B2E7F666D002A7563 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 2P97EM4L4N;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
+				MACOSX_DEPLOYMENT_TARGET = 15.6;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.electricwoods.PhotolalaTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = auto;
+				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx xros xrsimulator";
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2,7";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Photolala.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Photolala";
+				XROS_DEPLOYMENT_TARGET = 26.0;
+			};
+			name = Debug;
+		};
+		CCBE0E3C2E7F666D002A7563 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 2P97EM4L4N;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
+				MACOSX_DEPLOYMENT_TARGET = 15.6;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.electricwoods.PhotolalaTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = auto;
+				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx xros xrsimulator";
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2,7";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Photolala.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Photolala";
+				XROS_DEPLOYMENT_TARGET = 26.0;
+			};
+			name = Release;
+		};
 		CCF20B992E7F13DD005B0410 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -416,6 +543,15 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
+		CCBE0E3A2E7F666D002A7563 /* Build configuration list for PBXNativeTarget "PhotolalaTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				CCBE0E3B2E7F666D002A7563 /* Debug */,
+				CCBE0E3C2E7F666D002A7563 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
 		CCF20B8B2E7F13DB005B0410 /* Build configuration list for PBXProject "Photolala" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
