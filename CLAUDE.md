@@ -48,7 +48,7 @@ extension SomeView {
 }
 ```
 
-### K-Architecture Directory Catalog System
+### Photolala Directory Catalog System
 The app uses a sophisticated catalog system for managing 100K+ images:
 - **Fast Photo Key**: `{photo-head-md5}:{file-size}` for quick identity
 - **Immutable Catalogs**: SQLite snapshots stored as `.photolala.{catalog-md5}.sqlite`
