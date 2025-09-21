@@ -51,7 +51,7 @@ d4e5f67890123456,4194304,7d6c5b4a32109f8e,1699999996,RAW-CR2
 | --- | --- | --- |
 | Identity | `fast-photo-key` | `"{photo-head-md5}:{file-size}"`. Combines the MD5 of the first 4 KB with byte count. |
 | Identity | `photo-md5` | Full file MD5 used for deduplication, thumbnail lookup, and cloud sync. |
-| Cache (local) | Thumbnails | `{cache-root}/md5/thumbnails/{prefix-2-chars}/{photo-md5}.jpg` (prefix = first 2 hex chars). |
+| Cache (local) | Thumbnails | `{cache-root}/md5/thumbnails/{prefix-2-chars}/{photo-md5}.jpg` (prefix = first 2 hex chars). PTM-256 format (see [PTM-256 Spec](./ptm-256-thumbnail-spec.md)). |
 | Cache (local) | Metadata | `{cache-root}/md5/metadata/{prefix-2-chars}/{photo-md5}.json`. |
 | Cache (Apple Photos) | Thumbnails | `{cache-root}/apple/thumbnails/{apple-photo-id}.jpg`. |
 | Cache (Apple Photos) | Metadata | `{cache-root}/apple/metadata/{apple-photo-id}.json`. |
@@ -96,7 +96,7 @@ d4e5f67890123456,4194304,7d6c5b4a32109f8e,1699999996,RAW-CR2
 
 3. **Caching**
    - Maintain minimal CSV catalog with identity, date, and format information.
-   - Store thumbnails in `{cache-root}/md5/thumbnails/{prefix-2}/{photo-md5}.jpg`.
+   - Store thumbnails in `{cache-root}/md5/thumbnails/{prefix-2}/{photo-md5}.jpg` (PTM-256 format: 256×256 JPEG @ 85 quality).
    - Store metadata in `{cache-root}/md5/metadata/{prefix-2}/{photo-md5}.json`.
    - Keep detailed metadata separate from catalog for simplicity.
    - Use atomic operations to prevent partial updates.
