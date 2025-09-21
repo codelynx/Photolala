@@ -223,12 +223,12 @@ actor S3BackupService {
 
 ## Phase 3: S3 Download Components
 
-### 5. Create S3CloudBrowser
-**File**: `apple/Photolala/Services/S3CloudBrowser.swift`
+### 5. Create S3CloudBrowsingService
+**File**: `apple/Photolala/Services/S3CloudBrowsingService.swift`
 
 Cloud catalog browsing and progressive loading:
 ```swift
-actor S3CloudBrowser {
+actor S3CloudBrowsingService {
     private let s3Service: S3Service
     private let cacheManager: CacheManager
 
@@ -349,7 +349,7 @@ Cloud photo browsing:
 - Progress tracking
 
 ### Day 4: Cloud Browser
-- Implement S3CloudBrowser
+- Implement S3CloudBrowsingService
 - Use existing CatalogDatabase CSV support
 - Progressive thumbnail loading
 - Local cache integration

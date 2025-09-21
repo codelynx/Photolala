@@ -1,5 +1,5 @@
 //
-//  S3CloudBrowser.swift
+//  S3CloudBrowsingService.swift
 //  Photolala
 //
 //  Cloud catalog browsing with progressive thumbnail loading
@@ -10,8 +10,8 @@ import OSLog
 import CryptoKit
 
 /// Service for browsing cloud-backed photo catalogs
-public actor S3CloudBrowser {
-	private let logger = Logger(subsystem: "com.photolala", category: "S3CloudBrowser")
+public actor S3CloudBrowsingService {
+	private let logger = Logger(subsystem: "com.photolala", category: "S3CloudBrowsingService")
 	private let s3Service: S3Service
 	private let cacheManager: CacheManager
 
