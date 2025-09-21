@@ -10,7 +10,7 @@ import OSLog
 import CryptoKit
 
 /// Service for browsing cloud-backed photo catalogs
-public actor S3CloudBrowsingService {
+actor S3CloudBrowsingService {
 	private let logger = Logger(subsystem: "com.photolala", category: "S3CloudBrowsingService")
 	private let s3Service: S3Service
 	private let cacheManager: CacheManager
@@ -25,14 +25,15 @@ public actor S3CloudBrowsingService {
 
 	// MARK: - Initialization
 
-	public init(s3Service: S3Service) {
+	init(s3Service: S3Service) {
 		self.s3Service = s3Service
+		self.cacheManager = CacheManager.shared
 	}
 
 	// MARK: - Public API
 
 	/// Load cloud catalog from S3
-	public func loadCloudCatalog(userID: String) async throws -> CatalogDatabase {
+	func loadCloudCatalog(userID: String) async throws -> CatalogDatabase {
 		logger.info("Loading cloud catalog for user: \(userID)")
 
 		// 1. Get catalog pointer
@@ -67,12 +68,12 @@ public actor S3CloudBrowsingService {
 	}
 
 	/// Get cached cloud catalog
-	public func getCachedCatalog() -> CatalogDatabase? {
+	func getCachedCatalog() -> CatalogDatabase? {
 		cloudDatabase
 	}
 
 	/// Load thumbnail with progressive loading
-	public func loadThumbnail(photoMD5: String, userID: String) async -> Data? {
+	func loadThumbnail(photoMD5: String, userID: String) async -> Data? {
 		// 1. Check memory cache
 		if let cached = thumbnailCache[photoMD5] {
 			logger.debug("Thumbnail found in memory cache: \(photoMD5)")
@@ -104,7 +105,11 @@ public actor S3CloudBrowsingService {
 			)
 
 			// 4. Save to local cache
-			try await cacheManager.storeData(data, at: localPath)
+			try? FileManager.default.createDirectory(
+				at: localPath.deletingLastPathComponent(),
+				withIntermediateDirectories: true
+			)
+			try? data.write(to: localPath)
 			updateMemoryCache(photoMD5: photoMD5, data: data)
 
 			logger.info("Downloaded thumbnail from S3: \(photoMD5)")
@@ -117,7 +122,7 @@ public actor S3CloudBrowsingService {
 	}
 
 	/// Download full photo on demand
-	public func downloadPhoto(photoMD5: String, userID: String) async throws -> Data {
+	func downloadPhoto(photoMD5: String, userID: String) async throws -> Data {
 		logger.info("Downloading full photo: \(photoMD5)")
 
 		// Check if we have it in local cache
@@ -150,7 +155,7 @@ public actor S3CloudBrowsingService {
 	}
 
 	/// Prefetch thumbnails for visible items
-	public func prefetchThumbnails(photoMD5s: [String], userID: String) async {
+	func prefetchThumbnails(photoMD5s: [String], userID: String) async {
 		await withTaskGroup(of: Void.self) { group in
 			for md5 in photoMD5s.prefix(10) {  // Limit concurrent downloads
 				group.addTask { [weak self] in
@@ -161,7 +166,7 @@ public actor S3CloudBrowsingService {
 	}
 
 	/// Clear cached data
-	public func clearCache() {
+	func clearCache() {
 		thumbnailCache.removeAll()
 		cloudDatabase = nil
 		currentUserID = nil
@@ -183,18 +188,18 @@ public actor S3CloudBrowsingService {
 	}
 
 	/// Get catalog entries for UI display
-	public func getCatalogEntries() async -> [CatalogEntry] {
+	func getCatalogEntries() async -> [CatalogEntry] {
 		guard let database = cloudDatabase else { return [] }
 		return await database.getAllEntries()
 	}
 
 	/// Check if catalog is loaded
-	public func isCatalogLoaded() -> Bool {
+	func isCatalogLoaded() -> Bool {
 		cloudDatabase != nil
 	}
 
 	/// Get current user ID
-	public func getCurrentUserID() -> String? {
+	func getCurrentUserID() -> String? {
 		currentUserID
 	}
 }
@@ -202,33 +207,33 @@ public actor S3CloudBrowsingService {
 // MARK: - Cloud Photo Item
 
 /// Photo item from cloud catalog for display
-public struct CloudPhotoItem: Identifiable, Sendable {
-	public let id: String  // MD5
-	public let entry: CatalogEntry
-	public let userID: String
+@preconcurrency struct CloudPhotoItem: Identifiable, Sendable {
+	let id: String  // MD5
+	let entry: CatalogEntry
+	let userID: String
 
-	public var displayName: String {
+	nonisolated var displayName: String {
 		"Photo_\(entry.photoHeadMD5.prefix(8))"
 	}
 
-	public var photoDate: Date {
+	nonisolated var photoDate: Date {
 		entry.photoDate
 	}
 
-	public var format: ImageFormat {
+	nonisolated var format: ImageFormat {
 		entry.format
 	}
 
-	public var fileSize: Int64 {
+	nonisolated var fileSize: Int64 {
 		entry.fileSize
 	}
 
-	public var hasThumbnail: Bool {
+	nonisolated var hasThumbnail: Bool {
 		// Cloud photos should always have thumbnails
 		true
 	}
 
-	public init(entry: CatalogEntry, userID: String) {
+	nonisolated init(entry: CatalogEntry, userID: String) {
 		self.id = entry.photoMD5 ?? entry.fastPhotoKey
 		self.entry = entry
 		self.userID = userID

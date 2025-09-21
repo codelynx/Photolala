@@ -13,13 +13,13 @@ import CryptoKit
 /// Protocol for any photo item that can be uploaded to S3
 protocol PhotoItem: Sendable {
 	/// Unique identifier for the photo item
-	var id: String { get }
+	nonisolated var id: String { get }
 
 	/// Display name for UI
-	var displayName: String { get }
+	nonisolated var displayName: String { get }
 
 	/// Image format if known
-	var format: ImageFormat? { get }
+	nonisolated var format: ImageFormat? { get }
 
 	/// Load full photo data
 	func loadFullData() async throws -> Data
@@ -37,17 +37,16 @@ protocol PhotoItem: Sendable {
 struct LocalPhotoItem: PhotoItem {
 	let photoEntry: PhotoEntry
 	let url: URL
+	let id: String
+	let displayName: String
+	let format: ImageFormat?
 
-	var id: String {
-		photoEntry.id.fastKey.stringValue
-	}
-
-	var displayName: String {
-		photoEntry.fileName
-	}
-
-	var format: ImageFormat? {
-		photoEntry.id.fastKey.detectedFormat
+	init(photoEntry: PhotoEntry, url: URL) {
+		self.photoEntry = photoEntry
+		self.url = url
+		self.id = photoEntry.id.fastKey.stringValue
+		self.displayName = photoEntry.fileName
+		self.format = photoEntry.id.fastKey.detectedFormat
 	}
 
 	func loadFullData() async throws -> Data {
@@ -89,16 +88,16 @@ struct ApplePhotoItem: PhotoItem {
 	private var cachedMD5: String?
 	private var cachedFormat: ImageFormat?
 
-	var id: String {
+	nonisolated var id: String {
 		assetID
 	}
 
-	var displayName: String {
+	nonisolated var displayName: String {
 		// Will be implemented with PHAsset
 		"Photo \(assetID.prefix(8))"
 	}
 
-	var format: ImageFormat? {
+	nonisolated var format: ImageFormat? {
 		cachedFormat
 	}
 
@@ -132,7 +131,7 @@ enum UploadResult: Sendable {
 	case failed(Error)
 	case skipped  // Already exists in S3
 
-	var isSuccess: Bool {
+	nonisolated var isSuccess: Bool {
 		switch self {
 		case .completed, .skipped:
 			return true

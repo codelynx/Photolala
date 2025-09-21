@@ -13,6 +13,7 @@
 		CC33D6842E7F2935000F9BDF /* AWSAthena in Frameworks */ = {isa = PBXBuildFile; productRef = CC33D6832E7F2935000F9BDF /* AWSAthena */; };
 		CC33D6862E7F293F000F9BDF /* AWSSTS in Frameworks */ = {isa = PBXBuildFile; productRef = CC33D6852E7F293F000F9BDF /* AWSSTS */; };
 		CC5B3BFD2E7F16A8009202BE /* XPlatform in Frameworks */ = {isa = PBXBuildFile; productRef = CC5B3BFC2E7F16A8009202BE /* XPlatform */; };
+		CC8687772E809DFA00BFC007 /* AppIcon.icon in Resources */ = {isa = PBXBuildFile; fileRef = CC8687762E809DFA00BFC007 /* AppIcon.icon */; };
 		CCF20D8E2E7F1605005B0410 /* GoogleSignIn in Frameworks */ = {isa = PBXBuildFile; productRef = CCF20D8D2E7F1605005B0410 /* GoogleSignIn */; };
 		CCF20D902E7F1605005B0410 /* GoogleSignInSwift in Frameworks */ = {isa = PBXBuildFile; productRef = CCF20D8F2E7F1605005B0410 /* GoogleSignInSwift */; };
 /* End PBXBuildFile section */
@@ -28,6 +29,7 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		CC8687762E809DFA00BFC007 /* AppIcon.icon */ = {isa = PBXFileReference; lastKnownFileType = folder.iconcomposer.icon; path = AppIcon.icon; sourceTree = "<group>"; };
 		CCBE0E342E7F666D002A7563 /* PhotolalaTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = PhotolalaTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		CCF20B902E7F13DB005B0410 /* Photolala.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Photolala.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
@@ -85,6 +87,7 @@
 				CCBE0E352E7F666D002A7563 /* PhotolalaTests */,
 				CC33D67C2E7F2909000F9BDF /* Frameworks */,
 				CCF20B912E7F13DB005B0410 /* Products */,
+				CC8687762E809DFA00BFC007 /* AppIcon.icon */,
 			);
 			sourceTree = "<group>";
 		};
@@ -209,6 +212,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				CC8687772E809DFA00BFC007 /* AppIcon.icon in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -413,6 +417,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = NO;
 				AUTOMATION_APPLE_EVENTS = NO;
 				CODE_SIGN_ENTITLEMENTS = Photolala/Photolala.entitlements;
 				CODE_SIGN_STYLE = Automatic;
@@ -479,6 +484,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = NO;
 				AUTOMATION_APPLE_EVENTS = NO;
 				CODE_SIGN_ENTITLEMENTS = Photolala/Photolala.entitlements;
 				CODE_SIGN_STYLE = Automatic;

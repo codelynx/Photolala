@@ -13,7 +13,7 @@ import OSLog
 import CryptoKit
 
 /// Service for backing up photos to S3
-public actor S3BackupService {
+actor S3BackupService {
 	private let logger = Logger(subsystem: "com.photolala", category: "S3BackupService")
 	private let s3Service: S3Service
 	private let catalogDatabase: CatalogDatabase?
@@ -28,7 +28,7 @@ public actor S3BackupService {
 
 	// MARK: - Initialization
 
-	public init(s3Service: S3Service, catalogDatabase: CatalogDatabase? = nil) {
+	init(s3Service: S3Service, catalogDatabase: CatalogDatabase? = nil) {
 		self.s3Service = s3Service
 		self.catalogDatabase = catalogDatabase
 	}
@@ -36,7 +36,7 @@ public actor S3BackupService {
 	// MARK: - Public API
 
 	/// Backup photos to S3 sequentially
-	public func backupPhotos(_ items: [PhotoItem], userID: String) async -> [String: UploadResult] {
+	func backupPhotos(_ items: [PhotoItem], userID: String) async -> [String: UploadResult] {
 		guard !isUploading else {
 			logger.warning("Backup already in progress")
 			return [:]
@@ -50,15 +50,21 @@ public actor S3BackupService {
 		let startTime = Date()
 
 		for item in items {
+			// Capture properties outside the do block
+			let itemID = item.id
+			let itemDisplayName = item.displayName
+			let itemFormat = item.format ?? .unknown
+
 			do {
+
 				// 1. Compute MD5 (may require loading full data for Apple Photos)
 				let md5 = try await item.computeMD5()
-				logger.debug("Computed MD5 for \(item.displayName): \(md5)")
+				logger.debug("Computed MD5 for \(itemDisplayName): \(md5)")
 
 				// 2. Check if exists (deduplication)
 				let exists = await s3Service.checkPhotoExists(md5: md5, userID: userID)
 				if exists {
-					uploadResults[item.id] = .skipped
+					uploadResults[itemID] = .skipped
 					logger.info("Photo already exists in S3, skipping: \(md5)")
 					continue
 				}
@@ -72,11 +78,10 @@ public actor S3BackupService {
 				logger.debug("Generated thumbnail: \(thumbnailData.count) bytes")
 
 				// 5. Upload photo with format preservation
-				let format = item.format ?? .unknown
 				try await s3Service.uploadPhoto(
 					data: photoData,
 					md5: md5,
-					format: format,
+					format: itemFormat,
 					userID: userID
 				)
 
@@ -87,12 +92,12 @@ public actor S3BackupService {
 					userID: userID
 				)
 
-				uploadResults[item.id] = .completed
-				logger.info("Successfully uploaded: \(item.displayName)")
+				uploadResults[itemID] = .completed
+				logger.info("Successfully uploaded: \(itemDisplayName)")
 
 			} catch {
-				uploadResults[item.id] = .failed(error)
-				logger.error("Failed to upload \(item.displayName): \(error)")
+				uploadResults[itemID] = .failed(error)
+				logger.error("Failed to upload \(itemDisplayName): \(error)")
 			}
 		}
 
@@ -114,12 +119,12 @@ public actor S3BackupService {
 	}
 
 	/// Get current upload status
-	public func getUploadResults() -> [String: UploadResult] {
+	func getUploadResults() -> [String: UploadResult] {
 		uploadResults
 	}
 
 	/// Check if upload is in progress
-	public func isBackupInProgress() -> Bool {
+	func isBackupInProgress() -> Bool {
 		isUploading
 	}
 
@@ -275,19 +280,19 @@ public actor S3BackupService {
 
 // MARK: - Progress Reporting
 
-public extension S3BackupService {
+extension S3BackupService {
 	struct BackupProgress {
-		public let totalItems: Int
-		public let completedItems: Int
-		public let skippedItems: Int
-		public let failedItems: Int
+		let totalItems: Int
+		let completedItems: Int
+		let skippedItems: Int
+		let failedItems: Int
 
-		public var percentComplete: Double {
+		var percentComplete: Double {
 			guard totalItems > 0 else { return 0 }
 			return Double(completedItems + skippedItems + failedItems) / Double(totalItems) * 100
 		}
 
-		public var isComplete: Bool {
+		var isComplete: Bool {
 			completedItems + skippedItems + failedItems >= totalItems
 		}
 	}

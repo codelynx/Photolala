@@ -15,7 +15,7 @@ import Foundation
 import OSLog
 
 /// S3 service with explicit environment configuration
-actor S3Service {
+public actor S3Service {
 	private let logger = Logger(subsystem: "com.photolala", category: "S3Service")
 	private nonisolated(unsafe) var client: S3Client?
 	private let environment: Environment
@@ -214,7 +214,7 @@ actor S3Service {
 		// Check for .dat file (unified extension for deduplication)
 		let key = "photos/\(userID)/\(md5).dat"
 		do {
-			_ = try await client.headObject(input: HeadObjectInput(
+			_ = try await client?.headObject(input: HeadObjectInput(
 				bucket: bucketName,
 				key: key
 			))
@@ -236,10 +236,12 @@ actor S3Service {
 			bucket: bucketName,
 			contentType: format.mimeType,
 			key: key,
-			metadata: ["original-format": format.rawValue],
-			tagging: "Format=\(format.rawValue)"
+			metadata: ["original-format": format.rawValue]
+			// Note: Tagging removed as it requires s3:PutObjectTagging permission
+			// Format is preserved in metadata instead
 		)
 
+		guard let client = client else { throw S3Error.clientNotInitialized }
 		_ = try await client.putObject(input: input)
 		logger.info("Uploaded photo: \(key) with Format=\(format.rawValue)")
 	}
@@ -257,6 +259,7 @@ actor S3Service {
 			key: key
 		)
 
+		guard let client = client else { throw S3Error.clientNotInitialized }
 		_ = try await client.putObject(input: input)
 		logger.info("Uploaded thumbnail: \(key)")
 	}
@@ -274,6 +277,7 @@ actor S3Service {
 			key: key
 		)
 
+		guard let client = client else { throw S3Error.clientNotInitialized }
 		_ = try await client.putObject(input: input)
 		logger.info("Uploaded catalog: \(key)")
 	}
@@ -292,6 +296,7 @@ actor S3Service {
 			key: key
 		)
 
+		guard let client = client else { throw S3Error.clientNotInitialized }
 		_ = try await client.putObject(input: input)
 		logger.info("Updated catalog pointer to: \(catalogMD5)")
 	}
@@ -309,6 +314,7 @@ actor S3Service {
 			key: key
 		)
 
+		guard let client = client else { throw S3Error.clientNotInitialized }
 		let response = try await client.getObject(input: input)
 		guard let data = try await response.body?.readData() else {
 			throw S3Error.downloadFailed
@@ -333,6 +339,7 @@ actor S3Service {
 			key: key
 		)
 
+		guard let client = client else { throw S3Error.clientNotInitialized }
 		let response = try await client.getObject(input: input)
 		guard let data = try await response.body?.readData() else {
 			throw S3Error.downloadFailed
@@ -352,6 +359,7 @@ actor S3Service {
 			key: key
 		)
 
+		guard let client = client else { throw S3Error.clientNotInitialized }
 		let response = try await client.getObject(input: input)
 		guard let data = try await response.body?.readData() else {
 			throw S3Error.downloadFailed
@@ -372,6 +380,7 @@ actor S3Service {
 			key: key
 		)
 
+		guard let client = client else { throw S3Error.clientNotInitialized }
 		let response = try await client.getObject(input: input)
 		guard let data = try await response.body?.readData() else {
 			throw S3Error.downloadFailed

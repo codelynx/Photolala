@@ -65,7 +65,7 @@ public enum ImageFormat: String, CaseIterable, Sendable, Codable {
 	}
 
 	/// MIME type for web serving
-	public var mimeType: String {
+	public nonisolated var mimeType: String {
 		switch self {
 		case .jpeg: return "image/jpeg"
 		case .png: return "image/png"

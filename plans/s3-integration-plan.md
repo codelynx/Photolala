@@ -6,9 +6,12 @@ This plan outlines the implementation of S3 integration for Photolala, focusing 
 ## Core Principles
 - **Sequential uploads** (one-by-one) for simplicity
 - **MD5 as identity** - no date conflicts, true deduplication
+- **Universal .dat extension** - all photos stored as .dat for perfect deduplication
+- **Format in metadata** - original format preserved in S3 object metadata
 - **Local and S3 catalogs are separate** - no auto-sync
 - **User-initiated backup** - explicit action required
 - **Cache-first downloads** - check local before S3
+- **CSV-only catalogs** - no SQLite dependency for cloud catalogs
 
 ## Phase 1: Foundation Components
 
@@ -74,10 +77,10 @@ struct LocalPhotoItem: PhotoItem {
 }
 
 // Implementation Notes:
-// 1. ThumbnailCache.getThumbnail now returns URL to cached JPEG file
-// 2. loadThumbnail() reads Data from the cached file URL
+// 1. ThumbnailCache.getThumbnail returns URL to cached JPEG file
+// 2. loadThumbnail() reads Data from the cached file URL for S3 upload
 // 3. This avoids keeping large image data in memory
-}
+// 4. ThumbnailCache should provide helper method getThumbnailData() that returns Data directly
 
 // Apple Photos implementation (future)
 struct ApplePhotoItem: PhotoItem {
@@ -374,12 +377,16 @@ Cloud photo browsing:
 - Skip upload if exists (saves bandwidth/time)
 - Report as "skipped" in progress
 
-### Format Preservation
-- Upload all photos with `.dat` extension for perfect deduplication
+### Format Preservation Strategy
+- **Decision**: Use `.dat` extension universally (not original extensions)
+- **Rationale**: Perfect deduplication - same content always has same S3 key
 - S3 Key format: `photos/{user-uuid}/{photo-md5}.dat`
-- Add S3 object tag `Format=JPEG` (or PNG, HEIF, etc.) for format identification
-- Same MD5 = same S3 key regardless of source format
-- Lambda/CloudFront can read Format tag to set correct Content-Type header
+- Store format in S3 object metadata: `x-amz-meta-original-format=JPEG`
+- Same MD5 = same S3 key regardless of source format or extension variations
+- **MIME Resolution**: Lambda@Edge or CloudFront reads metadata to:
+  - Set correct Content-Type header when serving
+  - Optionally rewrite response filename with correct extension
+- **Note**: This avoids duplicates from extension variations (jpg vs jpeg)
 
 ### Catalog Management
 - Local catalog: represents local directory state
