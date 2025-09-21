@@ -73,4 +73,4 @@ playground.xcworkspace
 # Cache directories
 ~/Library/Caches/
 tmp/
-temp/
+temp/.claude/
