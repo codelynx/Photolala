@@ -68,6 +68,52 @@ Photolala2 implements a defense-in-depth security strategy with embedded encrypt
 - **Mitigation**: Quick app store review process
 - **Plan**: Emergency update procedures
 
+## S3 Access Control Strategy
+
+### Lambda-Based Identity Management with STS
+
+**Decision: Hybrid Lambda + STS Architecture**
+
+Photolala uses Lambda for identity management while granting users direct S3 access (via STS) to their own data. The app itself has zero S3 permissions in its embedded credentials.
+
+**Architecture:**
+1. **App Embedded Credentials**: Can only invoke Lambda functions
+2. **Lambda Functions**: Manage identity mappings and issue STS tokens
+3. **User STS Tokens**: Temporary credentials scoped to user's UUID
+
+**Security Benefits:**
+- **No S3 Permissions in App Binary**: Embedded credentials can only invoke Lambda
+- **Server-Side Auth**: Identity verification happens in Lambda, not client
+- **User Data Isolation**: STS tokens grant full access but only to user's namespace
+- **Audit Trail**: CloudTrail logs both Lambda invocations and S3 operations
+- **Defense in Depth**: Even if STS token leaked, only one user's data exposed
+
+**Access Control Layers:**
+```
+App Credentials:
+├── Can invoke: Lambda functions only
+└── Cannot access: Any S3 buckets
+
+Lambda Execution Role:
+├── Can access: identities/* (for auth)
+├── Can access: users/*/profile.json
+├── Can assume: User STS role
+└── Cannot access: photos/*, thumbnails/*, catalogs/*
+
+User STS Credentials:
+├── Can access: photos/{uuid}/*
+├── Can access: thumbnails/{uuid}/*
+├── Can access: catalogs/{uuid}/*
+├── Can access: users/{uuid}/*
+└── Cannot access: Other users' data or identities/*
+```
+
+**Trade-offs Accepted:**
+- Lambda cold start latency (mitigated by provisioned concurrency)
+- Additional AWS service dependency
+- More complex deployment (Lambda functions + S3)
+- These costs provide maximum security for users' personal photos
+
 ## Security Boundaries
 
 ### Trust Boundaries
