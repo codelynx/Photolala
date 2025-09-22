@@ -34,6 +34,16 @@
 		CCF20B902E7F13DB005B0410 /* Photolala.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Photolala.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		CCD1C6172E81BF2B00B6CE43 /* Exceptions for "Photolala" folder in "Photolala" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = CCF20B8F2E7F13DB005B0410 /* Photolala */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
+
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		CCBE0E352E7F666D002A7563 /* PhotolalaTests */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
@@ -42,6 +52,9 @@
 		};
 		CCF20B922E7F13DB005B0410 /* Photolala */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				CCD1C6172E81BF2B00B6CE43 /* Exceptions for "Photolala" folder in "Photolala" target */,
+			);
 			path = Photolala;
 			sourceTree = "<group>";
 		};
@@ -441,16 +454,9 @@
 				ENABLE_RESOURCE_ACCESS_PRINTING = NO;
 				ENABLE_RESOURCE_ACCESS_USB = NO;
 				ENABLE_USER_SELECTED_FILES = readonly;
-				GENERATE_INFOPLIST_FILE = NO;
+				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = Photolala/Info.plist;
-				INFOPLIST_KEY_CFBundleURLTypes = (
-					{
-						CFBundleURLName = "com.electricwoods.photolala.oauth";
-						CFBundleURLSchemes = (
-							"com.googleusercontent.apps.75309194504-g1a4hr3pc68301vuh21tibauh9ar1nkv",
-						);
-					},
-				);
+				INFOPLIST_KEY_CFBundleURLTypes = "{\n    CFBundleURLName = \"com.electricwoods.photolala.oauth\";\n    CFBundleURLSchemes =     (\n        \"com.googleusercontent.apps.75309194504-g1a4hr3pc68301vuh21tibauh9ar1nkv\"\n    );\n}";
 				INFOPLIST_KEY_NSPhotoLibraryAddUsageDescription = "Photolala needs permission to save photos to your photo library.";
 				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "Photolala needs access to your photo library to browse and manage your photos.";
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
@@ -518,16 +524,9 @@
 				ENABLE_RESOURCE_ACCESS_PRINTING = NO;
 				ENABLE_RESOURCE_ACCESS_USB = NO;
 				ENABLE_USER_SELECTED_FILES = readonly;
-				GENERATE_INFOPLIST_FILE = NO;
+				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = Photolala/Info.plist;
-				INFOPLIST_KEY_CFBundleURLTypes = (
-					{
-						CFBundleURLName = "com.electricwoods.photolala.oauth";
-						CFBundleURLSchemes = (
-							"com.googleusercontent.apps.75309194504-g1a4hr3pc68301vuh21tibauh9ar1nkv",
-						);
-					},
-				);
+				INFOPLIST_KEY_CFBundleURLTypes = "{\n    CFBundleURLName = \"com.electricwoods.photolala.oauth\";\n    CFBundleURLSchemes =     (\n        \"com.googleusercontent.apps.75309194504-g1a4hr3pc68301vuh21tibauh9ar1nkv\"\n    );\n}";
 				INFOPLIST_KEY_NSPhotoLibraryAddUsageDescription = "Photolala needs permission to save photos to your photo library.";
 				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "Photolala needs access to your photo library to browse and manage your photos.";
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;

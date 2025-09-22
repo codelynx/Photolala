@@ -18,9 +18,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 		// Handle URLs opened via the app
 		for url in urls {
 			if url.scheme == "com.googleusercontent.apps.75309194504-g1a4hr3pc68301vuh21tibauh9ar1nkv" {
-				Task {
-					await GoogleSignInCoordinator.handleOAuthCallback(url)
-				}
+				// Handle Google OAuth callback
+				GoogleSignInCoordinator.handleCallback(url)
 			}
 		}
 	}
@@ -35,9 +34,8 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
 	func application(_ app: UIApplication, open url: URL, options: [UIApplication.OpenURLOptionsKey : Any] = [:]) -> Bool {
 		// Handle URLs opened via the app
 		if url.scheme == "com.googleusercontent.apps.75309194504-g1a4hr3pc68301vuh21tibauh9ar1nkv" {
-			Task {
-				await GoogleSignInCoordinator.handleOAuthCallback(url)
-			}
+			// Handle Google OAuth callback
+			GoogleSignInCoordinator.handleCallback(url)
 			return true
 		}
 		return false

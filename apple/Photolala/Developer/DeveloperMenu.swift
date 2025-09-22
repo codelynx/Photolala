@@ -9,19 +9,12 @@ import SwiftUI
 struct DeveloperMenuCommands: Commands {
 	var body: some Commands {
 		CommandMenu("Developer") {
-			Button("Test Sign-In with Apple") {
-				Task {
-					await TestSignInHandler.testAppleSignIn()
+			Button("Test Sign-In") {
+				Task { @MainActor in
+					TestSignInWindowController.shared.show()
 				}
 			}
 			.keyboardShortcut("T", modifiers: [.command, .shift])
-
-			Button("Test Sign-In with Google") {
-				Task {
-					await TestSignInHandler.testGoogleSignIn()
-				}
-			}
-			.keyboardShortcut("G", modifiers: [.command, .shift])
 		}
 	}
 }

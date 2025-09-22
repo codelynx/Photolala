@@ -73,7 +73,7 @@ final class AccountManager: ObservableObject {
 		let jsonData = try JSONSerialization.data(withJSONObject: payload)
 
 		print("[AccountManager] Sending to Lambda for validation...")
-		let result = try await callAuthLambdaWithData("photolala-auth-signin", payloadData: jsonData)
+		let result = try await callAuthLambdaWithData("photolala-web-auth", payloadData: jsonData)
 
 		print("[AccountManager] ✓ Sign-in successful, user ID: \(result.user.id)")
 		self.currentUser = result.user
@@ -196,6 +196,11 @@ final class AccountManager: ObservableObject {
 
 		// Decode in MainActor context to avoid isolation issues
 		return try await MainActor.run {
+			// Debug: Log the raw response
+			if let responseString = String(data: responseData, encoding: .utf8) {
+				print("[AccountManager] Lambda response: \(responseString)")
+			}
+
 			let decoder = JSONDecoder()
 			decoder.dateDecodingStrategy = .iso8601
 			return try decoder.decode(AuthResult.self, from: responseData)
@@ -363,6 +368,8 @@ final class LambdaClientManager {
 			environment = .development
 		}
 
+		print("[LambdaClient] Creating client for environment: \(environment)")
+
 		// Get credentials for this environment
 		let accessKey: CredentialKey
 		let secretKey: CredentialKey
@@ -391,6 +398,9 @@ final class LambdaClientManager {
 		}.value else {
 			throw AccountError.lambdaError("AWS credentials not configured")
 		}
+
+		// Debug: Log which credentials are being used (partial for security)
+		print("[LambdaClient] Using AWS credentials: \(String(accessKeyValue.prefix(15)))...")
 
 		let credentialIdentity = AWSCredentialIdentity(
 			accessKey: accessKeyValue,

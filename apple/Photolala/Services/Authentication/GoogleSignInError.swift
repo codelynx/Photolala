@@ -15,6 +15,11 @@ enum GoogleSignInError: LocalizedError {
 	case noAuthorizationCode
 	case tokenExchangeFailed(String)
 	case userCancelled
+	case signInAlreadyInProgress
+	case invalidConfiguration
+	case authorizationFailed(String)
+	case invalidState
+	case invalidTokenResponse
 
 	// JWT verification errors
 	case invalidIDToken          // Structure invalid
@@ -43,6 +48,16 @@ enum GoogleSignInError: LocalizedError {
 			return "Failed to exchange authorization code: \(error)"
 		case .userCancelled:
 			return "Sign-in was cancelled"
+		case .signInAlreadyInProgress:
+			return "Sign-in is already in progress"
+		case .invalidConfiguration:
+			return "Invalid OAuth configuration"
+		case .authorizationFailed(let error):
+			return "Authorization failed: \(error)"
+		case .invalidState:
+			return "Invalid OAuth state"
+		case .invalidTokenResponse:
+			return "Invalid token response from Google"
 		case .invalidIDToken:
 			return "Invalid ID token structure"
 		case .missingKeyID:

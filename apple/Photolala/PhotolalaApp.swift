@@ -31,9 +31,8 @@ struct PhotolalaApp: App {
 					// Handle OAuth callbacks
 					if url.scheme == "com.googleusercontent.apps.75309194504-g1a4hr3pc68301vuh21tibauh9ar1nkv" {
 						print("[App] Google OAuth callback detected, handling...")
-						Task {
-							await GoogleSignInCoordinator.handleOAuthCallback(url)
-						}
+						// Handle Google OAuth callback
+						GoogleSignInCoordinator.handleCallback(url)
 					} else {
 						print("[App] Unknown URL scheme: \(url.scheme ?? "nil")")
 					}
