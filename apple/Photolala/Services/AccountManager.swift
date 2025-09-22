@@ -14,6 +14,7 @@ final class AccountManager: ObservableObject {
 	@Published private(set) var isSignedIn: Bool = false
 	private var stsCredentials: STSCredentials?
 	private var currentNonce: String?
+	private var googleSignInCoordinator: GoogleSignInCoordinator?
 
 
 	private init() {
@@ -40,6 +41,47 @@ final class AccountManager: ObservableObject {
 		self.stsCredentials = result
 		await saveSession()
 		return result
+	}
+
+	func signInWithGoogle() async throws -> PhotolalaUser {
+		print("[AccountManager] Starting Google Sign-In")
+
+		// Create and hold a strong reference to the coordinator
+		let coordinator = GoogleSignInCoordinator()
+		self.googleSignInCoordinator = coordinator
+		defer {
+			// Release the coordinator when the function completes
+			self.googleSignInCoordinator = nil
+		}
+
+		// Use the GoogleSignInCoordinator to perform OAuth flow
+		let credential = try await coordinator.performSignIn()
+
+		print("[AccountManager] Got Google credential for: \(credential.claims.email ?? "unknown")")
+
+		// Send credential to backend for validation and user creation
+		let payload: [String: Any] = [
+			"idToken": credential.idToken,
+			"provider": "google",
+			"accessToken": credential.accessToken,
+			"email": credential.claims.email ?? "",
+			"name": credential.claims.name ?? "",
+			"subject": credential.claims.subject
+		]
+
+		// Convert to Data here to avoid sendability issues
+		let jsonData = try JSONSerialization.data(withJSONObject: payload)
+
+		print("[AccountManager] Sending to Lambda for validation...")
+		let result = try await callAuthLambdaWithData("photolala-auth-signin", payloadData: jsonData)
+
+		print("[AccountManager] ✓ Sign-in successful, user ID: \(result.user.id)")
+		self.currentUser = result.user
+		self.stsCredentials = result.credentials
+		self.isSignedIn = true
+		await saveSession()
+
+		return result.user
 	}
 
 	func signInWithApple() async throws -> PhotolalaUser {
@@ -392,9 +434,15 @@ internal class AppleSignInCoordinator: NSObject, ASAuthorizationControllerDelega
 		#if os(macOS)
 		return NSApplication.shared.keyWindow ?? NSWindow()
 		#else
-		guard let scene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
-		      let window = scene.windows.first else {
-			return UIWindow()
+		// Find the foreground active scene and its key window
+		let foregroundScene = UIApplication.shared.connectedScenes
+			.compactMap { $0 as? UIWindowScene }
+			.first { $0.activationState == .foregroundActive }
+
+		guard let scene = foregroundScene,
+		      let window = scene.windows.first(where: { $0.isKeyWindow }) ?? scene.windows.first else {
+			// If no foreground scene with a window is found, this is a fatal presentation error
+			fatalError("Unable to find a foreground window for authentication presentation")
 		}
 		return window
 		#endif

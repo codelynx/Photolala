@@ -15,6 +15,13 @@ struct DeveloperMenuCommands: Commands {
 				}
 			}
 			.keyboardShortcut("T", modifiers: [.command, .shift])
+
+			Button("Test Sign-In with Google") {
+				Task {
+					await TestSignInHandler.testGoogleSignIn()
+				}
+			}
+			.keyboardShortcut("G", modifiers: [.command, .shift])
 		}
 	}
 }

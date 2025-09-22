@@ -10,43 +10,43 @@ import Foundation
 /// Configuration for Google OAuth
 struct GoogleOAuthConfiguration {
 	// Use the Web Client ID for server-side verification
-	static let webClientID = "75309194504-p2sfktq2ju97ataogb1e5fkl70cj2jg3.apps.googleusercontent.com"
+	nonisolated static let webClientID = "75309194504-p2sfktq2ju97ataogb1e5fkl70cj2jg3.apps.googleusercontent.com"
 
 	// Use iOS client ID for all Apple platforms (works better with ASWebAuthenticationSession)
-	static let clientID = "75309194504-g1a4hr3pc68301vuh21tibauh9ar1nkv.apps.googleusercontent.com"
+	nonisolated static let clientID = "75309194504-g1a4hr3pc68301vuh21tibauh9ar1nkv.apps.googleusercontent.com"
 
 	// OAuth redirect URI
-	static var redirectURI: String {
+	nonisolated static var redirectURI: String {
 		"com.googleusercontent.apps.\(clientID.components(separatedBy: ".").first!):/oauth2redirect"
 	}
 
 	// OAuth 2.0 endpoints
-	static let authorizationEndpoint = "https://accounts.google.com/o/oauth2/v2/auth"
-	static let tokenEndpoint = "https://oauth2.googleapis.com/token"
+	nonisolated static let authorizationEndpoint = "https://accounts.google.com/o/oauth2/v2/auth"
+	nonisolated static let tokenEndpoint = "https://oauth2.googleapis.com/token"
 
 	// Scopes
-	static let scopes = [
+	nonisolated static let scopes = [
 		"openid",
 		"email",
 		"profile"
 	]
 
 	// Additional configuration
-	static let hostedDomain: String? = nil  // Set to restrict to specific domain
-	static let loginHint: String? = nil     // Pre-fill email address
+	nonisolated static let hostedDomain: String? = nil  // Set to restrict to specific domain
+	nonisolated static let loginHint: String? = nil     // Pre-fill email address
 
 	// Platform-specific configuration
 	#if os(iOS)
-	static let preferEphemeralSession = false  // Use persistent session on iOS
+	nonisolated static let preferEphemeralSession = false  // Use persistent session on iOS
 	#elseif os(macOS)
-	static let preferEphemeralSession = false  // Use persistent session on macOS too
+	nonisolated static let preferEphemeralSession = false  // Use persistent session on macOS too
 	#endif
 }
 
 // MARK: - Helper Methods
 extension GoogleOAuthConfiguration {
 	/// Generate OAuth authorization URL
-	static func authorizationURL(state: String, codeChallenge: String? = nil) -> URL? {
+	nonisolated static func authorizationURL(state: String, codeChallenge: String? = nil) -> URL? {
 		var components = URLComponents(string: authorizationEndpoint)
 
 		var queryItems = [

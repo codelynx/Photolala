@@ -59,5 +59,55 @@ enum TestSignInHandler {
 			print("✗ Test failed: \(error)")
 		}
 	}
+
+	@MainActor
+	static func testGoogleSignIn() async {
+		do {
+			print("=== Starting Google Sign-In Test ===")
+
+			// 1. Create coordinator and perform OAuth flow
+			let coordinator = GoogleSignInCoordinator()
+			let credential = try await coordinator.performSignIn()
+			print("✓ Received Google credential")
+
+			// 2. Log redacted token info
+			print("✓ Identity token received:")
+			print("  - User ID: [REDACTED]")
+			print("  - Email: \(credential.claims.email != nil ? "[REDACTED]" : "not provided")")
+			print("  - Token length: \(credential.idToken.count) characters")
+
+			// 3. Validate JWT structure
+			let parts = credential.idToken.split(separator: ".")
+			if parts.count == 3 {
+				print("✓ Valid JWT structure (3 parts)")
+			} else {
+				print("✗ Invalid JWT structure")
+			}
+
+			// 4. Log claims info (redacted)
+			print("✓ Token claims:")
+			print("  - Issuer: \(credential.claims.issuer)")
+			print("  - Audience: \(credential.claims.audience.prefix(20))...")
+			print("  - Email verified: \(credential.claims.emailVerified ?? false)")
+			print("  - Has name: \(credential.claims.name != nil)")
+			print("  - Has picture: \(credential.claims.picture != nil)")
+			print("  - Nonce verified: yes")
+
+			print("=== Test Complete ===")
+
+		} catch GoogleSignInError.userCancelled {
+			print("✗ User cancelled the sign-in flow")
+		} catch GoogleSignInError.stateMismatch {
+			print("✗ Security error: State mismatch (possible CSRF)")
+		} catch GoogleSignInError.nonceMismatch {
+			print("✗ Security error: Nonce mismatch (possible replay attack)")
+		} catch GoogleSignInError.tokenExpired {
+			print("✗ Token validation failed: expired")
+		} catch GoogleSignInError.invalidSignature {
+			print("✗ Token validation failed: invalid signature")
+		} catch {
+			print("✗ Test failed: \(error)")
+		}
+	}
 }
 #endif

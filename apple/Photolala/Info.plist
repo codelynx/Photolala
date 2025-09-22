@@ -2,16 +2,29 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+	<key>CFBundleName</key>
+	<string>$(PRODUCT_NAME)</string>
+	<key>CFBundleIdentifier</key>
+	<string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
+	<key>CFBundleVersion</key>
+	<string>$(CURRENT_PROJECT_VERSION)</string>
+	<key>CFBundleShortVersionString</key>
+	<string>$(MARKETING_VERSION)</string>
+	<key>CFBundleExecutable</key>
+	<string>$(EXECUTABLE_NAME)</string>
+	<key>CFBundlePackageType</key>
+	<string>$(PRODUCT_BUNDLE_PACKAGE_TYPE)</string>
+	<key>LSMinimumSystemVersion</key>
+	<string>$(MACOSX_DEPLOYMENT_TARGET)</string>
 	<key>CFBundleURLTypes</key>
 	<array>
 		<dict>
 			<key>CFBundleTypeRole</key>
 			<string>Editor</string>
 			<key>CFBundleURLName</key>
-			<string></string>
+			<string>com.electricwoods.photolala.oauth</string>
 			<key>CFBundleURLSchemes</key>
 			<array>
-				<!-- iOS Client ID for Google Sign-In -->
 				<string>com.googleusercontent.apps.75309194504-g1a4hr3pc68301vuh21tibauh9ar1nkv</string>
 			</array>
 		</dict>
@@ -21,8 +34,9 @@
 		<string>googlechrome</string>
 		<string>googlechrome-x-callback</string>
 	</array>
-	<!-- Google Sign-In Client ID (kept for compatibility but configured programmatically) -->
-	<key>GIDClientID</key>
-	<string>75309194504-g1a4hr3pc68301vuh21tibauh9ar1nkv.apps.googleusercontent.com</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>Photolala needs permission to save photos to your photo library.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Photolala needs access to your photo library to browse and manage your photos.</string>
 </dict>
 </plist>
