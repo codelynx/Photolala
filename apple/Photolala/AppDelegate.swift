@@ -14,12 +14,24 @@ import UIKit
 
 #if os(macOS)
 class AppDelegate: NSObject, NSApplicationDelegate {
+	private var isHandlingOAuthCallback = false
+
 	func application(_ application: NSApplication, open urls: [URL]) {
 		// Handle URLs opened via the app
 		for url in urls {
 			if url.scheme == "com.googleusercontent.apps.75309194504-g1a4hr3pc68301vuh21tibauh9ar1nkv" {
+				// Mark that we're handling OAuth to prevent window creation
+				isHandlingOAuthCallback = true
+
 				// Handle Google OAuth callback
 				GoogleSignInCoordinator.handleCallback(url)
+
+				// Reset flag after a delay
+				DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
+					self?.isHandlingOAuthCallback = false
+				}
+
+				return
 			}
 		}
 	}
@@ -27,6 +39,20 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 	func applicationDidFinishLaunching(_ notification: Notification) {
 		// Additional setup after app launch
 		print("App launched successfully")
+	}
+
+	func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
+		// Don't create new window during OAuth callback
+		if isHandlingOAuthCallback {
+			return false
+		}
+		// If we have visible windows (like TestSignInView), don't create a new one
+		return !flag
+	}
+
+	func applicationShouldOpenUntitledFile(_ sender: NSApplication) -> Bool {
+		// Don't open untitled window during OAuth callback
+		return !isHandlingOAuthCallback
 	}
 }
 #else

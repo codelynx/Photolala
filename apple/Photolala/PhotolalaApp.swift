@@ -26,18 +26,11 @@ struct PhotolalaApp: App {
 	var body: some Scene {
 		WindowGroup {
 			ContentView()
-				.onOpenURL { url in
-					print("[App] Received URL: \(url.absoluteString)")
-					// Handle OAuth callbacks
-					if url.scheme == "com.googleusercontent.apps.75309194504-g1a4hr3pc68301vuh21tibauh9ar1nkv" {
-						print("[App] Google OAuth callback detected, handling...")
-						// Handle Google OAuth callback
-						GoogleSignInCoordinator.handleCallback(url)
-					} else {
-						print("[App] Unknown URL scheme: \(url.scheme ?? "nil")")
-					}
-				}
+			// OAuth callbacks are handled by AppDelegate
 		}
+		#if os(macOS)
+		.handlesExternalEvents(matching: ["main"])  // Only open for main window events
+		#endif
 		#if os(macOS) && DEBUG
 		.commands {
 			DeveloperMenuCommands()
