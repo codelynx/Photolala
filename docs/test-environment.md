@@ -116,11 +116,24 @@ func testS3Upload() async {
 
 ### 3. Authentication Testing
 
+#### Sign-In Diagnostics Panel (macOS debug builds):
+The app includes a visual Sign-In Diagnostics panel accessible via the Developer menu:
+- **Test Sign-In with Apple** (Cmd+Shift+T) - Opens diagnostics and starts Apple OAuth
+- **Test Sign-In with Google** (Cmd+Shift+G) - Opens diagnostics and starts Google OAuth
+- **Open Sign-In Test Panel** - Opens diagnostics window without starting a flow
+
+Features:
+- Real-time visual logging in a dedicated window
+- Full OAuth flow testing without backend dependencies
+- Secure token verification with redacted sensitive data
+- Selectable/copyable log output for debugging
+- No side effects on app state
+
 #### Apple Sign-In:
 ```swift
 // Test Target Only - Requires UI
 func testAppleSignIn() {
-    // Can only test in Test Target with UI
+    // Can test via Sign-In Diagnostics panel or mock in unit tests
     // Unit tests can mock the authentication service
 
     let mockAuth = MockAppleAuth()

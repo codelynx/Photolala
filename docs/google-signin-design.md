@@ -388,14 +388,21 @@ All errors provide localized descriptions suitable for user display.
 
 ### Developer Testing
 
-Developer menu support (macOS DEBUG builds):
+Developer menu support (macOS debug builds):
 ```swift
 #if os(macOS) && DEBUG
-"Test Sign-In with Google" menu item:
-- Isolated OAuth flow
+Sign-In Diagnostics Panel (TestSignInView):
+- "Test Sign-In with Apple" (Cmd+Shift+T)
+- "Test Sign-In with Google" (Cmd+Shift+G)
+- "Open Sign-In Test Panel" command for manual exploration
+
+Features:
+- Visual diagnostics window with real-time logging
+- Isolated OAuth flow testing
 - Token verification without backend
-- Redacted console logging
-- No side effects
+- Redacted sensitive information
+- Selectable/copyable log output
+- No side effects on app state
 #endif
 ```
 

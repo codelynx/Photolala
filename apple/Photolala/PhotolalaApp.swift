@@ -31,7 +31,7 @@ struct PhotolalaApp: App {
 		#if os(macOS)
 		.handlesExternalEvents(matching: ["main"])  // Only open for main window events
 		#endif
-		#if os(macOS) && DEBUG
+		#if os(macOS) && DEVELOPER
 		.commands {
 			DeveloperMenuCommands()
 		}

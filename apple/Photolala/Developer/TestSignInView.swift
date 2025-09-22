@@ -3,7 +3,7 @@
 //  Photolala
 //
 
-#if os(macOS) && DEBUG
+#if os(macOS) && DEVELOPER
 import SwiftUI
 import AuthenticationServices
 import AppKit
@@ -222,19 +222,48 @@ struct TestSignInView: View {
 	}
 
 	private var logOutput: some View {
-		ScrollView {
-			Text(viewModel.logEntries.joined(separator: "\n"))
-				.font(.system(.body, design: .monospaced))
-				.frame(maxWidth: .infinity, alignment: .leading)
-				.textSelection(.enabled)
+		ScrollViewReader { proxy in
+			let logView = ScrollView {
+				LazyVStack(alignment: .leading, spacing: 6) {
+					ForEach(Array(viewModel.logEntries.enumerated()), id: \.offset) { index, entry in
+						Text(entry)
+							.font(.system(.body, design: .monospaced))
+							.frame(maxWidth: .infinity, alignment: .leading)
+							.textSelection(.enabled)
+							.id(index)
+					}
+				}
 				.padding(12)
+			}
+			.background(Color(nsColor: .textBackgroundColor))
+			.clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+			.overlay(
+				RoundedRectangle(cornerRadius: 12, style: .continuous)
+					.strokeBorder(Color.secondary.opacity(0.25))
+			)
+
+			Group {
+				if #available(macOS 14.0, *) {
+					logView
+						.onChange(of: viewModel.logEntries.count) { _, newCount in
+							scrollToBottomIfNeeded(count: newCount, proxy: proxy)
+						}
+				} else {
+					logView
+						.onChange(of: viewModel.logEntries.count) { count in
+							scrollToBottomIfNeeded(count: count, proxy: proxy)
+						}
+				}
+			}
 		}
-		.background(Color(nsColor: .textBackgroundColor))
-		.clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-		.overlay(
-			RoundedRectangle(cornerRadius: 12, style: .continuous)
-				.strokeBorder(Color.secondary.opacity(0.25))
-		)
+	}
+
+	private func scrollToBottomIfNeeded(count: Int, proxy: ScrollViewProxy) {
+		guard count > 0,
+		      let last = viewModel.logEntries.indices.last else { return }
+		withAnimation(.easeInOut(duration: 0.2)) {
+			proxy.scrollTo(last, anchor: .bottom)
+		}
 	}
 
 	private func statusMessage(for flow: TestSignInViewModel.Flow) -> String {

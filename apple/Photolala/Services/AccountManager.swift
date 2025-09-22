@@ -472,7 +472,7 @@ internal class AppleSignInCoordinator: NSObject, ASAuthorizationControllerDelega
 }
 
 // MARK: - Test Support
-#if os(macOS) && DEBUG
+#if os(macOS) && DEVELOPER
 extension AccountManager {
 	@MainActor
 	func performTestAppleSignIn() async throws -> (credential: ASAuthorizationAppleIDCredential, nonce: String) {
