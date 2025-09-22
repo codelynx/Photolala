@@ -182,7 +182,7 @@ final class AccountManager: ObservableObject {
 		return data
 	}
 
-	private func randomNonceString(length: Int = 32) -> String {
+	internal func randomNonceString(length: Int = 32) -> String {
 		precondition(length > 0)
 		var randomBytes = [UInt8](repeating: 0, count: length)
 		let errorCode = SecRandomCopyBytes(kSecRandomDefault, randomBytes.count, &randomBytes)
@@ -272,7 +272,7 @@ final class AccountManager: ObservableObject {
 		return LambdaClient(config: config)
 	}
 
-	private func sha256(_ input: String) -> String {
+	internal func sha256(_ input: String) -> String {
 		let inputData = Data(input.utf8)
 		let hashedData = SHA256.hash(data: inputData)
 		let hashString = hashedData.compactMap {
@@ -374,7 +374,7 @@ final class LambdaClientManager {
 }
 
 @MainActor
-private class AppleSignInCoordinator: NSObject, ASAuthorizationControllerDelegate, ASAuthorizationControllerPresentationContextProviding {
+internal class AppleSignInCoordinator: NSObject, ASAuthorizationControllerDelegate, ASAuthorizationControllerPresentationContextProviding {
 	private var continuation: CheckedContinuation<ASAuthorizationAppleIDCredential, Error>?
 
 	func performSignIn(request: ASAuthorizationAppleIDRequest) async throws -> ASAuthorizationAppleIDCredential {
@@ -412,3 +412,27 @@ private class AppleSignInCoordinator: NSObject, ASAuthorizationControllerDelegat
 		continuation = nil
 	}
 }
+
+// MARK: - Test Support
+#if os(macOS) && DEBUG
+extension AccountManager {
+	@MainActor
+	func performTestAppleSignIn() async throws -> (credential: ASAuthorizationAppleIDCredential, nonce: String) {
+		// Generate nonce using now-internal helper
+		let nonce = randomNonceString()
+		// Note: currentNonce remains private, we just return it for test inspection
+
+		let appleIDProvider = ASAuthorizationAppleIDProvider()
+		let request = appleIDProvider.createRequest()
+		request.requestedScopes = [.fullName, .email]
+		request.nonce = sha256(nonce)  // Using now-internal helper
+
+		// Reuse now-internal coordinator
+		let coordinator = AppleSignInCoordinator()
+		let credential = try await coordinator.performSignIn(request: request)
+
+		// Return for test inspection without backend processing
+		return (credential, nonce)
+	}
+}
+#endif

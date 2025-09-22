@@ -13,5 +13,10 @@ struct PhotolalaApp: App {
 		WindowGroup {
 			ContentView()
 		}
+		#if os(macOS) && DEBUG
+		.commands {
+			DeveloperMenuCommands()
+		}
+		#endif
 	}
 }
