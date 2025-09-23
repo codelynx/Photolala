@@ -3,7 +3,9 @@
     "allow": [
       "Bash(xcodebuild:*)",
       "Bash(swift:*)",
-      "Bash(cat:*)"
+      "Bash(cat:*)",
+      "Bash(aws lambda invoke:*)",
+      "Bash(aws iam list-user-policies:*)"
     ],
     "deny": [],
     "ask": []

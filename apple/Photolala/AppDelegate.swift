@@ -83,7 +83,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 		if isHandlingOAuthCallback {
 			return false
 		}
-		// If we have visible windows (like TestSignInView), don't create a new one
+		// If we have visible windows, don't create a new one
 		return !flag
 	}
 

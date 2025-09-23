@@ -507,6 +507,11 @@ struct IdentityProviderDiagnosticsView: View {
 					Label("Copy", systemImage: "doc.on.doc")
 				}
 				.controlSize(.mini)
+
+				Button(action: exportDebugLog) {
+					Label("Export", systemImage: "square.and.arrow.up")
+				}
+				.controlSize(.mini)
 			}
 
 			ScrollView {
@@ -530,6 +535,23 @@ struct IdentityProviderDiagnosticsView: View {
 		let log = model.debugMessages.joined(separator: "\n")
 		NSPasteboard.general.clearContents()
 		NSPasteboard.general.setString(log, forType: .string)
+	}
+
+	private func exportDebugLog() {
+		var exportText = "OAuth Provider Diagnostics Export\n"
+		exportText += "Generated: \(Date().formatted())\n"
+		exportText += "Provider: \(model.selectedProvider.rawValue)\n"
+		exportText += "\n--- Debug Log ---\n"
+		exportText += model.debugMessages.joined(separator: "\n")
+
+		// Save to file
+		let savePanel = NSSavePanel()
+		savePanel.nameFieldStringValue = "oauth-diagnostics-\(Date().timeIntervalSince1970).txt"
+		savePanel.begin { result in
+			if result == .OK, let url = savePanel.url {
+				try? exportText.write(to: url, atomically: true, encoding: .utf8)
+			}
+		}
 	}
 }
 

@@ -133,14 +133,6 @@ struct PhotolalaAccountDiagnosticsView: View {
 				}
 			}
 			.pickerStyle(.segmented)
-
-			HStack {
-				Image(systemName: "info.circle")
-					.foregroundStyle(.secondary)
-				Text("Current: \(model.currentEnvironmentDisplay)")
-					.font(.caption)
-					.foregroundStyle(.secondary)
-			}
 		}
 	}
 
@@ -192,6 +184,11 @@ struct PhotolalaAccountDiagnosticsView: View {
 					Label("Clear", systemImage: "trash")
 				}
 				.disabled(model.isTestRunning)
+
+				Button(action: model.copyLogs) {
+					Label("Copy Logs", systemImage: "doc.on.doc")
+				}
+				.disabled(model.logs.isEmpty)
 
 				Button(action: model.exportLogs) {
 					Label("Export Logs", systemImage: "square.and.arrow.up")
@@ -491,31 +488,9 @@ final class PhotolalaAccountDiagnosticsModel {
 	var lastError: String?
 
 	// Environment
-	nonisolated private let originalEnvironment: String?
-
-	var currentEnvironmentDisplay: String {
-		let current = UserDefaults.standard.string(forKey: "environment_preference") ?? "development"
-		return current.capitalized
-	}
-
 	init() {
-		// Store and use current environment
-		originalEnvironment = UserDefaults.standard.string(forKey: "environment_preference")
-		switch originalEnvironment ?? "development" {
-		case "staging":
-			selectedEnvironment = .staging
-		case "production":
-			selectedEnvironment = .production
-		default:
-			selectedEnvironment = .development
-		}
-	}
-
-	deinit {
-		// Restore original environment
-		if let original = originalEnvironment {
-			UserDefaults.standard.set(original, forKey: "environment_preference")
-		}
+		// Default to development for testing
+		selectedEnvironment = .development
 	}
 
 	func runFullTest() {
@@ -532,9 +507,8 @@ final class PhotolalaAccountDiagnosticsModel {
 		testStartTime = Date()
 		clearResults()
 
-		// Set test environment
-		UserDefaults.standard.set(selectedEnvironment.userDefaultsValue, forKey: "environment_preference")
-		log(.info, "Environment set to: \(selectedEnvironment.rawValue)")
+		// Log test environment (no longer modifying UserDefaults)
+		log(.info, "Using environment: \(selectedEnvironment.rawValue)")
 
 		do {
 			// Setup diagnostic hooks
@@ -548,10 +522,10 @@ final class PhotolalaAccountDiagnosticsModel {
 
 			switch selectedProvider {
 			case .apple:
-				let result = try await accountManager.signInWithAppleWithDiagnostics()
+				let result = try await accountManager.signInWithAppleWithDiagnostics(environment: selectedEnvironment)
 				await handleAuthResult(result)
 			case .google:
-				let result = try await accountManager.signInWithGoogleWithDiagnostics()
+				let result = try await accountManager.signInWithGoogleWithDiagnostics(environment: selectedEnvironment)
 				await handleAuthResult(result)
 			}
 
@@ -577,9 +551,6 @@ final class PhotolalaAccountDiagnosticsModel {
 		}
 
 		isTestRunning = false
-
-		// Restore environment
-		restoreOriginalEnvironment()
 	}
 
 	private func setupDiagnosticHooks() {
@@ -649,12 +620,6 @@ final class PhotolalaAccountDiagnosticsModel {
 		logs.append(entry)
 	}
 
-	private func restoreOriginalEnvironment() {
-		if let original = originalEnvironment {
-			UserDefaults.standard.set(original, forKey: "environment_preference")
-			log(.info, "Environment restored to original value")
-		}
-	}
 
 	func clearResults() {
 		accountInfo = nil
@@ -662,6 +627,26 @@ final class PhotolalaAccountDiagnosticsModel {
 		logs.removeAll()
 		lastError = nil
 		testDuration = nil
+	}
+
+	func copyLogs() {
+		// Create export text
+		var exportText = "Photolala Account Diagnostics\n"
+		exportText += "Generated: \(Date().formatted())\n"
+		exportText += "Environment: \(selectedEnvironment.rawValue)\n"
+		exportText += "Provider: \(selectedProvider.rawValue)\n"
+		exportText += "\n--- Logs ---\n"
+
+		for log in logs {
+			exportText += "\(log.timestamp.formatted()): [\(log.type)] \(log.message)\n"
+			if let details = log.details {
+				exportText += "  Details: \(details)\n"
+			}
+		}
+
+		// Copy to clipboard
+		NSPasteboard.general.clearContents()
+		NSPasteboard.general.setString(exportText, forType: .string)
 	}
 
 	func exportLogs() {

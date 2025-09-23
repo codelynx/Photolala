@@ -23,6 +23,14 @@ enum TestEnvironment: String, CaseIterable {
 		}
 	}
 
+	var lambdaSuffix: String {
+		switch self {
+		case .development: return "dev"
+		case .staging: return "stage"
+		case .production: return "prod"
+		}
+	}
+
 	var color: Color {
 		switch self {
 		case .development: return .blue
