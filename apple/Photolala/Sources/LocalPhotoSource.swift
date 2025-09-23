@@ -23,6 +23,10 @@ class LocalPhotoSource: PhotoSourceProtocol {
 	// Map item IDs back to file paths (source's private knowledge)
 	private var idToPath: [String: URL] = [:]
 
+	// Security-scoped resource handling (iOS)
+	private var isAccessingSecurityScopedResource = false
+	private var ownsSecurityScopedResource = false
+
 	// Published properties
 	@Published private var photos: [PhotoBrowserItem] = []
 	@Published private var isLoading: Bool = false
@@ -46,14 +50,52 @@ class LocalPhotoSource: PhotoSourceProtocol {
 		supportsSearch: false
 	)
 
-	init(directoryURL: URL, catalogService: CatalogService? = nil) {
+	init(directoryURL: URL, catalogService: CatalogService? = nil, requiresSecurityScope: Bool = false, securityScopeAlreadyStarted: Bool = false) {
 		self.directoryURL = directoryURL
 		self.catalogService = catalogService ?? CatalogService(catalogDirectory: directoryURL)
+
+		// Start accessing security-scoped resource if needed (iOS)
+		if requiresSecurityScope {
+			startSecurityScopedAccess(alreadyStarted: securityScopeAlreadyStarted)
+		}
+	}
+
+	deinit {
+		// Stop accessing security-scoped resource when done
+		#if os(iOS)
+		if ownsSecurityScopedResource {
+			directoryURL.stopAccessingSecurityScopedResource()
+			print("[LocalPhotoSource] Stopped accessing security-scoped resource in deinit")
+		}
+		#endif
+	}
+
+	private func startSecurityScopedAccess(alreadyStarted: Bool) {
+		#if os(iOS)
+		guard !isAccessingSecurityScopedResource else { return }
+
+		if alreadyStarted {
+			isAccessingSecurityScopedResource = true
+			ownsSecurityScopedResource = true
+			print("[LocalPhotoSource] Security-scoped resource already started: \(directoryURL.path)")
+		} else if directoryURL.startAccessingSecurityScopedResource() {
+			isAccessingSecurityScopedResource = true
+			ownsSecurityScopedResource = true
+			print("[LocalPhotoSource] Started accessing security-scoped resource: \(directoryURL.path)")
+		} else if FileManager.default.isReadableFile(atPath: directoryURL.path) {
+			isAccessingSecurityScopedResource = true
+			print("[LocalPhotoSource] Security scope already active for: \(directoryURL.path)")
+		} else {
+			print("[LocalPhotoSource] Failed to access security-scoped resource: \(directoryURL.path)")
+		}
+		#endif
 	}
 
 	func loadPhotos() async throws -> [PhotoBrowserItem] {
 		isLoading = true
-		defer { isLoading = false }
+		defer {
+			isLoading = false
+		}
 
 		// Capture values before detaching to avoid actor isolation violations
 		let directoryURL = self.directoryURL
@@ -130,10 +172,10 @@ class LocalPhotoSource: PhotoSourceProtocol {
 			var height: Int?
 			var mimeType: String?
 
-			// Create image source to read metadata without decoding the full image
-			if let data = try? Data(contentsOf: url),
-			   let imageSource = CGImageSourceCreateWithData(data as CFData, nil) {
+			// Create image source from URL to stream metadata without loading the full image
+			if let imageSource = CGImageSourceCreateWithURL(url as CFURL, nil) {
 				// Get image properties without decoding the bitmap
+				// Pass nil options to avoid loading pixel data
 				if let properties = CGImageSourceCopyPropertiesAtIndex(imageSource, 0, nil) as? [CFString: Any] {
 					// Extract dimensions
 					width = properties[kCGImagePropertyPixelWidth] as? Int

@@ -6,13 +6,23 @@
 //
 
 import SwiftUI
+import Photos
+import UniformTypeIdentifiers
 #if os(iOS)
 import UIKit
 #elseif os(macOS)
 import AppKit
 #endif
 
+// Navigation destinations
+enum PhotoBrowserDestination: Hashable {
+	case localFolder(URL, Bool) // URL and securityScopeStarted
+	case applePhotos
+	case cloudPhotos
+}
+
 struct HomeView: View {
+	@State private var navigationPath = NavigationPath()
 	@State private var model = Model()
 
 	private var welcomeMessage: String {
@@ -28,21 +38,34 @@ struct HomeView: View {
 	}
 
 	var body: some View {
+		#if os(iOS)
+		NavigationStack(path: $navigationPath) {
+			homeContent
+				.navigationDestination(for: PhotoBrowserDestination.self) { destination in
+					photoBrowserView(for: destination)
+				}
+		}
+		.onChange(of: model.pendingDestination) { _, newDestination in
+			if let destination = newDestination {
+				navigationPath.append(destination)
+				model.pendingDestination = nil
+			}
+		}
+		#else
+		homeContent
+		#endif
+	}
+
+	var homeContent: some View {
 		VStack(spacing: 30) {
 			// App icon and name
 			VStack(spacing: 16) {
 				#if os(iOS)
-				if let appIcon = UIImage(named: "AppIcon") {
-					Image(uiImage: appIcon)
-						.resizable()
-						.aspectRatio(contentMode: .fit)
-						.frame(width: 80, height: 80)
-						.cornerRadius(16)
-				} else {
-					Image(systemName: "photo.stack")
-						.font(.system(size: 80))
-						.foregroundStyle(.tint)
-				}
+				// Note: AppIcon from bundle may not be available as a named image
+				// Using fallback system image for now
+				Image(systemName: "photo.stack")
+					.font(.system(size: 80))
+					.foregroundStyle(.tint)
 				#else
 				if let appIcon = NSImage(named: "AppIcon") {
 					Image(nsImage: appIcon)
@@ -237,7 +260,7 @@ struct HomeView: View {
 			// Show success message when user signs in
 			if isSignedIn && !model.showSignInSuccess {
 				if let user = model.currentUser {
-					model.signInSuccessMessage = "Welcome, \(user.displayName ?? "User")!"
+					model.signInSuccessMessage = "Welcome, \(user.displayName)!"
 					model.showSignInSuccess = true
 
 					// Hide success message after 3 seconds
@@ -284,6 +307,63 @@ struct HomeView: View {
 		.task {
 			await model.checkSignInStatus()
 		}
+		#if os(iOS)
+		.sheet(isPresented: $model.showingFolderPicker) {
+			DocumentPickerView(
+				isPresented: $model.showingFolderPicker,
+				contentTypes: [.folder],
+				onPick: { url, started in
+					model.handleFolderSelection(url, securityScopeStarted: started)
+				}
+			)
+		}
+		#else
+		.fileImporter(
+			isPresented: $model.showingFolderPicker,
+			allowedContentTypes: [.folder],
+			allowsMultipleSelection: false
+		) { result in
+			switch result {
+			case .success(let urls):
+				if let url = urls.first {
+					model.handleFolderSelection(url, securityScopeStarted: false)
+				}
+			case .failure(let error):
+				print("[HomeView] Folder selection failed: \(error)")
+			}
+		}
+		#endif
+	}
+
+	@ViewBuilder
+	private func photoBrowserView(for destination: PhotoBrowserDestination) -> some View {
+		switch destination {
+		case .localFolder(let url, let scopeStarted):
+			#if os(iOS)
+			let source = LocalPhotoSource(directoryURL: url, requiresSecurityScope: true, securityScopeAlreadyStarted: scopeStarted)
+			#else
+			let source = LocalPhotoSource(directoryURL: url)
+			#endif
+			let environment = PhotoBrowserEnvironment(source: source)
+			PhotoBrowserView(environment: environment, title: url.lastPathComponent)
+				#if os(macOS)
+				.frame(minWidth: 800, minHeight: 600)
+				#endif
+
+		case .applePhotos:
+			let source = ApplePhotosSource()
+			let environment = PhotoBrowserEnvironment(source: source)
+			PhotoBrowserView(environment: environment, title: "Photos Library")
+				#if os(macOS)
+				.frame(minWidth: 800, minHeight: 600)
+				#endif
+
+		case .cloudPhotos:
+			// TODO: Implement S3PhotoSource
+			Text("Cloud Photos - Coming Soon")
+				.font(.title)
+				.foregroundStyle(.secondary)
+		}
 	}
 }
 
@@ -297,6 +377,12 @@ extension HomeView {
 		var showSignInSuccess = false
 		var signInSuccessMessage = ""
 		var showingAccountSettings = false
+
+		// Navigation state
+		#if os(iOS)
+		// iOS navigation
+		var pendingDestination: PhotoBrowserDestination?
+		#endif
 
 		// User state
 		var isSignedIn = false
@@ -318,14 +404,42 @@ extension HomeView {
 			showingFolderPicker = true
 		}
 
+
 		@MainActor
 		func openPhotoLibrary() {
 			print("[HomeView] Photo library tapped")
+			#if os(macOS)
+			// Open in new window
+			PhotoWindowManager.shared.openApplePhotosWindow()
+			#else
+			// On iOS, use navigation
+			pendingDestination = .applePhotos
+			#endif
 		}
 
 		@MainActor
 		func openCloudPhotos() {
 			print("[HomeView] Cloud photos tapped")
+			#if os(macOS)
+			// TODO: Show cloud photos in sheet
+			#else
+			// On iOS, use navigation
+			pendingDestination = .cloudPhotos
+			#endif
+		}
+
+		@MainActor
+		func handleFolderSelection(_ url: URL, securityScopeStarted: Bool) {
+			print("[HomeView] Folder selected: \(url.path), scope started: \(securityScopeStarted)")
+
+			#if os(iOS)
+			// Set navigation immediately while picker is still visible
+			// This ensures SwiftUI processes the navigation correctly
+			self.pendingDestination = .localFolder(url, securityScopeStarted)
+			#else
+			// On macOS, open in new window
+			PhotoWindowManager.shared.openWindow(for: url)
+			#endif
 		}
 
 		@MainActor

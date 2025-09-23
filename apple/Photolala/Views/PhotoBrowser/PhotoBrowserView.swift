@@ -79,6 +79,9 @@ struct PhotoBrowserView: View {
 		.task {
 			await loadPhotos()
 		}
+		.onDisappear {
+			// View cleanup if needed
+		}
 		.onReceive(environment.source.photosPublisher) { newPhotos in
 			withAnimation(.easeInOut(duration: 0.2)) {
 				model.photos = newPhotos
@@ -93,7 +96,9 @@ struct PhotoBrowserView: View {
 
 	private func loadPhotos() async {
 		model.isLoading = true
-		defer { model.isLoading = false }
+		defer {
+			model.isLoading = false
+		}
 
 		do {
 			let photos = try await environment.source.loadPhotos()

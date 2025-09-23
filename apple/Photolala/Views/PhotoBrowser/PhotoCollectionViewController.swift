@@ -128,6 +128,14 @@ class PhotoCollectionViewController: NSViewController {
 		guard let layout = collectionView.collectionViewLayout as? NSCollectionViewFlowLayout else { return }
 
 		let width = view.bounds.width
+
+		// Skip if width is zero (view not laid out yet)
+		guard width > 0 else {
+			// Set a default size to avoid crash
+			layout.itemSize = environment.configuration.thumbnailSize
+			return
+		}
+
 		let spacing = environment.configuration.gridSpacing
 		let minColumns = environment.configuration.minimumColumns
 		let maxColumns = environment.configuration.maximumColumns
@@ -152,7 +160,10 @@ class PhotoCollectionViewController: NSViewController {
 		let itemWidth = floor(availableWidth / CGFloat(columns))
 		let itemSize = CGSize(width: itemWidth, height: itemWidth)
 
-		layout.itemSize = itemSize
+		// Only update if size is valid
+		if itemSize.width > 0 && itemSize.height > 0 {
+			layout.itemSize = itemSize
+		}
 	}
 }
 
@@ -248,6 +259,7 @@ class PhotoCollectionViewController: UIViewController {
 		view.backgroundColor = .systemBackground
 	}
 
+
 	override func viewWillLayoutSubviews() {
 		super.viewWillLayoutSubviews()
 		updateItemSize()
@@ -294,6 +306,10 @@ class PhotoCollectionViewController: UIViewController {
 		guard let layout = collectionView.collectionViewLayout as? UICollectionViewFlowLayout else { return }
 
 		let width = view.bounds.width
+
+		// Skip if width is zero (view not laid out yet)
+		guard width > 0 else { return }
+
 		let spacing = environment.configuration.gridSpacing
 		let minColumns = environment.configuration.minimumColumns
 		let maxColumns = environment.configuration.maximumColumns
@@ -318,8 +334,11 @@ class PhotoCollectionViewController: UIViewController {
 		let itemWidth = floor(availableWidth / CGFloat(columns))
 		let itemSize = CGSize(width: itemWidth, height: itemWidth)
 
-		layout.itemSize = itemSize
-		layout.invalidateLayout()
+		// Only update if size has changed
+		if layout.itemSize != itemSize {
+			layout.itemSize = itemSize
+			layout.invalidateLayout()
+		}
 	}
 }
 
