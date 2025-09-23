@@ -61,19 +61,22 @@ final class AccountManager: ObservableObject {
 
 		// Send credential to backend for validation and user creation
 		let payload: [String: Any] = [
-			"idToken": credential.idToken,
+			"id_token": credential.idToken,  // Lambda expects "id_token" with underscore
 			"provider": "google",
-			"accessToken": credential.accessToken,
+			"access_token": credential.accessToken,  // Consistent underscore format
 			"email": credential.claims.email ?? "",
 			"name": credential.claims.name ?? "",
 			"subject": credential.claims.subject
 		]
 
-		// Convert to Data here to avoid sendability issues
-		let jsonData = try JSONSerialization.data(withJSONObject: payload)
+		// Lambda expects API Gateway format with body as JSON string
+		let bodyData = try JSONSerialization.data(withJSONObject: payload)
+		let bodyString = String(data: bodyData, encoding: .utf8) ?? "{}"
+		let lambdaPayload = ["body": bodyString]
+		let jsonData = try JSONSerialization.data(withJSONObject: lambdaPayload)
 
 		print("[AccountManager] Sending to Lambda for validation...")
-		let result = try await callAuthLambdaWithData("photolala-web-auth", payloadData: jsonData)
+		let result = try await callAuthLambdaWithData("photolala-auth", payloadData: jsonData)
 
 		print("[AccountManager] ✓ Sign-in successful, user ID: \(result.user.id)")
 		self.currentUser = result.user
@@ -93,17 +96,20 @@ final class AccountManager: ObservableObject {
 
 		// Include nonce for backend validation to prevent replay attacks
 		let payload: [String: Any] = [
-			"idToken": tokenString,
+			"id_token": tokenString,  // Lambda expects "id_token" with underscore
 			"provider": "apple",
 			"nonce": currentNonce ?? "", // Send raw nonce for backend validation
-			"authorizationCode": credential.authorizationCode != nil ?
+			"authorization_code": credential.authorizationCode != nil ?
 				String(data: credential.authorizationCode!, encoding: .utf8) ?? "" : "",
 			"user": credential.user
 		]
 
-		// Convert to Data here to avoid sendability issues
-		let jsonData = try JSONSerialization.data(withJSONObject: payload)
-		let result = try await callAuthLambdaWithData("photolala-auth-signin", payloadData: jsonData)
+		// Lambda expects API Gateway format with body as JSON string
+		let bodyData = try JSONSerialization.data(withJSONObject: payload)
+		let bodyString = String(data: bodyData, encoding: .utf8) ?? "{}"
+		let lambdaPayload = ["body": bodyString]
+		let jsonData = try JSONSerialization.data(withJSONObject: lambdaPayload)
+		let result = try await callAuthLambdaWithData("photolala-auth", payloadData: jsonData)
 
 		self.currentUser = result.user
 		self.stsCredentials = result.credentials
@@ -212,6 +218,87 @@ final class AccountManager: ObservableObject {
 
 			let decoder = JSONDecoder()
 			decoder.dateDecodingStrategy = .iso8601
+
+			// First check if it's an API Gateway response format
+			struct LambdaGatewayResponse: Decodable {
+				let statusCode: Int?
+				let body: String?
+			}
+
+			if let gatewayResponse = try? JSONDecoder().decode(LambdaGatewayResponse.self, from: responseData) {
+				print("[AccountManager] Detected API Gateway response format - statusCode: \(gatewayResponse.statusCode ?? 0)")
+
+				// Parse the body if it exists
+				if let body = gatewayResponse.body, let bodyData = body.data(using: .utf8) {
+					// Check if it's a successful response
+					if gatewayResponse.statusCode == 200 {
+						do {
+							// Try to decode as AuthResult first
+							return try decoder.decode(AuthResult.self, from: bodyData)
+						} catch {
+							// If that fails, try to decode the simplified Lambda response
+							print("[AccountManager] Failed to decode body as AuthResult: \(error)")
+							print("[AccountManager] Attempting to parse simplified Lambda response...")
+
+							// Parse the simplified response from Lambda
+							struct SimpleLambdaResponse: Decodable {
+								let success: Bool
+								let isNewUser: Bool
+								let userId: String
+								let providerId: String?
+								let email: String?
+							}
+
+							if let simpleResponse = try? decoder.decode(SimpleLambdaResponse.self, from: bodyData),
+							   simpleResponse.success {
+								// Create mock AuthResult from the simple response
+								// Note: Lambda doesn't return STS credentials, so we'll use empty ones for now
+								let isApple = simpleResponse.providerId?.contains("apple") == true
+								let user = PhotolalaUser(
+									id: UUID(uuidString: simpleResponse.userId) ?? UUID(),
+									appleUserID: isApple ? simpleResponse.providerId : nil,
+									googleUserID: !isApple ? simpleResponse.providerId : nil,
+									email: simpleResponse.email,
+									displayName: simpleResponse.email ?? "User",
+									createdAt: Date(),
+									updatedAt: Date()
+								)
+
+								// Create mock STS credentials - these will need to be fetched separately
+								let credentials = STSCredentials(
+									accessKeyId: "",
+									secretAccessKey: "",
+									sessionToken: "",
+									expiration: Date().addingTimeInterval(3600)
+								)
+
+								let result = AuthResult(
+									user: user,
+									credentials: credentials,
+									isNewUser: simpleResponse.isNewUser
+								)
+
+								print("[AccountManager] Successfully created AuthResult from simplified response")
+								return result
+							} else {
+								throw AccountError.lambdaError("Failed to parse Lambda response body: \(error)")
+							}
+						}
+					} else {
+						// Try to parse error response
+						if let errorDict = try? JSONSerialization.jsonObject(with: bodyData) as? [String: Any],
+						   let errorMessage = errorDict["error"] as? String {
+							throw AccountError.lambdaError(errorMessage)
+						} else {
+							throw AccountError.lambdaError("Lambda returned status \(gatewayResponse.statusCode ?? 0): \(body)")
+						}
+					}
+				} else {
+					throw AccountError.lambdaError("Lambda returned empty response")
+				}
+			}
+
+			// If not API Gateway format, try direct parsing
 			return try decoder.decode(AuthResult.self, from: responseData)
 		}
 	}
@@ -255,6 +342,17 @@ final class AccountManager: ObservableObject {
 
 	internal func getFunctionName(_ baseName: String) -> String {
 		let environmentPreference = UserDefaults.standard.string(forKey: "environment_preference") ?? "development"
+
+		// Special cases for Lambda functions without environment suffixes
+		if baseName == "photolala-auth" {
+			// photolala-auth doesn't have environment-specific versions
+			return baseName
+		} else if baseName == "photolala-web-auth" && environmentPreference == "production" {
+			// photolala-web-auth is the production version (no suffix)
+			return baseName
+		}
+
+		// For other functions and environments, use suffix
 		let suffix: String
 		switch environmentPreference {
 		case "production":
