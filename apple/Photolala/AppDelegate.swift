@@ -18,8 +18,13 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
 	func application(_ application: NSApplication, open urls: [URL]) {
 		// Handle URLs opened via the app
+		print("[AppDelegate] Received URLs: \(urls)")
 		for url in urls {
-			if url.scheme == "com.googleusercontent.apps.75309194504-g1a4hr3pc68301vuh21tibauh9ar1nkv" {
+			print("[AppDelegate] Processing URL: \(url.absoluteString)")
+			print("[AppDelegate] URL scheme: \(url.scheme ?? "nil")")
+
+			if url.scheme == GoogleOAuthConfiguration.urlScheme {
+				print("[AppDelegate] ✓ Google OAuth callback detected")
 				// Mark that we're handling OAuth to prevent window creation
 				isHandlingOAuthCallback = true
 
@@ -34,11 +39,43 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 				return
 			}
 		}
+		print("[AppDelegate] No matching OAuth URL scheme found")
 	}
 
 	func applicationDidFinishLaunching(_ notification: Notification) {
 		// Additional setup after app launch
 		print("App launched successfully")
+
+		// Register for URL events
+		NSAppleEventManager.shared().setEventHandler(
+			self,
+			andSelector: #selector(handleGetURLEvent(_:with:)),
+			forEventClass: AEEventClass(kInternetEventClass),
+			andEventID: AEEventID(kAEGetURL)
+		)
+		print("[AppDelegate] Registered for URL events")
+	}
+
+	@objc func handleGetURLEvent(_ event: NSAppleEventDescriptor, with replyEvent: NSAppleEventDescriptor) {
+		guard let urlString = event.paramDescriptor(forKeyword: AEKeyword(keyDirectObject))?.stringValue,
+		      let url = URL(string: urlString) else {
+			print("[AppDelegate] Invalid URL in Apple Event")
+			return
+		}
+
+		print("[AppDelegate] Received URL via Apple Event: \(url.absoluteString)")
+
+		// Handle Google OAuth callback
+		if url.scheme == GoogleOAuthConfiguration.urlScheme {
+			print("[AppDelegate] ✓ Google OAuth callback detected via Apple Event")
+			isHandlingOAuthCallback = true
+			GoogleSignInCoordinator.handleCallback(url)
+
+			// Reset flag after a delay
+			DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
+				self?.isHandlingOAuthCallback = false
+			}
+		}
 	}
 
 	func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
@@ -59,7 +96,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 class AppDelegate: UIResponder, UIApplicationDelegate {
 	func application(_ app: UIApplication, open url: URL, options: [UIApplication.OpenURLOptionsKey : Any] = [:]) -> Bool {
 		// Handle URLs opened via the app
-		if url.scheme == "com.googleusercontent.apps.75309194504-g1a4hr3pc68301vuh21tibauh9ar1nkv" {
+		if url.scheme == GoogleOAuthConfiguration.urlScheme {
 			// Handle Google OAuth callback
 			GoogleSignInCoordinator.handleCallback(url)
 			return true

@@ -15,9 +15,21 @@ struct GoogleOAuthConfiguration {
 	// Use iOS client ID for all Apple platforms (works better with ASWebAuthenticationSession)
 	nonisolated static let clientID = "75309194504-g1a4hr3pc68301vuh21tibauh9ar1nkv.apps.googleusercontent.com"
 
-	// OAuth redirect URI
+	// OAuth redirect URI - must match exactly what's configured in Google Console
 	nonisolated static var redirectURI: String {
-		"com.googleusercontent.apps.\(clientID.components(separatedBy: ".").first!):/oauth2redirect"
+		// For iOS OAuth client, the redirect URI format is:
+		// com.googleusercontent.apps.{CLIENT_ID}:/oauth2redirect/google
+		// where CLIENT_ID is the full ID before ".apps.googleusercontent.com"
+		let clientIDPrefix = clientID.components(separatedBy: ".apps.googleusercontent.com").first ?? ""
+		return "com.googleusercontent.apps.\(clientIDPrefix):/oauth2redirect/google"
+	}
+
+	// URL Scheme for handling OAuth callbacks
+	// IMPORTANT: This must match the URL scheme registered in Info.plist under CFBundleURLSchemes
+	nonisolated static var urlScheme: String {
+		// Extract the client ID prefix (before ".apps.googleusercontent.com")
+		let clientIDPrefix = clientID.components(separatedBy: ".apps.googleusercontent.com").first ?? ""
+		return "com.googleusercontent.apps.\(clientIDPrefix)"
 	}
 
 	// OAuth 2.0 endpoints

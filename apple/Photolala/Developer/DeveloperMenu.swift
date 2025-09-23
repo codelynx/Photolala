@@ -9,6 +9,15 @@ import SwiftUI
 struct DeveloperMenuCommands: Commands {
 	var body: some Commands {
 		CommandMenu("Developer") {
+			Button("Identity Provider Diagnostics") {
+				Task { @MainActor in
+					IdentityProviderDiagnosticsController.shared.show()
+				}
+			}
+			.keyboardShortcut("I", modifiers: [.command, .shift])
+
+			Divider()
+
 			Button("Test Sign-In with Apple") {
 				Task { @MainActor in
 					TestSignInWindowController.shared.show(startingFlow: .apple)
@@ -22,6 +31,24 @@ struct DeveloperMenuCommands: Commands {
 				}
 			}
 			.keyboardShortcut("G", modifiers: [.command, .shift])
+
+			Divider()
+
+			Menu("Diagnostics") {
+				Button("OAuth Provider Diagnostics...") {
+					Task { @MainActor in
+						IdentityProviderDiagnosticsWindowController.shared.show()
+					}
+				}
+				.help("Test OAuth providers only (Apple ID, Google Sign-In)")
+
+				Button("Photolala Account Diagnostics...") {
+					Task { @MainActor in
+						PhotolalaAccountDiagnosticsWindowController.shared.show()
+					}
+				}
+				.help("Test full account lifecycle and Lambda functions")
+			}
 
 			Divider()
 

@@ -30,27 +30,35 @@ final class GoogleSignInCoordinator {
 
 	/// Performs the Google Sign-In flow
 	func performSignIn() async throws -> GoogleCredential {
+		print("[GoogleSignIn] Starting sign-in flow")
+
 		// Ensure only one sign-in at a time
 		guard GoogleSignInCoordinator.activeCoordinator == nil else {
+			print("[GoogleSignIn] ERROR: Sign-in already in progress")
 			throw GoogleSignInError.signInAlreadyInProgress
 		}
 
 		// Set this instance as active
 		GoogleSignInCoordinator.activeCoordinator = self
+		print("[GoogleSignIn] Coordinator activated")
 
 		defer {
 			// Clean up when done
 			if GoogleSignInCoordinator.activeCoordinator === self {
 				GoogleSignInCoordinator.activeCoordinator = nil
+				print("[GoogleSignIn] Coordinator deactivated")
 			}
 		}
 
 		return try await withCheckedThrowingContinuation { continuation in
 			self.authorizationContinuation = continuation
+			print("[GoogleSignIn] Continuation set, starting OAuth flow...")
 
 			do {
 				try startOAuthFlow()
+				print("[GoogleSignIn] OAuth flow started, waiting for callback...")
 			} catch {
+				print("[GoogleSignIn] ERROR starting OAuth flow: \(error)")
 				continuation.resume(throwing: error)
 				self.authorizationContinuation = nil
 			}
@@ -88,9 +96,15 @@ final class GoogleSignInCoordinator {
 
 	private func buildAuthorizationURL(codeChallenge: String, state: String, nonce: String) -> URL? {
 		var components = URLComponents(string: GoogleOAuthConfiguration.authorizationEndpoint)
+
+		let redirectURI = GoogleOAuthConfiguration.redirectURI
+		print("[GoogleSignIn] Building auth URL with:")
+		print("[GoogleSignIn]   Client ID: \(GoogleOAuthConfiguration.clientID)")
+		print("[GoogleSignIn]   Redirect URI: \(redirectURI)")
+
 		components?.queryItems = [
 			URLQueryItem(name: "client_id", value: GoogleOAuthConfiguration.clientID),
-			URLQueryItem(name: "redirect_uri", value: GoogleOAuthConfiguration.redirectURI),
+			URLQueryItem(name: "redirect_uri", value: redirectURI),
 			URLQueryItem(name: "response_type", value: "code"),
 			URLQueryItem(name: "scope", value: GoogleOAuthConfiguration.scopes.joined(separator: " ")),
 			URLQueryItem(name: "state", value: state),
@@ -100,13 +114,19 @@ final class GoogleSignInCoordinator {
 			URLQueryItem(name: "access_type", value: "offline"),
 			URLQueryItem(name: "prompt", value: "select_account")
 		]
+
+		if let url = components?.url {
+			print("[GoogleSignIn] Full authorization URL: \(url.absoluteString)")
+		}
+
 		return components?.url
 	}
 
 	private func openInBrowser(_ url: URL) {
-		print("[GoogleSignIn] Opening OAuth URL in browser")
+		print("[GoogleSignIn] Opening OAuth URL in browser: \(url.absoluteString.prefix(100))...")
 		#if os(macOS)
-		NSWorkspace.shared.open(url)
+		let result = NSWorkspace.shared.open(url)
+		print("[GoogleSignIn] Browser open result: \(result)")
 		#else
 		UIApplication.shared.open(url)
 		#endif

@@ -12,7 +12,7 @@ final class AccountManager: ObservableObject {
 
 	@Published private(set) var currentUser: PhotolalaUser?
 	@Published private(set) var isSignedIn: Bool = false
-	private var stsCredentials: STSCredentials?
+	internal var stsCredentials: STSCredentials?
 	private var currentNonce: String?
 	private var googleSignInCoordinator: GoogleSignInCoordinator?
 
@@ -124,6 +124,15 @@ final class AccountManager: ObservableObject {
 		await LambdaClientManager.shared.reset()
 	}
 
+	#if DEBUG || DEVELOPER
+	/// Test-only method to update user and credentials
+	internal func setTestCredentials(user: PhotolalaUser, credentials: STSCredentials) {
+		self.currentUser = user
+		self.isSignedIn = true
+		self.stsCredentials = credentials
+	}
+	#endif
+
 	@MainActor
 	private func loadStoredSession() async {
 		guard let userData = await KeychainService.shared.load(key: "photolala.user"),
@@ -150,7 +159,7 @@ final class AccountManager: ObservableObject {
 	}
 
 	@MainActor
-	private func saveSession() async {
+	internal func saveSession() async {
 		let encoder = JSONEncoder()
 		encoder.dateEncodingStrategy = .iso8601
 
@@ -190,7 +199,7 @@ final class AccountManager: ObservableObject {
 		return try await coordinator.performSignIn(request: request)
 	}
 
-	nonisolated private func callAuthLambdaWithData(_ functionName: String, payloadData: Data) async throws -> AuthResult {
+	nonisolated internal func callAuthLambdaWithData(_ functionName: String, payloadData: Data) async throws -> AuthResult {
 		let functionFullName = await getFunctionName(functionName)
 		let responseData = try await invokeLambda(functionName: functionFullName, payload: payloadData)
 
@@ -207,7 +216,7 @@ final class AccountManager: ObservableObject {
 		}
 	}
 
-	nonisolated private func invokeLambda(functionName: String, payload: Data) async throws -> Data {
+	nonisolated internal func invokeLambda(functionName: String, payload: Data) async throws -> Data {
 		// Get shared client from singleton manager
 		let lambda = try await LambdaClientManager.shared.getClient()
 
@@ -244,7 +253,7 @@ final class AccountManager: ObservableObject {
 		return String(nonce)
 	}
 
-	private func getFunctionName(_ baseName: String) -> String {
+	internal func getFunctionName(_ baseName: String) -> String {
 		let environmentPreference = UserDefaults.standard.string(forKey: "environment_preference") ?? "development"
 		let suffix: String
 		switch environmentPreference {
@@ -491,6 +500,23 @@ extension AccountManager {
 
 		// Return for test inspection without backend processing
 		return (credential, nonce)
+	}
+
+	@MainActor
+	func performTestGoogleSignIn() async throws -> GoogleCredential {
+		// Create coordinator for standalone OAuth test
+		let coordinator = GoogleSignInCoordinator()
+
+		// Keep a strong reference during the sign-in
+		self.googleSignInCoordinator = coordinator
+		defer {
+			self.googleSignInCoordinator = nil
+		}
+
+		// Perform OAuth flow and return credential (no Lambda calls)
+		let credential = try await coordinator.performSignIn()
+
+		return credential
 	}
 }
 #endif
