@@ -94,6 +94,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 }
 #else
 class AppDelegate: UIResponder, UIApplicationDelegate {
+	// Support for orientation locking
+	static var orientationLock = UIInterfaceOrientationMask.all
+
 	func application(_ app: UIApplication, open url: URL, options: [UIApplication.OpenURLOptionsKey : Any] = [:]) -> Bool {
 		// Handle URLs opened via the app
 		if url.scheme == GoogleOAuthConfiguration.urlScheme {
@@ -108,6 +111,10 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
 		// Additional setup after app launch
 		print("App launched successfully")
 		return true
+	}
+
+	func application(_ application: UIApplication, supportedInterfaceOrientationsFor window: UIWindow?) -> UIInterfaceOrientationMask {
+		return AppDelegate.orientationLock
 	}
 }
 #endif

@@ -25,7 +25,13 @@ struct PhotolalaApp: App {
 
 	var body: some Scene {
 		WindowGroup {
-			ContentView()
+			HomeView()
+				#if os(iOS)
+				.portraitOnlyForiPhone()
+				#endif
+				#if os(macOS)
+				.frame(minWidth: 600, minHeight: 700)
+				#endif
 			// OAuth callbacks are handled by AppDelegate
 		}
 		#if os(macOS)
