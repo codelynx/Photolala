@@ -25,6 +25,11 @@ struct PhotoCollectionViewRepresentable: NSViewControllerRepresentable {
 	}
 
 	func updateNSViewController(_ controller: PhotoCollectionViewController, context: Context) {
+		// Update environment if source changed
+		if controller.environment.source !== environment.source {
+			controller.environment = environment
+		}
+
 		// Update photos if changed
 		if controller.photos != photos {
 			controller.photos = photos
@@ -59,6 +64,11 @@ struct PhotoCollectionViewRepresentable: UIViewControllerRepresentable {
 	}
 
 	func updateUIViewController(_ controller: PhotoCollectionViewController, context: Context) {
+		// Update environment if source changed
+		if controller.environment.source !== environment.source {
+			controller.environment = environment
+		}
+
 		// Update photos if changed
 		if controller.photos != photos {
 			controller.photos = photos

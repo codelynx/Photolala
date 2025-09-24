@@ -8,6 +8,7 @@
 import Foundation
 import OSLog
 import CryptoKit
+import AWSS3
 
 /// Service for browsing cloud-backed photo catalogs
 actor S3CloudBrowsingService {
@@ -34,37 +35,49 @@ actor S3CloudBrowsingService {
 
 	/// Load cloud catalog from S3
 	func loadCloudCatalog(userID: String) async throws -> CatalogDatabase {
-		logger.info("Loading cloud catalog for user: \(userID)")
+		logger.info("[S3CloudBrowsing] Loading cloud catalog for user: \(userID)")
 
-		// 1. Get catalog pointer
-		let pointer = try await s3Service.downloadCatalogPointer(userID: userID)
-		logger.debug("Found catalog pointer: \(pointer)")
+		do {
+			// 1. Get catalog pointer
+			logger.info("[S3CloudBrowsing] Downloading catalog pointer...")
+			let pointer = try await s3Service.downloadCatalogPointer(userID: userID)
+			logger.info("[S3CloudBrowsing] Found catalog pointer: \(pointer)")
 
-		// 2. Download catalog CSV
-		let csvData = try await s3Service.downloadCatalog(
-			catalogMD5: pointer,
-			userID: userID
-		)
-		logger.debug("Downloaded catalog: \(csvData.count) bytes")
+			// 2. Download catalog CSV
+			let csvData = try await s3Service.downloadCatalog(
+				catalogMD5: pointer,
+				userID: userID
+			)
+			logger.debug("[S3CloudBrowsing] Downloaded catalog: \(csvData.count) bytes")
 
-		// 3. Create temporary file for CSV
-		let tempPath = FileManager.default.temporaryDirectory
-			.appendingPathComponent("cloud-catalog-\(pointer).csv")
+			// 3. Create temporary file for CSV
+			let tempPath = FileManager.default.temporaryDirectory
+				.appendingPathComponent("cloud-catalog-\(pointer).csv")
 
-		// Write CSV data
-		try csvData.write(to: tempPath)
+			// Write CSV data
+			try csvData.write(to: tempPath)
 
-		// 4. Create read-only database from CSV
-		let database = try await CatalogDatabase(path: tempPath, readOnly: true)
+			// 4. Create read-only database from CSV
+			let database = try await CatalogDatabase(path: tempPath, readOnly: true)
 
-		// Cache for reuse
-		self.cloudDatabase = database
-		self.currentUserID = userID
+			// Cache for reuse
+			self.cloudDatabase = database
+			self.currentUserID = userID
 
-		let entryCount = await database.getEntryCount()
-		logger.info("Loaded cloud catalog with \(entryCount) entries")
+			let entryCount = await database.getEntryCount()
+			logger.info("[S3CloudBrowsing] Loaded cloud catalog with \(entryCount) entries")
 
-		return database
+			return database
+
+		} catch let error as AWSS3.NoSuchKey {
+			// Handle case where user has no catalog yet
+			logger.info("[S3CloudBrowsing] No catalog exists for user \(userID) yet")
+			logger.info("[S3CloudBrowsing] This is expected for new users who haven't uploaded photos")
+			throw error  // Re-throw to be handled by S3PhotoSource
+		} catch {
+			logger.error("[S3CloudBrowsing] Failed to load catalog: \(error)")
+			throw error
+		}
 	}
 
 	/// Get cached cloud catalog

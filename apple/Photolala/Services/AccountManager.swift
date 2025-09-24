@@ -81,7 +81,9 @@ final class AccountManager: ObservableObject {
 		print("[AccountManager] ✓ Sign-in successful, user ID: \(result.user.id)")
 		self.currentUser = result.user
 		self.stsCredentials = result.credentials
+		print("[AccountManager] Setting isSignedIn = true after Google sign-in")
 		self.isSignedIn = true
+		print("[AccountManager] isSignedIn is now: \(self.isSignedIn)")
 		await saveSession()
 
 		return result.user
@@ -113,7 +115,9 @@ final class AccountManager: ObservableObject {
 
 		self.currentUser = result.user
 		self.stsCredentials = result.credentials
+		print("[AccountManager] Setting isSignedIn = true after Apple sign-in")
 		self.isSignedIn = true
+		print("[AccountManager] isSignedIn is now: \(self.isSignedIn)")
 		await saveSession()
 
 		return result.user

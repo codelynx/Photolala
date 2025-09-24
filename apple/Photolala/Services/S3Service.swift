@@ -308,29 +308,57 @@ public actor S3Service {
 		try await ensureInitialized()
 
 		let key = "catalogs/\(userID)/.photolala.md5"
+		logger.info("[S3Service] Attempting to download catalog pointer")
+		logger.info("[S3Service]   Bucket: \(self.bucketName)")
+		logger.info("[S3Service]   Key: \(key)")
+		logger.info("[S3Service]   User ID: \(userID)")
 
 		let input = GetObjectInput(
 			bucket: bucketName,
 			key: key
 		)
 
-		guard let client = client else { throw S3Error.clientNotInitialized }
-		let response = try await client.getObject(input: input)
-		guard let data = try await response.body?.readData() else {
-			throw S3Error.downloadFailed
+		guard let client = client else {
+			logger.error("[S3Service] Client not initialized")
+			throw S3Error.clientNotInitialized
 		}
 
-		guard let pointer = String(data: data, encoding: .utf8)?
-			.trimmingCharacters(in: .whitespacesAndNewlines) else {
-			throw S3Error.invalidData
-		}
+		do {
+			let response = try await client.getObject(input: input)
+			logger.info("[S3Service] Successfully got object response")
 
-		return pointer
+			guard let data = try await response.body?.readData() else {
+				logger.error("[S3Service] Failed to read response body")
+				throw S3Error.downloadFailed
+			}
+			logger.info("[S3Service] Read \(data.count) bytes from catalog pointer")
+
+			guard let pointer = String(data: data, encoding: .utf8)?
+				.trimmingCharacters(in: .whitespacesAndNewlines) else {
+				logger.error("[S3Service] Failed to decode pointer as UTF-8")
+				throw S3Error.invalidData
+			}
+
+			logger.info("[S3Service] Successfully retrieved catalog pointer: \(pointer)")
+			return pointer
+
+		} catch let error as AWSS3.NoSuchKey {
+			logger.error("[S3Service] NoSuchKey error - catalog pointer not found")
+			logger.error("[S3Service]   Expected location: s3://\(self.bucketName)/\(key)")
+			logger.error("[S3Service]   This means the user has no catalog uploaded yet")
+			throw error
+		} catch {
+			logger.error("[S3Service] Failed to download catalog pointer: \(error)")
+			throw error
+		}
 	}
 
 	/// Download catalog CSV
 	func downloadCatalog(catalogMD5: String, userID: String) async throws -> Data {
 		try await ensureInitialized()
+		logger.info("[S3Service] Downloading catalog CSV")
+		logger.info("[S3Service]   Catalog MD5: \(catalogMD5)")
+		logger.info("[S3Service]   User ID: \(userID)")
 
 		let key = "catalogs/\(userID)/.photolala.\(catalogMD5).csv"
 

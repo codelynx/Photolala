@@ -2,56 +2,64 @@
 //  PhotoBrowserView.swift
 //  Photolala
 //
-//  Main photo browser view with dependency injection
+//  Pure view for displaying photos - no source management
 //
 
 import SwiftUI
 import Combine
 
 struct PhotoBrowserView: View {
-	// Injected environment
+	// Immutable environment passed in from parent
 	let environment: PhotoBrowserEnvironment
-
-	// View model
-	@State private var model: Model
-
-	// Display settings
-	@State private var settings = PhotoBrowserSettings()
-
-	// Navigation title
 	let title: String
 
-	init(environment: PhotoBrowserEnvironment, title: String = "Photos") {
+	// View state
+	@State private var model = Model()
+	@State private var settings = PhotoBrowserSettings()
+
+	// Optional callbacks
+	let onItemTapped: ((PhotoBrowserItem) -> Void)?
+	let onSelectionChanged: ((Set<PhotoBrowserItem>) -> Void)?
+
+	init(environment: PhotoBrowserEnvironment,
+	     title: String = "Photos",
+	     onItemTapped: ((PhotoBrowserItem) -> Void)? = nil,
+	     onSelectionChanged: ((Set<PhotoBrowserItem>) -> Void)? = nil) {
 		self.environment = environment
 		self.title = title
-		self._model = State(initialValue: Model())
+		self.onItemTapped = onItemTapped
+		self.onSelectionChanged = onSelectionChanged
 	}
 
 	var body: some View {
-		PhotoCollectionViewRepresentable(
-			photos: model.photos,
-			selection: $model.selection,
-			environment: environment,
-			settings: settings,
-			onItemTapped: { item in
-				// Handle single tap - could show detail view
-				print("[PhotoBrowser] Tapped item: \(item.displayName)")
+		ZStack {
+			PhotoCollectionViewRepresentable(
+				photos: model.photos,
+				selection: $model.selection,
+				environment: environment,
+				settings: settings,
+				onItemTapped: { item in
+					onItemTapped?(item)
+					print("[PhotoBrowser] Tapped item: \(item.displayName)")
+				}
+			)
+
+			// Loading overlay for initial load
+			if model.isLoading && model.photos.isEmpty {
+				loadingOverlay
 			}
-		)
+
+			// Empty state
+			if !model.isLoading && model.photos.isEmpty {
+				emptyStateView
+			}
+		}
 		.navigationTitle(title)
 		#if os(macOS)
 		.navigationSubtitle("\(model.photos.count) photos")
 		#endif
 		.toolbar {
-			#if os(macOS)
-			ToolbarItem(placement: .navigation) {
-				Button(action: toggleSidebar) {
-					Image(systemName: "sidebar.left")
-				}
-			}
-			#endif
-
-			// Group items on the right side
+			// Display settings controls
 			ToolbarItemGroup(placement: .primaryAction) {
 				// Thumbnail size control
 				Picker("", selection: $settings.thumbnailSize) {
@@ -62,11 +70,8 @@ struct PhotoBrowserView: View {
 				}
 				.pickerStyle(.segmented)
 				.fixedSize()
-				#if os(iOS)
-				.scaleEffect(0.9) // Slightly smaller on iOS
-				#endif
 
-				// Fit/Fill toggle button
+				// Fit/Fill toggle
 				Button(action: {
 					settings.displayMode = settings.displayMode == .fit ? .fill : .fit
 				}) {
@@ -76,11 +81,8 @@ struct PhotoBrowserView: View {
 						.help(settings.displayMode == .fit ? "Switch to Fill" : "Switch to Fit")
 				}
 				.buttonStyle(.plain)
-				#if os(iOS)
-				.padding(.leading, 4)
-				#endif
 
-				// Info bar toggle button
+				// Info bar toggle
 				Button(action: {
 					settings.showInfoBar.toggle()
 				}) {
@@ -88,9 +90,6 @@ struct PhotoBrowserView: View {
 						.help(settings.showInfoBar ? "Hide Info Bar" : "Show Info Bar")
 				}
 				.buttonStyle(.plain)
-				#if os(iOS)
-				.padding(.leading, 4)
-				#endif
 
 				if model.isLoading {
 					ProgressView()
@@ -123,9 +122,6 @@ struct PhotoBrowserView: View {
 		.task {
 			await loadPhotos()
 		}
-		.onDisappear {
-			// View cleanup if needed
-		}
 		.onReceive(environment.source.photosPublisher) { newPhotos in
 			withAnimation(.easeInOut(duration: 0.2)) {
 				model.photos = newPhotos
@@ -134,15 +130,68 @@ struct PhotoBrowserView: View {
 		.onReceive(environment.source.isLoadingPublisher) { isLoading in
 			model.isLoading = isLoading
 		}
+		.onChange(of: model.selection) { _, newSelection in
+			onSelectionChanged?(newSelection)
+		}
+	}
+
+	// MARK: - UI Components
+
+	@ViewBuilder
+	private var loadingOverlay: some View {
+		VStack(spacing: 20) {
+			ProgressView()
+				.scaleEffect(1.5)
+			Text("Loading photos...")
+				.font(.headline)
+				.foregroundColor(.secondary)
+		}
+		.frame(maxWidth: .infinity, maxHeight: .infinity)
+		#if os(macOS)
+		.background(Color(NSColor.windowBackgroundColor).opacity(0.95))
+		#else
+		.background(Color(UIColor.systemBackground).opacity(0.95))
+		#endif
+	}
+
+	@ViewBuilder
+	private var emptyStateView: some View {
+		VStack(spacing: 20) {
+			if environment.source is S3PhotoSource {
+				// Cloud-specific empty state
+				Image(systemName: "icloud.slash")
+					.font(.system(size: 60))
+					.foregroundColor(.secondary)
+				Text("No Cloud Photos")
+					.font(.title2)
+					.bold()
+				Text("Upload photos to the cloud to see them here")
+					.foregroundColor(.secondary)
+			} else {
+				// Generic empty state
+				Image(systemName: "photo.on.rectangle.angled")
+					.font(.system(size: 60))
+					.foregroundColor(.secondary)
+				Text("No Photos")
+					.font(.title2)
+					.bold()
+				Text("This location doesn't contain any photos")
+					.foregroundColor(.secondary)
+			}
+		}
+		.frame(maxWidth: .infinity, maxHeight: .infinity)
+		#if os(macOS)
+		.background(Color(NSColor.windowBackgroundColor).opacity(0.95))
+		#else
+		.background(Color(UIColor.systemBackground).opacity(0.95))
+		#endif
 	}
 
 	// MARK: - Actions
 
 	private func loadPhotos() async {
 		model.isLoading = true
-		defer {
-			model.isLoading = false
-		}
+		defer { model.isLoading = false }
 
 		do {
 			let photos = try await environment.source.loadPhotos()
@@ -151,7 +200,7 @@ struct PhotoBrowserView: View {
 			}
 		} catch {
 			print("[PhotoBrowser] Failed to load photos: \(error)")
-			// TODO: Show error alert
+			// Just log - let the parent handle errors if needed
 		}
 	}
 
@@ -168,15 +217,6 @@ struct PhotoBrowserView: View {
 	private func deselectAll() {
 		model.selection.removeAll()
 	}
-
-	#if os(macOS)
-	private func toggleSidebar() {
-		NSApp.keyWindow?.firstResponder?.tryToPerform(
-			#selector(NSSplitViewController.toggleSidebar(_:)),
-			with: nil
-		)
-	}
-	#endif
 }
 
 // MARK: - View Model
@@ -187,7 +227,6 @@ extension PhotoBrowserView {
 		var photos: [PhotoBrowserItem] = []
 		var selection = Set<PhotoBrowserItem>()
 		var isLoading = false
-		var error: Error?
 
 		var hasSelection: Bool {
 			!selection.isEmpty

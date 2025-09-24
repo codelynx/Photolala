@@ -21,9 +21,54 @@ enum PhotoBrowserDestination: Hashable {
 	case cloudPhotos
 }
 
+// Helper view to load cloud photos asynchronously
+struct CloudPhotosLoaderView: View {
+	@State private var cloudSource: S3PhotoSource?
+	@State private var isLoading = true
+	@State private var errorMessage: String?
+
+	var body: some View {
+		if isLoading {
+			VStack {
+				ProgressView("Loading Cloud Photos...")
+					.scaleEffect(1.2)
+				Text("Connecting to Photolala Cloud")
+					.font(.caption)
+					.foregroundColor(.secondary)
+			}
+			.frame(maxWidth: .infinity, maxHeight: .infinity)
+			.task {
+				do {
+					let source = try await S3PhotoSource()
+					cloudSource = source
+					isLoading = false
+				} catch {
+					errorMessage = error.localizedDescription
+					isLoading = false
+				}
+			}
+		} else if let source = cloudSource {
+			let environment = PhotoBrowserEnvironment(source: source)
+			PhotoBrowserView(environment: environment, title: "Cloud Photos")
+		} else if let error = errorMessage {
+			VStack {
+				Image(systemName: "exclamationmark.triangle")
+					.font(.largeTitle)
+					.foregroundColor(.red)
+				Text("Failed to load cloud photos")
+					.font(.title2)
+				Text(error)
+					.font(.caption)
+					.foregroundColor(.secondary)
+			}
+		}
+	}
+}
+
 struct HomeView: View {
 	@State private var navigationPath = NavigationPath()
 	@State private var model = Model()
+	@StateObject private var accountManager = AccountManager.shared
 
 	private var welcomeMessage: String {
 		#if os(macOS)
@@ -307,6 +352,11 @@ struct HomeView: View {
 		.task {
 			await model.checkSignInStatus()
 		}
+		.onChange(of: accountManager.isSignedIn) { _, _ in
+			Task {
+				await model.checkSignInStatus()
+			}
+		}
 		#if os(iOS)
 		.sheet(isPresented: $model.showingFolderPicker) {
 			DocumentPickerView(
@@ -333,6 +383,15 @@ struct HomeView: View {
 			}
 		}
 		#endif
+		.sheet(isPresented: $model.showingSignIn) {
+			CloudAuthenticationView(isPresented: $model.showingSignIn)
+				.onDisappear {
+					// Check sign-in status after dismissal
+					Task {
+						await model.checkSignInStatus()
+					}
+				}
+		}
 	}
 
 	@ViewBuilder
@@ -359,10 +418,8 @@ struct HomeView: View {
 				#endif
 
 		case .cloudPhotos:
-			// TODO: Implement S3PhotoSource
-			Text("Cloud Photos - Coming Soon")
-				.font(.title)
-				.foregroundStyle(.secondary)
+			// Create cloud photo source asynchronously
+			CloudPhotosLoaderView()
 		}
 	}
 }
@@ -394,8 +451,8 @@ extension HomeView {
 		func checkSignInStatus() async {
 			// Check if user is signed in
 			currentUser = AccountManager.shared.getCurrentUser()
-			isSignedIn = currentUser != nil
-			print("[HomeView] Sign-in status checked: \(isSignedIn ? "Signed in" : "Not signed in")")
+			isSignedIn = AccountManager.shared.isSignedIn
+			print("[HomeView] Sign-in status checked: \(isSignedIn ? "Signed in as \(currentUser?.displayName ?? "unknown")" : "Not signed in")")
 		}
 
 		@MainActor
@@ -421,7 +478,16 @@ extension HomeView {
 		func openCloudPhotos() {
 			print("[HomeView] Cloud photos tapped")
 			#if os(macOS)
-			// TODO: Show cloud photos in sheet
+			// Open cloud photos in a new window
+			Task { @MainActor in
+				do {
+					let cloudSource = try await S3PhotoSource()
+					let environment = PhotoBrowserEnvironment(source: cloudSource)
+					PhotoWindowManager.shared.openCloudPhotosWindow(environment: environment)
+				} catch {
+					print("[HomeView] Failed to create cloud source: \(error)")
+				}
+			}
 			#else
 			// On iOS, use navigation
 			pendingDestination = .cloudPhotos

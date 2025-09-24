@@ -21,7 +21,7 @@ class PhotoCollectionViewController: NSViewController {
 	private var dataSource: NSCollectionViewDiffableDataSource<Int, String>!
 
 	// Environment
-	let environment: PhotoBrowserEnvironment
+	var environment: PhotoBrowserEnvironment
 
 	// Settings
 	let settings: PhotoBrowserSettings
@@ -222,7 +222,7 @@ class PhotoCollectionViewController: UIViewController {
 	private var dataSource: UICollectionViewDiffableDataSource<Int, String>!
 
 	// Environment
-	let environment: PhotoBrowserEnvironment
+	var environment: PhotoBrowserEnvironment
 
 	// Settings
 	let settings: PhotoBrowserSettings

@@ -95,6 +95,39 @@ class PhotoWindowManager {
 		window.makeKeyAndOrderFront(nil)
 	}
 
+	func openCloudPhotosWindow(environment: PhotoBrowserEnvironment) {
+		// Create the content view with NavigationStack
+		let contentView = NavigationStack {
+			PhotoBrowserView(environment: environment, title: "Cloud Photos")
+				.navigationTitle("Cloud Photos")
+				.navigationSubtitle("Photolala Cloud")
+		}
+
+		// Create and configure window
+		let window = createWindow(
+			withTitle: "Cloud Photos",
+			contentView: AnyView(contentView)
+		)
+
+		// Create window controller
+		let windowController = NSWindowController(window: window)
+		windowControllers.append(windowController)
+
+		// Clean up when window closes
+		let token = NotificationCenter.default.addObserver(
+			forName: NSWindow.willCloseNotification,
+			object: window,
+			queue: .main
+		) { [weak self] _ in
+			self?.cleanupWindowController(windowController)
+		}
+		observerTokens[windowController] = token
+
+		// Show the window
+		windowController.showWindow(nil)
+		window.makeKeyAndOrderFront(nil)
+	}
+
 	private func cleanupWindowController(_ windowController: NSWindowController) {
 		// Remove observer token
 		if let token = observerTokens[windowController] {
