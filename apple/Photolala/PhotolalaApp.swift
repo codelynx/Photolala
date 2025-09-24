@@ -16,6 +16,10 @@ struct PhotolalaApp: App {
 	@UIApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
 	#endif
 
+	#if os(iOS)
+	@State private var showBasketView = false
+	#endif
+
 	init() {
 		print("=========================================")
 		print("[App] Photolala starting...")
@@ -28,6 +32,11 @@ struct PhotolalaApp: App {
 			HomeView()
 				#if os(iOS)
 				.portraitOnlyForiPhone()
+				.sheet(isPresented: $showBasketView) {
+					NavigationStack {
+						PhotoBasketHostView()
+					}
+				}
 				#endif
 				#if os(macOS)
 				.frame(minWidth: 600, minHeight: 700)
@@ -37,10 +46,29 @@ struct PhotolalaApp: App {
 		#if os(macOS)
 		.handlesExternalEvents(matching: ["main"])  // Only open for main window events
 		#endif
-		#if os(macOS) && DEVELOPER
 		.commands {
+			#if os(macOS) && DEVELOPER
 			DeveloperMenuCommands()
+			#endif
+			// Basket commands
+			CommandGroup(after: .toolbar) {
+				Button("Open Photo Basket") {
+					#if os(macOS)
+					PhotoWindowManager.shared.openBasketWindow()
+					#else
+					showBasketView = true
+					#endif
+				}
+				.keyboardShortcut("b", modifiers: .command)
+
+				Divider()
+
+				Button("Clear Basket") {
+					PhotoBasket.shared.clear()
+				}
+				.keyboardShortcut("b", modifiers: [.command, .shift])
+				.disabled(PhotoBasket.shared.isEmpty)
+			}
 		}
-		#endif
 	}
 }

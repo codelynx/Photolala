@@ -25,6 +25,9 @@ class PhotoCellView: XView {
 	private var displayMode: ThumbnailDisplayMode = .fill
 	private var showInfoBar: Bool = false
 	private var currentItem: PhotoBrowserItem?
+	private var currentSource: (any PhotoSourceProtocol)?
+	private var currentSourceURL: URL? // For local sources - kept for basket context
+	private var currentSourceIdentifier: String? // Source-specific ID - kept for basket context
 
 	// MARK: - Initialization
 	override init(frame: CGRect) {
@@ -200,8 +203,10 @@ class PhotoCellView: XView {
 
 	// MARK: - Public API
 	func configure(with item: PhotoBrowserItem, source: any PhotoSourceProtocol, displayMode: ThumbnailDisplayMode = .fill, showInfoBar: Bool = false) {
-		// Store current item
+		// Store current item and source context (for future basket operations)
 		currentItem = item
+		currentSource = source
+		// Note: sourceURL and sourceIdentifier will be resolved when needed for basket operations
 
 		// Update display mode if changed
 		if self.displayMode != displayMode {
