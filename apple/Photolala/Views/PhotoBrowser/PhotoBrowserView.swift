@@ -8,10 +8,18 @@
 import SwiftUI
 import Combine
 
+// MARK: - Browser Mode
+
+enum PhotoBrowserMode {
+	case standard  // Normal photo browsing
+	case basket    // Basket view (no add operations)
+}
+
 struct PhotoBrowserView: View {
 	// Immutable environment passed in from parent
 	let environment: PhotoBrowserEnvironment
 	let title: String
+	let mode: PhotoBrowserMode
 
 	// View state
 	@State private var model = Model()
@@ -27,10 +35,12 @@ struct PhotoBrowserView: View {
 
 	init(environment: PhotoBrowserEnvironment,
 	     title: String = "Photos",
+	     mode: PhotoBrowserMode = .standard,
 	     onItemTapped: ((PhotoBrowserItem) -> Void)? = nil,
 	     onSelectionChanged: ((Set<PhotoBrowserItem>) -> Void)? = nil) {
 		self.environment = environment
 		self.title = title
+		self.mode = mode
 		self.onItemTapped = onItemTapped
 		self.onSelectionChanged = onSelectionChanged
 	}
@@ -100,37 +110,67 @@ struct PhotoBrowserView: View {
 						.scaleEffect(0.8)
 				}
 
-				// Selection-based basket actions
-				if model.hasSelection {
-					if selectionInBasket() {
-						// Show remove button when selection is in basket
-						Button(action: removeSelectionFromBasket) {
-							HStack(spacing: 2) {
-								Image(systemName: "basket")
-								Image(systemName: "minus.circle.fill")
-									.foregroundColor(.red)
+				// Context-specific basket actions
+				if mode == .standard {
+					// Standard mode: show add/remove basket actions
+					if model.hasSelection {
+						if selectionInBasket() {
+							// Show remove button when selection is in basket
+							Button(action: removeSelectionFromBasket) {
+								HStack(spacing: 2) {
+									Image(systemName: "basket")
+									Image(systemName: "minus.circle.fill")
+										.foregroundColor(.red)
+								}
 							}
-						}
-						.buttonStyle(.plain)
-						.help("Remove selected items from basket (⌥B)")
-						.keyboardShortcut("b", modifiers: .option)
-					} else {
-						// Show add button when selection is not in basket (or mixed)
-						Button(action: addSelectionToBasket) {
-							HStack(spacing: 2) {
-								Image(systemName: "basket")
-								Image(systemName: "plus.circle.fill")
-									.foregroundColor(.green)
+							.buttonStyle(.plain)
+							.help("Remove selected items from basket (⌥B)")
+							.keyboardShortcut("b", modifiers: .option)
+						} else {
+							// Show add button when selection is not in basket (or mixed)
+							Button(action: addSelectionToBasket) {
+								HStack(spacing: 2) {
+									Image(systemName: "basket")
+									Image(systemName: "plus.circle.fill")
+										.foregroundColor(.green)
+								}
 							}
+							.buttonStyle(.plain)
+							.help("Add selected items to basket (B)")
+							.keyboardShortcut("b", modifiers: [])
 						}
-						.buttonStyle(.plain)
-						.help("Add selected items to basket (B)")
-						.keyboardShortcut("b", modifiers: [])
 					}
-				}
 
-				// Basket badge
-				BasketBadgeView()
+					// Basket badge - only in standard mode
+					BasketBadgeView()
+				} else {
+					// Basket mode: show batch actions and stats
+					if model.hasSelection {
+						// Remove from basket button
+						Button(action: removeSelectionFromBasket) {
+							Label("Remove", systemImage: "trash")
+								.foregroundColor(.red)
+						}
+						.buttonStyle(.plain)
+						.help("Remove selected items from basket (Delete)")
+						.keyboardShortcut(.delete, modifiers: [])
+
+						// Selection stats
+						Text("\(model.selection.count) selected")
+							.font(.caption)
+							.foregroundColor(.secondary)
+					}
+
+					// Clear all button
+					Button(action: clearBasket) {
+						Label("Clear All", systemImage: "trash.fill")
+							.foregroundColor(.red)
+					}
+					.buttonStyle(.plain)
+					.help("Clear entire basket (⌘K)")
+					.keyboardShortcut("k", modifiers: .command)
+					.disabled(PhotoBasket.shared.isEmpty)
+				}
 			}
 
 			ToolbarItem(placement: .primaryAction) {
@@ -323,6 +363,29 @@ struct PhotoBrowserView: View {
 			message: "Removed \(count) item\(count == 1 ? "" : "s") from basket",
 			type: .info
 		)
+
+		// In basket mode, update photos after removal
+		if mode == .basket {
+			Task {
+				_ = try? await environment.source.loadPhotos()
+			}
+		}
+	}
+
+	private func clearBasket() {
+		let count = PhotoBasket.shared.count
+		PhotoBasket.shared.clear()
+
+		// Show toast
+		basketToast = BasketToast(
+			message: "Cleared \(count) item\(count == 1 ? "" : "s") from basket",
+			type: .info
+		)
+
+		// Update view
+		Task {
+			_ = try? await environment.source.loadPhotos()
+		}
 	}
 
 	private func selectionInBasket() -> Bool {

@@ -16,6 +16,7 @@ class PhotoWindowManager {
 
 	private var windowControllers: [NSWindowController] = []
 	private var observerTokens: [NSWindowController: NSObjectProtocol] = [:]
+	private var basketWindowController: NSWindowController?
 
 	private init() {}
 
@@ -129,15 +130,27 @@ class PhotoWindowManager {
 	}
 
 	func openBasketWindow() {
+		// If basket window is already open, just bring it to front
+		if let existingController = basketWindowController,
+		   let window = existingController.window,
+		   window.isVisible {
+			window.makeKeyAndOrderFront(nil)
+			return
+		}
+
 		// Create basket photo source
 		let source = BasketPhotoProvider()
 		let environment = PhotoBrowserEnvironment(source: source)
 
-		// Create the content view with NavigationStack
+		// Create the content view with NavigationStack and basket mode
 		let contentView = NavigationStack {
-			PhotoBrowserView(environment: environment, title: "Photo Basket")
-				.navigationTitle("Photo Basket")
-				.navigationSubtitle("\(PhotoBasket.shared.count) items")
+			PhotoBrowserView(
+				environment: environment,
+				title: "Photo Basket",
+				mode: .basket  // Pass basket mode
+			)
+			.navigationTitle("Photo Basket")
+			.navigationSubtitle("\(PhotoBasket.shared.count) items")
 		}
 
 		// Create and configure window
@@ -146,9 +159,14 @@ class PhotoWindowManager {
 			contentView: AnyView(contentView)
 		)
 
+		// Add unique basket icon to window
+		window.representedURL = URL(fileURLWithPath: "/")
+		window.standardWindowButton(.documentIconButton)?.image = NSImage(systemSymbolName: "basket.fill", accessibilityDescription: "Basket")
+
 		// Create window controller
 		let windowController = NSWindowController(window: window)
 		windowControllers.append(windowController)
+		basketWindowController = windowController
 
 		// Clean up when window closes
 		let token = NotificationCenter.default.addObserver(
@@ -156,7 +174,7 @@ class PhotoWindowManager {
 			object: window,
 			queue: .main
 		) { [weak self] _ in
-			self?.cleanupWindowController(windowController)
+			self?.cleanupBasketWindow(windowController)
 		}
 		observerTokens[windowController] = token
 
@@ -174,6 +192,16 @@ class PhotoWindowManager {
 
 		// Remove window controller
 		windowControllers.removeAll { $0 === windowController }
+	}
+
+	private func cleanupBasketWindow(_ windowController: NSWindowController) {
+		// Clear basket window reference
+		if basketWindowController === windowController {
+			basketWindowController = nil
+		}
+
+		// Call general cleanup
+		cleanupWindowController(windowController)
 	}
 
 	private func createWindow(withTitle title: String, contentView: AnyView) -> NSWindow {

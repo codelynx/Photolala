@@ -11,9 +11,17 @@ struct BasketBadgeView: View {
 	@StateObject private var basket = PhotoBasket.shared
 	@State private var showBasketView = false
 	@State private var isAnimating = false
+	let isInBasketView: Bool
+
+	init(isInBasketView: Bool = false) {
+		self.isInBasketView = isInBasketView
+	}
 
 	var body: some View {
 		Button(action: {
+			// Don't open if we're already in basket view
+			guard !isInBasketView else { return }
+
 			#if os(macOS)
 			// Use window manager on macOS
 			PhotoWindowManager.shared.openBasketWindow()
