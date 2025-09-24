@@ -5,7 +5,8 @@
       "Bash(swift:*)",
       "Bash(cat:*)",
       "Bash(aws lambda invoke:*)",
-      "Bash(aws iam list-user-policies:*)"
+      "Bash(aws iam list-user-policies:*)",
+      "Bash(swiftc:*)"
     ],
     "deny": [],
     "ask": []
