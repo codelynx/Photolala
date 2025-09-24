@@ -38,6 +38,7 @@ final class BasketActionService: ObservableObject {
 	private let catalogService: CatalogService?
 	private let s3Service: S3Service?
 	private var uploadCoordinator: BasketUploadCoordinator?
+	private let catalogCache: LocalCatalogCache?
 
 	// Current operation
 	private var currentTask: Task<Void, Error>?
@@ -45,6 +46,13 @@ final class BasketActionService: ObservableObject {
 	init(catalogService: CatalogService? = nil, s3Service: S3Service? = nil) {
 		self.catalogService = catalogService
 		self.s3Service = s3Service
+
+		// Initialize catalog cache if catalog service is available
+		if let catalogService = catalogService {
+			self.catalogCache = LocalCatalogCache(catalogService: catalogService)
+		} else {
+			self.catalogCache = nil
+		}
 	}
 
 	// MARK: - Public API
@@ -98,7 +106,8 @@ final class BasketActionService: ObservableObject {
 			}
 			uploadCoordinator = await BasketUploadCoordinator(
 				s3Service: s3Service,
-				catalogService: catalogService
+				catalogService: catalogService,
+				catalogCache: catalogCache
 			)
 		}
 
@@ -247,6 +256,7 @@ actor BasketUploadCoordinator {
 	private let logger = Logger(subsystem: "com.photolala", category: "BasketUploadCoordinator")
 	private let s3Service: S3Service
 	private let catalogService: CatalogService?
+	private let catalogCache: LocalCatalogCache?
 
 	// Upload queue - stores items with their computed MD5s
 	private var uploadQueue: [(item: BasketItem, md5: String?)] = []
@@ -255,9 +265,10 @@ actor BasketUploadCoordinator {
 	// Progress tracking
 	private var uploadProgress = PassthroughSubject<BasketActionProgress, Never>()
 
-	init(s3Service: S3Service, catalogService: CatalogService? = nil) {
+	init(s3Service: S3Service, catalogService: CatalogService? = nil, catalogCache: LocalCatalogCache? = nil) {
 		self.s3Service = s3Service
 		self.catalogService = catalogService
+		self.catalogCache = catalogCache
 	}
 
 	func queueForUpload(item: BasketItem) {
@@ -335,6 +346,9 @@ actor BasketUploadCoordinator {
 			if let catalogService = catalogService {
 				try await catalogService.starEntry(entry)
 				logger.info("Added \(item.displayName) to catalog (starred)")
+
+				// Update local cache
+				await self.catalogCache?.addToCache(md5: photoMD5)
 			}
 
 			// TODO: Actually upload to S3
