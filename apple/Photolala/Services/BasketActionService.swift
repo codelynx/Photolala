@@ -102,7 +102,8 @@ final class BasketActionService: ObservableObject {
 
 		// Resume the appropriate action
 		if let action = BasketAction(rawValue: checkpoint.action) {
-			try await executeAction(action, items: unprocessedItems)
+			// Execute action with the resumed checkpoint (don't create a new one)
+			try await executeActionWithCheckpoint(action, items: unprocessedItems, checkpoint: checkpoint)
 		} else {
 			throw BasketActionError.unsupportedAction(checkpoint.action)
 		}
@@ -114,6 +115,16 @@ final class BasketActionService: ObservableObject {
 	}
 
 	// MARK: - Star Implementation
+
+	/// Execute action with existing checkpoint (for resume)
+	private func executeActionWithCheckpoint(_ action: BasketAction, items: [BasketItem], checkpoint: StarCheckpoint) async throws {
+		switch action {
+		case .star:
+			try await starItemsWithCheckpoint(items, checkpoint: checkpoint)
+		default:
+			throw BasketActionError.unsupportedAction(action.rawValue)
+		}
+	}
 
 	private func starItems(_ items: [BasketItem]) async throws {
 		logger.info("Starting star operation for \(items.count) items")
@@ -129,20 +140,33 @@ final class BasketActionService: ObservableObject {
 		// Create checkpoint for resumability
 		let checkpoint = checkpointManager.createCheckpoint(action: .star, items: supportedItems)
 
-		// Initialize upload coordinator if needed
+		try await starItemsWithCheckpoint(supportedItems, checkpoint: checkpoint)
+	}
+
+	/// Core star implementation that works with both new and resumed checkpoints
+	private func starItemsWithCheckpoint(_ items: [BasketItem], checkpoint: StarCheckpoint) async throws {
+		logger.info("Processing star operation with checkpoint \(checkpoint.id)")
+
+		// Initialize or update upload coordinator
+		guard let s3Service = s3Service else {
+			throw BasketActionError.missingDependency("S3Service")
+		}
+
 		if uploadCoordinator == nil {
-			guard let s3Service = s3Service else {
-				throw BasketActionError.missingDependency("S3Service")
-			}
 			uploadCoordinator = await BasketUploadCoordinator(
 				s3Service: s3Service,
 				catalogService: catalogService,
-				catalogCache: catalogCache
+				catalogCache: catalogCache,
+				checkpointManager: checkpointManager,
+				checkpointId: checkpoint.id
 			)
+		} else {
+			// Update checkpoint ID for existing coordinator
+			await uploadCoordinator?.updateCheckpointId(checkpoint.id)
 		}
 
 		// Process each item
-		for (index, item) in supportedItems.enumerated() {
+		for (index, item) in items.enumerated() {
 			// Check for cancellation
 			try Task.checkCancellation()
 
@@ -150,46 +174,25 @@ final class BasketActionService: ObservableObject {
 			currentProgress = BasketActionProgress(
 				action: .star,
 				currentItem: index + 1,
-				totalItems: supportedItems.count,
+				totalItems: items.count,
 				currentItemName: item.displayName,
 				message: "Computing MD5 for \(item.displayName)...",
 				isComplete: false,
 				error: nil
 			)
 
-			do {
-				// Queue for processing (coordinator will handle MD5 computation and catalog update)
-				await uploadCoordinator?.queueForUpload(item: item)
-				logger.debug("Queued item for star: \(item.displayName)")
-
-				// Mark as processed in checkpoint
-				checkpointManager.markItemProcessed(
-					checkpointId: checkpoint.id,
-					basketItemId: item.id,
-					displayName: item.displayName,
-					md5: nil, // MD5 will be computed during upload
-					uploaded: false
-				)
-			} catch {
-				// Mark as failed in checkpoint
-				checkpointManager.markItemFailed(
-					checkpointId: checkpoint.id,
-					basketItemId: item.id,
-					displayName: item.displayName,
-					error: error.localizedDescription
-				)
-				logger.error("Failed to queue \(item.displayName): \(error)")
-				// Continue with next item
-			}
+			// Queue for processing (coordinator will handle MD5 computation and catalog update)
+			await uploadCoordinator?.queueForUpload(item: item)
+			logger.debug("Queued item for star: \(item.displayName)")
 		}
 
 		// Mark complete
 		currentProgress = BasketActionProgress(
 			action: .star,
-			currentItem: supportedItems.count,
-			totalItems: supportedItems.count,
+			currentItem: items.count,
+			totalItems: items.count,
 			currentItemName: "",
-			message: "Starred \(supportedItems.count) items for upload",
+			message: "Starred \(items.count) items for upload",
 			isComplete: true,
 			error: nil
 		)
@@ -308,6 +311,8 @@ actor BasketUploadCoordinator {
 	private let s3Service: S3Service
 	private let catalogService: CatalogService?
 	private let catalogCache: LocalCatalogCache?
+	private let checkpointManager: StarCheckpointManager?
+	private var checkpointId: UUID?
 
 	// Upload queue - stores items with their computed MD5s
 	private var uploadQueue: [(item: BasketItem, md5: String?)] = []
@@ -316,10 +321,21 @@ actor BasketUploadCoordinator {
 	// Progress tracking
 	private var uploadProgress = PassthroughSubject<BasketActionProgress, Never>()
 
-	init(s3Service: S3Service, catalogService: CatalogService? = nil, catalogCache: LocalCatalogCache? = nil) {
+	init(s3Service: S3Service,
+	     catalogService: CatalogService? = nil,
+	     catalogCache: LocalCatalogCache? = nil,
+	     checkpointManager: StarCheckpointManager? = nil,
+	     checkpointId: UUID? = nil) {
 		self.s3Service = s3Service
 		self.catalogService = catalogService
 		self.catalogCache = catalogCache
+		self.checkpointManager = checkpointManager
+		self.checkpointId = checkpointId
+	}
+
+	func updateCheckpointId(_ newId: UUID) {
+		self.checkpointId = newId
+		logger.debug("Updated checkpoint ID to: \(newId)")
 	}
 
 	func queueForUpload(item: BasketItem) {
@@ -350,6 +366,9 @@ actor BasketUploadCoordinator {
 
 			// Compute MD5 if not already done
 			var md5: String?
+			var exportedAsset: ExportedAsset? // For Apple Photos cleanup
+			var detectedFormat: ImageFormat = .unknown // Track detected format
+
 			if item.sourceType == .local {
 				// resolveURL needs to be called on MainActor
 				let resolved = await MainActor.run {
@@ -363,15 +382,83 @@ actor BasketUploadCoordinator {
 						}
 					}
 					md5 = try await computeFullMD5(for: resolved.url)
+
+					// Detect format for local files
+					detectedFormat = detectImageFormat(from: resolved.url) ?? .unknown
 				}
 			} else if item.sourceType == .applePhotos {
-				// TODO: Export and compute MD5 for Apple Photos
-				logger.warning("Apple Photos export not yet implemented")
-				continue
+				// Export Apple Photos item and compute MD5
+				if let assetId = item.sourceIdentifier {
+					do {
+						// Create a task to run on MainActor
+						let exported: ExportedAsset = try await withCheckedThrowingContinuation { continuation in
+							Task { @MainActor in
+								do {
+									let exporter = ApplePhotoExporter()
+									let result = try await exporter.exportAsset(assetId)
+									continuation.resume(returning: result)
+								} catch {
+									continuation.resume(throwing: error)
+								}
+							}
+						}
+
+						// Compute MD5 of exported file
+						md5 = try await computeFullMD5(for: exported.temporaryURL)
+
+						// Detect format for exported files
+						detectedFormat = detectImageFormat(from: exported.temporaryURL) ?? .heif // Default to HEIF for Apple Photos
+
+						// Store exported asset for later cleanup
+						exportedAsset = exported
+					} catch {
+						logger.error("Failed to export Apple Photos item \(item.displayName): \(error)")
+
+						// Mark as failed in checkpoint
+						if let checkpointManager = checkpointManager, let checkpointId = checkpointId {
+							await MainActor.run {
+								checkpointManager.markItemFailed(
+									checkpointId: checkpointId,
+									basketItemId: item.id,
+									displayName: item.displayName,
+									error: error.localizedDescription
+								)
+							}
+						}
+						continue
+					}
+				} else {
+					logger.warning("Apple Photos item missing asset identifier")
+
+					// Mark as failed in checkpoint
+					if let checkpointManager = checkpointManager, let checkpointId = checkpointId {
+						await MainActor.run {
+							checkpointManager.markItemFailed(
+								checkpointId: checkpointId,
+								basketItemId: item.id,
+								displayName: item.displayName,
+								error: "Missing asset identifier"
+							)
+						}
+					}
+					continue
+				}
 			}
 
 			guard let photoMD5 = md5 else {
 				logger.error("Failed to compute MD5 for \(item.displayName)")
+
+				// Mark as failed in checkpoint
+				if let checkpointManager = checkpointManager, let checkpointId = checkpointId {
+					await MainActor.run {
+						checkpointManager.markItemFailed(
+							checkpointId: checkpointId,
+							basketItemId: item.id,
+							displayName: item.displayName,
+							error: "Failed to compute MD5"
+						)
+					}
+				}
 				continue
 			}
 
@@ -380,17 +467,30 @@ actor BasketUploadCoordinator {
 				let isStarred = try await catalogService.isStarred(md5: photoMD5)
 				if isStarred {
 					logger.info("Item \(item.displayName) already starred (in catalog)")
+
+					// Mark as already processed (deduplicated)
+					if let checkpointManager = checkpointManager, let checkpointId = checkpointId {
+						await MainActor.run {
+							checkpointManager.markItemProcessed(
+								checkpointId: checkpointId,
+								basketItemId: item.id,
+								displayName: item.displayName,
+								md5: photoMD5,
+								uploaded: true // Already in catalog means already uploaded
+							)
+						}
+					}
 					continue
 				}
 			}
 
-			// Create catalog entry
+			// Create catalog entry with detected format
 			let entry = CatalogEntry(
 				photoHeadMD5: String(photoMD5.prefix(8)), // Use first 8 chars for head MD5
 				fileSize: item.fileSize ?? 0,
 				photoMD5: photoMD5,
 				photoDate: item.photoDate ?? Date(),
-				format: .jpeg // TODO: Detect actual format
+				format: detectedFormat
 			)
 
 			// Add to catalog (star)
@@ -402,17 +502,124 @@ actor BasketUploadCoordinator {
 				await self.catalogCache?.addToCache(md5: photoMD5)
 			}
 
-			// TODO: Actually upload to S3
-			// try await s3Service.uploadPhoto(...)
+			// Upload to S3
+			var uploadSucceeded = false
+			do {
+				if item.sourceType == .local {
+					// Get the file data for local files
+					let resolved = await MainActor.run {
+						item.resolveURL()
+					}
 
-			// Simulate upload delay
-			try await Task.sleep(nanoseconds: 100_000_000) // 0.1 seconds
+					if let resolved = resolved {
+						defer {
+							if resolved.didStartAccessing {
+								resolved.url.stopAccessingSecurityScopedResource()
+							}
+						}
+
+						let fileData = try Data(contentsOf: resolved.url)
+						let format = detectImageFormat(from: resolved.url) ?? .jpeg
+
+						try await s3Service.uploadPhoto(
+							data: fileData,
+							md5: photoMD5,
+							format: format,
+							userID: "default" // TODO: Get actual user ID
+						)
+						uploadSucceeded = true
+						logger.info("Uploaded local file \(item.displayName) to S3")
+					}
+				} else if item.sourceType == .applePhotos && exportedAsset != nil {
+					// Upload exported Apple Photos item
+					let fileData = try Data(contentsOf: exportedAsset!.temporaryURL)
+					let format = detectImageFormat(from: exportedAsset!.temporaryURL) ?? .heif // Default to HEIF for Apple Photos
+
+					try await s3Service.uploadPhoto(
+						data: fileData,
+						md5: photoMD5,
+						format: format,
+						userID: "default" // TODO: Get actual user ID
+					)
+					uploadSucceeded = true
+					logger.info("Uploaded Apple Photos item \(item.displayName) to S3")
+				}
+
+				// Mark as successfully processed in checkpoint
+				if uploadSucceeded, let checkpointManager = checkpointManager, let checkpointId = checkpointId {
+					await MainActor.run {
+						checkpointManager.markItemProcessed(
+							checkpointId: checkpointId,
+							basketItemId: item.id,
+							displayName: item.displayName,
+							md5: photoMD5,
+							uploaded: true
+						)
+					}
+				}
+			} catch {
+				logger.error("Failed to upload \(item.displayName): \(error)")
+
+				// Mark as failed in checkpoint
+				if let checkpointManager = checkpointManager, let checkpointId = checkpointId {
+					await MainActor.run {
+						checkpointManager.markItemFailed(
+							checkpointId: checkpointId,
+							basketItemId: item.id,
+							displayName: item.displayName,
+							error: error.localizedDescription
+						)
+					}
+				}
+			}
+
+			// Clean up exported Apple Photos asset
+			if let exportedAsset = exportedAsset {
+				await MainActor.run {
+					exportedAsset.cleanup()
+				}
+			}
 		}
 
 		// Clear queue after successful upload
 		self.uploadQueue.removeAll()
 
 		logger.info("Upload complete")
+	}
+
+	// Helper to detect image format from file extension
+	private func detectImageFormat(from url: URL) -> ImageFormat? {
+		let ext = url.pathExtension.lowercased()
+		switch ext {
+		case "jpg", "jpeg", "jpe", "jfif":
+			return .jpeg
+		case "png":
+			return .png
+		case "heic", "heif":
+			return .heif
+		case "gif":
+			return .gif
+		case "tiff", "tif":
+			return .tiff
+		case "webp":
+			return .webp
+		case "bmp":
+			return .bmp
+		case "cr2":
+			return .rawCR2
+		case "nef":
+			return .rawNEF
+		case "arw":
+			return .rawARW
+		case "dng":
+			return .rawDNG
+		case "orf":
+			return .rawORF
+		case "raf":
+			return .rawRAF
+		default:
+			return nil
+		}
 	}
 
 	// Helper to compute MD5
