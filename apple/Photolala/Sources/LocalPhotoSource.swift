@@ -23,6 +23,16 @@ class LocalPhotoSource: PhotoSourceProtocol {
 	// Map item IDs back to file paths (source's private knowledge)
 	private var idToPath: [String: URL] = [:]
 
+	// Public accessor for getting file URL for a photo item
+	public func fileURL(for itemId: String) -> URL? {
+		idToPath[itemId]
+	}
+
+	// Get the directory URL (for basket context)
+	public var baseDirectoryURL: URL {
+		directoryURL
+	}
+
 	// Security-scoped resource handling (iOS/macOS sandbox)
 	private var securityScopedURL: URL?
 	private var isAccessingSecurityScopedResource = false

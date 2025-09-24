@@ -14,7 +14,13 @@ struct BasketBadgeView: View {
 
 	var body: some View {
 		Button(action: {
+			#if os(macOS)
+			// Use window manager on macOS
+			PhotoWindowManager.shared.openBasketWindow()
+			#else
+			// Use sheet on iOS
 			showBasketView = true
+			#endif
 		}) {
 			HStack(spacing: 4) {
 				Image(systemName: basket.isEmpty ? "basket" : "basket.fill")
@@ -40,14 +46,13 @@ struct BasketBadgeView: View {
 		.disabled(basket.isEmpty)
 		.help("Photo Basket (\(basket.count) items) - ⌘B")
 		.keyboardShortcut("b", modifiers: .command)
+		#if os(iOS)
 		.sheet(isPresented: $showBasketView) {
 			NavigationStack {
 				PhotoBasketHostView()
 			}
-			#if os(macOS)
-			.frame(minWidth: 900, minHeight: 600)
-			#endif
 		}
+		#endif
 		.onChange(of: basket.count) { oldCount, newCount in
 			// Animate when items are added
 			if newCount > oldCount {

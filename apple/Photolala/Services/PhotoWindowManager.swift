@@ -128,6 +128,43 @@ class PhotoWindowManager {
 		window.makeKeyAndOrderFront(nil)
 	}
 
+	func openBasketWindow() {
+		// Create basket photo source
+		let source = BasketPhotoProvider()
+		let environment = PhotoBrowserEnvironment(source: source)
+
+		// Create the content view with NavigationStack
+		let contentView = NavigationStack {
+			PhotoBrowserView(environment: environment, title: "Photo Basket")
+				.navigationTitle("Photo Basket")
+				.navigationSubtitle("\(PhotoBasket.shared.count) items")
+		}
+
+		// Create and configure window
+		let window = createWindow(
+			withTitle: "Photo Basket",
+			contentView: AnyView(contentView)
+		)
+
+		// Create window controller
+		let windowController = NSWindowController(window: window)
+		windowControllers.append(windowController)
+
+		// Clean up when window closes
+		let token = NotificationCenter.default.addObserver(
+			forName: NSWindow.willCloseNotification,
+			object: window,
+			queue: .main
+		) { [weak self] _ in
+			self?.cleanupWindowController(windowController)
+		}
+		observerTokens[windowController] = token
+
+		// Show the window
+		windowController.showWindow(nil)
+		window.makeKeyAndOrderFront(nil)
+	}
+
 	private func cleanupWindowController(_ windowController: NSWindowController) {
 		// Remove observer token
 		if let token = observerTokens[windowController] {

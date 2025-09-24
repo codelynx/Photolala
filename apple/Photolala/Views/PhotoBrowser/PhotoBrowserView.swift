@@ -16,6 +16,9 @@ struct PhotoBrowserView: View {
 	// View state
 	@State private var model = Model()
 	@State private var settings = PhotoBrowserSettings()
+	#if os(iOS)
+	@State private var showBasketView = false
+	#endif
 
 	// Optional callbacks
 	let onItemTapped: ((PhotoBrowserItem) -> Void)?
@@ -95,6 +98,9 @@ struct PhotoBrowserView: View {
 					ProgressView()
 						.scaleEffect(0.8)
 				}
+
+				// Basket badge
+				BasketBadgeView()
 			}
 
 			ToolbarItem(placement: .primaryAction) {
@@ -133,6 +139,13 @@ struct PhotoBrowserView: View {
 		.onChange(of: model.selection) { _, newSelection in
 			onSelectionChanged?(newSelection)
 		}
+		#if os(iOS)
+		.sheet(isPresented: $showBasketView) {
+			NavigationStack {
+				PhotoBasketHostView()
+			}
+		}
+		#endif
 	}
 
 	// MARK: - UI Components
