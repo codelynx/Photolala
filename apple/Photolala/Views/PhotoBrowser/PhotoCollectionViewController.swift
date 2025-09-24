@@ -118,23 +118,7 @@ class PhotoCollectionViewController: NSViewController {
 				for: indexPath
 			) as! PhotoCell
 
-			// Determine source context for basket operations
-			var sourceURL: URL?
-			var sourceIdentifier: String?
-
-			if let localSource = self.environment.source as? LocalPhotoSource {
-				// For local sources, we need the file URL
-				sourceURL = localSource.fileURL(for: item.id)
-				sourceIdentifier = sourceURL?.path ?? item.id
-			} else if self.environment.source is S3PhotoSource {
-				// For S3, the item ID is typically the S3 key
-				sourceIdentifier = item.id
-			} else if self.environment.source is ApplePhotosSource {
-				// For Apple Photos, use the asset identifier
-				sourceIdentifier = item.id
-			}
-
-			cell.configure(with: item, source: self.environment.source, displayMode: self.settings.displayMode, showInfoBar: self.settings.showInfoBar, sourceURL: sourceURL, sourceIdentifier: sourceIdentifier)
+			cell.configure(with: item, source: self.environment.source, displayMode: self.settings.displayMode, showInfoBar: self.settings.showInfoBar)
 			return cell
 		}
 	}
@@ -327,23 +311,7 @@ class PhotoCollectionViewController: UIViewController {
 				for: indexPath
 			) as! PhotoCell
 
-			// Determine source context for basket operations
-			var sourceURL: URL?
-			var sourceIdentifier: String?
-
-			if let localSource = self.environment.source as? LocalPhotoSource {
-				// For local sources, we need the file URL
-				sourceURL = localSource.fileURL(for: item.id)
-				sourceIdentifier = sourceURL?.path ?? item.id
-			} else if self.environment.source is S3PhotoSource {
-				// For S3, the item ID is typically the S3 key
-				sourceIdentifier = item.id
-			} else if self.environment.source is ApplePhotosSource {
-				// For Apple Photos, use the asset identifier
-				sourceIdentifier = item.id
-			}
-
-			cell.configure(with: item, source: self.environment.source, displayMode: self.settings.displayMode, showInfoBar: self.settings.showInfoBar, sourceURL: sourceURL, sourceIdentifier: sourceIdentifier)
+			cell.configure(with: item, source: self.environment.source, displayMode: self.settings.displayMode, showInfoBar: self.settings.showInfoBar)
 			return cell
 		}
 	}

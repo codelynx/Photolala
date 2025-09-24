@@ -19,6 +19,7 @@ struct PhotoBrowserView: View {
 	#if os(iOS)
 	@State private var showBasketView = false
 	#endif
+	@State private var basketToast: BasketToast?
 
 	// Optional callbacks
 	let onItemTapped: ((PhotoBrowserItem) -> Void)?
@@ -99,6 +100,35 @@ struct PhotoBrowserView: View {
 						.scaleEffect(0.8)
 				}
 
+				// Selection-based basket actions
+				if model.hasSelection {
+					if selectionInBasket() {
+						// Show remove button when selection is in basket
+						Button(action: removeSelectionFromBasket) {
+							HStack(spacing: 2) {
+								Image(systemName: "basket")
+								Image(systemName: "minus.circle.fill")
+									.foregroundColor(.red)
+							}
+						}
+						.buttonStyle(.plain)
+						.help("Remove selected items from basket (⌥B)")
+						.keyboardShortcut("b", modifiers: .option)
+					} else {
+						// Show add button when selection is not in basket (or mixed)
+						Button(action: addSelectionToBasket) {
+							HStack(spacing: 2) {
+								Image(systemName: "basket")
+								Image(systemName: "plus.circle.fill")
+									.foregroundColor(.green)
+							}
+						}
+						.buttonStyle(.plain)
+						.help("Add selected items to basket (B)")
+						.keyboardShortcut("b", modifiers: [])
+					}
+				}
+
 				// Basket badge
 				BasketBadgeView()
 			}
@@ -146,6 +176,18 @@ struct PhotoBrowserView: View {
 			}
 		}
 		#endif
+		.overlay(alignment: .bottom) {
+			if let toast = basketToast {
+				ToastView(toast: toast)
+					.transition(.move(edge: .bottom).combined(with: .opacity))
+					.animation(.spring(), value: basketToast)
+					.onAppear {
+						DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+							basketToast = nil
+						}
+					}
+			}
+		}
 	}
 
 	// MARK: - UI Components
@@ -229,6 +271,129 @@ struct PhotoBrowserView: View {
 
 	private func deselectAll() {
 		model.selection.removeAll()
+	}
+
+	// MARK: - Basket Actions
+
+	private func addSelectionToBasket() {
+		guard !model.selection.isEmpty else { return }
+
+		// Get source context for all selected items
+		for item in model.selection {
+			let sourceType = getSourceType()
+			var url: URL?
+			var identifier: String?
+
+			// Resolve source-specific context
+			if let localSource = environment.source as? LocalPhotoSource {
+				url = localSource.fileURL(for: item.id)
+				identifier = url?.path ?? item.id
+			} else if environment.source is S3PhotoSource {
+				identifier = item.id // S3 key
+			} else if environment.source is ApplePhotosSource {
+				identifier = item.id // Asset identifier
+			}
+
+			// Add to basket with proper context
+			PhotoBasket.shared.add(item, sourceType: sourceType, sourceIdentifier: identifier, url: url)
+		}
+
+		// Show toast
+		basketToast = BasketToast(
+			message: "Added \(model.selection.count) item\(model.selection.count == 1 ? "" : "s") to basket",
+			type: .success
+		)
+
+		// Optional: Clear selection after adding
+		// model.selection.removeAll()
+	}
+
+	private func removeSelectionFromBasket() {
+		guard !model.selection.isEmpty else { return }
+
+		let count = model.selection.count
+
+		// Remove selected items from basket
+		for item in model.selection {
+			PhotoBasket.shared.remove(item.id)
+		}
+
+		// Show toast
+		basketToast = BasketToast(
+			message: "Removed \(count) item\(count == 1 ? "" : "s") from basket",
+			type: .info
+		)
+	}
+
+	private func selectionInBasket() -> Bool {
+		// Check if ALL selected items are in the basket
+		// For mixed state, we show the add button (returns false)
+		guard !model.selection.isEmpty else { return false }
+		return model.selection.allSatisfy { PhotoBasket.shared.contains($0.id) }
+	}
+
+	private func getSourceType() -> PhotoSourceType {
+		if environment.source is LocalPhotoSource {
+			return .local
+		} else if environment.source is S3PhotoSource {
+			return .cloud
+		} else if environment.source is ApplePhotosSource {
+			return .applePhotos
+		} else {
+			return .local // Default
+		}
+	}
+
+}
+
+// MARK: - Toast Support
+
+struct BasketToast: Equatable {
+	let message: String
+	let type: ToastType
+	let id = UUID()
+
+	enum ToastType {
+		case success, info, warning
+	}
+}
+
+struct ToastView: View {
+	let toast: BasketToast
+
+	var body: some View {
+		HStack(spacing: 12) {
+			Image(systemName: icon)
+				.foregroundColor(iconColor)
+
+			Text(toast.message)
+				.font(.callout)
+				.foregroundColor(.primary)
+		}
+		.padding(.horizontal, 16)
+		.padding(.vertical, 12)
+		.background(
+			RoundedRectangle(cornerRadius: 8)
+				.fill(.regularMaterial)
+				.shadow(color: .black.opacity(0.1), radius: 4, y: 2)
+		)
+		.padding()
+	}
+
+	private var icon: String {
+		switch toast.type {
+		case .success: return "checkmark.circle.fill"
+		case .info: return "info.circle.fill"
+		case .warning: return "exclamationmark.triangle.fill"
+		}
+	}
+
+	private var iconColor: Color {
+		switch toast.type {
+		case .success: return .green
+		case .info: return .blue
+		case .warning: return .orange
+		}
 	}
 }
 

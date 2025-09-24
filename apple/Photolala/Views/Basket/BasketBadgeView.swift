@@ -45,7 +45,6 @@ struct BasketBadgeView: View {
 		.buttonStyle(.plain)
 		.disabled(basket.isEmpty)
 		.help("Photo Basket (\(basket.count) items) - ⌘B")
-		.keyboardShortcut("b", modifiers: .command)
 		#if os(iOS)
 		.sheet(isPresented: $showBasketView) {
 			NavigationStack {

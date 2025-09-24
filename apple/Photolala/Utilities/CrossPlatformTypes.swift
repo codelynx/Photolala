@@ -19,7 +19,6 @@ typealias XBezierPath = NSBezierPath
 typealias XFont = NSFont
 typealias XScreen = NSScreen
 typealias XTextField = NSTextField
-typealias XButton = NSButton
 
 #else
 import UIKit
@@ -33,6 +32,5 @@ typealias XBezierPath = UIBezierPath
 typealias XFont = UIFont
 typealias XScreen = UIScreen
 typealias XTextField = UILabel
-typealias XButton = UIButton
 
 #endif

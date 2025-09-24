@@ -21,16 +21,13 @@ class PhotoCellView: XView {
 	private var selectionOverlay: XView!
 	private var infoBar: XView!
 	private var infoLabel: XTextField!
-	private var basketButton: XButton!
-	private var basketIndicator: XView!
 	private var currentLoadTask: Task<Void, Never>?
 	private var displayMode: ThumbnailDisplayMode = .fill
 	private var showInfoBar: Bool = false
 	private var currentItem: PhotoBrowserItem?
 	private var currentSource: (any PhotoSourceProtocol)?
-	private var currentSourceURL: URL? // For local sources
-	private var currentSourceIdentifier: String? // Source-specific ID
-	private weak var basketService: PhotoBasket?
+	private var currentSourceURL: URL? // For local sources - kept for basket context
+	private var currentSourceIdentifier: String? // Source-specific ID - kept for basket context
 
 	// MARK: - Initialization
 	override init(frame: CGRect) {
@@ -143,42 +140,6 @@ class PhotoCellView: XView {
 		#endif
 		infoLabel.translatesAutoresizingMaskIntoConstraints = false
 		infoBar.addSubview(infoLabel)
-
-		// Create basket button (overlay on top-right)
-		#if os(macOS)
-		basketButton = NSButton()
-		basketButton.title = ""
-		basketButton.image = NSImage(systemSymbolName: "plus.circle.fill", accessibilityDescription: "Add to basket")
-		basketButton.isBordered = false
-		basketButton.bezelStyle = .regularSquare
-		basketButton.target = self
-		basketButton.action = #selector(basketButtonTapped)
-		#else
-		basketButton = UIButton(type: .system)
-		basketButton.setImage(UIImage(systemName: "plus.circle.fill"), for: .normal)
-		basketButton.tintColor = .white
-		basketButton.addTarget(self, action: #selector(basketButtonTapped), for: .touchUpInside)
-		#endif
-		basketButton.translatesAutoresizingMaskIntoConstraints = false
-		basketButton.isHidden = true // Hidden by default
-		addSubview(basketButton)
-
-		// Create basket indicator (green checkmark when item is in basket)
-		basketIndicator = XView()
-		basketIndicator.translatesAutoresizingMaskIntoConstraints = false
-		#if os(macOS)
-		basketIndicator.wantsLayer = true
-		basketIndicator.layer?.backgroundColor = NSColor.systemGreen.cgColor
-		basketIndicator.layer?.cornerRadius = 10
-		#else
-		basketIndicator.backgroundColor = .systemGreen
-		basketIndicator.layer.cornerRadius = 10
-		#endif
-		basketIndicator.isHidden = true
-		addSubview(basketIndicator)
-
-		// Get basket service reference
-		basketService = PhotoBasket.shared
 	}
 
 	// Constraint references for dynamic updates
@@ -237,32 +198,15 @@ class PhotoCellView: XView {
 			infoLabel.centerYAnchor.constraint(equalTo: infoBar.centerYAnchor)
 		])
 
-		// Basket button - top-right corner of image container
-		constraints.append(contentsOf: [
-			basketButton.topAnchor.constraint(equalTo: imageContainer.topAnchor, constant: 8),
-			basketButton.trailingAnchor.constraint(equalTo: imageContainer.trailingAnchor, constant: -8),
-			basketButton.widthAnchor.constraint(equalToConstant: 30),
-			basketButton.heightAnchor.constraint(equalToConstant: 30)
-		])
-
-		// Basket indicator - bottom-left corner
-		constraints.append(contentsOf: [
-			basketIndicator.bottomAnchor.constraint(equalTo: imageContainer.bottomAnchor, constant: -8),
-			basketIndicator.leadingAnchor.constraint(equalTo: imageContainer.leadingAnchor, constant: 8),
-			basketIndicator.widthAnchor.constraint(equalToConstant: 20),
-			basketIndicator.heightAnchor.constraint(equalToConstant: 20)
-		])
-
 		NSLayoutConstraint.activate(constraints)
 	}
 
 	// MARK: - Public API
-	func configure(with item: PhotoBrowserItem, source: any PhotoSourceProtocol, displayMode: ThumbnailDisplayMode = .fill, showInfoBar: Bool = false, sourceURL: URL? = nil, sourceIdentifier: String? = nil) {
-		// Store current item and source context
+	func configure(with item: PhotoBrowserItem, source: any PhotoSourceProtocol, displayMode: ThumbnailDisplayMode = .fill, showInfoBar: Bool = false) {
+		// Store current item and source context (for future basket operations)
 		currentItem = item
 		currentSource = source
-		currentSourceURL = sourceURL
-		currentSourceIdentifier = sourceIdentifier
+		// Note: sourceURL and sourceIdentifier will be resolved when needed for basket operations
 
 		// Update display mode if changed
 		if self.displayMode != displayMode {
@@ -281,9 +225,6 @@ class PhotoCellView: XView {
 		if showInfoBar {
 			updateInfoLabel(item: item)
 		}
-
-		// Update basket button state
-		updateBasketButtonState()
 
 		// Cancel previous load
 		currentLoadTask?.cancel()
@@ -429,108 +370,4 @@ class PhotoCellView: XView {
 		}
 		#endif
 	}
-
-	// MARK: - Basket Support
-	private func updateBasketButtonState() {
-		guard let item = currentItem else { return }
-
-		let isInBasket = basketService?.contains(item.id) ?? false
-
-		// Update button image
-		#if os(macOS)
-		basketButton.image = NSImage(systemSymbolName: isInBasket ? "checkmark.circle.fill" : "plus.circle.fill",
-									accessibilityDescription: isInBasket ? "Remove from basket" : "Add to basket")
-		#else
-		basketButton.setImage(UIImage(systemName: isInBasket ? "checkmark.circle.fill" : "plus.circle.fill"), for: .normal)
-		basketButton.tintColor = isInBasket ? .systemGreen : .white
-		#endif
-
-		// Show/hide indicator
-		basketIndicator.isHidden = !isInBasket
-	}
-
-	@objc private func basketButtonTapped() {
-		guard let item = currentItem,
-			  let source = currentSource else { return }
-
-		// Determine source type and context
-		let sourceType: PhotoSourceType
-		var url: URL?
-		var identifier: String?
-
-		if source is LocalPhotoSource {
-			sourceType = .local
-			// For local sources, we need the URL for bookmarks
-			url = currentSourceURL
-			identifier = currentSourceIdentifier ?? currentSourceURL?.path
-		} else if source is S3PhotoSource {
-			sourceType = .cloud
-			// For cloud, use the S3 key as identifier
-			identifier = currentSourceIdentifier ?? item.id
-		} else if source is ApplePhotosSource {
-			sourceType = .applePhotos
-			// For Apple Photos, use the asset identifier
-			identifier = currentSourceIdentifier ?? item.id
-		} else {
-			// Default to local for unknown sources
-			sourceType = .local
-			url = currentSourceURL
-			identifier = currentSourceIdentifier
-		}
-
-		// Toggle item in basket with full context
-		basketService?.toggle(item, sourceType: sourceType, sourceIdentifier: identifier, url: url)
-
-		// Update UI
-		updateBasketButtonState()
-
-		// Haptic feedback on iOS
-		#if os(iOS)
-		let impact = UIImpactFeedbackGenerator(style: .light)
-		impact.impactOccurred()
-		#endif
-	}
-
-	// Show basket button on hover (macOS) or always (iOS)
-	override func updateTrackingAreas() {
-		#if os(macOS)
-		super.updateTrackingAreas()
-
-		// Remove existing tracking areas
-		for area in trackingAreas {
-			removeTrackingArea(area)
-		}
-
-		// Add new tracking area
-		let area = NSTrackingArea(
-			rect: bounds,
-			options: [.mouseEnteredAndExited, .activeInKeyWindow],
-			owner: self,
-			userInfo: nil
-		)
-		addTrackingArea(area)
-		#endif
-	}
-
-	#if os(macOS)
-	override func mouseEntered(with event: NSEvent) {
-		super.mouseEntered(with: event)
-		basketButton.isHidden = false
-	}
-
-	override func mouseExited(with event: NSEvent) {
-		super.mouseExited(with: event)
-		let isInBasket = basketService?.contains(currentItem?.id ?? "") ?? false
-		// Keep button visible if item is in basket
-		if !isInBasket {
-			basketButton.isHidden = true
-		}
-	}
-	#else
-	// On iOS, always show the button
-	override func layoutSubviews() {
-		super.layoutSubviews()
-		basketButton.isHidden = false
-	}
-	#endif
 }
