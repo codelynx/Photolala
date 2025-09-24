@@ -207,6 +207,7 @@ class PhotoCellView: XView {
 		if self.displayMode != displayMode {
 			self.displayMode = displayMode
 			imageView.displayMode = displayMode
+			updateBorder()
 		}
 
 		// Update info bar visibility
@@ -241,6 +242,7 @@ class PhotoCellView: XView {
 					self.stopLoading()
 					if let thumbnail = thumbnail {
 						self.imageView.image = thumbnail
+						self.updateBorder()  // Update border after image loads
 					} else {
 						// Show placeholder for missing thumbnail
 						self.showPlaceholder()
@@ -339,6 +341,28 @@ class PhotoCellView: XView {
 		infoLabel.stringValue = infoText
 		#else
 		infoLabel.text = infoText
+		#endif
+	}
+
+	private func updateBorder() {
+		// Show border only in fit mode (not fill)
+		let showBorder = displayMode == .fit
+		#if os(macOS)
+		if showBorder {
+			imageView.layer?.borderWidth = 1
+			imageView.layer?.borderColor = NSColor.separatorColor.cgColor
+		} else {
+			imageView.layer?.borderWidth = 0
+			imageView.layer?.borderColor = nil
+		}
+		#else
+		if showBorder {
+			imageView.layer.borderWidth = 1
+			imageView.layer.borderColor = UIColor.separator.cgColor
+		} else {
+			imageView.layer.borderWidth = 0
+			imageView.layer.borderColor = nil
+		}
 		#endif
 	}
 }
