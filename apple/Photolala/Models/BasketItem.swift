@@ -88,7 +88,7 @@ struct BasketItem: Identifiable, Hashable, Codable {
 	}
 
 	/// Check if the app is running in a sandboxed environment
-	private static func isSandboxed() -> Bool {
+	static func isSandboxed() -> Bool {
 		#if os(iOS) || os(visionOS)
 		// iOS is always sandboxed
 		return true

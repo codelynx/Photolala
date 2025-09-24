@@ -251,7 +251,45 @@ public final class CatalogService: ObservableObject {
 
 		return try await database.getAllEntries()
 	}
-	
+
+	// MARK: - Star Operations (Catalog Membership)
+
+	/// Check if a photo is starred (exists in catalog) by MD5
+	public func isStarred(md5: String) async throws -> Bool {
+		guard let database = database else {
+			throw CatalogServiceError.notInitialized
+		}
+
+		return await database.containsMD5(md5)
+	}
+
+	/// Star a photo by adding/updating its entry in the catalog
+	public func starEntry(_ entry: CatalogEntry) async throws {
+		guard let database = database else {
+			throw CatalogServiceError.notInitialized
+		}
+
+		try await database.upsertEntry(entry)
+	}
+
+	/// Unstar a photo by removing it from the catalog
+	public func unstarEntry(md5: String) async throws {
+		guard let database = database else {
+			throw CatalogServiceError.notInitialized
+		}
+
+		try await database.removeByMD5(md5)
+	}
+
+	/// Get entry by MD5
+	public func getEntryByMD5(_ md5: String) async throws -> CatalogEntry? {
+		guard let database = database else {
+			throw CatalogServiceError.notInitialized
+		}
+
+		return await database.getEntryByMD5(md5)
+	}
+
 	/// Get photo metadata from cache
 	public func getMetadata(for photoMD5: PhotoMD5) async throws -> PhotoMetadata? {
 		// Metadata is stored in cache, not in CSV database

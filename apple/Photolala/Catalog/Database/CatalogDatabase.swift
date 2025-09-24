@@ -66,6 +66,17 @@ public actor CatalogDatabase {
 			throw CatalogDatabaseError.readOnlyDatabase
 		}
 
+		// If entry has MD5, remove any existing entries with same MD5 first
+		// This ensures no duplicate MD5s in the catalog
+		if let md5 = entry.photoMD5 {
+			let keysToRemove = entries.compactMap { key, existing in
+				existing.photoMD5 == md5 && key != entry.fastPhotoKey ? key : nil
+			}
+			for key in keysToRemove {
+				entries.removeValue(forKey: key)
+			}
+		}
+
 		entries[entry.fastPhotoKey] = entry
 		try await saveCSV()
 	}
@@ -79,6 +90,36 @@ public actor CatalogDatabase {
 		if var entry = entries[fastKey] {
 			entry.photoMD5 = photoMD5
 			entries[fastKey] = entry
+			try await saveCSV()
+		}
+	}
+
+	/// Check if catalog contains an entry with the given MD5
+	public func containsMD5(_ md5: String) async -> Bool {
+		entries.values.contains { $0.photoMD5 == md5 }
+	}
+
+	/// Get entry by MD5
+	public func getEntryByMD5(_ md5: String) async -> CatalogEntry? {
+		entries.values.first { $0.photoMD5 == md5 }
+	}
+
+	/// Remove entry by MD5
+	public func removeByMD5(_ md5: String) async throws {
+		guard !readOnly else {
+			throw CatalogDatabaseError.readOnlyDatabase
+		}
+
+		// Find and remove all entries with this MD5
+		let keysToRemove = entries.compactMap { key, entry in
+			entry.photoMD5 == md5 ? key : nil
+		}
+
+		for key in keysToRemove {
+			entries.removeValue(forKey: key)
+		}
+
+		if !keysToRemove.isEmpty {
 			try await saveCSV()
 		}
 	}

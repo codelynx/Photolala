@@ -143,7 +143,7 @@ struct EmptyBasketView: View {
 
 // MARK: - Basket Actions
 
-enum BasketAction: String, CaseIterable, Identifiable {
+public enum BasketAction: String, CaseIterable, Identifiable {
 	case star = "Star"
 	case unstar = "Unstar"
 	case createAlbum = "Create Album"
@@ -152,9 +152,9 @@ enum BasketAction: String, CaseIterable, Identifiable {
 	case archive = "Move to Archive"
 	case retrieve = "Retrieve from Archive"
 
-	var id: String { rawValue }
+	public var id: String { rawValue }
 
-	var icon: String {
+	public var icon: String {
 		switch self {
 		case .star: return "star.fill"
 		case .unstar: return "star.slash"
