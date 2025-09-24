@@ -39,6 +39,7 @@ final class BasketActionService: ObservableObject {
 	private let s3Service: S3Service?
 	private var uploadCoordinator: BasketUploadCoordinator?
 	private let catalogCache: LocalCatalogCache?
+	private let checkpointManager: StarCheckpointManager
 
 	// Current operation
 	private var currentTask: Task<Void, Error>?
@@ -46,6 +47,7 @@ final class BasketActionService: ObservableObject {
 	init(catalogService: CatalogService? = nil, s3Service: S3Service? = nil) {
 		self.catalogService = catalogService
 		self.s3Service = s3Service
+		self.checkpointManager = StarCheckpointManager()
 
 		// Initialize catalog cache if catalog service is available
 		if let catalogService = catalogService {
@@ -84,6 +86,31 @@ final class BasketActionService: ObservableObject {
 		currentTask?.cancel()
 		currentTask = nil
 		currentProgress = nil
+		checkpointManager.pauseCheckpoint()
+	}
+
+	/// Resume from a checkpoint
+	func resumeFromCheckpoint(_ checkpointId: UUID, originalItems: [BasketItem]) async throws {
+		guard let checkpoint = try await checkpointManager.resumeCheckpoint(checkpointId) else {
+			throw BasketActionError.checkpointNotFound
+		}
+
+		// Get unprocessed items
+		let unprocessedItems = checkpointManager.getUnprocessedItems(for: checkpoint, from: originalItems)
+
+		logger.info("Resuming checkpoint with \(unprocessedItems.count) unprocessed items")
+
+		// Resume the appropriate action
+		if let action = BasketAction(rawValue: checkpoint.action) {
+			try await executeAction(action, items: unprocessedItems)
+		} else {
+			throw BasketActionError.unsupportedAction(checkpoint.action)
+		}
+	}
+
+	/// Get available checkpoints
+	var availableCheckpoints: [StarCheckpoint] {
+		checkpointManager.availableCheckpoints
 	}
 
 	// MARK: - Star Implementation
@@ -98,6 +125,9 @@ final class BasketActionService: ObservableObject {
 		guard !supportedItems.isEmpty else {
 			throw BasketActionError.noSupportedItems
 		}
+
+		// Create checkpoint for resumability
+		let checkpoint = checkpointManager.createCheckpoint(action: .star, items: supportedItems)
 
 		// Initialize upload coordinator if needed
 		if uploadCoordinator == nil {
@@ -127,9 +157,30 @@ final class BasketActionService: ObservableObject {
 				error: nil
 			)
 
-			// Queue for processing (coordinator will handle MD5 computation and catalog update)
-			await uploadCoordinator?.queueForUpload(item: item)
-			logger.debug("Queued item for star: \(item.displayName)")
+			do {
+				// Queue for processing (coordinator will handle MD5 computation and catalog update)
+				await uploadCoordinator?.queueForUpload(item: item)
+				logger.debug("Queued item for star: \(item.displayName)")
+
+				// Mark as processed in checkpoint
+				checkpointManager.markItemProcessed(
+					checkpointId: checkpoint.id,
+					basketItemId: item.id,
+					displayName: item.displayName,
+					md5: nil, // MD5 will be computed during upload
+					uploaded: false
+				)
+			} catch {
+				// Mark as failed in checkpoint
+				checkpointManager.markItemFailed(
+					checkpointId: checkpoint.id,
+					basketItemId: item.id,
+					displayName: item.displayName,
+					error: error.localizedDescription
+				)
+				logger.error("Failed to queue \(item.displayName): \(error)")
+				// Continue with next item
+			}
 		}
 
 		// Mark complete
@@ -390,6 +441,7 @@ enum BasketActionError: LocalizedError {
 	case noSupportedItems
 	case missingDependency(String)
 	case uploadFailed(String)
+	case checkpointNotFound
 
 	var errorDescription: String? {
 		switch self {
@@ -401,6 +453,8 @@ enum BasketActionError: LocalizedError {
 			return "Missing required dependency: \(dependency)"
 		case .uploadFailed(let message):
 			return "Upload failed: \(message)"
+		case .checkpointNotFound:
+			return "Checkpoint not found or cannot be resumed"
 		}
 	}
 }
