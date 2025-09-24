@@ -18,6 +18,7 @@ typealias XActivityIndicator = NSProgressIndicator
 typealias XBezierPath = NSBezierPath
 typealias XFont = NSFont
 typealias XScreen = NSScreen
+typealias XTextField = NSTextField
 
 #else
 import UIKit
@@ -30,5 +31,6 @@ typealias XActivityIndicator = UIActivityIndicatorView
 typealias XBezierPath = UIBezierPath
 typealias XFont = UIFont
 typealias XScreen = UIScreen
+typealias XTextField = UILabel
 
 #endif

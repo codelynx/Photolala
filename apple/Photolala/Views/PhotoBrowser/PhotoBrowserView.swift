@@ -15,6 +15,9 @@ struct PhotoBrowserView: View {
 	// View model
 	@State private var model: Model
 
+	// Display settings
+	@State private var settings = PhotoBrowserSettings()
+
 	// Navigation title
 	let title: String
 
@@ -29,6 +32,7 @@ struct PhotoBrowserView: View {
 			photos: model.photos,
 			selection: $model.selection,
 			environment: environment,
+			settings: settings,
 			onItemTapped: { item in
 				// Handle single tap - could show detail view
 				print("[PhotoBrowser] Tapped item: \(item.displayName)")
@@ -47,7 +51,47 @@ struct PhotoBrowserView: View {
 			}
 			#endif
 
-			ToolbarItem(placement: .primaryAction) {
+			// Group items on the right side
+			ToolbarItemGroup(placement: .primaryAction) {
+				// Thumbnail size control
+				Picker("", selection: $settings.thumbnailSize) {
+					ForEach(ThumbnailSize.allCases, id: \.self) { size in
+						Text(size.rawValue)
+							.tag(size)
+					}
+				}
+				.pickerStyle(.segmented)
+				.fixedSize()
+				#if os(iOS)
+				.scaleEffect(0.9) // Slightly smaller on iOS
+				#endif
+
+				// Fit/Fill toggle button
+				Button(action: {
+					settings.displayMode = settings.displayMode == .fit ? .fill : .fit
+				}) {
+					Image(systemName: settings.displayMode == .fit
+						? "rectangle.arrowtriangle.2.inward"
+						: "rectangle.arrowtriangle.2.outward")
+						.help(settings.displayMode == .fit ? "Switch to Fill" : "Switch to Fit")
+				}
+				.buttonStyle(.plain)
+				#if os(iOS)
+				.padding(.leading, 4)
+				#endif
+
+				// Info bar toggle button
+				Button(action: {
+					settings.showInfoBar.toggle()
+				}) {
+					Image(systemName: settings.showInfoBar ? "square" : "inset.filled.bottomthird.square")
+						.help(settings.showInfoBar ? "Hide Info Bar" : "Show Info Bar")
+				}
+				.buttonStyle(.plain)
+				#if os(iOS)
+				.padding(.leading, 4)
+				#endif
+
 				if model.isLoading {
 					ProgressView()
 						.scaleEffect(0.8)

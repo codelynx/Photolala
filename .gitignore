@@ -78,3 +78,6 @@ tmp/
 # Log files
 logs/**
 *.log
+
+untracked/
+untracked/**

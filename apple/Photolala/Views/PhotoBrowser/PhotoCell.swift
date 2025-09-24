@@ -23,8 +23,8 @@ class PhotoCell: NSCollectionViewItem {
 	}
 
 	// Pass-through to the view
-	func configure(with item: PhotoBrowserItem, source: any PhotoSourceProtocol) {
-		photoCellView.configure(with: item, source: source)
+	func configure(with item: PhotoBrowserItem, source: any PhotoSourceProtocol, displayMode: ThumbnailDisplayMode = .fill, showInfoBar: Bool = false) {
+		photoCellView.configure(with: item, source: source, displayMode: displayMode, showInfoBar: showInfoBar)
 	}
 
 	override func prepareForReuse() {
@@ -71,8 +71,8 @@ class PhotoCell: UICollectionViewCell {
 	}
 
 	// Pass-through to the view
-	func configure(with item: PhotoBrowserItem, source: any PhotoSourceProtocol) {
-		photoCellView.configure(with: item, source: source)
+	func configure(with item: PhotoBrowserItem, source: any PhotoSourceProtocol, displayMode: ThumbnailDisplayMode = .fill, showInfoBar: Bool = false) {
+		photoCellView.configure(with: item, source: source, displayMode: displayMode, showInfoBar: showInfoBar)
 	}
 
 	override func prepareForReuse() {

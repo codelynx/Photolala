@@ -12,10 +12,11 @@ struct PhotoCollectionViewRepresentable: NSViewControllerRepresentable {
 	let photos: [PhotoBrowserItem]
 	@Binding var selection: Set<PhotoBrowserItem>
 	let environment: PhotoBrowserEnvironment
+	let settings: PhotoBrowserSettings
 	let onItemTapped: ((PhotoBrowserItem) -> Void)?
 
 	func makeNSViewController(context: Context) -> PhotoCollectionViewController {
-		let controller = PhotoCollectionViewController(environment: environment)
+		let controller = PhotoCollectionViewController(environment: environment, settings: settings)
 		controller.onItemTapped = onItemTapped
 		controller.onSelectionChanged = { newSelection in
 			self.selection = newSelection
@@ -33,6 +34,9 @@ struct PhotoCollectionViewRepresentable: NSViewControllerRepresentable {
 		if controller.selection != selection {
 			controller.selection = selection
 		}
+
+		// Update item size if settings changed
+		controller.updateItemSize()
 	}
 
 	typealias NSViewControllerType = PhotoCollectionViewController
@@ -42,10 +46,11 @@ struct PhotoCollectionViewRepresentable: UIViewControllerRepresentable {
 	let photos: [PhotoBrowserItem]
 	@Binding var selection: Set<PhotoBrowserItem>
 	let environment: PhotoBrowserEnvironment
+	let settings: PhotoBrowserSettings
 	let onItemTapped: ((PhotoBrowserItem) -> Void)?
 
 	func makeUIViewController(context: Context) -> PhotoCollectionViewController {
-		let controller = PhotoCollectionViewController(environment: environment)
+		let controller = PhotoCollectionViewController(environment: environment, settings: settings)
 		controller.onItemTapped = onItemTapped
 		controller.onSelectionChanged = { newSelection in
 			self.selection = newSelection
@@ -63,6 +68,9 @@ struct PhotoCollectionViewRepresentable: UIViewControllerRepresentable {
 		if controller.selection != selection {
 			controller.selection = selection
 		}
+
+		// Update item size if settings changed
+		controller.updateItemSize()
 	}
 
 	typealias UIViewControllerType = PhotoCollectionViewController

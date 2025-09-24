@@ -23,6 +23,11 @@ class PhotoCollectionViewController: NSViewController {
 	// Environment
 	let environment: PhotoBrowserEnvironment
 
+	// Settings
+	let settings: PhotoBrowserSettings
+	private var lastDisplayMode: ThumbnailDisplayMode?
+	private var lastShowInfoBar: Bool?
+
 	// State
 	var photos: [PhotoBrowserItem] = [] {
 		didSet {
@@ -40,8 +45,9 @@ class PhotoCollectionViewController: NSViewController {
 	var onItemTapped: ((PhotoBrowserItem) -> Void)?
 	var onSelectionChanged: ((Set<PhotoBrowserItem>) -> Void)?
 
-	init(environment: PhotoBrowserEnvironment) {
+	init(environment: PhotoBrowserEnvironment, settings: PhotoBrowserSettings = PhotoBrowserSettings()) {
 		self.environment = environment
+		self.settings = settings
 		super.init(nibName: nil, bundle: nil)
 	}
 
@@ -63,9 +69,15 @@ class PhotoCollectionViewController: NSViewController {
 
 		// Set up layout
 		let layout = NSCollectionViewFlowLayout()
-		layout.minimumLineSpacing = environment.configuration.gridSpacing
-		layout.minimumInteritemSpacing = environment.configuration.gridSpacing
-		layout.itemSize = environment.configuration.thumbnailSize
+		layout.minimumLineSpacing = settings.itemSpacing
+		layout.minimumInteritemSpacing = settings.itemSpacing
+		layout.itemSize = settings.itemSize
+		layout.sectionInset = NSEdgeInsets(
+			top: settings.sectionInsets.top,
+			left: settings.sectionInsets.leading,
+			bottom: settings.sectionInsets.bottom,
+			right: settings.sectionInsets.trailing
+		)
 		collectionView.collectionViewLayout = layout
 
 		// Register cell
@@ -88,7 +100,10 @@ class PhotoCollectionViewController: NSViewController {
 
 	override func viewWillLayout() {
 		super.viewWillLayout()
-		updateItemSize()
+		// Don't update on every layout to avoid loops
+		if view.frame.width > 0 {
+			updateItemSize()
+		}
 	}
 
 	private func setupDataSource() {
@@ -103,7 +118,7 @@ class PhotoCollectionViewController: NSViewController {
 				for: indexPath
 			) as! PhotoCell
 
-			cell.configure(with: item, source: self.environment.source)
+			cell.configure(with: item, source: self.environment.source, displayMode: self.settings.displayMode, showInfoBar: self.settings.showInfoBar)
 			return cell
 		}
 	}
@@ -124,45 +139,49 @@ class PhotoCollectionViewController: NSViewController {
 		collectionView.selectionIndexPaths = Set(indexPaths)
 	}
 
-	private func updateItemSize() {
+	func updateItemSize(forceReload: Bool = false) {
 		guard let layout = collectionView.collectionViewLayout as? NSCollectionViewFlowLayout else { return }
 
 		let width = view.bounds.width
 
 		// Skip if width is zero (view not laid out yet)
-		guard width > 0 else {
-			// Set a default size to avoid crash
-			layout.itemSize = environment.configuration.thumbnailSize
-			return
-		}
+		guard width > 0 else { return }
 
-		let spacing = environment.configuration.gridSpacing
-		let minColumns = environment.configuration.minimumColumns
-		let maxColumns = environment.configuration.maximumColumns
+		// Check if display mode or info bar changed
+		let displayModeChanged = lastDisplayMode != nil && lastDisplayMode != settings.displayMode
+		let infoBarChanged = lastShowInfoBar != nil && lastShowInfoBar != settings.showInfoBar
+		lastDisplayMode = settings.displayMode
+		lastShowInfoBar = settings.showInfoBar
 
-		// Calculate optimal number of columns
-		var columns = minColumns
-		for cols in minColumns...maxColumns {
-			let totalSpacing = spacing * CGFloat(cols + 1)
-			let availableWidth = width - totalSpacing
-			let itemWidth = availableWidth / CGFloat(cols)
+		// Get optimized layout from settings
+		let (optimizedSize, _) = settings.optimizeLayout(for: width)
 
-			if itemWidth >= environment.configuration.thumbnailSize.width {
-				columns = cols
-			} else {
-				break
+		// Only update if size changed significantly (avoid layout loops)
+		let currentSize = layout.itemSize
+		let sizeChanged = abs(currentSize.width - optimizedSize.width) > 1 ||
+		                  abs(currentSize.height - optimizedSize.height) > 1
+
+		if sizeChanged {
+			layout.itemSize = optimizedSize
+			layout.minimumLineSpacing = settings.itemSpacing
+			layout.minimumInteritemSpacing = settings.itemSpacing
+			layout.sectionInset = NSEdgeInsets(
+				top: settings.sectionInsets.top,
+				left: settings.sectionInsets.leading,
+				bottom: settings.sectionInsets.bottom,
+				right: settings.sectionInsets.trailing
+			)
+
+			// Animate the change on macOS (be careful with transforms!)
+			// Use frame-based animation, not layer transforms
+			NSAnimationContext.runAnimationGroup { context in
+				context.duration = 0.25
+				context.allowsImplicitAnimation = true
+				layout.invalidateLayout()
 			}
-		}
-
-		// Calculate item size
-		let totalSpacing = spacing * CGFloat(columns + 1)
-		let availableWidth = width - totalSpacing
-		let itemWidth = floor(availableWidth / CGFloat(columns))
-		let itemSize = CGSize(width: itemWidth, height: itemWidth)
-
-		// Only update if size is valid
-		if itemSize.width > 0 && itemSize.height > 0 {
-			layout.itemSize = itemSize
+		} else if forceReload || displayModeChanged || infoBarChanged {
+			// Force reload cells to update display mode or info bar
+			collectionView.reloadData()
 		}
 	}
 }
@@ -205,6 +224,11 @@ class PhotoCollectionViewController: UIViewController {
 	// Environment
 	let environment: PhotoBrowserEnvironment
 
+	// Settings
+	let settings: PhotoBrowserSettings
+	private var lastDisplayMode: ThumbnailDisplayMode?
+	private var lastShowInfoBar: Bool?
+
 	// State
 	var photos: [PhotoBrowserItem] = [] {
 		didSet {
@@ -222,8 +246,9 @@ class PhotoCollectionViewController: UIViewController {
 	var onItemTapped: ((PhotoBrowserItem) -> Void)?
 	var onSelectionChanged: ((Set<PhotoBrowserItem>) -> Void)?
 
-	init(environment: PhotoBrowserEnvironment) {
+	init(environment: PhotoBrowserEnvironment, settings: PhotoBrowserSettings = PhotoBrowserSettings()) {
 		self.environment = environment
+		self.settings = settings
 		super.init(nibName: nil, bundle: nil)
 	}
 
@@ -234,9 +259,15 @@ class PhotoCollectionViewController: UIViewController {
 	override func loadView() {
 		// Create layout
 		let layout = UICollectionViewFlowLayout()
-		layout.minimumLineSpacing = environment.configuration.gridSpacing
-		layout.minimumInteritemSpacing = environment.configuration.gridSpacing
-		layout.itemSize = environment.configuration.thumbnailSize
+		layout.minimumLineSpacing = settings.itemSpacing
+		layout.minimumInteritemSpacing = settings.itemSpacing
+		layout.itemSize = settings.itemSize
+		layout.sectionInset = UIEdgeInsets(
+			top: settings.sectionInsets.top,
+			left: settings.sectionInsets.leading,
+			bottom: settings.sectionInsets.bottom,
+			right: settings.sectionInsets.trailing
+		)
 
 		// Create collection view
 		collectionView = UICollectionView(frame: .zero, collectionViewLayout: layout)
@@ -262,7 +293,10 @@ class PhotoCollectionViewController: UIViewController {
 
 	override func viewWillLayoutSubviews() {
 		super.viewWillLayoutSubviews()
-		updateItemSize()
+		// Don't update on every layout to avoid loops
+		if view.frame.width > 0 {
+			updateItemSize()
+		}
 	}
 
 	private func setupDataSource() {
@@ -277,7 +311,7 @@ class PhotoCollectionViewController: UIViewController {
 				for: indexPath
 			) as! PhotoCell
 
-			cell.configure(with: item, source: self.environment.source)
+			cell.configure(with: item, source: self.environment.source, displayMode: self.settings.displayMode, showInfoBar: self.settings.showInfoBar)
 			return cell
 		}
 	}
@@ -302,7 +336,7 @@ class PhotoCollectionViewController: UIViewController {
 		}
 	}
 
-	private func updateItemSize() {
+	func updateItemSize(forceReload: Bool = false) {
 		guard let layout = collectionView.collectionViewLayout as? UICollectionViewFlowLayout else { return }
 
 		let width = view.bounds.width
@@ -310,34 +344,39 @@ class PhotoCollectionViewController: UIViewController {
 		// Skip if width is zero (view not laid out yet)
 		guard width > 0 else { return }
 
-		let spacing = environment.configuration.gridSpacing
-		let minColumns = environment.configuration.minimumColumns
-		let maxColumns = environment.configuration.maximumColumns
+		// Check if display mode or info bar changed
+		let displayModeChanged = lastDisplayMode != nil && lastDisplayMode != settings.displayMode
+		let infoBarChanged = lastShowInfoBar != nil && lastShowInfoBar != settings.showInfoBar
+		lastDisplayMode = settings.displayMode
+		lastShowInfoBar = settings.showInfoBar
 
-		// Calculate optimal number of columns
-		var columns = minColumns
-		for cols in minColumns...maxColumns {
-			let totalSpacing = spacing * CGFloat(cols + 1)
-			let availableWidth = width - totalSpacing
-			let itemWidth = availableWidth / CGFloat(cols)
+		// Get optimized layout from settings
+		let (optimizedSize, _) = settings.optimizeLayout(for: width)
 
-			if itemWidth >= environment.configuration.thumbnailSize.width {
-				columns = cols
-			} else {
-				break
+		// Only update if size changed significantly (avoid layout loops)
+		let currentSize = layout.itemSize
+		let sizeChanged = abs(currentSize.width - optimizedSize.width) > 1 ||
+		                  abs(currentSize.height - optimizedSize.height) > 1
+
+		if sizeChanged {
+			layout.itemSize = optimizedSize
+			layout.minimumLineSpacing = settings.itemSpacing
+			layout.minimumInteritemSpacing = settings.itemSpacing
+			layout.sectionInset = UIEdgeInsets(
+				top: settings.sectionInsets.top,
+				left: settings.sectionInsets.leading,
+				bottom: settings.sectionInsets.bottom,
+				right: settings.sectionInsets.trailing
+			)
+
+			// Animate the change
+			UIView.animate(withDuration: 0.25) {
+				self.collectionView.collectionViewLayout.invalidateLayout()
+				self.collectionView.layoutIfNeeded()
 			}
-		}
-
-		// Calculate item size
-		let totalSpacing = spacing * CGFloat(columns + 1)
-		let availableWidth = width - totalSpacing
-		let itemWidth = floor(availableWidth / CGFloat(columns))
-		let itemSize = CGSize(width: itemWidth, height: itemWidth)
-
-		// Only update if size has changed
-		if layout.itemSize != itemSize {
-			layout.itemSize = itemSize
-			layout.invalidateLayout()
+		} else if forceReload || displayModeChanged || infoBarChanged {
+			// Force reload cells to update display mode or info bar
+			collectionView.reloadData()
 		}
 	}
 }

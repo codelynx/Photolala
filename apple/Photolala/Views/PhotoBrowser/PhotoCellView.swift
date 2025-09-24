@@ -15,10 +15,16 @@ import UIKit
 
 class PhotoCellView: XView {
 	// MARK: - Properties
-	private var photoImageView: XImageView!
+	private var imageContainer: XView!
+	private var imageView: ScalableImageView!
 	private var loadingView: XActivityIndicator!
 	private var selectionOverlay: XView!
+	private var infoBar: XView!
+	private var infoLabel: XTextField!
 	private var currentLoadTask: Task<Void, Never>?
+	private var displayMode: ThumbnailDisplayMode = .fill
+	private var showInfoBar: Bool = false
+	private var currentItem: PhotoBrowserItem?
 
 	// MARK: - Initialization
 	override init(frame: CGRect) {
@@ -46,19 +52,31 @@ class PhotoCellView: XView {
 		clipsToBounds = true
 		#endif
 
-		// Create image view
-		photoImageView = XImageView()
-		photoImageView.translatesAutoresizingMaskIntoConstraints = false
+		// Create image container (square)
+		imageContainer = XView()
+		imageContainer.translatesAutoresizingMaskIntoConstraints = false
 		#if os(macOS)
-		photoImageView.imageScaling = .scaleProportionallyUpOrDown
-		photoImageView.wantsLayer = true
-		photoImageView.layer?.cornerRadius = 4
-		photoImageView.layer?.masksToBounds = true
-		#else
-		photoImageView.contentMode = .scaleAspectFill
-		photoImageView.clipsToBounds = true
+		imageContainer.wantsLayer = true
 		#endif
-		addSubview(photoImageView)
+		addSubview(imageContainer)
+
+		// Create scalable image view inside container
+		#if os(macOS)
+		imageView = ScalableImageView()
+		#else
+		imageView = ScalableImageView(frame: .zero)
+		#endif
+		imageView.translatesAutoresizingMaskIntoConstraints = false
+		imageView.displayMode = displayMode
+		#if os(macOS)
+		imageView.wantsLayer = true
+		imageView.layer?.cornerRadius = 4
+		imageView.layer?.masksToBounds = true
+		#else
+		imageView.layer.cornerRadius = 4
+		imageView.clipsToBounds = true
+		#endif
+		imageContainer.addSubview(imageView)
 
 		// Create loading indicator
 		#if os(macOS)
@@ -89,36 +107,124 @@ class PhotoCellView: XView {
 		#endif
 		selectionOverlay.isHidden = true
 		addSubview(selectionOverlay)
+
+		// Create info bar
+		infoBar = XView()
+		infoBar.translatesAutoresizingMaskIntoConstraints = false
+		#if os(macOS)
+		infoBar.wantsLayer = true
+		infoBar.layer?.backgroundColor = NSColor.controlBackgroundColor.withAlphaComponent(0.9).cgColor
+		#else
+		infoBar.backgroundColor = UIColor.secondarySystemBackground.withAlphaComponent(0.9)
+		#endif
+		infoBar.isHidden = !showInfoBar
+		addSubview(infoBar)
+
+		// Create info label
+		#if os(macOS)
+		infoLabel = NSTextField()
+		infoLabel.isEditable = false
+		infoLabel.isBordered = false
+		infoLabel.drawsBackground = false
+		infoLabel.font = NSFont.systemFont(ofSize: 10)
+		infoLabel.textColor = NSColor.secondaryLabelColor
+		infoLabel.lineBreakMode = .byTruncatingTail
+		#else
+		infoLabel = UILabel()
+		infoLabel.font = UIFont.systemFont(ofSize: 10)
+		infoLabel.textColor = UIColor.secondaryLabel
+		infoLabel.lineBreakMode = .byTruncatingTail
+		#endif
+		infoLabel.translatesAutoresizingMaskIntoConstraints = false
+		infoBar.addSubview(infoLabel)
 	}
+
+	// Constraint references for dynamic updates
+	private var infoBarHeightConstraint: NSLayoutConstraint!
+	private var infoBarTopConstraint: NSLayoutConstraint!
 
 	private func setupConstraints() {
 		// Explicit constraints for both platforms (especially important for AppKit)
-		NSLayoutConstraint.activate([
-			// Image view fills the cell
-			photoImageView.topAnchor.constraint(equalTo: topAnchor),
-			photoImageView.leadingAnchor.constraint(equalTo: leadingAnchor),
-			photoImageView.trailingAnchor.constraint(equalTo: trailingAnchor),
-			photoImageView.bottomAnchor.constraint(equalTo: bottomAnchor),
+		var constraints: [NSLayoutConstraint] = []
 
-			// Loading indicator centered
-			loadingView.centerXAnchor.constraint(equalTo: centerXAnchor),
-			loadingView.centerYAnchor.constraint(equalTo: centerYAnchor),
+		// Image container - square aspect ratio, fills width
+		constraints.append(contentsOf: [
+			imageContainer.topAnchor.constraint(equalTo: topAnchor),
+			imageContainer.leadingAnchor.constraint(equalTo: leadingAnchor),
+			imageContainer.trailingAnchor.constraint(equalTo: trailingAnchor),
+			// Make it square
+			imageContainer.heightAnchor.constraint(equalTo: imageContainer.widthAnchor)
+		])
 
-			// Selection overlay matches bounds
+		// Image view fills the container
+		constraints.append(contentsOf: [
+			imageView.topAnchor.constraint(equalTo: imageContainer.topAnchor),
+			imageView.leadingAnchor.constraint(equalTo: imageContainer.leadingAnchor),
+			imageView.trailingAnchor.constraint(equalTo: imageContainer.trailingAnchor),
+			imageView.bottomAnchor.constraint(equalTo: imageContainer.bottomAnchor)
+		])
+
+		// Loading indicator centered in image container
+		constraints.append(contentsOf: [
+			loadingView.centerXAnchor.constraint(equalTo: imageContainer.centerXAnchor),
+			loadingView.centerYAnchor.constraint(equalTo: imageContainer.centerYAnchor)
+		])
+
+		// Selection overlay matches entire cell
+		constraints.append(contentsOf: [
 			selectionOverlay.topAnchor.constraint(equalTo: topAnchor),
 			selectionOverlay.leadingAnchor.constraint(equalTo: leadingAnchor),
 			selectionOverlay.trailingAnchor.constraint(equalTo: trailingAnchor),
 			selectionOverlay.bottomAnchor.constraint(equalTo: bottomAnchor)
 		])
+
+		// Info bar - positioned below image container
+		infoBarTopConstraint = infoBar.topAnchor.constraint(equalTo: imageContainer.bottomAnchor)
+		infoBarHeightConstraint = infoBar.heightAnchor.constraint(equalToConstant: 0)
+		constraints.append(contentsOf: [
+			infoBarTopConstraint,
+			infoBar.leadingAnchor.constraint(equalTo: leadingAnchor),
+			infoBar.trailingAnchor.constraint(equalTo: trailingAnchor),
+			infoBarHeightConstraint
+		])
+
+		// Info label inside info bar
+		constraints.append(contentsOf: [
+			infoLabel.leadingAnchor.constraint(equalTo: infoBar.leadingAnchor, constant: 4),
+			infoLabel.trailingAnchor.constraint(equalTo: infoBar.trailingAnchor, constant: -4),
+			infoLabel.centerYAnchor.constraint(equalTo: infoBar.centerYAnchor)
+		])
+
+		NSLayoutConstraint.activate(constraints)
 	}
 
 	// MARK: - Public API
-	func configure(with item: PhotoBrowserItem, source: any PhotoSourceProtocol) {
+	func configure(with item: PhotoBrowserItem, source: any PhotoSourceProtocol, displayMode: ThumbnailDisplayMode = .fill, showInfoBar: Bool = false) {
+		// Store current item
+		currentItem = item
+
+		// Update display mode if changed
+		if self.displayMode != displayMode {
+			self.displayMode = displayMode
+			imageView.displayMode = displayMode
+		}
+
+		// Update info bar visibility
+		if self.showInfoBar != showInfoBar {
+			self.showInfoBar = showInfoBar
+			updateInfoBarVisibility()
+		}
+
+		// Update info label
+		if showInfoBar {
+			updateInfoLabel(item: item)
+		}
+
 		// Cancel previous load
 		currentLoadTask?.cancel()
 
 		// Reset state
-		photoImageView.image = nil
+		imageView.image = nil
 		startLoading()
 
 		// Load thumbnail with async task
@@ -134,7 +240,7 @@ class PhotoCellView: XView {
 				await MainActor.run {
 					self.stopLoading()
 					if let thumbnail = thumbnail {
-						self.photoImageView.image = thumbnail
+						self.imageView.image = thumbnail
 					} else {
 						// Show placeholder for missing thumbnail
 						self.showPlaceholder()
@@ -155,9 +261,15 @@ class PhotoCellView: XView {
 	func reset() {
 		currentLoadTask?.cancel()
 		currentLoadTask = nil
+		currentItem = nil
 		stopLoading() // Stop any ongoing animation
-		photoImageView.image = nil
+		imageView.image = nil
 		selectionOverlay.isHidden = true
+		#if os(macOS)
+		infoLabel.stringValue = ""
+		#else
+		infoLabel.text = ""
+		#endif
 		// Reset background color to default
 		#if os(macOS)
 		layer?.backgroundColor = NSColor.controlBackgroundColor.cgColor
@@ -202,6 +314,31 @@ class PhotoCellView: XView {
 		layer?.backgroundColor = NSColor.systemRed.withAlphaComponent(0.1).cgColor
 		#else
 		backgroundColor = UIColor.systemRed.withAlphaComponent(0.1)
+		#endif
+	}
+
+	private func updateInfoBarVisibility() {
+		infoBar.isHidden = !showInfoBar
+		// Update height constraint based on visibility
+		let targetHeight: CGFloat = showInfoBar ? 20 : 0
+		if infoBarHeightConstraint.constant != targetHeight {
+			infoBarHeightConstraint.constant = targetHeight
+			#if os(macOS)
+			needsLayout = true
+			#else
+			setNeedsLayout()
+			#endif
+		}
+	}
+
+	private func updateInfoLabel(item: PhotoBrowserItem) {
+		// For now, just show the display name
+		// TODO: Load metadata through photo source for date and size
+		let infoText = item.displayName
+		#if os(macOS)
+		infoLabel.stringValue = infoText
+		#else
+		infoLabel.text = infoText
 		#endif
 	}
 }
