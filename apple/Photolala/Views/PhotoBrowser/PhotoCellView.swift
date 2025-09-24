@@ -18,7 +18,6 @@ class PhotoCellView: XView {
 	private var imageContainer: XView!
 	private var imageView: ScalableImageView!
 	private var loadingView: XActivityIndicator!
-	private var selectionOverlay: XView!
 	private var infoBar: XView!
 	private var infoLabel: XTextField!
 	private var currentLoadTask: Task<Void, Never>?
@@ -28,6 +27,7 @@ class PhotoCellView: XView {
 	private var currentSource: (any PhotoSourceProtocol)?
 	private var currentSourceURL: URL? // For local sources - kept for basket context
 	private var currentSourceIdentifier: String? // Source-specific ID - kept for basket context
+	private var isSelected = false
 
 	// MARK: - Initialization
 	override init(frame: CGRect) {
@@ -93,24 +93,6 @@ class PhotoCellView: XView {
 		loadingView.translatesAutoresizingMaskIntoConstraints = false
 		addSubview(loadingView)
 
-		// Create selection overlay
-		selectionOverlay = XView()
-		selectionOverlay.translatesAutoresizingMaskIntoConstraints = false
-		#if os(macOS)
-		selectionOverlay.wantsLayer = true
-		selectionOverlay.layer?.backgroundColor = NSColor.controlAccentColor.withAlphaComponent(0.3).cgColor
-		selectionOverlay.layer?.cornerRadius = 4
-		selectionOverlay.layer?.borderWidth = 3
-		selectionOverlay.layer?.borderColor = NSColor.controlAccentColor.cgColor
-		#else
-		selectionOverlay.backgroundColor = UIColor.tintColor.withAlphaComponent(0.3)
-		selectionOverlay.layer.borderWidth = 3
-		selectionOverlay.layer.borderColor = UIColor.tintColor.cgColor
-		selectionOverlay.layer.cornerRadius = 4
-		#endif
-		selectionOverlay.isHidden = true
-		addSubview(selectionOverlay)
-
 		// Create info bar
 		infoBar = XView()
 		infoBar.translatesAutoresizingMaskIntoConstraints = false
@@ -171,14 +153,6 @@ class PhotoCellView: XView {
 		constraints.append(contentsOf: [
 			loadingView.centerXAnchor.constraint(equalTo: imageContainer.centerXAnchor),
 			loadingView.centerYAnchor.constraint(equalTo: imageContainer.centerYAnchor)
-		])
-
-		// Selection overlay matches entire cell
-		constraints.append(contentsOf: [
-			selectionOverlay.topAnchor.constraint(equalTo: topAnchor),
-			selectionOverlay.leadingAnchor.constraint(equalTo: leadingAnchor),
-			selectionOverlay.trailingAnchor.constraint(equalTo: trailingAnchor),
-			selectionOverlay.bottomAnchor.constraint(equalTo: bottomAnchor)
 		])
 
 		// Info bar - positioned below image container
@@ -271,7 +245,8 @@ class PhotoCellView: XView {
 		currentItem = nil
 		stopLoading() // Stop any ongoing animation
 		imageView.image = nil
-		selectionOverlay.isHidden = true
+		isSelected = false
+		updateSelectionBorder()
 		#if os(macOS)
 		infoLabel.stringValue = ""
 		#else
@@ -286,7 +261,45 @@ class PhotoCellView: XView {
 	}
 
 	func setSelected(_ selected: Bool) {
-		selectionOverlay.isHidden = !selected
+		isSelected = selected
+		updateSelectionBorder()
+	}
+
+	private func updateSelectionBorder() {
+		if isSelected {
+			// Add selection border to image view
+			#if os(macOS)
+			imageView.layer?.borderWidth = 3
+			imageView.layer?.borderColor = NSColor.controlAccentColor.cgColor
+			imageView.layer?.backgroundColor = NSColor.controlAccentColor.withAlphaComponent(0.2).cgColor
+			#else
+			imageView.layer.borderWidth = 3
+			imageView.layer.borderColor = UIColor.tintColor.cgColor
+			imageView.backgroundColor = UIColor.tintColor.withAlphaComponent(0.2)
+			#endif
+		} else {
+			// Remove selection border
+			#if os(macOS)
+			// Keep the border from updateBorder() for fit mode
+			if displayMode == .fit {
+				imageView.layer?.borderWidth = 1
+				imageView.layer?.borderColor = NSColor.separatorColor.cgColor
+			} else {
+				imageView.layer?.borderWidth = 0
+				imageView.layer?.borderColor = nil
+			}
+			imageView.layer?.backgroundColor = nil
+			#else
+			if displayMode == .fit {
+				imageView.layer.borderWidth = 1
+				imageView.layer.borderColor = UIColor.separator.cgColor
+			} else {
+				imageView.layer.borderWidth = 0
+				imageView.layer.borderColor = nil
+			}
+			imageView.backgroundColor = nil
+			#endif
+		}
 	}
 
 	// MARK: - Private Helpers
@@ -350,6 +363,11 @@ class PhotoCellView: XView {
 	}
 
 	private func updateBorder() {
+		// Don't update border if selected (selection border takes precedence)
+		if isSelected {
+			return
+		}
+
 		// Show border only in fit mode (not fill)
 		let showBorder = displayMode == .fit
 		#if os(macOS)
