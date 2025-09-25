@@ -18,9 +18,11 @@ public actor ThumbnailCache {
 	private let logger = Logger(subsystem: "com.photolala", category: "ThumbnailCache")
 	private let cacheManager = CacheManager.shared
 
-	// Thumbnail configuration
-	private let thumbnailSize = CGSize(width: 256, height: 256)
-	private let jpegQuality: CGFloat = 0.8
+	// PTM-256 Thumbnail configuration
+	// Short edge is 256px, long edge up to 512px
+	private let shortEdge: CGFloat = 256
+	private let maxLongEdge: CGFloat = 512
+	private let jpegQuality: CGFloat = 0.85
 
 	// Rate limiting
 	private let maxConcurrentGenerations = 4
@@ -74,6 +76,61 @@ public actor ThumbnailCache {
 		return image
 	}
 
+	/// Get thumbnail as JPEG Data for S3 upload
+	/// This generates a PTM-256 compliant JPEG thumbnail
+	public func getThumbnailData(for photoMD5: PhotoMD5, sourceURL: URL) async throws -> Data {
+		// Generate thumbnail image
+		let image = try await generateThumbnail(from: sourceURL)
+
+		// Convert to JPEG data with PTM-256 spec
+		return try await Task.detached(priority: .utility) {
+			var quality = self.jpegQuality
+			var attempts = 0
+			let maxAttempts = 3
+			let minQuality: CGFloat = 0.70
+
+			while attempts < maxAttempts {
+				let data = NSMutableData()
+				guard let destination = CGImageDestinationCreateWithData(
+					data as CFMutableData,
+					UTType.jpeg.identifier as CFString,
+					1,
+					nil
+				) else {
+					throw ThumbnailError.saveFailed
+				}
+
+				let properties: [CFString: Any] = [
+					kCGImageDestinationLossyCompressionQuality: quality,
+					kCGImageDestinationOptimizeColorForSharing: true
+				]
+
+				CGImageDestinationAddImage(destination, image, properties as CFDictionary)
+
+				guard CGImageDestinationFinalize(destination) else {
+					throw ThumbnailError.saveFailed
+				}
+
+				// Check if size is within PTM-256 limits
+				if data.length <= 50_000 {
+					self.logger.debug("Generated PTM-256 thumbnail: \(photoMD5.value) (\(data.length) bytes)")
+					return data as Data
+				}
+
+				// Try lower quality if too large
+				attempts += 1
+				quality = max(quality - 0.05, minQuality)
+
+				if quality <= minQuality && data.length > 50_000 {
+					self.logger.warning("PTM-256 thumbnail exceeds 50KB: \(photoMD5.value) (\(data.length) bytes)")
+					return data as Data
+				}
+			}
+
+			throw ThumbnailError.sizeLimitExceeded
+		}.value
+	}
+
 	/// Prefetch thumbnails for multiple photos
 	public func prefetchThumbnails(for photos: [(PhotoMD5, URL)], cacheType: CacheType = .md5) async {
 		await withTaskGroup(of: Void.self) { group in
@@ -105,7 +162,8 @@ public actor ThumbnailCache {
 
 	// MARK: - Private Methods
 
-	/// Generate thumbnail from source image
+	/// Generate PTM-256 thumbnail from source image
+	/// Follows PTM-256 spec: short edge 256px, long edge up to 512px
 	private func generateThumbnail(from sourceURL: URL) async throws -> CGImage {
 		// Rate limiting
 		while activeGenerations >= maxConcurrentGenerations {
@@ -116,17 +174,54 @@ public actor ThumbnailCache {
 		defer { activeGenerations -= 1 }
 
 		return try await Task.detached(priority: .utility) {
-			guard let imageSource = CGImageSourceCreateWithURL(sourceURL as CFURL, nil) else {
+			// Load the source image
+			guard let imageSource = CGImageSourceCreateWithURL(sourceURL as CFURL, nil),
+				  let cgImage = CGImageSourceCreateImageAtIndex(imageSource, 0, nil) else {
 				throw ThumbnailError.invalidImageSource
 			}
 
-			let options: [CFString: Any] = [
-				kCGImageSourceCreateThumbnailFromImageAlways: true,
-				kCGImageSourceCreateThumbnailWithTransform: true,
-				kCGImageSourceThumbnailMaxPixelSize: max(self.thumbnailSize.width, self.thumbnailSize.height)
-			]
+			// Calculate dimensions following PTM-256 spec
+			let width = CGFloat(cgImage.width)
+			let height = CGFloat(cgImage.height)
+			let scale = self.shortEdge / min(width, height)
 
-			guard let thumbnail = CGImageSourceCreateThumbnailAtIndex(imageSource, 0, options as CFDictionary) else {
+			let scaledWidth = width * scale
+			let scaledHeight = height * scale
+
+			// Clamp long edge to 512px max
+			let targetWidth = min(scaledWidth, self.maxLongEdge)
+			let targetHeight = min(scaledHeight, self.maxLongEdge)
+
+			// Create context for thumbnail
+			guard let context = CGContext(
+				data: nil,
+				width: Int(targetWidth.rounded()),
+				height: Int(targetHeight.rounded()),
+				bitsPerComponent: 8,
+				bytesPerRow: 0,
+				space: CGColorSpaceCreateDeviceRGB(),
+				bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+			) else {
+				throw ThumbnailError.generationFailed
+			}
+
+			context.interpolationQuality = .high
+
+			// Calculate drawing rect with cropping if needed
+			var offsetX = (targetWidth - scaledWidth) / 2
+			var offsetY = (targetHeight - scaledHeight) / 2
+
+			// For portraits, bias crop upward by 40% to preserve faces
+			if scaledHeight > targetHeight {
+				let overflow = scaledHeight - targetHeight
+				offsetY += overflow * 0.4
+				offsetY = min(offsetY, 0) // Don't push outside top edge
+			}
+
+			let drawRect = CGRect(x: offsetX, y: offsetY, width: scaledWidth, height: scaledHeight)
+			context.draw(cgImage, in: drawRect)
+
+			guard let thumbnail = context.makeImage() else {
 				throw ThumbnailError.generationFailed
 			}
 
@@ -145,34 +240,58 @@ public actor ThumbnailCache {
 		}.value
 	}
 
-	/// Save thumbnail to disk
+	/// Save thumbnail to disk following PTM-256 spec
 	private func saveThumbnail(_ image: CGImage, to url: URL) async throws {
 		let data = try await Task.detached(priority: .utility) {
-			let data = NSMutableData()
-			guard let destination = CGImageDestinationCreateWithData(
-				data as CFMutableData,
-				UTType.jpeg.identifier as CFString,
-				1,
-				nil
-			) else {
-				throw ThumbnailError.saveFailed
+			var quality = self.jpegQuality
+			var attempts = 0
+			let maxAttempts = 3
+			let minQuality: CGFloat = 0.70
+
+			while attempts < maxAttempts {
+				let data = NSMutableData()
+				guard let destination = CGImageDestinationCreateWithData(
+					data as CFMutableData,
+					UTType.jpeg.identifier as CFString,
+					1,
+					nil
+				) else {
+					throw ThumbnailError.saveFailed
+				}
+
+				// PTM-256 spec: optimize for sharing, use current quality
+				let properties: [CFString: Any] = [
+					kCGImageDestinationLossyCompressionQuality: quality,
+					kCGImageDestinationOptimizeColorForSharing: true
+				]
+
+				CGImageDestinationAddImage(destination, image, properties as CFDictionary)
+
+				guard CGImageDestinationFinalize(destination) else {
+					throw ThumbnailError.saveFailed
+				}
+
+				// Check if size is within PTM-256 limits (max 50KB)
+				if data.length <= 50_000 {
+					return data as Data
+				}
+
+				// Try lower quality if too large
+				attempts += 1
+				quality = max(quality - 0.05, minQuality)
+
+				if quality <= minQuality && data.length > 50_000 {
+					// Accept file even if slightly over limit at minimum quality
+					self.logger.warning("PTM-256 thumbnail exceeds 50KB at minimum quality: \(data.length) bytes")
+					return data as Data
+				}
 			}
 
-			let properties: [CFString: Any] = [
-				kCGImageDestinationLossyCompressionQuality: self.jpegQuality
-			]
-
-			CGImageDestinationAddImage(destination, image, properties as CFDictionary)
-
-			guard CGImageDestinationFinalize(destination) else {
-				throw ThumbnailError.saveFailed
-			}
-
-			return data as Data
+			throw ThumbnailError.sizeLimitExceeded
 		}.value
 
 		try await cacheManager.storeData(data, at: url)
-		logger.debug("Saved thumbnail to: \(url.lastPathComponent)")
+		logger.debug("Saved PTM-256 thumbnail to: \(url.lastPathComponent) (\(data.count) bytes)")
 	}
 
 	/// Update memory cache with LRU eviction
@@ -197,6 +316,7 @@ enum ThumbnailError: LocalizedError {
 	case generationFailed
 	case loadFailed
 	case saveFailed
+	case sizeLimitExceeded
 
 	var errorDescription: String? {
 		switch self {
@@ -208,6 +328,8 @@ enum ThumbnailError: LocalizedError {
 			return "Failed to load thumbnail from cache"
 		case .saveFailed:
 			return "Failed to save thumbnail to cache"
+		case .sizeLimitExceeded:
+			return "Thumbnail exceeds 50KB limit even at minimum quality"
 		}
 	}
 }

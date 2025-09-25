@@ -213,9 +213,10 @@ class LocalPhotoSource: PhotoSourceProtocol {
 			throw PhotoSourceError.itemNotFound
 		}
 
-		// Load image directly (catalog integration can be added later)
-		// Load and scale thumbnail using thread-safe CoreGraphics
-		let thumbnailSize = CGSize(width: 256, height: 256)
+		// Load image directly using PTM-256 thumbnail spec
+		// Short edge: 256px, long edge: up to 512px
+		let shortEdge: CGFloat = 256
+		let maxLongEdge: CGFloat = 512
 
 		return try await Task.detached {
 			// Load image data
@@ -227,21 +228,23 @@ class LocalPhotoSource: PhotoSourceProtocol {
 				throw PhotoSourceError.invalidData
 			}
 
-			// Calculate scaled size maintaining aspect ratio
-			let originalWidth = CGFloat(cgImage.width)
-			let originalHeight = CGFloat(cgImage.height)
-			let widthRatio = thumbnailSize.width / originalWidth
-			let heightRatio = thumbnailSize.height / originalHeight
-			let scaleFactor = min(widthRatio, heightRatio)
+			// Calculate dimensions following PTM-256 spec
+			let width = CGFloat(cgImage.width)
+			let height = CGFloat(cgImage.height)
+			let scale = shortEdge / min(width, height)
 
-			let scaledWidth = Int(originalWidth * scaleFactor)
-			let scaledHeight = Int(originalHeight * scaleFactor)
+			let scaledWidth = width * scale
+			let scaledHeight = height * scale
+
+			// Clamp long edge to 512px max
+			let targetWidth = min(scaledWidth, maxLongEdge)
+			let targetHeight = min(scaledHeight, maxLongEdge)
 
 			// Create context for scaling
 			guard let context = CGContext(
 				data: nil,
-				width: scaledWidth,
-				height: scaledHeight,
+				width: Int(targetWidth.rounded()),
+				height: Int(targetHeight.rounded()),
 				bitsPerComponent: 8,
 				bytesPerRow: 0,
 				space: CGColorSpaceCreateDeviceRGB(),
@@ -250,9 +253,21 @@ class LocalPhotoSource: PhotoSourceProtocol {
 				throw PhotoSourceError.invalidData
 			}
 
-			// Draw scaled image
 			context.interpolationQuality = .high
-			context.draw(cgImage, in: CGRect(x: 0, y: 0, width: scaledWidth, height: scaledHeight))
+
+			// Calculate drawing rect with cropping if needed
+			var offsetX = (targetWidth - scaledWidth) / 2
+			var offsetY = (targetHeight - scaledHeight) / 2
+
+			// For portraits, bias crop upward by 40% to preserve faces
+			if scaledHeight > targetHeight {
+				let overflow = scaledHeight - targetHeight
+				offsetY += overflow * 0.4
+				offsetY = min(offsetY, 0)
+			}
+
+			let drawRect = CGRect(x: offsetX, y: offsetY, width: scaledWidth, height: scaledHeight)
+			context.draw(cgImage, in: drawRect)
 
 			// Get scaled CGImage
 			guard let scaledCGImage = context.makeImage() else {
@@ -261,7 +276,7 @@ class LocalPhotoSource: PhotoSourceProtocol {
 
 			// Convert to platform image
 			#if os(macOS)
-			return NSImage(cgImage: scaledCGImage, size: CGSize(width: scaledWidth, height: scaledHeight))
+			return NSImage(cgImage: scaledCGImage, size: CGSize(width: targetWidth, height: targetHeight))
 			#else
 			return UIImage(cgImage: scaledCGImage)
 			#endif
