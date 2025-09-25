@@ -97,6 +97,9 @@ final class AccountManager: ObservableObject {
 		self.isSignedIn = true
 		print("[AccountManager] isSignedIn is now: \(self.isSignedIn)")
 
+		// Ensure status.json exists for new or returning users
+		await ensureStatusFileExists(for: result.user)
+
 		// Store user UUID for status checking
 		storeUserUUID(result.user.id.uuidString)
 
@@ -134,6 +137,9 @@ final class AccountManager: ObservableObject {
 		print("[AccountManager] Setting isSignedIn = true after Apple sign-in")
 		self.isSignedIn = true
 		print("[AccountManager] isSignedIn is now: \(self.isSignedIn)")
+
+		// Ensure status.json exists for new or returning users
+		await ensureStatusFileExists(for: result.user)
 
 		// Store user UUID for status checking
 		storeUserUUID(result.user.id.uuidString)
@@ -729,27 +735,21 @@ extension AccountManager {
 
 			// Check status.json
 			if let status = try await s3Service.getUserStatus(for: userUUID) {
-				accountStatus = status.accountStatus
+				accountStatus = status.typedStatus
 
 				// Handle different states
-				switch status.accountStatus {
-				case .scheduledForDeletion:
+				switch status.typedStatus {
+				case .scheduledForDeletion(let deleteDate):
 					// Account is scheduled for deletion, show warning UI
-					print("[AccountManager] Account scheduled for deletion")
-				case .deleted:
-					// Account was deleted, clear local data
-					print("[AccountManager] Account was deleted")
-					await handleDeletedAccount()
+					print("[AccountManager] Account scheduled for deletion on \(deleteDate)")
 				case .active:
 					// Normal operation
 					break
 				}
 			} else {
-				// No status.json found - could mean deleted account
-				print("[AccountManager] No status.json found for UUID: \(userUUID)")
-				// In production, this would mean the account doesn't exist
-				// For now, assume active for backward compatibility during development
-				accountStatus = .active
+				// No status.json found - account has been deleted
+				print("[AccountManager] Account deleted (no status.json)")
+				await handleDeletedAccount()
 			}
 		} catch {
 			print("[AccountManager] Failed to check account status: \(error)")
@@ -781,7 +781,7 @@ extension AccountManager {
 		currentUser = nil
 		stsCredentials = nil
 		isSignedIn = false
-		accountStatus = .deleted(deletedDate: Date())
+		accountStatus = .active  // Reset to active (account no longer exists)
 
 		// Clear stored UUID
 		UserDefaults.standard.removeObject(forKey: userUUIDKey)
@@ -797,6 +797,31 @@ extension AccountManager {
 	@MainActor
 	func storeUserUUID(_ uuid: String) {
 		UserDefaults.standard.set(uuid, forKey: userUUIDKey)
+	}
+
+	/// Ensure status.json exists for a user (create if missing)
+	private func ensureStatusFileExists(for user: PhotolalaUser) async {
+		do {
+			let environment = getCurrentAWSEnvironment()
+			let s3Service = try await S3Service.forEnvironment(environment)
+
+			// Check if status.json already exists
+			if let existingStatus = try await s3Service.getUserStatus(for: user.id.uuidString) {
+				// Status exists, update accountStatus
+				accountStatus = existingStatus.typedStatus
+				print("[AccountManager] Existing status.json found: \(existingStatus.accountStatus)")
+			} else {
+				// Create new status.json for active account
+				let status = UserStatusFile(status: .active)
+				try await s3Service.writeUserStatus(status, for: user.id.uuidString)
+				accountStatus = .active
+				print("[AccountManager] Created new status.json for user \(user.id)")
+			}
+		} catch {
+			print("[AccountManager] Failed to ensure status.json: \(error)")
+			// Don't block sign-in on status.json creation failure
+			accountStatus = .active
+		}
 	}
 
 	/// Clear stored UUID on sign-out

@@ -67,10 +67,7 @@ actor DeletionScheduler {
 
 		// Update user status file
 		let status = UserStatusFile(
-			accountStatus: .scheduledForDeletion(deleteDate: deleteDate),
-			lastModified: Date(),
-			canCancel: true,
-			accessLevel: .readOnly
+			status: .scheduledForDeletion(deleteDate: deleteDate)
 		)
 
 		try await s3Service.writeUserStatus(status, for: user.id.uuidString)
@@ -82,7 +79,7 @@ actor DeletionScheduler {
 	func cancelScheduledDeletion(user: PhotolalaUser) async throws {
 		// Read current status to get deletion date
 		guard let currentStatus = try await s3Service.getUserStatus(for: user.id.uuidString),
-			  case .scheduledForDeletion(let deleteDate) = currentStatus.accountStatus else {
+			  case .scheduledForDeletion(let deleteDate) = currentStatus.typedStatus else {
 			throw DeletionError.notScheduledForDeletion
 		}
 
@@ -102,10 +99,7 @@ actor DeletionScheduler {
 
 		// Update user status to active
 		let status = UserStatusFile(
-			accountStatus: .active,
-			lastModified: Date(),
-			canCancel: false,
-			accessLevel: .full
+			status: .active
 		)
 
 		try await s3Service.writeUserStatus(status, for: user.id.uuidString)
@@ -121,16 +115,11 @@ actor DeletionScheduler {
 
 		logger.info("Expediting deletion for user \(user.id) (dev only)")
 
-		// Delete user data (photos, catalogs, thumbnails)
-		let deletedCount = try await s3Service.deleteUserData(userID: user.id.uuidString)
-		logger.info("Deleted \(deletedCount) objects for user \(user.id)")
-
-		// Delete identity mappings
-		let identitiesDeleted = try await s3Service.deleteIdentityMappings(userID: user.id.uuidString)
-		logger.info("Deleted \(identitiesDeleted) identity mappings for user \(user.id)")
-
-		// Finally, remove status.json to indicate account is fully deleted
-		try await s3Service.deleteObject(key: "users/\(user.id.uuidString)/status.json")
+		// Delete all user data using the comprehensive method
+		// This includes photos, thumbnails, catalogs, user data, AND identity mappings
+		// Note: deleteAllUserData also removes status.json (under users/ prefix)
+		try await s3Service.deleteAllUserData(userID: user.id.uuidString)
+		logger.info("Deleted all data including identity mappings for user \(user.id)")
 
 		// Note: After this point, the account no longer exists
 		// The user can sign up again with the same identity if desired

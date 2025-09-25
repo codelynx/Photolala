@@ -3,7 +3,7 @@ import Foundation
 enum AccountStatus: Codable, Sendable {
 	case active
 	case scheduledForDeletion(deleteDate: Date)
-	case deleted(deletedDate: Date)
+	// Note: No 'deleted' case - when deleted, status.json is removed entirely
 
 	enum CodingKeys: String, CodingKey {
 		case status
@@ -21,9 +21,6 @@ enum AccountStatus: Codable, Sendable {
 		case "scheduled_for_deletion":
 			let deleteDate = try container.decode(Date.self, forKey: .deleteDate)
 			self = .scheduledForDeletion(deleteDate: deleteDate)
-		case "deleted":
-			let deletedDate = try container.decode(Date.self, forKey: .deletedDate)
-			self = .deleted(deletedDate: deletedDate)
 		default:
 			throw DecodingError.dataCorrupted(.init(
 				codingPath: container.codingPath,
@@ -41,23 +38,47 @@ enum AccountStatus: Codable, Sendable {
 		case .scheduledForDeletion(let deleteDate):
 			try container.encode("scheduled_for_deletion", forKey: .status)
 			try container.encode(deleteDate, forKey: .deleteDate)
-		case .deleted(let deletedDate):
-			try container.encode("deleted", forKey: .status)
-			try container.encode(deletedDate, forKey: .deletedDate)
 		}
 	}
 }
 
-@preconcurrency struct UserStatusFile: Codable, Sendable {
-	let accountStatus: AccountStatus
+/// Minimal status.json structure - Phase 1
+struct UserStatusFile: Codable, Sendable {
+	let accountStatus: String  // "active" or "scheduled_for_deletion"
+	let deleteDate: Date?       // Only present when scheduled_for_deletion
 	let lastModified: Date
-	let canCancel: Bool
-	let accessLevel: AccessLevel
 
-	enum AccessLevel: String, Codable, Sendable {
-		case full = "full"
-		case readOnly = "read_only"
-		case none = "none"
+	/// Helper to get typed status
+	nonisolated var typedStatus: AccountStatus {
+		switch accountStatus {
+		case "active":
+			return .active
+		case "scheduled_for_deletion":
+			if let deleteDate = deleteDate {
+				return .scheduledForDeletion(deleteDate: deleteDate)
+			}
+			return .active // Fallback if malformed
+		default:
+			return .active // Unknown status = treat as active
+		}
+	}
+
+	/// Helper to check if cancellation is allowed
+	nonisolated var canCancel: Bool {
+		return accountStatus == "scheduled_for_deletion"
+	}
+
+	/// Create status file from typed enum
+	nonisolated init(status: AccountStatus, lastModified: Date = Date()) {
+		self.lastModified = lastModified
+		switch status {
+		case .active:
+			self.accountStatus = "active"
+			self.deleteDate = nil
+		case .scheduledForDeletion(let date):
+			self.accountStatus = "scheduled_for_deletion"
+			self.deleteDate = date
+		}
 	}
 }
 

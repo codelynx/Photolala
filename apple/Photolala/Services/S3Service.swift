@@ -883,12 +883,12 @@ extension S3Service {
 		var errors: [String] = []
 
 		// Define namespaces to delete (excluding identities)
+		// Note: These match the actual S3 structure
 		let namespaces = [
-			("photos", "users/\(userID)/photos/"),
-			("catalogs", "users/\(userID)/catalogs/"),
-			("thumbnails", "users/\(userID)/thumbnails/"),
-			("metadata", "users/\(userID)/metadata/"),
-			("stars", "users/\(userID)/stars/")
+			("photos", "photos/\(userID)/"),
+			("thumbnails", "thumbnails/\(userID)/"),
+			("catalogs", "catalogs/\(userID)/"),
+			("users", "users/\(userID)/")  // This includes status.json, stars, etc.
 		]
 
 		await progressDelegate?.updateOperation("Deleting user data (preserving tombstones)...")
