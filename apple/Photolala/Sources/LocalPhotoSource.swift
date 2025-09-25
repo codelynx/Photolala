@@ -309,18 +309,30 @@ class LocalPhotoSource: PhotoSourceProtocol {
 			return (nil, nil, nil)
 		}
 
-		// Try to compute Fast Photo Key
+		// Check if BasketActionService has cached identity for this path
+		// This provides app-wide caching across all photo browsers
+		if let identity = await BasketActionService.shared.getCachedIdentity(for: url.path) {
+			print("[LocalPhotoSource] Using cached identity for \(url.lastPathComponent)")
+			return (identity.fullMD5, identity.headMD5, identity.fileSize)
+		}
+
+		// No cache hit, compute Fast Photo Key
 		do {
 			let fastKey = try await FastPhotoKey(contentsOf: url)
-			// File size is already in the Fast Photo Key
 			let fileSize = fastKey.fileSize
 
-			print("[LocalPhotoSource] Photo identity for \(url.lastPathComponent):")
+			print("[LocalPhotoSource] Computed identity for \(url.lastPathComponent):")
 			print("  - Head MD5: \(fastKey.headMD5)")
 			print("  - File size: \(fileSize)")
 
-			// TODO: Check if we have cached full MD5 for this file
-			// For now, return Fast Photo Key components
+			// Cache the identity for future use across the app
+			let identity = PhotoIdentity(
+				headMD5: fastKey.headMD5,
+				fileSize: fastKey.fileSize,
+				fullMD5: nil
+			)
+			await BasketActionService.shared.cachePhotoIdentity(identity, for: url.path)
+
 			return (nil, fastKey.headMD5, fileSize)
 		} catch {
 			// If we can't compute, try to get file size from attributes

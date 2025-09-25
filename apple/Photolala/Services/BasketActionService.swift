@@ -48,6 +48,7 @@ final class BasketActionService: ObservableObject {
 	private var catalogService: CatalogService?
 	private var uploadCoordinator: BasketUploadCoordinator?
 	private var catalogCache: LocalCatalogCache?
+	private let identityCache = LocalPhotoIdentityCache()
 	private let checkpointManager: StarCheckpointManager
 
 	// Current operation
@@ -138,6 +139,48 @@ final class BasketActionService: ObservableObject {
 	func isStarredByFastKey(_ fastKey: String) async -> Bool {
 		guard let cache = catalogCache else { return false }
 		return await cache.isStarredByFastKey(fastKey)
+	}
+
+	/// Check if a local file is starred using cached identity if available
+	func isLocalFileStarred(path: String) async -> Bool {
+		// First check identity cache for fast lookup
+		if let identity = await identityCache.getIdentity(for: path) {
+			// Check by full MD5 if available
+			if let fullMD5 = identity.fullMD5 {
+				return await isStarred(md5: fullMD5)
+			}
+			// Check by Fast Photo Key if available
+			if let headMD5 = identity.headMD5, let fileSize = identity.fileSize {
+				return await isStarredByFastKey(headMD5: headMD5, fileSize: fileSize)
+			}
+		}
+
+		// No cached identity, need to compute Fast Photo Key (faster than full MD5)
+		let url = URL(fileURLWithPath: path)
+		if let fastKey = try? await FastPhotoKey(contentsOf: url) {
+			// Cache the identity for future use
+			let identity = PhotoIdentity(
+				headMD5: fastKey.headMD5,
+				fileSize: fastKey.fileSize,
+				fullMD5: nil
+			)
+			await identityCache.cacheIdentity(identity, for: path)
+
+			// Check using Fast Photo Key
+			return await isStarredByFastKey(headMD5: fastKey.headMD5, fileSize: fastKey.fileSize)
+		}
+
+		return false
+	}
+
+	/// Get cached photo identity for a file path (public for photo sources)
+	func getCachedIdentity(for path: String) async -> PhotoIdentity? {
+		return await identityCache.getIdentity(for: path)
+	}
+
+	/// Cache photo identity for a file path (public for photo sources)
+	func cachePhotoIdentity(_ identity: PhotoIdentity, for path: String) async {
+		await identityCache.cacheIdentity(identity, for: path)
 	}
 
 	/// Execute a basket action on the given items
@@ -344,14 +387,17 @@ final class BasketActionService: ObservableObject {
 
 			do {
 				// For unstar, we delete from S3
-				if item.sourceType == .local || item.sourceType == .applePhotos {
+				if item.sourceType == .local || item.sourceType == .applePhotos || item.sourceType == .cloud {
 					// Use the userID from the beginning of the function
 
-					// Compute MD5 - for basket items, the ID should be the MD5
-					var md5: String = item.id
+					// Compute or determine MD5 based on source type
+					var md5: String?
 
-					// For local files, we can recompute to verify
-					if item.sourceType == .local {
+					if item.sourceType == .cloud {
+						// For cloud items, the ID is already the MD5
+						md5 = item.id
+					} else if item.sourceType == .local {
+						// For local files, compute MD5 from the file
 						let resolved = item.resolveURL()
 						if let resolved = resolved {
 							defer {
@@ -361,24 +407,42 @@ final class BasketActionService: ObservableObject {
 							}
 							// Compute MD5 for the item
 							md5 = try await computeFullMD5(for: resolved.url)
+							logger.info("Computed MD5 for local file \(item.displayName): \(md5 ?? "nil")")
+						} else if let sourceIdentifier = item.sourceIdentifier {
+							// Try using sourceIdentifier as file path
+							let url = URL(fileURLWithPath: sourceIdentifier)
+							if FileManager.default.fileExists(atPath: url.path) {
+								md5 = try await computeFullMD5(for: url)
+								logger.info("Computed MD5 from sourceIdentifier for \(item.displayName): \(md5 ?? "nil")")
+							} else {
+								logger.error("Cannot access local file for MD5 computation: \(sourceIdentifier)")
+							}
+						} else {
+							logger.error("No URL or sourceIdentifier available for local file \(item.displayName)")
 						}
 					} else if item.sourceType == .applePhotos {
 						// For Apple Photos, look up the MD5 from our mapping
 						if let mappedMD5 = starredItemsMapping[item.id] {
 							md5 = mappedMD5
+							logger.info("Found mapped MD5 for Apple Photos item \(item.displayName): \(md5 ?? "nil")")
 						} else {
 							logger.warning("Cannot unstar Apple Photos item \(item.displayName) - MD5 mapping not found for ID: \(item.id)")
-							continue
 						}
 					}
 
+					// Check if we have an MD5
+					guard let photoMD5 = md5 else {
+						logger.error("No MD5 found for \(item.displayName) - cannot unstar")
+						continue
+					}
+
 					// Delete photo from S3
-					let s3Key = "photos/\(userID)/\(md5).dat"
+					let s3Key = "photos/\(userID)/\(photoMD5).dat"
 					try await s3Service.deleteObject(key: s3Key)
 					logger.info("Deleted \(item.displayName) from S3 at \(s3Key)")
 
 					// Delete thumbnail from S3
-					let thumbnailKey = "thumbnails/\(userID)/\(md5).jpg"
+					let thumbnailKey = "thumbnails/\(userID)/\(photoMD5).jpg"
 					do {
 						try await s3Service.deleteObject(key: thumbnailKey)
 						logger.info("Deleted thumbnail for \(item.displayName) from S3")
@@ -388,13 +452,13 @@ final class BasketActionService: ObservableObject {
 					}
 
 					// Remove from upload queue if present
-					await uploadCoordinator?.removeFromQueue(md5: md5)
+					await uploadCoordinator?.removeFromQueue(md5: photoMD5)
 
 					// Remove from catalog to update star state
 					if let catalogService = catalogService {
 						do {
 							// Remove from catalog
-							try await catalogService.unstarEntry(md5: md5)
+							try await catalogService.unstarEntry(md5: photoMD5)
 							logger.info("Removed \(item.displayName) from catalog")
 
 							// Create snapshot after modification to update pointer
@@ -408,7 +472,7 @@ final class BasketActionService: ObservableObject {
 
 					// Update cache if available
 					if let cache = catalogCache {
-						await cache.removeFromCache(md5: md5)
+						await cache.removeFromCache(md5: photoMD5)
 					}
 
 					// Remove MD5 mapping
@@ -472,7 +536,17 @@ final class BasketActionService: ObservableObject {
 	// MARK: - Helpers
 
 	private func computeFullMD5(for url: URL) async throws -> String {
+		let path = url.path
+
+		// Check cache first
+		if let cachedIdentity = await identityCache.getIdentity(for: path),
+		   let cachedMD5 = cachedIdentity.fullMD5 {
+			logger.debug("Using cached MD5 for \(path)")
+			return cachedMD5
+		}
+
 		// Compute full file MD5 with streaming
+		logger.debug("Computing MD5 for \(path)")
 		let handle = try FileHandle(forReadingFrom: url)
 		defer { try? handle.close() }
 
@@ -486,7 +560,20 @@ final class BasketActionService: ObservableObject {
 		}
 
 		let digest = hasher.finalize()
-		return digest.map { String(format: "%02x", $0) }.joined()
+		let md5 = digest.map { String(format: "%02x", $0) }.joined()
+
+		// Also compute Fast Photo Key while we're at it
+		let fastKey = try await FastPhotoKey(contentsOf: url)
+
+		// Cache the complete identity
+		let identity = PhotoIdentity(
+			headMD5: fastKey.headMD5,
+			fileSize: fastKey.fileSize,
+			fullMD5: md5
+		)
+		await identityCache.cacheIdentity(identity, for: path)
+
+		return md5
 	}
 }
 
