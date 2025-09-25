@@ -79,9 +79,15 @@ final class PhotoBasket: ObservableObject {
 		// Create security-scoped bookmark if URL provided (for local sources)
 		var bookmark: Data? = nil
 		if let url = url, sourceType == .local {
-			bookmark = BasketItem.createBookmark(from: url)
-			if bookmark == nil {
-				print("[PhotoBasket] Warning: Failed to create bookmark for \(url)")
+			// Check if the URL is accessible
+			if FileManager.default.isReadableFile(atPath: url.path) {
+				bookmark = BasketItem.createBookmark(from: url)
+				if bookmark == nil {
+					print("[PhotoBasket] Warning: Failed to create bookmark for \(url.path)")
+					print("[PhotoBasket] The file is readable, but bookmark creation failed. This might be a sandbox issue.")
+				}
+			} else {
+				print("[PhotoBasket] Warning: File not accessible for bookmark creation: \(url.path)")
 			}
 		}
 

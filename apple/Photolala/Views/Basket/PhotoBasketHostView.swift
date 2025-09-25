@@ -9,6 +9,7 @@ import SwiftUI
 
 struct PhotoBasketHostView: View {
 	@StateObject private var basket = PhotoBasket.shared
+	@State private var actionService = BasketActionViewModel()
 	@State private var environment: PhotoBrowserEnvironment
 	@State private var showActionSheet = false
 	@State private var selectedAction: BasketAction?
@@ -24,7 +25,8 @@ struct PhotoBasketHostView: View {
 	var body: some View {
 		PhotoBrowserView(
 			environment: environment,
-			title: "Basket"
+			title: "Basket",
+			mode: .basket
 		)
 		.navigationTitle("Photo Basket")
 		.navigationSubtitle("\(basket.count) items")
@@ -43,7 +45,7 @@ struct PhotoBasketHostView: View {
 			// Action buttons
 			ToolbarItemGroup(placement: .primaryAction) {
 				if !basket.isEmpty {
-					// Actions menu
+					// Actions menu for other operations
 					Menu {
 						BasketActionsMenu(
 							onAction: { action in
@@ -62,6 +64,7 @@ struct PhotoBasketHostView: View {
 						Label("Clear", systemImage: "trash")
 					}
 					.foregroundColor(.red)
+					.help("Remove all items from basket")
 				}
 			}
 		}
@@ -83,7 +86,11 @@ struct PhotoBasketHostView: View {
 			Text("Remove all \(basket.count) items from the basket?")
 		}
 		.sheet(item: $selectedAction) { action in
-			BasketActionSheet(action: action, items: basket.items)
+			BasketActionSheet(
+				action: action,
+				items: basket.items,
+				actionService: actionService
+			)
 		}
 	}
 
@@ -186,16 +193,6 @@ struct BasketActionsMenu: View {
 	let onAction: (BasketAction) -> Void
 
 	var body: some View {
-		Section("Organization") {
-			Button(action: { onAction(.star) }) {
-				Label("Star All", systemImage: "star.fill")
-			}
-
-			Button(action: { onAction(.unstar) }) {
-				Label("Unstar All", systemImage: "star.slash")
-			}
-		}
-
 		Section("Albums") {
 			Button(action: { onAction(.createAlbum) }) {
 				Label("Create Album", systemImage: "folder.badge.plus")
@@ -229,11 +226,9 @@ struct BasketActionsMenu: View {
 struct BasketActionSheet: View {
 	let action: BasketAction
 	let items: [BasketItem]
+	@Bindable var actionService: BasketActionViewModel
 	@SwiftUI.Environment(\.dismiss) private var dismiss: DismissAction
-	@State private var isProcessing = false
-	@State private var progress: Double = 0
-	@State private var currentItem: String = ""
-	@State private var error: Error?
+	@State private var albumName: String = ""
 
 	var body: some View {
 		VStack(spacing: 20) {
@@ -263,15 +258,17 @@ struct BasketActionSheet: View {
 			.padding()
 
 			// Progress
-			if isProcessing {
+			if actionService.isProcessing {
 				VStack(spacing: 12) {
-					ProgressView(value: progress)
+					ProgressView(value: actionService.progress?.percentComplete ?? 0)
 						.progressViewStyle(.linear)
 
-					Text(currentItem)
-						.font(.caption)
-						.foregroundColor(.secondary)
-						.lineLimit(1)
+					if let progressInfo = actionService.progress {
+						Text(progressInfo.message)
+							.font(.caption)
+							.foregroundColor(.secondary)
+							.lineLimit(2)
+					}
 				}
 				.padding()
 			}
@@ -282,24 +279,34 @@ struct BasketActionSheet: View {
 			Spacer()
 
 			// Action button
-			Button(action: executeAction) {
-				Label(
-					isProcessing ? "Processing..." : "Execute",
-					systemImage: isProcessing ? "clock" : action.icon
-				)
+			HStack {
+				if actionService.isProcessing {
+					Button("Cancel") {
+						actionService.cancel()
+					}
+					.buttonStyle(.bordered)
+					.controlSize(.large)
+				}
+
+				Button(action: executeAction) {
+					Label(
+						actionService.isProcessing ? "Processing..." : "Execute",
+						systemImage: actionService.isProcessing ? "clock" : action.icon
+					)
+				}
+				.buttonStyle(.borderedProminent)
+				.disabled(actionService.isProcessing || !canExecute)
+				.controlSize(.large)
 			}
-			.buttonStyle(.borderedProminent)
-			.disabled(isProcessing)
-			.controlSize(.large)
 		}
 		.padding()
 		.frame(width: 500, height: 400)
-		.alert("Error", isPresented: .constant(error != nil)) {
+		.alert("Error", isPresented: .constant(actionService.error != nil)) {
 			Button("OK") {
-				error = nil
+				actionService.error = nil
 			}
 		} message: {
-			Text(error?.localizedDescription ?? "Unknown error")
+			Text(actionService.error?.localizedDescription ?? "Unknown error")
 		}
 	}
 
@@ -328,24 +335,25 @@ struct BasketActionSheet: View {
 		}
 	}
 
+	private var canExecute: Bool {
+		switch action {
+		case .star, .unstar:
+			return true
+		case .createAlbum:
+			return !albumName.isEmpty
+		default:
+			return false // Not implemented yet
+		}
+	}
+
 	private func executeAction() {
-		// TODO: Implement actual action execution via BasketActionService
-		isProcessing = true
-
 		Task {
-			// Simulate processing
-			for i in 0..<items.count {
-				currentItem = items[i].displayName
-				progress = Double(i + 1) / Double(items.count)
+			await actionService.executeAction(action, items: items)
 
-				try? await Task.sleep(nanoseconds: 100_000_000) // 0.1 seconds
+			// Dismiss if successful
+			if !actionService.isProcessing && actionService.error == nil {
+				dismiss()
 			}
-
-			isProcessing = false
-			dismiss()
-
-			// Clear basket after successful action
-			await PhotoBasket.shared.clear()
 		}
 	}
 }

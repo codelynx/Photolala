@@ -111,7 +111,31 @@ struct PhotoBrowserView: View {
 				}
 
 				// Context-specific basket actions
-				if mode == .standard {
+				if mode == .basket {
+					// Basket mode: show star/unstar actions
+					Divider()
+
+					// Star button
+					Button(action: {
+						Task {
+							await starAllItems()
+						}
+					}) {
+						Label("Star All", systemImage: "star.fill")
+					}
+					.buttonStyle(.borderedProminent)
+					.help("Upload all items to cloud")
+
+					// Unstar button
+					Button(action: {
+						Task {
+							await unstarAllItems()
+						}
+					}) {
+						Label("Unstar All", systemImage: "star.slash")
+					}
+					.help("Remove all items from cloud")
+				} else if mode == .standard {
 					// Standard mode: show add/remove basket actions
 					if model.hasSelection {
 						if selectionInBasket() {
@@ -315,6 +339,36 @@ struct PhotoBrowserView: View {
 
 	// MARK: - Basket Actions
 
+	private func starAllItems() async {
+		// Get all basket items
+		let items = PhotoBasket.shared.items
+		guard !items.isEmpty else { return }
+
+		do {
+			// Execute star action through the service
+			try await BasketActionService.shared.executeAction(.star, items: items)
+			// Basket will be cleared by the service after successful operation
+		} catch {
+			print("Failed to star items: \(error)")
+		}
+	}
+
+	private func unstarAllItems() async {
+		// Get all basket items
+		let items = PhotoBasket.shared.items
+		guard !items.isEmpty else { return }
+
+		do {
+			// Execute unstar action through the service
+			try await BasketActionService.shared.executeAction(.unstar, items: items)
+			// Basket will be cleared by the service after successful operation
+		} catch {
+			print("Failed to unstar items: \(error)")
+		}
+	}
+
+	// MARK: - Basket Actions
+
 	private func addSelectionToBasket() {
 		guard !model.selection.isEmpty else { return }
 
@@ -326,8 +380,14 @@ struct PhotoBrowserView: View {
 
 			// Resolve source-specific context
 			if let localSource = environment.source as? LocalPhotoSource {
+				// Get the file URL
 				url = localSource.fileURL(for: item.id)
 				identifier = url?.path ?? item.id
+
+				// For LocalPhotoSource, the directory already has security-scoped access
+				// The bookmark should still be created from the file URL, but it may fail
+				// if the parent directory doesn't have proper access. In that case,
+				// we'll still add the item but without a bookmark (using identifier as fallback)
 			} else if environment.source is S3PhotoSource {
 				identifier = item.id // S3 key
 			} else if environment.source is ApplePhotosSource {

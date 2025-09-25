@@ -29,35 +29,99 @@ struct BasketActionProgress {
 /// Service for executing basket actions
 @MainActor
 final class BasketActionService: ObservableObject {
+	// Singleton instance - configured at app startup
+	static let shared = BasketActionService()
+
+	/// Configure/update the shared instance with dependencies
+	/// Can be called multiple times to update dependencies
+	static func configure(s3Service: S3Service?, catalogService: CatalogService? = nil) {
+		shared.updateDependencies(s3Service: s3Service, catalogService: catalogService)
+	}
+
 	private let logger = Logger(subsystem: "com.photolala", category: "BasketActionService")
 
 	// Progress publisher
 	@Published private(set) var currentProgress: BasketActionProgress?
 
-	// Dependencies
-	private let catalogService: CatalogService?
-	private let s3Service: S3Service?
+	// Dependencies (mutable for configuration)
+	private var s3Service: S3Service?
+	private var catalogService: CatalogService?
 	private var uploadCoordinator: BasketUploadCoordinator?
-	private let catalogCache: LocalCatalogCache?
+	private var catalogCache: LocalCatalogCache?
 	private let checkpointManager: StarCheckpointManager
 
 	// Current operation
 	private var currentTask: Task<Void, Error>?
 
-	init(catalogService: CatalogService? = nil, s3Service: S3Service? = nil) {
-		self.catalogService = catalogService
-		self.s3Service = s3Service
-		self.checkpointManager = StarCheckpointManager()
+	// MD5 mapping persistence for Apple Photos
+	private let md5MappingURL: URL = {
+		let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
+		let photolalaDir = appSupport.appendingPathComponent("Photolala", isDirectory: true)
+		try? FileManager.default.createDirectory(at: photolalaDir, withIntermediateDirectories: true)
+		return photolalaDir.appendingPathComponent("starred-md5-mapping.json")
+	}()
+	// Mapping of original item IDs to MD5s (for Apple Photos unstar)
+	private var starredItemsMapping: [String: String] = [:]  // originalID -> MD5
 
-		// Initialize catalog cache if catalog service is available
+	private init() {
+		self.checkpointManager = StarCheckpointManager()
+		// Dependencies will be configured later
+		self.s3Service = nil
+		self.catalogService = nil
+		self.catalogCache = nil
+
+		// Load existing MD5 mappings
+		if let data = try? Data(contentsOf: md5MappingURL),
+		   let mapping = try? JSONDecoder().decode([String: String].self, from: data) {
+			self.starredItemsMapping = mapping
+		}
+	}
+
+	/// Update dependencies (can be called multiple times)
+	private func updateDependencies(s3Service: S3Service?, catalogService: CatalogService?) {
+		self.s3Service = s3Service
+		self.catalogService = catalogService
+
+		// Update catalog cache if catalog service is available
 		if let catalogService = catalogService {
 			self.catalogCache = LocalCatalogCache(catalogService: catalogService)
 		} else {
 			self.catalogCache = nil
 		}
+
+		// Reset upload coordinator to use new dependencies
+		self.uploadCoordinator = nil
+
+		logger.info("Updated dependencies - S3: \(s3Service != nil), Catalog: \(catalogService != nil)")
+	}
+
+	// MARK: - Private Helpers
+
+	/// Save MD5 mapping for items (particularly Apple Photos)
+	func saveMD5Mapping(originalID: String, md5: String) {
+		starredItemsMapping[originalID] = md5
+		// Persist to disk
+		if let data = try? JSONEncoder().encode(starredItemsMapping) {
+			try? data.write(to: md5MappingURL)
+		}
+	}
+
+	/// Remove MD5 mapping when item is unstarred
+	func removeMD5Mapping(originalID: String) {
+		starredItemsMapping.removeValue(forKey: originalID)
+		// Persist to disk
+		if let data = try? JSONEncoder().encode(starredItemsMapping) {
+			try? data.write(to: md5MappingURL)
+		}
 	}
 
 	// MARK: - Public API
+
+	/// Check if an item is starred (exists in catalog)
+	func isStarred(md5: String) async -> Bool {
+		guard let cache = catalogCache else { return false }
+		return await cache.isStarred(md5: md5)
+	}
 
 	/// Execute a basket action on the given items
 	func executeAction(_ action: BasketAction, items: [BasketItem]) async throws {
@@ -134,6 +198,14 @@ final class BasketActionService: ObservableObject {
 	private func starItems(_ items: [BasketItem]) async throws {
 		logger.info("Starting star operation for \(items.count) items")
 
+		// Ensure both S3 and catalog services are available
+		guard s3Service != nil else {
+			throw BasketActionError.missingDependency("S3Service not initialized")
+		}
+		guard catalogService != nil else {
+			throw BasketActionError.missingDependency("CatalogService not initialized")
+		}
+
 		// Filter for local and Apple Photos items
 		let supportedItems = items.filter {
 			$0.sourceType == .local || $0.sourceType == .applePhotos
@@ -158,7 +230,7 @@ final class BasketActionService: ObservableObject {
 		}
 
 		if uploadCoordinator == nil {
-			uploadCoordinator = await BasketUploadCoordinator(
+			uploadCoordinator = BasketUploadCoordinator(
 				s3Service: s3Service,
 				catalogService: catalogService,
 				catalogCache: catalogCache,
@@ -208,8 +280,12 @@ final class BasketActionService: ObservableObject {
 	private func unstarItems(_ items: [BasketItem]) async throws {
 		logger.info("Starting unstar operation for \(items.count) items")
 
-		guard let catalogService = catalogService else {
-			throw BasketActionError.missingDependency("CatalogService")
+		// Ensure both S3 and catalog services are available
+		guard let s3Service = s3Service else {
+			throw BasketActionError.missingDependency("S3Service not initialized")
+		}
+		guard catalogService != nil else {
+			throw BasketActionError.missingDependency("CatalogService not initialized")
 		}
 
 		// Process each item
@@ -229,35 +305,108 @@ final class BasketActionService: ObservableObject {
 			)
 
 			do {
-				// For unstar, we need to find the MD5 in the catalog
-				// Try to resolve URL from bookmark for local files
-				if item.sourceType == .local {
-					let resolved = item.resolveURL()
-					if let resolved = resolved {
-						defer {
-							if resolved.didStartAccessing {
-								resolved.url.stopAccessingSecurityScopedResource()
-							}
-						}
-
-						// Compute MD5 for the item
-						let md5 = try await computeFullMD5(for: resolved.url)
-
-						// Remove from catalog (unstar)
-						try await catalogService.unstarEntry(md5: md5)
-
-						// Remove from upload queue if present
-						await uploadCoordinator?.removeFromQueue(md5: md5)
-
-						logger.debug("Unstarred item: \(item.displayName)")
+				// For unstar, we delete from S3
+				if item.sourceType == .local || item.sourceType == .applePhotos {
+					// Get the current user for S3 key
+					let userID = await MainActor.run {
+						AccountManager.shared.getCurrentUser()?.id.uuidString ?? "anonymous"
 					}
-				} else if item.sourceType == .applePhotos {
-					// For Apple Photos, we'd need the exported MD5
-					logger.warning("Unstar for Apple Photos items not yet implemented")
+
+					// Compute MD5 - for basket items, the ID should be the MD5
+					var md5: String = item.id
+
+					// For local files, we can recompute to verify
+					if item.sourceType == .local {
+						let resolved = item.resolveURL()
+						if let resolved = resolved {
+							defer {
+								if resolved.didStartAccessing {
+									resolved.url.stopAccessingSecurityScopedResource()
+								}
+							}
+							// Compute MD5 for the item
+							md5 = try await computeFullMD5(for: resolved.url)
+						}
+					} else if item.sourceType == .applePhotos {
+						// For Apple Photos, look up the MD5 from our mapping
+						if let mappedMD5 = starredItemsMapping[item.id] {
+							md5 = mappedMD5
+						} else {
+							logger.warning("Cannot unstar Apple Photos item \(item.displayName) - MD5 mapping not found for ID: \(item.id)")
+							continue
+						}
+					}
+
+					// Construct S3 key matching upload path: photos/<userID>/<md5>.dat
+					let s3Key = "photos/\(userID)/\(md5).dat"
+					try await s3Service.deleteObject(key: s3Key)
+					logger.info("Deleted \(item.displayName) from S3 at \(s3Key)")
+
+					// Remove from upload queue if present
+					await uploadCoordinator?.removeFromQueue(md5: md5)
+
+					// Remove from catalog to update star state
+					if let catalogService = catalogService {
+						do {
+							// Remove from catalog
+							try await catalogService.unstarEntry(md5: md5)
+							logger.info("Removed \(item.displayName) from catalog")
+
+							// Create snapshot after modification to update pointer
+							try await catalogService.createSnapshot()
+							logger.info("Created catalog snapshot after unstar")
+						} catch {
+							logger.error("Failed to remove from catalog: \(error)")
+							// Continue even if catalog update fails - S3 deletion succeeded
+						}
+					}
+
+					// Update cache if available
+					if let cache = catalogCache {
+						await cache.removeFromCache(md5: md5)
+					}
+
+					// Remove MD5 mapping
+					if item.sourceType == .applePhotos {
+						removeMD5Mapping(originalID: item.id)
+					}
+				} else {
+					logger.info("Skipping \(item.sourceType.rawValue) item \(item.displayName) - not supported for unstar")
 				}
 			} catch {
 				logger.error("Failed to unstar item \(item.displayName): \(error)")
 				// Continue with next item
+			}
+		}
+
+		// Upload catalog to S3 after all unstar operations complete
+		// This ensures the cloud catalog is in sync with local catalog
+		if let catalogService = catalogService {
+			do {
+				// Get the current catalog info (contains MD5 and path)
+				if let catalogInfo = await MainActor.run(body: { catalogService.catalogInfo }) {
+					// Read the CSV data from the snapshot file
+					let csvData = try Data(contentsOf: catalogInfo.path)
+
+					// Get current user ID
+					let userID = await MainActor.run {
+						AccountManager.shared.getCurrentUser()?.id.uuidString ?? "anonymous"
+					}
+
+					// Upload catalog CSV to S3
+					try await s3Service.uploadCatalog(csvData: csvData, catalogMD5: catalogInfo.md5, userID: userID)
+					logger.info("Uploaded updated catalog to S3 after unstar: .photolala.\(catalogInfo.md5).csv")
+
+					// Update the catalog pointer on S3
+					try await s3Service.updateCatalogPointer(catalogMD5: catalogInfo.md5, userID: userID)
+					logger.info("Updated catalog pointer on S3 to: \(catalogInfo.md5)")
+				} else {
+					logger.warning("No catalog info available after unstar operation - catalog not uploaded to S3")
+				}
+			} catch {
+				logger.error("Failed to upload catalog to S3 after unstar: \(error)")
+				// Don't throw - catalog upload failure shouldn't fail the unstar operation
+				// Photos are already removed from S3 and local catalog is updated
 			}
 		}
 
@@ -415,15 +564,72 @@ actor BasketUploadCoordinator {
 				}
 
 				if let resolved = resolved {
-					defer {
-						if resolved.didStartAccessing {
-							resolved.url.stopAccessingSecurityScopedResource()
+					do {
+						// Ensure cleanup happens after MD5 computation
+						defer {
+							if resolved.didStartAccessing {
+								resolved.url.stopAccessingSecurityScopedResource()
+							}
+						}
+						// Compute MD5 and detect format before releasing
+						md5 = try await computeFullMD5(for: resolved.url)
+						detectedFormat = detectImageFormat(from: resolved.url) ?? .jpeg
+					} catch {
+						logger.error("Failed to compute MD5 for \(item.displayName): \(error)")
+						throw error
+					}
+				} else if let sourceIdentifier = item.sourceIdentifier {
+					// Fallback to sourceIdentifier (file path) if bookmark resolution fails
+					logger.warning("Bookmark resolution failed for \(item.displayName), trying sourceIdentifier: \(sourceIdentifier)")
+					let url = URL(fileURLWithPath: sourceIdentifier)
+
+					// Check if file is accessible
+					if FileManager.default.isReadableFile(atPath: url.path) {
+						do {
+							md5 = try await computeFullMD5(for: url)
+							detectedFormat = detectImageFormat(from: url) ?? .jpeg
+							logger.info("Successfully computed MD5 using sourceIdentifier fallback for \(item.displayName)")
+						} catch {
+							logger.error("Failed to compute MD5 using sourceIdentifier for \(item.displayName): \(error)")
+							// Mark as failed in checkpoint
+							if let checkpointManager = checkpointManager, let checkpointId = checkpointId {
+								await MainActor.run {
+									checkpointManager.markItemFailed(
+										checkpointId: checkpointId,
+										basketItemId: item.id,
+										displayName: item.displayName,
+										error: "Failed to compute MD5: \(error.localizedDescription)"
+									)
+								}
+							}
+						}
+					} else {
+						logger.error("File not accessible at path: \(sourceIdentifier)")
+						// Mark as failed in checkpoint
+						if let checkpointManager = checkpointManager, let checkpointId = checkpointId {
+							await MainActor.run {
+								checkpointManager.markItemFailed(
+									checkpointId: checkpointId,
+									basketItemId: item.id,
+									displayName: item.displayName,
+									error: "File not accessible at path: \(sourceIdentifier)"
+								)
+							}
 						}
 					}
-					md5 = try await computeFullMD5(for: resolved.url)
-
-					// Detect format for local files (default to JPEG for unknown)
-					detectedFormat = detectImageFormat(from: resolved.url) ?? .jpeg
+				} else {
+					logger.error("Could not resolve URL for local item \(item.displayName) - no bookmark or sourceIdentifier")
+					// Mark as failed in checkpoint
+					if let checkpointManager = checkpointManager, let checkpointId = checkpointId {
+						await MainActor.run {
+							checkpointManager.markItemFailed(
+								checkpointId: checkpointId,
+								basketItemId: item.id,
+								displayName: item.displayName,
+								error: "No bookmark or sourceIdentifier available"
+							)
+						}
+					}
 				}
 			} else if item.sourceType == .applePhotos {
 				// Export Apple Photos item and compute MD5
@@ -544,6 +750,10 @@ actor BasketUploadCoordinator {
 				try await catalogService.starEntry(entry)
 				logger.info("Added \(item.displayName) to catalog (starred)")
 
+				// Create snapshot after modification to update pointer
+				try await catalogService.createSnapshot()
+				logger.info("Created catalog snapshot after star")
+
 				// Update local cache
 				await self.catalogCache?.addToCache(md5: photoMD5)
 			}
@@ -558,17 +768,28 @@ actor BasketUploadCoordinator {
 					}
 
 					if let resolved = resolved {
-						defer {
+						let fileData: Data
+						do {
+							fileData = try Data(contentsOf: resolved.url)
+						} catch {
+							logger.error("Failed to read file data for \(item.displayName): \(error)")
+							// Clean up security-scoped resource
 							if resolved.didStartAccessing {
 								resolved.url.stopAccessingSecurityScopedResource()
 							}
+							throw error
 						}
-
-						let fileData = try Data(contentsOf: resolved.url)
 
 						// Get current user ID
 						let userID = await MainActor.run {
 							AccountManager.shared.getCurrentUser()?.id.uuidString ?? "anonymous"
+						}
+
+						// Clean up security-scoped resource after upload
+						defer {
+							if resolved.didStartAccessing {
+								resolved.url.stopAccessingSecurityScopedResource()
+							}
 						}
 
 						try await s3Service.uploadPhoto(
@@ -597,6 +818,12 @@ actor BasketUploadCoordinator {
 					)
 					uploadSucceeded = true
 					logger.info("Uploaded Apple Photos item \(item.displayName) to S3")
+
+					// Save MD5 mapping for Apple Photos items
+					// Note: We need to call this on the main actor where BasketActionService lives
+					await MainActor.run {
+						BasketActionService.shared.saveMD5Mapping(originalID: item.id, md5: photoMD5)
+					}
 				}
 
 				// Mark as successfully processed in checkpoint
@@ -636,6 +863,37 @@ actor BasketUploadCoordinator {
 		}
 
 		logger.info("Upload complete")
+
+		// Upload catalog to S3 after all star operations complete
+		// This ensures the cloud catalog is in sync with local catalog
+		if let catalogService = catalogService {
+			do {
+				// Get the current catalog info (contains MD5 and path)
+				if let catalogInfo = await MainActor.run(body: { catalogService.catalogInfo }) {
+					// Read the CSV data from the snapshot file
+					let csvData = try Data(contentsOf: catalogInfo.path)
+
+					// Get current user ID
+					let userID = await MainActor.run {
+						AccountManager.shared.getCurrentUser()?.id.uuidString ?? "anonymous"
+					}
+
+					// Upload catalog CSV to S3
+					try await s3Service.uploadCatalog(csvData: csvData, catalogMD5: catalogInfo.md5, userID: userID)
+					logger.info("Uploaded catalog to S3: .photolala.\(catalogInfo.md5).csv")
+
+					// Update the catalog pointer on S3
+					try await s3Service.updateCatalogPointer(catalogMD5: catalogInfo.md5, userID: userID)
+					logger.info("Updated catalog pointer on S3 to: \(catalogInfo.md5)")
+				} else {
+					logger.warning("No catalog info available after star operation - catalog not uploaded to S3")
+				}
+			} catch {
+				logger.error("Failed to upload catalog to S3: \(error)")
+				// Don't throw - catalog upload failure shouldn't fail the star operation
+				// Photos are already uploaded and local catalog is updated
+			}
+		}
 	}
 
 	// Helper to detect image format from file extension
@@ -713,6 +971,105 @@ enum BasketActionError: LocalizedError {
 			return "Upload failed: \(message)"
 		case .checkpointNotFound:
 			return "Checkpoint not found or cannot be resumed"
+		}
+	}
+}
+
+// MARK: - View Model
+
+/// View model for basket actions
+@MainActor
+@Observable
+final class BasketActionViewModel {
+	// Action service
+	private let service = BasketActionService.shared
+
+	// Published state
+	var isProcessing = false
+	var progress: ProgressInfo?
+	var error: Error?
+	private var currentTask: Task<Void, Error>?
+
+	// Progress tracking
+	struct ProgressInfo {
+		let action: BasketAction
+		let totalCount: Int
+		let processedCount: Int
+		let message: String
+
+		var percentComplete: Double {
+			guard totalCount > 0 else { return 0 }
+			return Double(processedCount) / Double(totalCount)
+		}
+	}
+
+	// MARK: - Actions
+
+	/// Execute a basket action
+	func executeAction(_ action: BasketAction, items: [BasketItem]) async {
+		// Cancel any existing task
+		currentTask?.cancel()
+
+		isProcessing = true
+		error = nil
+		progress = ProgressInfo(
+			action: action,
+			totalCount: items.count,
+			processedCount: 0,
+			message: "Starting \(action.rawValue)..."
+		)
+
+		currentTask = Task {
+			do {
+				// Execute the action through the service
+				try await service.executeAction(action, items: items)
+
+				// Clear basket after successful action (for star/unstar)
+				if action == .star || action == .unstar {
+					PhotoBasket.shared.clear()
+				}
+
+				// Update progress to complete
+				progress = ProgressInfo(
+					action: action,
+					totalCount: items.count,
+					processedCount: items.count,
+					message: "Completed"
+				)
+				isProcessing = false
+				progress = nil
+			} catch {
+				if error is CancellationError {
+					// User cancelled, not an error
+					self.progress = ProgressInfo(
+						action: action,
+						totalCount: items.count,
+						processedCount: progress?.processedCount ?? 0,
+						message: "Cancelled"
+					)
+				} else {
+					self.error = error
+				}
+				isProcessing = false
+			}
+		}
+	}
+
+	/// Cancel current operation
+	func cancel() {
+		currentTask?.cancel()
+		currentTask = nil
+		isProcessing = false
+	}
+
+	enum ActionError: LocalizedError {
+		case notImplemented
+
+		var errorDescription: String? {
+			switch self {
+			case .notImplemented:
+				return "This action is not yet implemented"
+			}
 		}
 	}
 }

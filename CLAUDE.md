@@ -81,3 +81,4 @@ Environment selection is handled in-app via UserDefaults (iOS/macOS), not throug
 - Environment selection via UserDefaults in-app (no external config)
 - Production builds locked to production environment
 - See `docs/security.md` and `docs/credential-security.md` for details
+- try not to commit before review

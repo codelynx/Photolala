@@ -20,6 +20,7 @@ class PhotoCellView: XView {
 	private var loadingView: XActivityIndicator!
 	private var infoBar: XView!
 	private var infoLabel: XTextField!
+	private var starIndicator: XImageView!
 	private var currentLoadTask: Task<Void, Never>?
 	private var displayMode: ThumbnailDisplayMode = .fill
 	private var showInfoBar: Bool = false
@@ -28,6 +29,7 @@ class PhotoCellView: XView {
 	private var currentSourceURL: URL? // For local sources - kept for basket context
 	private var currentSourceIdentifier: String? // Source-specific ID - kept for basket context
 	private var isSelected = false
+	private var isStarred = false
 
 	// MARK: - Initialization
 	override init(frame: CGRect) {
@@ -122,6 +124,22 @@ class PhotoCellView: XView {
 		#endif
 		infoLabel.translatesAutoresizingMaskIntoConstraints = false
 		infoBar.addSubview(infoLabel)
+
+		// Create star indicator
+		#if os(macOS)
+		starIndicator = NSImageView()
+		starIndicator.image = NSImage(systemSymbolName: "star.fill", accessibilityDescription: "Starred")
+		starIndicator.contentTintColor = .systemYellow
+		starIndicator.imageScaling = .scaleProportionallyDown
+		#else
+		starIndicator = UIImageView()
+		starIndicator.image = UIImage(systemName: "star.fill")
+		starIndicator.tintColor = .systemYellow
+		starIndicator.contentMode = .scaleAspectFit
+		#endif
+		starIndicator.translatesAutoresizingMaskIntoConstraints = false
+		starIndicator.isHidden = true
+		addSubview(starIndicator)
 	}
 
 	// Constraint references for dynamic updates
@@ -155,6 +173,14 @@ class PhotoCellView: XView {
 			loadingView.centerYAnchor.constraint(equalTo: imageContainer.centerYAnchor)
 		])
 
+		// Star indicator in top-right corner
+		constraints.append(contentsOf: [
+			starIndicator.topAnchor.constraint(equalTo: imageContainer.topAnchor, constant: 8),
+			starIndicator.trailingAnchor.constraint(equalTo: imageContainer.trailingAnchor, constant: -8),
+			starIndicator.widthAnchor.constraint(equalToConstant: 20),
+			starIndicator.heightAnchor.constraint(equalToConstant: 20)
+		])
+
 		// Info bar - positioned below image container
 		infoBarTopConstraint = infoBar.topAnchor.constraint(equalTo: imageContainer.bottomAnchor)
 		infoBarHeightConstraint = infoBar.heightAnchor.constraint(equalToConstant: 0)
@@ -181,6 +207,18 @@ class PhotoCellView: XView {
 		currentItem = item
 		currentSource = source
 		// Note: sourceURL and sourceIdentifier will be resolved when needed for basket operations
+
+		// Check if item is starred (if ID looks like MD5)
+		// TODO: Properly compute MD5 from source when needed
+		if item.id.count == 32 && item.id.allSatisfy({ $0.isHexDigit }) {
+			// ID looks like an MD5 hash
+			// For now, star indicator is hidden by default until we implement proper checking
+			isStarred = false
+			starIndicator.isHidden = true
+		} else {
+			isStarred = false
+			starIndicator.isHidden = true
+		}
 
 		// Update display mode if changed
 		if self.displayMode != displayMode {
@@ -263,6 +301,22 @@ class PhotoCellView: XView {
 	func setSelected(_ selected: Bool) {
 		isSelected = selected
 		updateSelectionBorder()
+	}
+
+	func updateStarredState() {
+		// Update star indicator if item is loaded
+		if let item = currentItem {
+			// Check if ID looks like MD5
+			if item.id.count == 32 && item.id.allSatisfy({ $0.isHexDigit }) {
+				// TODO: Check starred state through BasketActionService
+				// For now, keep star hidden
+				isStarred = false
+				starIndicator.isHidden = true
+			} else {
+				isStarred = false
+				starIndicator.isHidden = true
+			}
+		}
 	}
 
 	private func updateSelectionBorder() {
