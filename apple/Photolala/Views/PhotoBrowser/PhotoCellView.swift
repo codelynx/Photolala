@@ -256,16 +256,23 @@ class PhotoCellView: XView {
 				// Get photo identity from source
 				let identity = await source.getPhotoIdentity(for: item.id)
 
+				print("[PhotoCellView] Checking star status for \(item.displayName):")
+				print("  - Full MD5: \(identity.fullMD5 ?? "nil")")
+				print("  - Head MD5: \(identity.headMD5 ?? "nil")")
+				print("  - File size: \(identity.fileSize ?? 0)")
+
 				// Check starred status using available identifiers
 				if let fullMD5 = identity.fullMD5 {
 					// Have full MD5 - most accurate check
 					starred = await BasketActionService.shared.isStarred(md5: fullMD5)
+					print("  - Checked by full MD5: \(starred)")
 				} else if let headMD5 = identity.headMD5, let fileSize = identity.fileSize {
 					// Have Fast Photo Key - check by that
 					starred = await BasketActionService.shared.isStarredByFastKey(
 						headMD5: headMD5,
 						fileSize: fileSize
 					)
+					print("  - Checked by Fast Key: \(starred)")
 				} else if item.id.count == 32 && item.id.allSatisfy({ $0.isHexDigit }) {
 					// Fallback: ID might be an MD5 itself
 					starred = await BasketActionService.shared.isStarred(md5: item.id)

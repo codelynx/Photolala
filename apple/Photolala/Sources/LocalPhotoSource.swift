@@ -315,6 +315,10 @@ class LocalPhotoSource: PhotoSourceProtocol {
 			// File size is already in the Fast Photo Key
 			let fileSize = fastKey.fileSize
 
+			print("[LocalPhotoSource] Photo identity for \(url.lastPathComponent):")
+			print("  - Head MD5: \(fastKey.headMD5)")
+			print("  - File size: \(fileSize)")
+
 			// TODO: Check if we have cached full MD5 for this file
 			// For now, return Fast Photo Key components
 			return (nil, fastKey.headMD5, fileSize)

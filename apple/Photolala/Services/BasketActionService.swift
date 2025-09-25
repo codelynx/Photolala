@@ -85,6 +85,11 @@ final class BasketActionService: ObservableObject {
 		// Update catalog cache if catalog service is available
 		if let catalogService = catalogService {
 			self.catalogCache = LocalCatalogCache(catalogService: catalogService)
+			// Start sync immediately
+			Task {
+				try? await self.catalogCache?.syncWithS3()
+				await self.catalogCache?.startPeriodicSync()
+			}
 		} else {
 			self.catalogCache = nil
 		}

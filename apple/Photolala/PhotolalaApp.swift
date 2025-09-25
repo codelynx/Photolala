@@ -51,7 +51,7 @@ struct PhotolalaApp: App {
 
 				// Configure BasketActionService with both initialized services
 				BasketActionService.configure(s3Service: s3Service, catalogService: globalCatalogService)
-				print("[App] BasketActionService configured with initialized catalog and S3 services")
+				print("[App] BasketActionService configured with initialized catalog and S3 services (cache sync will start automatically)")
 			} catch {
 				print("[App] Warning: Failed to initialize services: \(error)")
 				// Star/unstar operations will not be available

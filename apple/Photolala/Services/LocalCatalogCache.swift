@@ -61,7 +61,10 @@ actor LocalCatalogCache {
 	/// Check if a photo is starred by Fast Photo Key
 	func isStarredByFastKey(headMD5: String, fileSize: Int64) -> Bool {
 		let fastKey = "\(headMD5.lowercased()):\(fileSize)"
-		return cachedFastKeys.contains(fastKey)
+		let isStarred = cachedFastKeys.contains(fastKey)
+		print("[LocalCatalogCache] Checking Fast Key \(fastKey): \(isStarred)")
+		print("  - Available keys: \(Array(cachedFastKeys.prefix(5)))")
+		return isStarred
 	}
 
 	/// Check if a photo is starred by Fast Photo Key string
@@ -96,16 +99,19 @@ actor LocalCatalogCache {
 			logger.info("Sync already in progress")
 			return
 		}
-		
+
 		isSyncing = true
 		defer { isSyncing = false }
-		
+
 		logger.info("Starting S3 catalog sync")
 
 		// Get all MD5s and Fast Keys from catalog
 		let allEntries = try await catalogService.getEntries()
 		let newMD5s = Set(allEntries.compactMap { $0.photoMD5 })
 		let newFastKeys = Set(allEntries.map { $0.fastPhotoKey.lowercased() })
+
+		logger.info("Loaded \(allEntries.count) catalog entries")
+		logger.info("Sample Fast Keys: \(Array(newFastKeys.prefix(3)))")
 
 		// Update cache
 		let added = newMD5s.subtracting(cachedMD5s)
@@ -114,9 +120,9 @@ actor LocalCatalogCache {
 		cachedMD5s = newMD5s
 		cachedFastKeys = newFastKeys
 		lastSyncDate = Date()
-		
-		logger.info("Sync complete: \(self.cachedMD5s.count) total, +\(added.count) -\(removed.count)")
-		
+
+		logger.info("Sync complete: \(self.cachedMD5s.count) MD5s, \(self.cachedFastKeys.count) Fast Keys, +\(added.count) -\(removed.count)")
+
 		// Save to disk
 		await saveCache()
 	}
@@ -153,18 +159,21 @@ actor LocalCatalogCache {
 			let data = try Data(contentsOf: cacheURL)
 			let cache = try JSONDecoder().decode(CacheData.self, from: data)
 			self.cachedMD5s = Set(cache.md5s)
+			self.cachedFastKeys = Set(cache.fastKeys ?? [])
 			self.lastSyncDate = cache.lastSync
-			logger.info("Loaded cache: \(self.cachedMD5s.count) MD5s")
+			logger.info("Loaded cache: \(self.cachedMD5s.count) MD5s, \(self.cachedFastKeys.count) Fast Keys")
 		} catch {
 			logger.info("No existing cache or failed to load: \(error)")
 			// Start fresh
 			self.cachedMD5s = []
+			self.cachedFastKeys = []
 		}
 	}
 	
 	private func saveCache() async {
 		let cache = CacheData(
 			md5s: Array(self.cachedMD5s),
+			fastKeys: Array(self.cachedFastKeys),
 			lastSync: self.lastSyncDate
 		)
 
@@ -181,6 +190,7 @@ actor LocalCatalogCache {
 	
 	private struct CacheData: Codable {
 		let md5s: [String]
+		let fastKeys: [String]?  // Added for Fast Photo Key support
 		let lastSync: Date?
 	}
 }
