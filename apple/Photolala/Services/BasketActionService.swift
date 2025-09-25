@@ -786,10 +786,40 @@ actor BasketUploadCoordinator {
 				}
 			}
 
-			// Create catalog entry and add to catalog
+			// Prepare to compute actual Fast Photo Key
+			var actualHeadMD5: String = String(photoMD5.prefix(8)) // fallback to first 8 chars
+			var actualFileSize: Int64 = item.fileSize ?? 0
+
+			// Try to compute actual Fast Photo Key from file
+			if item.sourceType == .local {
+				// For local files, try to compute from the file path
+				if let sourceIdentifier = item.sourceIdentifier {
+					let url = URL(fileURLWithPath: sourceIdentifier)
+					do {
+						let fastKey = try await FastPhotoKey(contentsOf: url)
+						actualHeadMD5 = fastKey.headMD5
+						actualFileSize = fastKey.fileSize
+						logger.info("Computed Fast Photo Key for \(item.displayName): \(actualHeadMD5):\(actualFileSize)")
+					} catch {
+						logger.warning("Failed to compute Fast Photo Key, using fallback: \(error)")
+					}
+				}
+			} else if item.sourceType == .applePhotos, let exportedAsset = exportedAsset {
+				// For Apple Photos, compute from exported file
+				do {
+					let fastKey = try await FastPhotoKey(contentsOf: exportedAsset.temporaryURL)
+					actualHeadMD5 = fastKey.headMD5
+					actualFileSize = fastKey.fileSize
+					logger.info("Computed Fast Photo Key for Apple Photos \(item.displayName): \(actualHeadMD5):\(actualFileSize)")
+				} catch {
+					logger.warning("Failed to compute Fast Photo Key for Apple Photos, using fallback: \(error)")
+				}
+			}
+
+			// Create catalog entry with actual Fast Photo Key
 			let entry = CatalogEntry(
-				photoHeadMD5: String(photoMD5.prefix(8)),
-				fileSize: item.fileSize ?? 0,
+				photoHeadMD5: actualHeadMD5,
+				fileSize: actualFileSize,
 				photoMD5: photoMD5,
 				photoDate: item.photoDate ?? Date(),
 				format: detectedFormat
