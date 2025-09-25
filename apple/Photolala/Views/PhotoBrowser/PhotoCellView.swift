@@ -19,8 +19,10 @@ class PhotoCellView: XView {
 	private var imageView: ScalableImageView!
 	private var loadingView: XActivityIndicator!
 	private var infoBar: XView!
-	private var infoLabel: XTextField!
-	private var starIndicator: XImageView!
+	private var infoStackView: XHStackView!
+	private var starIconView: XImageView!  // Star icon in info bar
+	private var photoDateLabel: XTextField!  // Photo date label
+	private var fileSizeLabel: XTextField!  // File size label
 	private var currentLoadTask: Task<Void, Never>?
 	private var displayMode: ThumbnailDisplayMode = .fill
 	private var showInfoBar: Bool = false
@@ -107,39 +109,75 @@ class PhotoCellView: XView {
 		infoBar.isHidden = !showInfoBar
 		addSubview(infoBar)
 
-		// Create info label
-		#if os(macOS)
-		infoLabel = NSTextField()
-		infoLabel.isEditable = false
-		infoLabel.isBordered = false
-		infoLabel.drawsBackground = false
-		infoLabel.font = NSFont.systemFont(ofSize: 10)
-		infoLabel.textColor = NSColor.secondaryLabelColor
-		infoLabel.lineBreakMode = .byTruncatingTail
-		#else
-		infoLabel = UILabel()
-		infoLabel.font = UIFont.systemFont(ofSize: 10)
-		infoLabel.textColor = UIColor.secondaryLabel
-		infoLabel.lineBreakMode = .byTruncatingTail
-		#endif
-		infoLabel.translatesAutoresizingMaskIntoConstraints = false
-		infoBar.addSubview(infoLabel)
+		// Create horizontal stack view for info bar content
+		infoStackView = XHStackView(spacing: 6)
+		infoStackView.translatesAutoresizingMaskIntoConstraints = false
+		infoBar.addSubview(infoStackView)
 
-		// Create star indicator
+		// Create star icon for info bar
 		#if os(macOS)
-		starIndicator = NSImageView()
-		starIndicator.image = NSImage(systemSymbolName: "star.fill", accessibilityDescription: "Starred")
-		starIndicator.contentTintColor = .systemYellow
-		starIndicator.imageScaling = .scaleProportionallyDown
+		starIconView = NSImageView()
+		starIconView.image = NSImage(systemSymbolName: "star.fill", accessibilityDescription: "Starred")
+		starIconView.contentTintColor = .systemYellow
+		starIconView.imageScaling = .scaleProportionallyDown
 		#else
-		starIndicator = UIImageView()
-		starIndicator.image = UIImage(systemName: "star.fill")
-		starIndicator.tintColor = .systemYellow
-		starIndicator.contentMode = .scaleAspectFit
+		starIconView = UIImageView()
+		starIconView.image = UIImage(systemName: "star.fill")
+		starIconView.tintColor = .systemYellow
+		starIconView.contentMode = .scaleAspectFit
 		#endif
-		starIndicator.translatesAutoresizingMaskIntoConstraints = false
-		starIndicator.isHidden = true
-		addSubview(starIndicator)
+		starIconView.translatesAutoresizingMaskIntoConstraints = false
+		infoStackView.addArrangedSubview(starIconView)
+
+		// Create photo date label
+		#if os(macOS)
+		photoDateLabel = NSTextField()
+		photoDateLabel.isEditable = false
+		photoDateLabel.isBordered = false
+		photoDateLabel.drawsBackground = false
+		photoDateLabel.font = NSFont.systemFont(ofSize: 10)
+		photoDateLabel.textColor = NSColor.secondaryLabelColor
+		photoDateLabel.lineBreakMode = .byTruncatingTail
+		photoDateLabel.stringValue = "--"
+		#else
+		photoDateLabel = UILabel()
+		photoDateLabel.font = UIFont.systemFont(ofSize: 10)
+		photoDateLabel.textColor = UIColor.secondaryLabel
+		photoDateLabel.lineBreakMode = .byTruncatingTail
+		photoDateLabel.text = "--"
+		#endif
+		photoDateLabel.translatesAutoresizingMaskIntoConstraints = false
+		infoStackView.addArrangedSubview(photoDateLabel)
+
+		// Add spacer view for elastic spacing
+		let spacer = XView()
+		spacer.translatesAutoresizingMaskIntoConstraints = false
+		#if os(macOS)
+		spacer.setContentHuggingPriority(.defaultLow, for: .horizontal)
+		#else
+		spacer.setContentHuggingPriority(.defaultLow, for: .horizontal)
+		#endif
+		infoStackView.addArrangedSubview(spacer)
+
+		// Create file size label
+		#if os(macOS)
+		fileSizeLabel = NSTextField()
+		fileSizeLabel.isEditable = false
+		fileSizeLabel.isBordered = false
+		fileSizeLabel.drawsBackground = false
+		fileSizeLabel.font = NSFont.systemFont(ofSize: 10)
+		fileSizeLabel.textColor = NSColor.tertiaryLabelColor
+		fileSizeLabel.lineBreakMode = .byTruncatingTail
+		fileSizeLabel.stringValue = "--"
+		#else
+		fileSizeLabel = UILabel()
+		fileSizeLabel.font = UIFont.systemFont(ofSize: 10)
+		fileSizeLabel.textColor = UIColor.tertiaryLabel
+		fileSizeLabel.lineBreakMode = .byTruncatingTail
+		fileSizeLabel.text = "--"
+		#endif
+		fileSizeLabel.translatesAutoresizingMaskIntoConstraints = false
+		infoStackView.addArrangedSubview(fileSizeLabel)
 	}
 
 	// Constraint references for dynamic updates
@@ -173,12 +211,10 @@ class PhotoCellView: XView {
 			loadingView.centerYAnchor.constraint(equalTo: imageContainer.centerYAnchor)
 		])
 
-		// Star indicator in top-right corner
+		// Star icon constraints in info bar
 		constraints.append(contentsOf: [
-			starIndicator.topAnchor.constraint(equalTo: imageContainer.topAnchor, constant: 8),
-			starIndicator.trailingAnchor.constraint(equalTo: imageContainer.trailingAnchor, constant: -8),
-			starIndicator.widthAnchor.constraint(equalToConstant: 20),
-			starIndicator.heightAnchor.constraint(equalToConstant: 20)
+			starIconView.widthAnchor.constraint(equalToConstant: 12),
+			starIconView.heightAnchor.constraint(equalToConstant: 12)
 		])
 
 		// Info bar - positioned below image container
@@ -191,11 +227,11 @@ class PhotoCellView: XView {
 			infoBarHeightConstraint
 		])
 
-		// Info label inside info bar
+		// Stack view inside info bar
 		constraints.append(contentsOf: [
-			infoLabel.leadingAnchor.constraint(equalTo: infoBar.leadingAnchor, constant: 4),
-			infoLabel.trailingAnchor.constraint(equalTo: infoBar.trailingAnchor, constant: -4),
-			infoLabel.centerYAnchor.constraint(equalTo: infoBar.centerYAnchor)
+			infoStackView.leadingAnchor.constraint(equalTo: infoBar.leadingAnchor, constant: 4),
+			infoStackView.trailingAnchor.constraint(equalTo: infoBar.trailingAnchor, constant: -4),
+			infoStackView.centerYAnchor.constraint(equalTo: infoBar.centerYAnchor)
 		])
 
 		NSLayoutConstraint.activate(constraints)
@@ -208,16 +244,44 @@ class PhotoCellView: XView {
 		currentSource = source
 		// Note: sourceURL and sourceIdentifier will be resolved when needed for basket operations
 
-		// Check if item is starred (if ID looks like MD5)
-		// TODO: Properly compute MD5 from source when needed
-		if item.id.count == 32 && item.id.allSatisfy({ $0.isHexDigit }) {
-			// ID looks like an MD5 hash
-			// For now, star indicator is hidden by default until we implement proper checking
-			isStarred = false
-			starIndicator.isHidden = true
+		// Always show info bar if we want metadata display
+		if showInfoBar {
+			infoBar.isHidden = false
+			infoBarHeightConstraint.constant = 20
+
+			// Check starred status
+			Task { @MainActor in
+				var starred = false
+
+				// Get photo identity from source
+				let identity = await source.getPhotoIdentity(for: item.id)
+
+				// Check starred status using available identifiers
+				if let fullMD5 = identity.fullMD5 {
+					// Have full MD5 - most accurate check
+					starred = await BasketActionService.shared.isStarred(md5: fullMD5)
+				} else if let headMD5 = identity.headMD5, let fileSize = identity.fileSize {
+					// Have Fast Photo Key - check by that
+					starred = await BasketActionService.shared.isStarredByFastKey(
+						headMD5: headMD5,
+						fileSize: fileSize
+					)
+				} else if item.id.count == 32 && item.id.allSatisfy({ $0.isHexDigit }) {
+					// Fallback: ID might be an MD5 itself
+					starred = await BasketActionService.shared.isStarred(md5: item.id)
+				}
+
+				self.isStarred = starred
+				// Show/hide star icon based on starred state
+				self.starIconView.isHidden = !starred
+				// Load metadata for all photos
+				self.updatePhotoMetadata(item: item, source: source)
+			}
 		} else {
+			// Info bar disabled
+			infoBar.isHidden = true
+			infoBarHeightConstraint.constant = 0
 			isStarred = false
-			starIndicator.isHidden = true
 		}
 
 		// Update display mode if changed
@@ -227,16 +291,8 @@ class PhotoCellView: XView {
 			updateBorder()
 		}
 
-		// Update info bar visibility
-		if self.showInfoBar != showInfoBar {
-			self.showInfoBar = showInfoBar
-			updateInfoBarVisibility()
-		}
-
-		// Update info label
-		if showInfoBar {
-			updateInfoLabel(item: item)
-		}
+		// Store showInfoBar setting
+		self.showInfoBar = showInfoBar
 
 		// Cancel previous load
 		currentLoadTask?.cancel()
@@ -285,10 +341,15 @@ class PhotoCellView: XView {
 		imageView.image = nil
 		isSelected = false
 		updateSelectionBorder()
+		infoBar.isHidden = true
+		infoBarHeightConstraint.constant = 0
+		starIconView.isHidden = true
 		#if os(macOS)
-		infoLabel.stringValue = ""
+		photoDateLabel.stringValue = "--"
+		fileSizeLabel.stringValue = "--"
 		#else
-		infoLabel.text = ""
+		photoDateLabel.text = "--"
+		fileSizeLabel.text = "--"
 		#endif
 		// Reset background color to default
 		#if os(macOS)
@@ -305,18 +366,64 @@ class PhotoCellView: XView {
 
 	func updateStarredState() {
 		// Update star indicator if item is loaded
-		if let item = currentItem {
+		if let item = currentItem, let source = currentSource, showInfoBar {
 			// Check if ID looks like MD5
 			if item.id.count == 32 && item.id.allSatisfy({ $0.isHexDigit }) {
-				// TODO: Check starred state through BasketActionService
-				// For now, keep star hidden
-				isStarred = false
-				starIndicator.isHidden = true
+				// ID looks like an MD5 hash - check if it's starred
+				Task { @MainActor in
+					let starred = await BasketActionService.shared.isStarred(md5: item.id)
+					self.isStarred = starred
+					// Update star icon visibility
+					self.starIconView.isHidden = !starred
+					// Update metadata
+					self.updatePhotoMetadata(item: item, source: source)
+				}
 			} else {
 				isStarred = false
-				starIndicator.isHidden = true
+				starIconView.isHidden = true
+				updatePhotoMetadata(item: item, source: source)
 			}
 		}
+	}
+
+	private func updatePhotoMetadata(item: PhotoBrowserItem, source: any PhotoSourceProtocol) {
+		// TODO: Fetch actual metadata from source
+		// For now, show what we can deduce:
+		// - Local photos: likely have file size
+		// - Apple Photos: might have cached size
+		// - All should have dates
+
+		let dateFormatter = DateFormatter()
+		dateFormatter.dateStyle = .short
+		dateFormatter.timeStyle = .none
+
+		// For now, use placeholder data
+		// TODO: Get actual metadata from photo source
+		let hasDate = true  // Most photos have dates
+		let hasSize = true  // Local always has, Apple Photos might have if cached
+
+		#if os(macOS)
+		photoDateLabel.stringValue = hasDate ? dateFormatter.string(from: Date()) : ""
+		photoDateLabel.isHidden = !hasDate
+		fileSizeLabel.stringValue = hasSize ? "2.5 MB" : ""
+		fileSizeLabel.isHidden = !hasSize
+		#else
+		photoDateLabel.text = hasDate ? dateFormatter.string(from: Date()) : ""
+		photoDateLabel.isHidden = !hasDate
+		fileSizeLabel.text = hasSize ? "2.5 MB" : ""
+		fileSizeLabel.isHidden = !hasSize
+		#endif
+
+		// Hide info bar if no metadata to show
+		let hasAnyMetadata = !starIconView.isHidden || hasDate || hasSize
+		infoBar.isHidden = !hasAnyMetadata
+		infoBarHeightConstraint.constant = hasAnyMetadata ? 20 : 0
+
+		#if os(macOS)
+		needsLayout = true
+		#else
+		setNeedsLayout()
+		#endif
 	}
 
 	private func updateSelectionBorder() {
@@ -392,28 +499,12 @@ class PhotoCellView: XView {
 	}
 
 	private func updateInfoBarVisibility() {
-		infoBar.isHidden = !showInfoBar
-		// Update height constraint based on visibility
-		let targetHeight: CGFloat = showInfoBar ? 20 : 0
-		if infoBarHeightConstraint.constant != targetHeight {
-			infoBarHeightConstraint.constant = targetHeight
-			#if os(macOS)
-			needsLayout = true
-			#else
-			setNeedsLayout()
-			#endif
-		}
+		// Info bar visibility is now controlled by starred state
+		// This method is kept for compatibility but doesn't do anything
 	}
 
 	private func updateInfoLabel(item: PhotoBrowserItem) {
-		// For now, just show the display name
-		// TODO: Load metadata through photo source for date and size
-		let infoText = item.displayName
-		#if os(macOS)
-		infoLabel.stringValue = infoText
-		#else
-		infoLabel.text = infoText
-		#endif
+		// Not used anymore - we only show star indicator
 	}
 
 	private func updateBorder() {

@@ -18,6 +18,7 @@ actor LocalCatalogCache {
 	
 	// In-memory cache
 	private var cachedMD5s: Set<String> = []
+	private var cachedFastKeys: Set<String> = []  // Fast photo keys (head-md5:size)
 	private var lastSyncDate: Date?
 	private var isSyncing = false
 	
@@ -56,10 +57,24 @@ actor LocalCatalogCache {
 	func isStarred(md5: String) -> Bool {
 		cachedMD5s.contains(md5)
 	}
-	
+
+	/// Check if a photo is starred by Fast Photo Key
+	func isStarredByFastKey(headMD5: String, fileSize: Int64) -> Bool {
+		let fastKey = "\(headMD5.lowercased()):\(fileSize)"
+		return cachedFastKeys.contains(fastKey)
+	}
+
+	/// Check if a photo is starred by Fast Photo Key string
+	func isStarredByFastKey(_ fastKey: String) -> Bool {
+		cachedFastKeys.contains(fastKey.lowercased())
+	}
+
 	/// Add MD5 to cache (when starring locally)
-	func addToCache(md5: String) {
+	func addToCache(md5: String, fastKey: String? = nil) {
 		cachedMD5s.insert(md5)
+		if let fastKey = fastKey {
+			cachedFastKeys.insert(fastKey.lowercased())
+		}
 		Task {
 			await saveCache()
 		}
@@ -86,16 +101,18 @@ actor LocalCatalogCache {
 		defer { isSyncing = false }
 		
 		logger.info("Starting S3 catalog sync")
-		
-		// Get all MD5s from catalog
+
+		// Get all MD5s and Fast Keys from catalog
 		let allEntries = try await catalogService.getEntries()
 		let newMD5s = Set(allEntries.compactMap { $0.photoMD5 })
+		let newFastKeys = Set(allEntries.map { $0.fastPhotoKey.lowercased() })
 
 		// Update cache
 		let added = newMD5s.subtracting(cachedMD5s)
 		let removed = cachedMD5s.subtracting(newMD5s)
 
 		cachedMD5s = newMD5s
+		cachedFastKeys = newFastKeys
 		lastSyncDate = Date()
 		
 		logger.info("Sync complete: \(self.cachedMD5s.count) total, +\(added.count) -\(removed.count)")

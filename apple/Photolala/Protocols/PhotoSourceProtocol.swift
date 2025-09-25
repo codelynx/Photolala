@@ -24,6 +24,10 @@ protocol PhotoSourceProtocol: AnyObject {
 	/// Load full-resolution image data
 	func loadFullImage(for itemId: String) async throws -> Data
 
+	/// Get photo identity (MD5 or Fast Photo Key) for catalog checking
+	/// Returns: (fullMD5?, headMD5?, fileSize?)
+	func getPhotoIdentity(for itemId: String) async -> (fullMD5: String?, headMD5: String?, fileSize: Int64?)
+
 	/// Publisher for photo updates
 	var photosPublisher: AnyPublisher<[PhotoBrowserItem], Never> { get }
 

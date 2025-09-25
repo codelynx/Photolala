@@ -299,6 +299,39 @@ class LocalPhotoSource: PhotoSourceProtocol {
 		}.value
 	}
 
+	nonisolated func getPhotoIdentity(for itemId: String) async -> (fullMD5: String?, headMD5: String?, fileSize: Int64?) {
+		// Get URL from main actor
+		let url = await MainActor.run {
+			idToPath[itemId]
+		}
+
+		guard let url = url else {
+			return (nil, nil, nil)
+		}
+
+		// Try to compute Fast Photo Key
+		do {
+			let fastKey = try await FastPhotoKey(contentsOf: url)
+			// File size is already in the Fast Photo Key
+			let fileSize = fastKey.fileSize
+
+			// TODO: Check if we have cached full MD5 for this file
+			// For now, return Fast Photo Key components
+			return (nil, fastKey.headMD5, fileSize)
+		} catch {
+			// If we can't compute, try to get file size from attributes
+			do {
+				let attributes = try FileManager.default.attributesOfItem(atPath: url.path)
+				if let fileSize = attributes[.size] as? Int64 {
+					return (nil, nil, fileSize)
+				}
+			} catch {
+				// Ignore
+			}
+			return (nil, nil, nil)
+		}
+	}
+
 	// MARK: - Helper Methods
 
 	func refresh() async throws {

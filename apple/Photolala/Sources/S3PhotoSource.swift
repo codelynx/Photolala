@@ -209,6 +209,23 @@ final class S3PhotoSource: PhotoSourceProtocol {
 		return imageData
 	}
 
+	func getPhotoIdentity(for itemId: String) async -> (fullMD5: String?, headMD5: String?, fileSize: Int64?) {
+		// For S3 photos, the itemId IS the MD5
+		// Find the catalog entry to get more info
+		if let entry = catalogEntries.first(where: {
+			($0.photoMD5 ?? $0.photoHeadMD5) == itemId
+		}) {
+			return (entry.photoMD5, entry.photoHeadMD5, entry.fileSize)
+		}
+
+		// If it looks like an MD5, return it as such
+		if itemId.count == 32 && itemId.allSatisfy({ $0.isHexDigit }) {
+			return (itemId, nil, nil)
+		}
+
+		return (nil, nil, nil)
+	}
+
 	// MARK: - Protocol Publishers
 
 	var photosPublisher: AnyPublisher<[PhotoBrowserItem], Never> {

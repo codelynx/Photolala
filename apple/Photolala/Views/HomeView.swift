@@ -69,6 +69,20 @@ struct HomeView: View {
 	@State private var navigationPath = NavigationPath()
 	@State private var model = Model()
 	@StateObject private var accountManager = AccountManager.shared
+	@State private var environmentRefresh = UUID()  // For forcing refresh
+
+	#if DEVELOPER
+	private var environmentColor: Color {
+		switch CredentialManager.shared.currentEnvironment {
+		case .development:
+			return .blue
+		case .staging:
+			return .orange
+		case .production:
+			return .red
+		}
+	}
+	#endif
 
 	private var welcomeMessage: String {
 		#if os(macOS)
@@ -128,6 +142,37 @@ struct HomeView: View {
 				Text("Photolala")
 					.font(.largeTitle)
 					.fontWeight(.medium)
+
+				// Environment indicator for developer builds (including TestFlight)
+				#if DEVELOPER
+				HStack(spacing: 4) {
+					Image(systemName: "server.rack")
+						.font(.caption)
+					Text(CredentialManager.shared.currentEnvironment.rawValue.uppercased())
+						.font(.caption)
+						.fontWeight(.semibold)
+				}
+				.padding(.horizontal, 8)
+				.padding(.vertical, 4)
+				.background(environmentColor)
+				.foregroundColor(.white)
+				.cornerRadius(4)
+				.contextMenu {
+					Button("Development") {
+						UserDefaults.standard.set("development", forKey: "environment_preference")
+						environmentRefresh = UUID()
+					}
+					Button("Staging") {
+						UserDefaults.standard.set("staging", forKey: "environment_preference")
+						environmentRefresh = UUID()
+					}
+					Button("Production") {
+						UserDefaults.standard.set("production", forKey: "environment_preference")
+						environmentRefresh = UUID()
+					}
+				}
+				.id(environmentRefresh)  // Force refresh when environment changes
+				#endif
 			}
 
 			// Welcome message

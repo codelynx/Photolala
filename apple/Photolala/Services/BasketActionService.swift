@@ -123,6 +123,18 @@ final class BasketActionService: ObservableObject {
 		return await cache.isStarred(md5: md5)
 	}
 
+	/// Check if an item is starred by Fast Photo Key
+	func isStarredByFastKey(headMD5: String, fileSize: Int64) async -> Bool {
+		guard let cache = catalogCache else { return false }
+		return await cache.isStarredByFastKey(headMD5: headMD5, fileSize: fileSize)
+	}
+
+	/// Check if an item is starred by Fast Photo Key string
+	func isStarredByFastKey(_ fastKey: String) async -> Bool {
+		guard let cache = catalogCache else { return false }
+		return await cache.isStarredByFastKey(fastKey)
+	}
+
 	/// Execute a basket action on the given items
 	func executeAction(_ action: BasketAction, items: [BasketItem]) async throws {
 		// Cancel any existing operation

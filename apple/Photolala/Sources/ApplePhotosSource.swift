@@ -212,6 +212,13 @@ class ApplePhotosSource: PhotoSourceProtocol {
 		}
 	}
 
+	nonisolated func getPhotoIdentity(for itemId: String) async -> (fullMD5: String?, headMD5: String?, fileSize: Int64?) {
+		// For Apple Photos, we might have cached MD5 from previous export
+		// TODO: Check cache for previously computed MD5
+		// For now, we can't efficiently compute MD5 without exporting
+		return (nil, nil, nil)
+	}
+
 	// MARK: - Helper Methods
 
 	private func getDisplayName(for asset: PHAsset) -> String {

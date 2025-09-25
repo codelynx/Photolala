@@ -133,6 +133,21 @@ final class BasketPhotoProvider: PhotoSourceProtocol {
 		return try await source.loadFullImage(for: itemId)
 	}
 
+	func getPhotoIdentity(for itemId: String) async -> (fullMD5: String?, headMD5: String?, fileSize: Int64?) {
+		// Find the basket item
+		guard let basketItem = basket.item(withId: itemId) else {
+			return (nil, nil, nil)
+		}
+
+		// Try to resolve source and get identity from it
+		do {
+			let source = try await resolveSourceForItem(basketItem)
+			return await source.getPhotoIdentity(for: itemId)
+		} catch {
+			return (nil, nil, nil)
+		}
+	}
+
 	// MARK: - Publishers
 
 	var photosPublisher: AnyPublisher<[PhotoBrowserItem], Never> {

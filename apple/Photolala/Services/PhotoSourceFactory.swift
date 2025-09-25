@@ -177,6 +177,10 @@ final class EmptyPhotoSource: PhotoSourceProtocol {
 		throw PhotoSourceError.itemNotFound
 	}
 
+	func getPhotoIdentity(for itemId: String) async -> (fullMD5: String?, headMD5: String?, fileSize: Int64?) {
+		return (nil, nil, nil)
+	}
+
 	var photosPublisher: AnyPublisher<[PhotoBrowserItem], Never> {
 		Just([]).eraseToAnyPublisher()
 	}

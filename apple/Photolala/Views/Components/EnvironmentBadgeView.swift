@@ -46,8 +46,8 @@ struct EnvironmentBadgeView: View {
 	}
 
 	private var shouldShowBadge: Bool {
-		#if DEBUG || DEVELOPER
-		// Show badge in debug and developer builds
+		#if DEVELOPER
+		// Show badge in developer builds (including TestFlight)
 		return true
 		#else
 		// Hide badge in AppStore builds
