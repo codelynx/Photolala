@@ -46,7 +46,7 @@ struct PhotolalaApp: App {
 				print("[App] Global catalog initialized successfully")
 
 				// Get S3 service
-				let s3Service = try await S3Service.forCurrentEnvironment()
+				let s3Service = try await S3Service.forCurrentAWSEnvironment()
 				print("[App] S3Service initialized successfully")
 
 				// Configure BasketActionService with both initialized services

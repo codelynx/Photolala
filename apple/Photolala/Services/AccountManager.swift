@@ -28,6 +28,13 @@ final class AccountManager: ObservableObject {
 		currentUser
 	}
 
+	@MainActor
+	func updateUser(_ user: PhotolalaUser) async {
+		currentUser = user
+		// The STS credentials don't change when user profile updates
+		// User profile is stored separately in S3
+	}
+
 	func getSTSCredentials() async throws -> STSCredentials {
 		if let credentials = stsCredentials, !credentials.isExpired {
 			return credentials
@@ -146,7 +153,7 @@ final class AccountManager: ObservableObject {
 	}
 
 	@MainActor
-	func deleteAccount() async throws {
+	func deleteAccount(progressDelegate: (any DeletionProgressDelegate)? = nil) async throws {
 		guard let user = currentUser else {
 			throw AccountError.notSignedIn
 		}
@@ -154,10 +161,10 @@ final class AccountManager: ObservableObject {
 		print("[AccountManager] Starting account deletion for user: \(user.id.uuidString)")
 
 		// Get S3 service for current environment
-		let s3Service = try await S3Service.forCurrentEnvironment()
+		let s3Service = try await S3Service.forCurrentAWSEnvironment()
 
-		// Delete all user data from S3
-		try await s3Service.deleteAllUserData(userID: user.id.uuidString)
+		// Delete all user data from S3 with progress tracking
+		try await s3Service.deleteAllUserData(userID: user.id.uuidString, progressDelegate: progressDelegate)
 
 		// TODO: Call Lambda to remove identity mappings from DynamoDB
 		// For now, S3Service.deleteIdentityMappings handles S3-stored mappings
@@ -435,7 +442,7 @@ final class AccountManager: ObservableObject {
 	nonisolated private func createLambdaClient() async throws -> LambdaClient {
 		// Get current environment from UserDefaults
 		let environmentPreference = UserDefaults.standard.string(forKey: "environment_preference") ?? "development"
-		let environment: Environment
+		let environment: AWSEnvironment
 		switch environmentPreference {
 		case "production":
 			environment = .production
@@ -530,7 +537,7 @@ final class LambdaClientManager {
 	private func createClient() async throws -> LambdaClient {
 		// Get current environment from UserDefaults
 		let environmentPreference = UserDefaults.standard.string(forKey: "environment_preference") ?? "development"
-		let environment: Environment
+		let environment: AWSEnvironment
 		switch environmentPreference {
 		case "production":
 			environment = .production

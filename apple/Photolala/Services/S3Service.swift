@@ -18,13 +18,13 @@ import OSLog
 public actor S3Service {
 	private let logger = Logger(subsystem: "com.photolala", category: "S3Service")
 	private nonisolated(unsafe) var client: S3Client?
-	private let environment: Environment
+	private let environment: AWSEnvironment
 	private var awsCredentials: AWSCredentials?
 	private let bucketName: String
 	private var isInitialized = false
 
 	/// Initialize S3Service with explicit environment and credentials
-	init(environment: Environment, credentials: AWSCredentials) {
+	init(environment: AWSEnvironment, credentials: AWSCredentials) {
 		self.environment = environment
 		self.awsCredentials = credentials
 		// Compute bucket name based on environment
@@ -39,7 +39,7 @@ public actor S3Service {
 	}
 
 	/// Initialize S3Service with environment (fetches credentials automatically)
-	init(environment: Environment) async throws {
+	init(environment: AWSEnvironment) async throws {
 		self.environment = environment
 		// Compute bucket name based on environment
 		switch environment {
@@ -59,7 +59,7 @@ public actor S3Service {
 	}
 
 	/// Initialize S3Service for lazy loading (backward compatibility)
-	private init(environment: Environment, lazy: Bool) {
+	private init(environment: AWSEnvironment, lazy: Bool) {
 		self.environment = environment
 		// Compute bucket name based on environment
 		switch environment {
@@ -201,7 +201,7 @@ public actor S3Service {
 	}
 
 	/// Get the current environment
-	func getEnvironment() -> Environment {
+	func getAWSEnvironment() -> AWSEnvironment {
 		return environment
 	}
 
@@ -439,19 +439,19 @@ public actor S3Service {
 
 extension S3Service {
 	/// Create S3Service for the current app environment (reads from UserDefaults)
-	static func forCurrentEnvironment() async throws -> S3Service {
+	static func forCurrentAWSEnvironment() async throws -> S3Service {
 		let credentialManager = await CredentialManager.shared
 		let environment = await credentialManager.currentEnvironment
 		return try await S3Service(environment: environment)
 	}
 
 	/// Create S3Service for a specific environment
-	static func forEnvironment(_ environment: Environment) async throws -> S3Service {
+	static func forEnvironment(_ environment: AWSEnvironment) async throws -> S3Service {
 		return try await S3Service(environment: environment)
 	}
 
 	/// Helper to get credentials for a specific environment
-	private static func getCredentials(for environment: Environment) async -> AWSCredentials? {
+	private static func getCredentials(for environment: AWSEnvironment) async -> AWSCredentials? {
 		await MainActor.run {
 			let accessKeyEnum: CredentialKey
 			let secretKeyEnum: CredentialKey
@@ -484,13 +484,103 @@ extension S3Service {
 
 	/// Shared instance for the current app environment (backward compatibility)
 	/// Note: Uses lazy initialization - credentials fetched on first use
-	/// New code should use forEnvironment() or forCurrentEnvironment() instead
+	/// New code should use forAWSEnvironment() or forCurrentAWSEnvironment() instead
 	static let shared = S3Service(environment: .development, lazy: true)
+
+	// MARK: - User Management
+
+	/// Calculate storage usage for a user
+	func calculateStorageUsage(userID: String) async throws -> (totalBytes: Int64, photoCount: Int) {
+		try await ensureInitialized()
+		guard let client = client else {
+			throw S3Error.clientNotInitialized
+		}
+
+		// Validate user ID is not empty
+		guard !userID.isEmpty else {
+			throw S3Error.invalidParameters("User ID is required for storage calculation")
+		}
+
+		var totalBytes: Int64 = 0
+		var photoCount = 0
+
+		// Count objects in photos namespace
+		let photosPrefix = "photos/\(userID)/"
+		var continuationToken: String?
+
+		repeat {
+			let listInput = ListObjectsV2Input(
+				bucket: bucketName,
+				continuationToken: continuationToken,
+				prefix: photosPrefix
+			)
+
+			let output = try await client.listObjectsV2(input: listInput)
+
+			if let contents = output.contents {
+				for object in contents {
+					totalBytes += Int64(object.size ?? 0)
+					photoCount += 1
+				}
+			}
+
+			continuationToken = output.nextContinuationToken
+		} while continuationToken != nil
+
+		// Also count thumbnails (but don't add to photo count)
+		let thumbnailsPrefix = "thumbnails/\(userID)/"
+		continuationToken = nil
+
+		repeat {
+			let listInput = ListObjectsV2Input(
+				bucket: bucketName,
+				continuationToken: continuationToken,
+				prefix: thumbnailsPrefix
+			)
+
+			let output = try await client.listObjectsV2(input: listInput)
+
+			if let contents = output.contents {
+				for object in contents {
+					totalBytes += Int64(object.size ?? 0)
+				}
+			}
+
+			continuationToken = output.nextContinuationToken
+		} while continuationToken != nil
+
+		return (totalBytes, photoCount)
+	}
+
+	/// Update user profile in S3
+	@MainActor
+	func updateUserProfile(_ user: PhotolalaUser) async throws {
+		try await ensureInitialized()
+		guard let client = client else {
+			throw S3Error.clientNotInitialized
+		}
+
+		let key = "users/\(user.id.uuidString)/profile.json"
+
+		let encoder = JSONEncoder()
+		encoder.dateEncodingStrategy = .iso8601
+		let userData = try encoder.encode(user)
+
+		let input = PutObjectInput(
+			body: .data(userData),
+			bucket: bucketName,
+			contentType: "application/json",
+			key: key
+		)
+
+		_ = try await client.putObject(input: input)
+		logger.info("[S3Service] Updated user profile for \(user.id.uuidString)")
+	}
 
 	// MARK: - Account Deletion
 
-	/// Delete all user data from S3 with pagination support
-	func deleteAllUserData(userID: String) async throws {
+	/// Delete all user data from S3 with pagination support and progress tracking
+	func deleteAllUserData(userID: String, progressDelegate: (any DeletionProgressDelegate)? = nil) async throws {
 		try await ensureInitialized()
 		guard let client = client else {
 			throw S3Error.clientNotInitialized
@@ -502,28 +592,58 @@ extension S3Service {
 		var totalDeleted = 0
 		var errors: [String] = []
 
-		// Delete all objects under user's directories
-		let prefixes = [
-			"photos/\(userID)/",
-			"thumbnails/\(userID)/",
-			"catalogs/\(userID)/",
-			"users/\(userID)/"
+		// Define namespaces and their prefixes
+		let namespaces: [(name: String, prefix: String)] = [
+			("photos", "photos/\(userID)/"),
+			("thumbnails", "thumbnails/\(userID)/"),
+			("catalogs", "catalogs/\(userID)/"),
+			("users", "users/\(userID)/")
 		]
 
-		for prefix in prefixes {
+		for (namespace, prefix) in namespaces {
+			await progressDelegate?.updateOperation("Deleting \(namespace)...")
+
 			do {
-				let deleted = try await deleteObjectsWithPrefix(prefix, client: client)
-				totalDeleted += deleted
-				logger.info("[S3Service] Deleted \(deleted) objects from \(prefix)")
+				let result = try await deleteObjectsWithPrefix(
+					prefix,
+					client: client,
+					namespace: namespace,
+					progressDelegate: progressDelegate
+				)
+				totalDeleted += result.deleted
+
+				// Add any per-object errors to our error list
+				errors.append(contentsOf: result.errors)
+
+				logger.info("[S3Service] Deleted \(result.deleted) objects from \(prefix)")
+
+				// Report completion or failure based on whether there were errors
+				if result.errors.isEmpty {
+					await progressDelegate?.namespaceCompleted(namespace: namespace, deletedCount: result.deleted)
+				} else {
+					// Partial failure - some objects deleted, some failed
+					await progressDelegate?.namespaceFailed(namespace: namespace, error: S3Error.partialDeletionFailure(errors: result.errors, deletedCount: result.deleted))
+				}
 			} catch {
 				let errorMsg = "Failed to delete from \(prefix): \(error)"
 				errors.append(errorMsg)
 				logger.error("[S3Service] \(errorMsg)")
+				await progressDelegate?.namespaceFailed(namespace: namespace, error: error)
 			}
 		}
 
 		// Also try to delete identity mappings
-		await deleteIdentityMappings(userID: userID)
+		await progressDelegate?.updateOperation("Deleting identity mappings...")
+		do {
+			let deletedIdentities = try await deleteIdentityMappings(userID: userID, progressDelegate: progressDelegate)
+			totalDeleted += deletedIdentities
+			await progressDelegate?.namespaceCompleted(namespace: "identities", deletedCount: deletedIdentities)
+		} catch {
+			let errorMsg = "Failed to delete identity mappings: \(error)"
+			errors.append(errorMsg)
+			logger.error("[S3Service] \(errorMsg)")
+			await progressDelegate?.namespaceFailed(namespace: "identities", error: error)
+		}
 
 		// If any errors occurred, throw an error with details
 		if !errors.isEmpty {
@@ -534,10 +654,22 @@ extension S3Service {
 		logger.info("[S3Service] Account deletion complete. Total objects deleted: \(totalDeleted)")
 	}
 
-	/// Delete all objects with a given prefix (with pagination)
-	private func deleteObjectsWithPrefix(_ prefix: String, client: S3Client) async throws -> Int {
+	/// Delete all objects with a given prefix (with pagination and progress)
+	private func deleteObjectsWithPrefix(
+		_ prefix: String,
+		client: S3Client,
+		namespace: String? = nil,
+		progressDelegate: (any DeletionProgressDelegate)? = nil
+	) async throws -> (deleted: Int, errors: [String]) {
 		var continuationToken: String?
 		var totalDeleted = 0
+		var collectedErrors: [String] = []
+
+		// First, count total objects to track progress
+		var totalObjects = 0
+		if progressDelegate != nil, let namespace = namespace {
+			totalObjects = try await countObjectsWithPrefix(prefix, client: client)
+		}
 
 		repeat {
 			// List objects (max 1000 per request)
@@ -552,37 +684,73 @@ extension S3Service {
 
 			// Delete objects in this batch
 			if let contents = output.contents, !contents.isEmpty {
-				let objects = contents.compactMap { object -> ObjectIdentifier? in
+				let objects = contents.compactMap { object -> S3ClientTypes.ObjectIdentifier? in
 					guard let key = object.key else { return nil }
-					return ObjectIdentifier(key: key)
+					return S3ClientTypes.ObjectIdentifier(key: key)
 				}
 
 				if !objects.isEmpty {
+					// Note: quiet: false so we get per-object results
 					let deleteInput = DeleteObjectsInput(
 						bucket: bucketName,
-						delete: Delete(objects: objects, quiet: true)
+						delete: S3ClientTypes.Delete(objects: objects, quiet: false)
 					)
 
 					let deleteOutput = try await client.deleteObjects(input: deleteInput)
 
+					// Count successful deletions
+					let successfulDeletions = deleteOutput.deleted?.count ?? 0
+					totalDeleted += successfulDeletions
+
+					// Collect errors
 					if let errors = deleteOutput.errors, !errors.isEmpty {
-						logger.error("[S3Service] Batch deletion errors: \(errors)")
-						// Continue despite errors
+						for error in errors {
+							let errorMsg = "Failed to delete \(error.key ?? "unknown"): \(error.message ?? "unknown error")"
+							collectedErrors.append(errorMsg)
+							logger.error("[S3Service] \(errorMsg)")
+						}
 					}
 
-					totalDeleted += objects.count
+					// Report progress based on actual deletions
+					if let progressDelegate = progressDelegate, let namespace = namespace, totalObjects > 0 {
+						let progress = Double(totalDeleted) / Double(totalObjects)
+						await progressDelegate.updateProgress(namespace: namespace, progress: progress, itemsDeleted: totalDeleted)
+					}
 				}
 			}
 
 			continuationToken = output.nextContinuationToken
 		} while continuationToken != nil
 
-		return totalDeleted
+		return (totalDeleted, collectedErrors)
 	}
 
-	/// Delete identity mappings for a user
-	func deleteIdentityMappings(userID: String) async {
-		guard let client = client else { return }
+	/// Count objects with a given prefix
+	private func countObjectsWithPrefix(_ prefix: String, client: S3Client) async throws -> Int {
+		var continuationToken: String?
+		var totalCount = 0
+
+		repeat {
+			let listInput = ListObjectsV2Input(
+				bucket: bucketName,
+				continuationToken: continuationToken,
+				maxKeys: 1000,
+				prefix: prefix
+			)
+
+			let output = try await client.listObjectsV2(input: listInput)
+			totalCount += output.contents?.count ?? 0
+			continuationToken = output.nextContinuationToken
+		} while continuationToken != nil
+
+		return totalCount
+	}
+
+	/// Delete identity mappings for a user and return count
+	func deleteIdentityMappings(userID: String, progressDelegate: (any DeletionProgressDelegate)? = nil) async throws -> Int {
+		guard let client = client else {
+			throw S3Error.clientNotInitialized
+		}
 
 		// Identity mappings are stored as identities/{provider}/{providerID} -> userID
 		// Include all provider types: apple, google, and email
@@ -592,9 +760,14 @@ extension S3Service {
 			"identities/email/"
 		]
 
+		var totalDeleted = 0
+		var identitiesProcessed = 0
+		let totalIdentities = identityPrefixes.count
+
 		for prefix in identityPrefixes {
 			do {
 				var continuationToken: String?
+				var prefixDeleted = 0
 
 				repeat {
 					let listInput = ListObjectsV2Input(
@@ -620,6 +793,8 @@ extension S3Service {
 								let deleteInput = DeleteObjectInput(bucket: bucketName, key: key)
 								_ = try? await client.deleteObject(input: deleteInput)
 								logger.info("[S3Service] Deleted identity mapping: \(key)")
+								prefixDeleted += 1
+								totalDeleted += 1
 							}
 						}
 					}
@@ -627,11 +802,38 @@ extension S3Service {
 					continuationToken = output.nextContinuationToken
 				} while continuationToken != nil
 
+				identitiesProcessed += 1
+				if let progressDelegate = progressDelegate {
+					let progress = Double(identitiesProcessed) / Double(totalIdentities)
+					await progressDelegate.updateProgress(namespace: "identities", progress: progress, itemsDeleted: totalDeleted)
+				}
+
 			} catch {
 				logger.error("[S3Service] Error cleaning identity mappings from \(prefix): \(error)")
+				// Continue with other prefixes
 			}
 		}
+
+		return totalDeleted
 	}
+}
+
+// MARK: - Progress Tracking
+
+/// Protocol for tracking deletion progress
+@MainActor
+protocol DeletionProgressDelegate: AnyObject, Sendable {
+	/// Called when progress is made within a namespace
+	func updateProgress(namespace: String, progress: Double, itemsDeleted: Int) async
+
+	/// Called when a namespace is completed
+	func namespaceCompleted(namespace: String, deletedCount: Int) async
+
+	/// Called when a namespace fails
+	func namespaceFailed(namespace: String, error: Error) async
+
+	/// Called to update the current operation description
+	func updateOperation(_ operation: String) async
 }
 
 // MARK: - Error Types
@@ -643,6 +845,7 @@ enum S3Error: LocalizedError {
 	case downloadFailed
 	case invalidData
 	case notFound
+	case invalidParameters(String)
 	case partialDeletionFailure(errors: [String], deletedCount: Int)
 
 	var errorDescription: String? {
@@ -661,6 +864,8 @@ enum S3Error: LocalizedError {
 			return "Invalid data format"
 		case .notFound:
 			return "Object not found in S3"
+		case .invalidParameters(let message):
+			return "Invalid parameters: \(message)"
 		case .partialDeletionFailure(let errors, let deletedCount):
 			return "Account deletion partially failed. Deleted \(deletedCount) objects. Errors: \(errors.joined(separator: "; "))"
 		}

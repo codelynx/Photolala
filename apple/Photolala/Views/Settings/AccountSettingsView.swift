@@ -10,7 +10,7 @@ import AuthenticationServices
 
 struct AccountSettingsView: View {
 	@State private var model = Model()
-	@Environment(\.dismiss) private var dismiss
+	@Environment(\.dismiss) var dismiss
 
 	var body: some View {
 		NavigationStack {
@@ -65,10 +65,15 @@ struct AccountSettingsView: View {
 			.sheet(isPresented: $model.showingReauthentication) {
 				ReauthenticationView { success in
 					if success {
-						Task {
-							await model.deleteAccount()
-							dismiss()
-						}
+						model.showingDeletionProgress = true
+					}
+				}
+			}
+			.sheet(isPresented: $model.showingDeletionProgress) {
+				DeletionProgressView(isPresented: $model.showingDeletionProgress) { success in
+					if success {
+						// Account deleted successfully, dismiss the settings view
+						dismiss()
 					}
 				}
 			}
@@ -236,6 +241,7 @@ extension AccountSettingsView {
 		var showingSignOutConfirmation = false
 		var showingDeleteConfirmation = false
 		var showingReauthentication = false
+		var showingDeletionProgress = false
 		var showingEditProfile = false
 		var showingError = false
 		var errorMessage = ""
@@ -278,10 +284,14 @@ extension AccountSettingsView {
 
 			do {
 				// Get S3 service
-				let s3Service = try await S3Service.forCurrentEnvironment()
+				let s3Service = try await S3Service.forCurrentAWSEnvironment()
 
-				// Calculate storage usage
-				let usage = try await s3Service.calculateStorageUsage()
+				// Calculate storage usage for current user
+				guard let user = AccountManager.shared.getCurrentUser() else {
+					print("[AccountSettings] No current user for storage calculation")
+					return
+				}
+				let usage = try await s3Service.calculateStorageUsage(userID: user.id.uuidString)
 				storageUsedBytes = usage.totalBytes
 				photoCount = usage.photoCount
 
@@ -313,13 +323,13 @@ extension AccountSettingsView {
 					updatedAt: Date()
 				)
 
-				// Save to S3
-				let s3Service = try await S3Service.forCurrentEnvironment()
-				try await s3Service.updateUserProfile(updatedUser)
-
-				// Update local state
+				// Update local state first
 				await AccountManager.shared.updateUser(updatedUser)
 				displayName = newName
+
+				// Save to S3
+				let s3Service = try await S3Service.forCurrentAWSEnvironment()
+				try await s3Service.updateUserProfile(updatedUser)
 			} catch {
 				errorMessage = "Failed to update profile: \(error.localizedDescription)"
 				showingError = true
@@ -337,17 +347,6 @@ extension AccountSettingsView {
 			await AccountManager.shared.signOut()
 		}
 
-		func deleteAccount() async {
-			do {
-				// Use centralized account deletion in AccountManager
-				try await AccountManager.shared.deleteAccount()
-
-				print("[AccountSettingsView] Account deleted successfully")
-			} catch {
-				errorMessage = "Failed to delete account: \(error.localizedDescription)"
-				showingError = true
-			}
-		}
 
 		enum AuthProvider {
 			case apple, google
@@ -360,7 +359,7 @@ extension AccountSettingsView {
 struct EditProfileView: View {
 	@State private var displayName: String
 	let onSave: (String) -> Void
-	@Environment(\.dismiss) private var dismiss
+	@Environment(\.dismiss) var dismiss
 
 	init(displayName: String, onSave: @escaping (String) -> Void) {
 		_displayName = State(initialValue: displayName)
@@ -399,7 +398,7 @@ struct EditProfileView: View {
 
 struct ReauthenticationView: View {
 	let onAuthenticated: (Bool) -> Void
-	@Environment(\.dismiss) private var dismiss
+	@Environment(\.dismiss) var dismiss
 	@State private var isAuthenticating = false
 
 	var body: some View {

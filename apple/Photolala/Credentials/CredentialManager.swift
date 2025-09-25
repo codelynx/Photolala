@@ -23,7 +23,7 @@ public struct AppleSignInConfig {
 	public let privateKey: String
 }
 
-public enum Environment: String {
+public enum AWSEnvironment: String {
 	case development = "development"
 	case staging = "staging"
 	case production = "production"
@@ -40,9 +40,9 @@ public enum Environment: String {
 // MARK: - Protocol for Testing
 
 public protocol CredentialProviding {
-	func awsCredentials(for environment: Environment) -> AWSCredentials?
+	func awsCredentials(for environment: AWSEnvironment) -> AWSCredentials?
 	var appleSignInConfig: AppleSignInConfig? { get }
-	var currentEnvironment: Environment { get }
+	var currentEnvironment: AWSEnvironment { get }
 }
 
 // MARK: - Main Implementation
@@ -54,10 +54,10 @@ public class CredentialManager: CredentialProviding {
 
 	// MARK: - Current Environment
 
-	public var currentEnvironment: Environment {
+	public var currentEnvironment: AWSEnvironment {
 		#if DEBUG || DEVELOPER
 		let envString = UserDefaults.standard.string(forKey: "environment_preference") ?? "development"
-		return Environment(rawValue: envString) ?? .development
+		return AWSEnvironment(rawValue: envString) ?? .development
 		#else
 		// Production builds always use production
 		return .production
@@ -66,7 +66,7 @@ public class CredentialManager: CredentialProviding {
 
 	// MARK: - AWS Credentials
 
-	public func awsCredentials(for environment: Environment) -> AWSCredentials? {
+	public func awsCredentials(for environment: AWSEnvironment) -> AWSCredentials? {
 		let accessKey: CredentialKey
 		let secretKey: CredentialKey
 
@@ -197,7 +197,7 @@ extension CredentialManager {
 
 #if DEBUG
 public class MockCredentialManager: CredentialProviding {
-	public var mockEnvironment: Environment = .development
+	public var mockEnvironment: AWSEnvironment = .development
 	public var mockAWSCredentials: AWSCredentials?
 	public var mockAppleConfig: AppleSignInConfig?
 
@@ -218,11 +218,11 @@ public class MockCredentialManager: CredentialProviding {
 		)
 	}
 
-	public var currentEnvironment: Environment {
+	public var currentEnvironment: AWSEnvironment {
 		return mockEnvironment
 	}
 
-	public func awsCredentials(for environment: Environment) -> AWSCredentials? {
+	public func awsCredentials(for environment: AWSEnvironment) -> AWSCredentials? {
 		return mockAWSCredentials
 	}
 
