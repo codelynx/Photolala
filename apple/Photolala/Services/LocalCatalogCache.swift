@@ -151,6 +151,24 @@ actor LocalCatalogCache {
 		syncTask?.cancel()
 		syncTask = nil
 	}
+
+	/// Clear all cached data
+	func clear() async {
+		cachedMD5s.removeAll()
+		cachedFastKeys.removeAll()
+		lastSyncDate = nil
+
+		// Stop any ongoing sync
+		stopPeriodicSync()
+
+		// Delete cache file from disk
+		do {
+			try FileManager.default.removeItem(at: cacheURL)
+			logger.info("Cleared catalog cache and deleted cache file")
+		} catch {
+			logger.error("Error deleting cache file: \(error)")
+		}
+	}
 	
 	// MARK: - Private Methods
 	

@@ -160,6 +160,21 @@ public actor ThumbnailCache {
 		logger.info("Memory cache cleared")
 	}
 
+	/// Clear all cached thumbnails (memory and disk)
+	public func clearAll() async {
+		// Clear memory cache
+		clearMemoryCache()
+
+		// Clear disk cache through CacheManager
+		do {
+			// Clear both MD5 and Apple Photos caches
+			try await cacheManager.clearAllCaches()
+			logger.info("Cleared all thumbnail caches")
+		} catch {
+			logger.error("Failed to clear disk cache: \(error)")
+		}
+	}
+
 	// MARK: - Private Methods
 
 	/// Generate PTM-256 thumbnail from source image

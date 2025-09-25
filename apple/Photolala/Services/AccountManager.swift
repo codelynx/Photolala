@@ -125,13 +125,51 @@ final class AccountManager: ObservableObject {
 
 	@MainActor
 	func signOut() async {
+		print("[AccountManager] Starting sign-out process")
+
+		// Cancel any ongoing basket operations
+		await PhotoBasket.shared.cancelCurrentOperation()
+
+		// Clear user session
 		currentUser = nil
 		stsCredentials = nil
 		isSignedIn = false
 		await clearStoredSession()
 
+		// Clear all caches
+		await clearAllCaches()
+
 		// Clear shared Lambda client
 		await LambdaClientManager.shared.reset()
+
+		print("[AccountManager] Sign-out complete")
+	}
+
+	/// Clear all application caches
+	private func clearAllCaches() async {
+		print("[AccountManager] Clearing all caches")
+
+		// Clear photo identity cache
+		await LocalPhotoIdentityCache.shared.clear()
+
+		// Clear catalog cache - MUST clear in-memory cache before deleting directory
+		await BasketActionService.shared.clearCatalogCache()
+
+		// Now safe to delete the catalog cache directory
+		let appSupport = FileManager.default.urls(for: .applicationSupportDirectory,
+												   in: .userDomainMask).first!
+		let catalogCacheDir = appSupport
+			.appendingPathComponent("Photolala")
+			.appendingPathComponent("CatalogCache")
+		try? FileManager.default.removeItem(at: catalogCacheDir)
+
+		// Clear thumbnail cache
+		await ThumbnailCache.shared.clearAll()
+
+		// Clear basket items
+		PhotoBasket.shared.clear()
+
+		print("[AccountManager] All caches cleared")
 	}
 
 	#if DEBUG || DEVELOPER
