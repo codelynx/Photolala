@@ -113,7 +113,13 @@ final class StarCheckpointManager: ObservableObject {
 	/// Update checkpoint with processed item
 	func markItemProcessed(checkpointId: UUID, basketItemId: String, displayName: String, md5: String?, uploaded: Bool = false) {
 		guard var checkpoint = activeCheckpoint, checkpoint.id == checkpointId else { return }
-		
+
+		// Check if already processed (shouldn't happen, but be defensive)
+		if checkpoint.processedItems.contains(where: { $0.basketItemId == basketItemId }) {
+			logger.warning("Item \(basketItemId) already marked as processed, skipping duplicate")
+			return
+		}
+
 		let processedItem = StarCheckpoint.ProcessedItem(
 			basketItemId: basketItemId,
 			displayName: displayName,
@@ -121,15 +127,19 @@ final class StarCheckpointManager: ObservableObject {
 			processedAt: Date(),
 			uploaded: uploaded
 		)
-		
+
 		checkpoint.processedItems.append(processedItem)
+
+		// Remove from failed items if it was previously failed (successful retry)
+		checkpoint.failedItems.removeAll { $0.basketItemId == basketItemId }
+
 		checkpoint.lastUpdated = Date()
-		
+
 		// Update status if all items processed
 		if checkpoint.processedItems.count + checkpoint.failedItems.count >= checkpoint.totalItems {
 			checkpoint.status = checkpoint.failedItems.isEmpty ? .completed : .failed
 		}
-		
+
 		activeCheckpoint = checkpoint
 		Task {
 			await saveCheckpoint(checkpoint)

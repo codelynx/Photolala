@@ -87,6 +87,11 @@ final class BasketActionService: ObservableObject {
 		currentTask = nil
 		currentProgress = nil
 		checkpointManager.pauseCheckpoint()
+
+		// Also cancel any ongoing uploads
+		Task {
+			await uploadCoordinator?.cancelUpload()
+		}
 	}
 
 	/// Resume from a checkpoint
@@ -197,16 +202,7 @@ final class BasketActionService: ObservableObject {
 			error: nil
 		)
 
-		// Start upload process if configured
-		if let coordinator = uploadCoordinator {
-			Task {
-				do {
-					try await coordinator.startUpload()
-				} catch {
-					logger.error("Upload failed: \(error)")
-				}
-			}
-		}
+		// Upload will start automatically when items are queued
 	}
 
 	private func unstarItems(_ items: [BasketItem]) async throws {
@@ -317,6 +313,7 @@ actor BasketUploadCoordinator {
 	// Upload queue - stores items with their computed MD5s
 	private var uploadQueue: [(item: BasketItem, md5: String?)] = []
 	private var isUploading = false
+	private var uploadTask: Task<Void, Error>?
 
 	// Progress tracking
 	private var uploadProgress = PassthroughSubject<BasketActionProgress, Never>()
@@ -342,11 +339,36 @@ actor BasketUploadCoordinator {
 		// MD5 will be computed during upload process
 		uploadQueue.append((item, nil))
 		logger.debug("Queued item for upload: \(item.displayName)")
+
+		// If not currently uploading, start the upload process
+		if !isUploading {
+			startUploadInBackground()
+		}
 	}
 
 	func removeFromQueue(md5: String) {
 		uploadQueue.removeAll { tuple in tuple.md5 == md5 }
 		logger.debug("Removed items with MD5 from queue: \(md5)")
+	}
+
+	func cancelUpload() {
+		uploadTask?.cancel()
+		uploadTask = nil
+		isUploading = false
+		logger.info("Upload cancelled")
+	}
+
+	func startUploadInBackground() {
+		uploadTask?.cancel() // Cancel any existing task
+		uploadTask = Task {
+			do {
+				try await startUpload()
+			} catch {
+				if !Task.isCancelled {
+					logger.error("Upload failed: \(error)")
+				}
+			}
+		}
 	}
 
 	func startUpload() async throws {
@@ -356,13 +378,30 @@ actor BasketUploadCoordinator {
 		}
 
 		isUploading = true
-		defer { isUploading = false }
+		defer {
+			isUploading = false
 
-		logger.info("Starting upload of \(self.uploadQueue.count) items")
+			// If there are still items in queue after this batch, start another upload
+			if !self.uploadQueue.isEmpty {
+				logger.info("Queue has \(self.uploadQueue.count) new items, starting another upload batch")
+				self.startUploadInBackground()
+			}
+		}
 
-		// Process each item in the queue
-		for (index, (item, _)) in self.uploadQueue.enumerated() {
-			logger.debug("Processing item \(index + 1)/\(self.uploadQueue.count): \(item.displayName)")
+		// Process items one at a time, removing from queue as we go
+		while !self.uploadQueue.isEmpty {
+			// Check for cancellation before processing next item
+			do {
+				try Task.checkCancellation()
+			} catch {
+				// On cancellation, items remain in queue for next upload
+				logger.info("Upload cancelled with \(self.uploadQueue.count) items remaining")
+				throw error
+			}
+
+			// Remove and process first item
+			let (item, _) = self.uploadQueue.removeFirst()
+			logger.debug("Processing item: \(item.displayName) (\(self.uploadQueue.count) remaining)")
 
 			// Compute MD5 if not already done
 			var md5: String?
@@ -383,8 +422,8 @@ actor BasketUploadCoordinator {
 					}
 					md5 = try await computeFullMD5(for: resolved.url)
 
-					// Detect format for local files
-					detectedFormat = detectImageFormat(from: resolved.url) ?? .unknown
+					// Detect format for local files (default to JPEG for unknown)
+					detectedFormat = detectImageFormat(from: resolved.url) ?? .jpeg
 				}
 			} else if item.sourceType == .applePhotos {
 				// Export Apple Photos item and compute MD5
@@ -480,6 +519,13 @@ actor BasketUploadCoordinator {
 							)
 						}
 					}
+
+					// Clean up exported Apple Photos asset before continuing
+					if let exportedAsset = exportedAsset {
+						await MainActor.run {
+							exportedAsset.cleanup()
+						}
+					}
 					continue
 				}
 			}
@@ -519,13 +565,17 @@ actor BasketUploadCoordinator {
 						}
 
 						let fileData = try Data(contentsOf: resolved.url)
-						let format = detectImageFormat(from: resolved.url) ?? .jpeg
+
+						// Get current user ID
+						let userID = await MainActor.run {
+							AccountManager.shared.getCurrentUser()?.id.uuidString ?? "anonymous"
+						}
 
 						try await s3Service.uploadPhoto(
 							data: fileData,
 							md5: photoMD5,
-							format: format,
-							userID: "default" // TODO: Get actual user ID
+							format: detectedFormat, // Use the already-detected format
+							userID: userID
 						)
 						uploadSucceeded = true
 						logger.info("Uploaded local file \(item.displayName) to S3")
@@ -533,13 +583,17 @@ actor BasketUploadCoordinator {
 				} else if item.sourceType == .applePhotos && exportedAsset != nil {
 					// Upload exported Apple Photos item
 					let fileData = try Data(contentsOf: exportedAsset!.temporaryURL)
-					let format = detectImageFormat(from: exportedAsset!.temporaryURL) ?? .heif // Default to HEIF for Apple Photos
+
+					// Get current user ID
+					let userID = await MainActor.run {
+						AccountManager.shared.getCurrentUser()?.id.uuidString ?? "anonymous"
+					}
 
 					try await s3Service.uploadPhoto(
 						data: fileData,
 						md5: photoMD5,
-						format: format,
-						userID: "default" // TODO: Get actual user ID
+						format: detectedFormat, // Use the already-detected format
+						userID: userID
 					)
 					uploadSucceeded = true
 					logger.info("Uploaded Apple Photos item \(item.displayName) to S3")
@@ -580,9 +634,6 @@ actor BasketUploadCoordinator {
 				}
 			}
 		}
-
-		// Clear queue after successful upload
-		self.uploadQueue.removeAll()
 
 		logger.info("Upload complete")
 	}
