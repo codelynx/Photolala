@@ -396,6 +396,22 @@ public actor S3Service {
 		return data
 	}
 
+	/// Delete thumbnail
+	func deleteThumbnail(md5: String, userID: String) async throws {
+		try await ensureInitialized()
+
+		let key = "thumbnails/\(userID)/\(md5).jpg"
+
+		let input = DeleteObjectInput(
+			bucket: bucketName,
+			key: key
+		)
+
+		guard let client = client else { throw S3Error.clientNotInitialized }
+		_ = try await client.deleteObject(input: input)
+		logger.info("Deleted thumbnail: \(key)")
+	}
+
 	/// Download photo (always stored as .dat)
 	func downloadPhoto(md5: String, userID: String) async throws -> Data {
 		try await ensureInitialized()

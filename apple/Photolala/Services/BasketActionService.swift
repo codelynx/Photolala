@@ -185,6 +185,19 @@ final class BasketActionService: ObservableObject {
 
 	// MARK: - Star Implementation
 
+	/// Get the current authenticated user ID, throwing if not signed in
+	private func getAuthenticatedUserID() async throws -> String {
+		let user = await MainActor.run {
+			AccountManager.shared.getCurrentUser()
+		}
+
+		guard let user = user else {
+			throw BasketActionError.notAuthenticated
+		}
+
+		return user.id.uuidString
+	}
+
 	/// Execute action with existing checkpoint (for resume)
 	private func executeActionWithCheckpoint(_ action: BasketAction, items: [BasketItem], checkpoint: StarCheckpoint) async throws {
 		switch action {
@@ -224,6 +237,9 @@ final class BasketActionService: ObservableObject {
 	private func starItemsWithCheckpoint(_ items: [BasketItem], checkpoint: StarCheckpoint) async throws {
 		logger.info("Processing star operation with checkpoint \(checkpoint.id)")
 
+		// Get authenticated user ID upfront
+		let userID = try await getAuthenticatedUserID()
+
 		// Initialize or update upload coordinator
 		guard let s3Service = s3Service else {
 			throw BasketActionError.missingDependency("S3Service")
@@ -235,11 +251,13 @@ final class BasketActionService: ObservableObject {
 				catalogService: catalogService,
 				catalogCache: catalogCache,
 				checkpointManager: checkpointManager,
-				checkpointId: checkpoint.id
+				checkpointId: checkpoint.id,
+				userID: userID
 			)
 		} else {
 			// Update checkpoint ID for existing coordinator
 			await uploadCoordinator?.updateCheckpointId(checkpoint.id)
+			await uploadCoordinator?.updateUserID(userID)
 		}
 
 		// Process each item
@@ -280,6 +298,9 @@ final class BasketActionService: ObservableObject {
 	private func unstarItems(_ items: [BasketItem]) async throws {
 		logger.info("Starting unstar operation for \(items.count) items")
 
+		// Get authenticated user ID upfront
+		let userID = try await getAuthenticatedUserID()
+
 		// Ensure both S3 and catalog services are available
 		guard let s3Service = s3Service else {
 			throw BasketActionError.missingDependency("S3Service not initialized")
@@ -307,10 +328,7 @@ final class BasketActionService: ObservableObject {
 			do {
 				// For unstar, we delete from S3
 				if item.sourceType == .local || item.sourceType == .applePhotos {
-					// Get the current user for S3 key
-					let userID = await MainActor.run {
-						AccountManager.shared.getCurrentUser()?.id.uuidString ?? "anonymous"
-					}
+					// Use the userID from the beginning of the function
 
 					// Compute MD5 - for basket items, the ID should be the MD5
 					var md5: String = item.id
@@ -337,10 +355,20 @@ final class BasketActionService: ObservableObject {
 						}
 					}
 
-					// Construct S3 key matching upload path: photos/<userID>/<md5>.dat
+					// Delete photo from S3
 					let s3Key = "photos/\(userID)/\(md5).dat"
 					try await s3Service.deleteObject(key: s3Key)
 					logger.info("Deleted \(item.displayName) from S3 at \(s3Key)")
+
+					// Delete thumbnail from S3
+					let thumbnailKey = "thumbnails/\(userID)/\(md5).jpg"
+					do {
+						try await s3Service.deleteObject(key: thumbnailKey)
+						logger.info("Deleted thumbnail for \(item.displayName) from S3")
+					} catch {
+						logger.warning("Failed to delete thumbnail for \(item.displayName): \(error)")
+						// Continue even if thumbnail deletion fails
+					}
 
 					// Remove from upload queue if present
 					await uploadCoordinator?.removeFromQueue(md5: md5)
@@ -388,10 +416,7 @@ final class BasketActionService: ObservableObject {
 					// Read the CSV data from the snapshot file
 					let csvData = try Data(contentsOf: catalogInfo.path)
 
-					// Get current user ID
-					let userID = await MainActor.run {
-						AccountManager.shared.getCurrentUser()?.id.uuidString ?? "anonymous"
-					}
+					// userID already available from start of function
 
 					// Upload catalog CSV to S3
 					try await s3Service.uploadCatalog(csvData: csvData, catalogMD5: catalogInfo.md5, userID: userID)
@@ -458,6 +483,7 @@ actor BasketUploadCoordinator {
 	private let catalogCache: LocalCatalogCache?
 	private let checkpointManager: StarCheckpointManager?
 	private var checkpointId: UUID?
+	private var userID: String
 
 	// Upload queue - stores items with their computed MD5s
 	private var uploadQueue: [(item: BasketItem, md5: String?)] = []
@@ -471,17 +497,24 @@ actor BasketUploadCoordinator {
 	     catalogService: CatalogService? = nil,
 	     catalogCache: LocalCatalogCache? = nil,
 	     checkpointManager: StarCheckpointManager? = nil,
-	     checkpointId: UUID? = nil) {
+	     checkpointId: UUID? = nil,
+	     userID: String) {
 		self.s3Service = s3Service
 		self.catalogService = catalogService
 		self.catalogCache = catalogCache
 		self.checkpointManager = checkpointManager
 		self.checkpointId = checkpointId
+		self.userID = userID
 	}
 
 	func updateCheckpointId(_ newId: UUID) {
 		self.checkpointId = newId
 		logger.debug("Updated checkpoint ID to: \(newId)")
+	}
+
+	func updateUserID(_ newID: String) {
+		self.userID = newID
+		logger.debug("Updated user ID to: \(newID)")
 	}
 
 	func queueForUpload(item: BasketItem) {
@@ -736,21 +769,20 @@ actor BasketUploadCoordinator {
 				}
 			}
 
-			// Create catalog entry with detected format
+			// Create catalog entry and add to catalog
 			let entry = CatalogEntry(
-				photoHeadMD5: String(photoMD5.prefix(8)), // Use first 8 chars for head MD5
+				photoHeadMD5: String(photoMD5.prefix(8)),
 				fileSize: item.fileSize ?? 0,
 				photoMD5: photoMD5,
 				photoDate: item.photoDate ?? Date(),
 				format: detectedFormat
 			)
 
-			// Add to catalog (star)
 			if let catalogService = catalogService {
 				try await catalogService.starEntry(entry)
 				logger.info("Added \(item.displayName) to catalog (starred)")
 
-				// Create snapshot after modification to update pointer
+				// Create snapshot after modification
 				try await catalogService.createSnapshot()
 				logger.info("Created catalog snapshot after star")
 
@@ -758,99 +790,115 @@ actor BasketUploadCoordinator {
 				await self.catalogCache?.addToCache(md5: photoMD5)
 			}
 
-			// Upload to S3
+			// Upload photo to S3
 			var uploadSucceeded = false
-			do {
-				if item.sourceType == .local {
-					// Get the file data for local files
-					let resolved = await MainActor.run {
-						item.resolveURL()
+			if item.sourceType == .local {
+				// Try to get URL from bookmark first
+				let resolved = await MainActor.run { item.resolveURL() }
+				var uploadURL: URL?
+				var needsCleanup = false
+
+				if let resolved = resolved {
+					uploadURL = resolved.url
+					needsCleanup = resolved.didStartAccessing
+				} else if let sourceIdentifier = item.sourceIdentifier {
+					// Fallback to sourceIdentifier (file path) if bookmark resolution fails
+					logger.warning("Bookmark resolution failed for upload, using sourceIdentifier: \(sourceIdentifier)")
+					let url = URL(fileURLWithPath: sourceIdentifier)
+					if FileManager.default.isReadableFile(atPath: url.path) {
+						uploadURL = url
+					} else {
+						logger.error("File not accessible for upload at path: \(sourceIdentifier)")
+					}
+				}
+
+				if let uploadURL = uploadURL {
+					defer {
+						if needsCleanup {
+							uploadURL.stopAccessingSecurityScopedResource()
+						}
 					}
 
-					if let resolved = resolved {
-						let fileData: Data
-						do {
-							fileData = try Data(contentsOf: resolved.url)
-						} catch {
-							logger.error("Failed to read file data for \(item.displayName): \(error)")
-							// Clean up security-scoped resource
-							if resolved.didStartAccessing {
-								resolved.url.stopAccessingSecurityScopedResource()
-							}
-							throw error
-						}
-
-						// Get current user ID
-						let userID = await MainActor.run {
-							AccountManager.shared.getCurrentUser()?.id.uuidString ?? "anonymous"
-						}
-
-						// Clean up security-scoped resource after upload
-						defer {
-							if resolved.didStartAccessing {
-								resolved.url.stopAccessingSecurityScopedResource()
-							}
-						}
-
-						try await s3Service.uploadPhoto(
-							data: fileData,
-							md5: photoMD5,
-							format: detectedFormat, // Use the already-detected format
-							userID: userID
-						)
-						uploadSucceeded = true
-						logger.info("Uploaded local file \(item.displayName) to S3")
-					}
-				} else if item.sourceType == .applePhotos && exportedAsset != nil {
-					// Upload exported Apple Photos item
-					let fileData = try Data(contentsOf: exportedAsset!.temporaryURL)
-
-					// Get current user ID
-					let userID = await MainActor.run {
-						AccountManager.shared.getCurrentUser()?.id.uuidString ?? "anonymous"
-					}
-
+					let fileData = try Data(contentsOf: uploadURL)
 					try await s3Service.uploadPhoto(
 						data: fileData,
 						md5: photoMD5,
-						format: detectedFormat, // Use the already-detected format
-						userID: userID
+						format: detectedFormat,
+						userID: self.userID
 					)
 					uploadSucceeded = true
-					logger.info("Uploaded Apple Photos item \(item.displayName) to S3")
+					logger.info("Uploaded local file \(item.displayName) to S3")
 
-					// Save MD5 mapping for Apple Photos items
-					// Note: We need to call this on the main actor where BasketActionService lives
-					await MainActor.run {
-						BasketActionService.shared.saveMD5Mapping(originalID: item.id, md5: photoMD5)
-					}
-				}
+					// Generate and upload thumbnail
+					do {
+						let thumbnailCache = ThumbnailCache.shared
+						let photoMD5Obj = PhotoMD5(photoMD5)
+						let thumbnailData = try await thumbnailCache.getThumbnailData(
+							for: photoMD5Obj,
+							sourceURL: uploadURL
+						)
 
-				// Mark as successfully processed in checkpoint
-				if uploadSucceeded, let checkpointManager = checkpointManager, let checkpointId = checkpointId {
-					await MainActor.run {
-						checkpointManager.markItemProcessed(
-							checkpointId: checkpointId,
-							basketItemId: item.id,
-							displayName: item.displayName,
+						try await s3Service.uploadThumbnail(
+							data: thumbnailData,
 							md5: photoMD5,
-							uploaded: true
+							userID: self.userID
 						)
+						logger.info("Uploaded PTM-256 thumbnail for \(item.displayName) (\(thumbnailData.count) bytes)")
+					} catch {
+						logger.error("Failed to generate/upload thumbnail for \(item.displayName): \(error)")
+						// Don't fail the star operation if thumbnail fails
 					}
+				} else {
+					logger.error("Could not get upload URL for \(item.displayName) - no bookmark or accessible sourceIdentifier")
 				}
-			} catch {
-				logger.error("Failed to upload \(item.displayName): \(error)")
+			} else if item.sourceType == .applePhotos && exportedAsset != nil {
+				// Upload exported Apple Photos item
+				let fileData = try Data(contentsOf: exportedAsset!.temporaryURL)
+				try await s3Service.uploadPhoto(
+					data: fileData,
+					md5: photoMD5,
+					format: detectedFormat,
+					userID: self.userID
+				)
+				uploadSucceeded = true
+				logger.info("Uploaded Apple Photos item \(item.displayName) to S3")
 
-				// Mark as failed in checkpoint
-				if let checkpointManager = checkpointManager, let checkpointId = checkpointId {
-					await MainActor.run {
-						checkpointManager.markItemFailed(
-							checkpointId: checkpointId,
-							basketItemId: item.id,
-							displayName: item.displayName,
-							error: error.localizedDescription
-						)
-					}
+				// Generate and upload thumbnail
+				do {
+					let thumbnailCache = ThumbnailCache.shared
+					let photoMD5Obj = PhotoMD5(photoMD5)
+					let thumbnailData = try await thumbnailCache.getThumbnailData(
+						for: photoMD5Obj,
+						sourceURL: exportedAsset!.temporaryURL
+					)
+
+					try await s3Service.uploadThumbnail(
+						data: thumbnailData,
+						md5: photoMD5,
+						userID: self.userID
+					)
+					logger.info("Uploaded PTM-256 thumbnail for \(item.displayName) (\(thumbnailData.count) bytes)")
+				} catch {
+					logger.error("Failed to generate/upload thumbnail for \(item.displayName): \(error)")
+					// Don't fail the star operation if thumbnail fails
+				}
+
+				// Save MD5 mapping for Apple Photos items
+				await MainActor.run {
+					BasketActionService.shared.saveMD5Mapping(originalID: item.id, md5: photoMD5)
+				}
+			}
+
+			// Mark as successfully processed in checkpoint
+			if uploadSucceeded, let checkpointManager = checkpointManager, let checkpointId = checkpointId {
+				await MainActor.run {
+					checkpointManager.markItemProcessed(
+						checkpointId: checkpointId,
+						basketItemId: item.id,
+						displayName: item.displayName,
+						md5: photoMD5,
+						uploaded: true
+					)
 				}
 			}
 
@@ -860,6 +908,7 @@ actor BasketUploadCoordinator {
 					exportedAsset.cleanup()
 				}
 			}
+
 		}
 
 		logger.info("Upload complete")
@@ -873,10 +922,7 @@ actor BasketUploadCoordinator {
 					// Read the CSV data from the snapshot file
 					let csvData = try Data(contentsOf: catalogInfo.path)
 
-					// Get current user ID
-					let userID = await MainActor.run {
-						AccountManager.shared.getCurrentUser()?.id.uuidString ?? "anonymous"
-					}
+					// userID already available from start of function
 
 					// Upload catalog CSV to S3
 					try await s3Service.uploadCatalog(csvData: csvData, catalogMD5: catalogInfo.md5, userID: userID)
@@ -958,6 +1004,7 @@ enum BasketActionError: LocalizedError {
 	case missingDependency(String)
 	case uploadFailed(String)
 	case checkpointNotFound
+	case notAuthenticated
 
 	var errorDescription: String? {
 		switch self {
@@ -971,6 +1018,8 @@ enum BasketActionError: LocalizedError {
 			return "Upload failed: \(message)"
 		case .checkpointNotFound:
 			return "Checkpoint not found or cannot be resumed"
+		case .notAuthenticated:
+			return "Please sign in to star photos to the cloud"
 		}
 	}
 }
