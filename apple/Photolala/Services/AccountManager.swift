@@ -12,14 +12,19 @@ final class AccountManager: ObservableObject {
 
 	@Published private(set) var currentUser: PhotolalaUser?
 	@Published private(set) var isSignedIn: Bool = false
+	@Published private(set) var accountStatus: AccountStatus = .active
 	internal var stsCredentials: STSCredentials?
 	private var currentNonce: String?
 	private var googleSignInCoordinator: GoogleSignInCoordinator?
+	private var statusCheckTimer: Timer?
 
+	private let userUUIDKey = "com.electricwoods.photolala.account.uuid"
 
 	private init() {
 		Task {
 			await loadStoredSession()
+			await checkAccountStatus()
+			startStatusPolling()
 		}
 	}
 
@@ -91,6 +96,10 @@ final class AccountManager: ObservableObject {
 		print("[AccountManager] Setting isSignedIn = true after Google sign-in")
 		self.isSignedIn = true
 		print("[AccountManager] isSignedIn is now: \(self.isSignedIn)")
+
+		// Store user UUID for status checking
+		storeUserUUID(result.user.id.uuidString)
+
 		await saveSession()
 
 		return result.user
@@ -125,6 +134,10 @@ final class AccountManager: ObservableObject {
 		print("[AccountManager] Setting isSignedIn = true after Apple sign-in")
 		self.isSignedIn = true
 		print("[AccountManager] isSignedIn is now: \(self.isSignedIn)")
+
+		// Store user UUID for status checking
+		storeUserUUID(result.user.id.uuidString)
+
 		await saveSession()
 
 		return result.user
@@ -141,6 +154,11 @@ final class AccountManager: ObservableObject {
 		currentUser = nil
 		stsCredentials = nil
 		isSignedIn = false
+		accountStatus = .active
+
+		// Clear stored UUID
+		clearStoredUUID()
+
 		await clearStoredSession()
 
 		// Clear all caches
@@ -690,3 +708,113 @@ extension AccountManager {
 	}
 }
 #endif
+
+// MARK: - Account Status Management
+
+extension AccountManager {
+	/// Check account status from S3
+	@MainActor
+	func checkAccountStatus() async {
+		// Get stored UUID from UserDefaults
+		guard let userUUID = UserDefaults.standard.string(forKey: userUUIDKey) else {
+			// No stored UUID = no account or fresh install
+			accountStatus = .active
+			return
+		}
+
+		do {
+			// Get S3 service for current environment
+			let environment = getCurrentAWSEnvironment()
+			let s3Service = try await S3Service.forEnvironment(environment)
+
+			// Check status.json
+			if let status = try await s3Service.getUserStatus(for: userUUID) {
+				accountStatus = status.accountStatus
+
+				// Handle different states
+				switch status.accountStatus {
+				case .scheduledForDeletion:
+					// Account is scheduled for deletion, show warning UI
+					print("[AccountManager] Account scheduled for deletion")
+				case .deleted:
+					// Account was deleted, clear local data
+					print("[AccountManager] Account was deleted")
+					await handleDeletedAccount()
+				case .active:
+					// Normal operation
+					break
+				}
+			} else {
+				// No status.json found - could mean deleted account
+				print("[AccountManager] No status.json found for UUID: \(userUUID)")
+				// In production, this would mean the account doesn't exist
+				// For now, assume active for backward compatibility during development
+				accountStatus = .active
+			}
+		} catch {
+			print("[AccountManager] Failed to check account status: \(error)")
+			// On error, assume active to not block the user
+			accountStatus = .active
+		}
+	}
+
+	/// Start polling for status updates
+	private func startStatusPolling() {
+		// Poll every 10 minutes while app is active
+		statusCheckTimer = Timer.scheduledTimer(withTimeInterval: 600, repeats: true) { _ in
+			Task { @MainActor in
+				await self.checkAccountStatus()
+			}
+		}
+	}
+
+	/// Stop polling
+	private func stopStatusPolling() {
+		statusCheckTimer?.invalidate()
+		statusCheckTimer = nil
+	}
+
+	/// Handle deleted account state
+	@MainActor
+	private func handleDeletedAccount() async {
+		// Clear all local data
+		currentUser = nil
+		stsCredentials = nil
+		isSignedIn = false
+		accountStatus = .deleted(deletedDate: Date())
+
+		// Clear stored UUID
+		UserDefaults.standard.removeObject(forKey: userUUIDKey)
+
+		// Clear stored session
+		await clearStoredSession()
+
+		// Stop polling
+		stopStatusPolling()
+	}
+
+	/// Store user UUID on successful sign-in
+	@MainActor
+	func storeUserUUID(_ uuid: String) {
+		UserDefaults.standard.set(uuid, forKey: userUUIDKey)
+	}
+
+	/// Clear stored UUID on sign-out
+	@MainActor
+	func clearStoredUUID() {
+		UserDefaults.standard.removeObject(forKey: userUUIDKey)
+	}
+
+	/// Get current AWS environment
+	private func getCurrentAWSEnvironment() -> AWSEnvironment {
+		let environmentPreference = UserDefaults.standard.string(forKey: "environment_preference") ?? "development"
+		switch environmentPreference {
+		case "production":
+			return .production
+		case "staging":
+			return .staging
+		default:
+			return .development
+		}
+	}
+}

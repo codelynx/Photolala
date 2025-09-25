@@ -667,7 +667,7 @@ extension S3Service {
 
 		// First, count total objects to track progress
 		var totalObjects = 0
-		if progressDelegate != nil, let namespace = namespace {
+		if progressDelegate != nil, namespace != nil {
 			totalObjects = try await countObjectsWithPrefix(prefix, client: client)
 		}
 
@@ -868,13 +868,72 @@ extension S3Service {
 
 		return totalDeleted
 	}
+
+	/// Delete user data (photos, catalogs, thumbnails) without touching identity mappings
+	/// Used for immediate deletion in development
+	func deleteUserData(userID: String, progressDelegate: (any DeletionProgressDelegate)? = nil) async throws -> Int {
+		try await ensureInitialized()
+		guard let client = client else {
+			throw S3Error.clientNotInitialized
+		}
+
+		logger.info("[S3Service] Starting immediate user data deletion for user: \(userID)")
+
+		var totalDeleted = 0
+		var errors: [String] = []
+
+		// Define namespaces to delete (excluding identities)
+		let namespaces = [
+			("photos", "users/\(userID)/photos/"),
+			("catalogs", "users/\(userID)/catalogs/"),
+			("thumbnails", "users/\(userID)/thumbnails/"),
+			("metadata", "users/\(userID)/metadata/"),
+			("stars", "users/\(userID)/stars/")
+		]
+
+		await progressDelegate?.updateOperation("Deleting user data (preserving tombstones)...")
+
+		// Delete each namespace
+		for (namespace, prefix) in namespaces {
+			await progressDelegate?.updateOperation("Deleting \(namespace)...")
+			do {
+				let result = try await deleteObjectsWithPrefix(prefix, client: client, namespace: namespace, progressDelegate: progressDelegate)
+				totalDeleted += result.deleted
+				errors.append(contentsOf: result.errors)
+
+				// Report completion or failure
+				if result.errors.isEmpty {
+					await progressDelegate?.namespaceCompleted(namespace: namespace, deletedCount: result.deleted)
+				} else {
+					await progressDelegate?.namespaceFailed(
+						namespace: namespace,
+						error: S3Error.partialDeletionFailure(errors: result.errors, deletedCount: result.deleted)
+					)
+				}
+			} catch {
+				let errorMsg = "Failed to delete from \(prefix): \(error)"
+				errors.append(errorMsg)
+				logger.error("[S3Service] \(errorMsg)")
+				await progressDelegate?.namespaceFailed(namespace: namespace, error: error)
+			}
+		}
+
+		// If any errors occurred, throw an error with details
+		if !errors.isEmpty {
+			logger.error("[S3Service] User data deletion completed with errors: \(errors)")
+			throw S3Error.partialDeletionFailure(errors: errors, deletedCount: totalDeleted)
+		}
+
+		logger.info("[S3Service] User data deletion complete. Total objects deleted: \(totalDeleted)")
+		return totalDeleted
+	}
 }
 
 // MARK: - Array Extension
 
 extension Array {
 	/// Split array into chunks of specified size
-	func chunked(into size: Int) -> [[Element]] {
+	nonisolated func chunked(into size: Int) -> [[Element]] {
 		return stride(from: 0, to: count, by: size).map {
 			Array(self[$0..<Swift.min($0 + size, count)])
 		}
@@ -933,4 +992,68 @@ enum S3Error: LocalizedError {
 			return "Account deletion partially failed. Deleted \(deletedCount) objects. Errors: \(errors.joined(separator: "; "))"
 		}
 	}
+}
+
+// MARK: - Account Status and Tombstone Support
+
+extension S3Service {
+	/// Write or update user status file
+	func writeUserStatus(_ status: UserStatusFile, for userID: String) async throws {
+		try await ensureInitialized()
+		guard let client = client else {
+			throw S3Error.clientNotInitialized
+		}
+
+		let key = "users/\(userID)/status.json"
+
+		// Encode on main actor to avoid isolation issues
+		let data = try await MainActor.run {
+			let encoder = JSONEncoder()
+			encoder.dateEncodingStrategy = .iso8601
+			return try encoder.encode(status)
+		}
+
+		let putInput = PutObjectInput(
+			body: .data(data),
+			bucket: bucketName,
+			contentType: "application/json",
+			key: key
+		)
+
+		_ = try await client.putObject(input: putInput)
+		logger.info("Updated status.json for user \(userID)")
+	}
+
+	/// Read user status file
+	func getUserStatus(for userID: String) async throws -> UserStatusFile? {
+		try await ensureInitialized()
+		guard let client = client else {
+			throw S3Error.clientNotInitialized
+		}
+
+		let key = "users/\(userID)/status.json"
+		let getInput = GetObjectInput(bucket: bucketName, key: key)
+
+		do {
+			let output = try await client.getObject(input: getInput)
+			guard let data = try await output.body?.readData() else {
+				return nil
+			}
+
+			// Decode on main actor to avoid isolation issues
+			return try await MainActor.run {
+				let decoder = JSONDecoder()
+				decoder.dateDecodingStrategy = .iso8601
+				return try decoder.decode(UserStatusFile.self, from: data)
+			}
+		} catch {
+			// If file doesn't exist, return nil
+			if error is AWSS3.NoSuchKey {
+				logger.debug("No status.json found for user \(userID)")
+				return nil
+			}
+			throw error
+		}
+	}
+
 }

@@ -65,13 +65,8 @@ struct AccountSettingsView: View {
 			} message: {
 				Text("Are you sure you want to sign out? Your local data will remain on this device.")
 			}
-			.alert("Delete Account", isPresented: $model.showingDeleteConfirmation) {
-				Button("Cancel", role: .cancel) { }
-				Button("Delete Account", role: .destructive) {
-					model.showingReauthentication = true
-				}
-			} message: {
-				Text("This will permanently delete your account and all cloud data. This action cannot be undone.")
+			.sheet(isPresented: $model.showingDeletionOptions) {
+				AccountDeletionView()
 			}
 			.alert("Error", isPresented: $model.showingError) {
 				Button("OK") { }
@@ -528,7 +523,7 @@ struct AccountSettingsView: View {
 
 				// Delete Account button
 				Button {
-					model.showingDeleteConfirmation = true
+					model.showingDeletionOptions = true
 				} label: {
 					HStack {
 						Image(systemName: "trash.fill")
@@ -594,7 +589,7 @@ extension AccountSettingsView {
 
 		// UI State
 		var showingSignOutConfirmation = false
-		var showingDeleteConfirmation = false
+		var showingDeletionOptions = false
 		var showingReauthentication = false
 		var showingDeletionProgress = false
 		var showingEditProfile = false

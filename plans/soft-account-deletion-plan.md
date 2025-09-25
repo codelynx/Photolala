@@ -2,7 +2,7 @@
 
 ## Executive Summary
 
-Implement a user-friendly account deletion system that provides a grace period for users to change their mind while maintaining full compliance with Apple, Google, and privacy regulations. The system uses scheduled deletion with identity tombstones to prevent account resurrection while allowing cancellation during the grace period.
+Implement a user-friendly account deletion system that provides a grace period for users to change their mind while maintaining full compliance with Apple, Google, and privacy regulations. The system uses scheduled deletion with status.json as the source of truth for account existence.
 
 **Key Innovation**: Uses S3 Batch Operations for scalable deletion of 100K+ objects including Deep Archive data, ensuring compliance by deleting all data on the same schedule without retrieval fees.
 
@@ -25,52 +25,51 @@ Implement a user-friendly account deletion system that provides a grace period f
 ### Three-Phase Deletion System
 
 ```
-1. ACTIVE → User requests deletion
-2. SCHEDULED_FOR_DELETION → Grace period (1-30 days based on environment)
-3. DELETED → Permanent deletion with tombstones
+1. active → User requests deletion
+2. scheduled_for_deletion → Grace period (3 min dev, 3 days staging, 30 days production)
+3. [removed] → Permanent deletion (status.json removed)
 ```
 
 ### Key Components
 1. **Scheduled Deletion**: Queue deletions with configurable grace period
-2. **Identity Tombstones**: Mark identities as deleted vs removing them
+2. **Status.json as Source of Truth**: Account exists if status.json exists
 3. **Lambda Processor**: Daily job to execute scheduled deletions
 4. **Cancellation Flow**: Allow users to cancel during grace period
 
-### What are Tombstones?
+### Account Detection Logic
 
-A tombstone is a marker indicating something has been deleted, rather than removing the record entirely. This prevents "account resurrection" where deleted accounts can sign back in and get a fresh account.
+The system uses `users/{uuid}/status.json` as the definitive source for account existence:
 
-**Without tombstones (problematic)**:
-- Identity mapping deleted → User signs in → System creates new account
+**Account States**:
+- status.json exists with `active` → Normal account
+- status.json exists with `scheduled_for_deletion` → Grace period
+- status.json exists with `deleted` → Soft deleted (awaiting cleanup)
+- status.json returns 404 → Account fully deleted, can create new
 
-**With tombstones (solution)**:
-- Identity mapping replaced with `DELETED|2024-02-14T10:30:00Z|user-uuid`
-- User attempts sign-in → System recognizes deleted status → Sign-in blocked
-
-**Benefits**:
-- Prevents account resurrection
-- Provides audit trail
-- Enables compliance tracking
-- Supports potential recovery if needed
+**Sign-in Flow**:
+1. User signs in with Apple/Google ID
+2. Lambda checks identity mapping → gets UUID
+3. Check `users/{uuid}/status.json`
+4. If no status.json → account deleted → offer signup
+5. If status.json exists → check state → proceed accordingly
 
 ## Technical Architecture
 
 ### Data Flow
 
 ```
-User Request → Schedule Deletion → Grace Period → Lambda Execution → Tombstone Creation
+User Request → Schedule Deletion → Grace Period → Lambda Execution → Full Deletion
       ↓                                    ↓                              ↓
-  Confirmation                    Can Cancel/Expedite              Cannot Resurrect
+  Confirmation                    Can Cancel/Expedite           status.json Removed
       ↓                                    ↓                              ↓
- All Devices Notified            Read-Only Access             Devices Force Signed Out
+ All Devices Notified            Read-Only Access             Account No Longer Exists
 ```
 
 ### S3 Structure
 
-**Identity Mappings** (tombstones prevent resurrection):
-- Active: `identities/apple:000123` → `"user-uuid"`
-- Scheduled: `identities/apple:000123` → `"SCHEDULED|2024-01-15T10:30:00Z|2024-02-14T10:30:00Z|user-uuid"`
-- Deleted: `identities/apple:000123` → `"DELETED|2024-02-14T10:30:00Z|user-uuid"`
+**Identity Mappings** (simple UUID storage):
+- Active/Scheduled: `identities/apple:000123` → `"user-uuid"`
+- Deleted: Key removed entirely
 
 **Scheduled Deletions** (organized by date for batch processing):
 - `scheduled-deletions/2024-02-14/user-uuid` → Deletion metadata
@@ -81,24 +80,24 @@ User Request → Schedule Deletion → Grace Period → Lambda Execution → Tom
 - 404 = Account deleted
 
 **IAM Considerations**:
-- Auth Lambda: Read-only access to identities (cannot modify tombstones)
-- Deletion Lambda: Write access for tombstone creation
+- Auth Lambda: Read-only access to identities and status.json
+- Deletion Lambda: Write/delete access for all user data
 - Client apps: No direct identity access, only user data
 
 ## Implementation Phases
 
 ### Phase 1: Foundation (Week 1-2)
 
-#### 1.1 Identity Mapping State Management
+#### 1.1 Identity Mapping Management
 
-**What**: Extend identity mappings to support three states (active, scheduled, deleted)
+**What**: Keep identity mappings simple - they only store the user UUID
 
-**Format Decision**: Pipe-delimited for simplicity
-- Active: `user-uuid`
-- Scheduled: `SCHEDULED|2024-01-15T10:30:00Z|2024-02-14T10:30:00Z|user-uuid`
-- Deleted: `DELETED|2024-02-14T10:30:00Z|user-uuid`
+**Format**: Simple UUID string
+- Always stores: `user-uuid` (never changes)
+- All state information: Tracked in `users/{uuid}/status.json`
+- On deletion: Identity mapping removed entirely
 
-**Alternative**: JSON format for future extensibility if needed
+**Key principle**: Identity mappings are stateless - they only map external ID to internal UUID
 
 #### 1.2 Deletion Scheduling Service
 
@@ -109,9 +108,9 @@ User Request → Schedule Deletion → Grace Period → Lambda Execution → Tom
   - **Development**: 3 minutes (for rapid testing)
   - **Staging**: 3 days (for integration testing)
   - **Production**: 30 days (for user safety)
-- Update identity mappings to SCHEDULED state
 - Create scheduled deletion entries organized by date/time
-- Handle cancellations by reverting to ACTIVE state
+- Update status.json to reflect scheduled state
+- Handle cancellations by updating status.json back to active
 - Send confirmation emails
 
 ### Phase 2: S3 Batch Operations Integration (Week 2-3)
@@ -146,20 +145,20 @@ User Request → Schedule Deletion → Grace Period → Lambda Execution → Tom
 3. **Lambda**: For large accounts, creates S3 Batch Operations job
 4. **Lambda**: Returns status to client for monitoring
 5. **Client**: Polls Lambda status endpoint only (no direct AWS API access)
-6. **Lambda**: Handles all backend work - tombstones, notifications, cleanup
+6. **Lambda**: Handles all backend work - deletion, notifications, cleanup
 
 **Key Security Boundaries**:
 - Client never touches S3Control or S3 APIs directly for deletion
 - Client only interacts with Lambda endpoints
-- Lambda owns all privileged operations (tombstones, batch jobs, emails)
+- Lambda owns all privileged operations (deletion, batch jobs, emails)
 - Client role limited to requesting and monitoring
 
 #### 2.3 Key Technical Decisions
 
-**Identity Tombstone Format**: Use pipe-delimited format to avoid parsing issues
-- Active: `user-uuid`
-- Scheduled: `SCHEDULED|2024-01-15T10:30:00Z|2024-02-14T10:30:00Z|user-uuid`
-- Deleted: `DELETED|2024-02-14T10:30:00Z|user-uuid`
+**Identity Mapping Format**: Simple UUID storage
+- All account states: `user-uuid`
+- Account state tracked in: `users/{uuid}/status.json`
+- Deleted accounts: Identity mapping removed entirely
 
 **Batch Job Triggers**:
 - **User-initiated**: Client calls Lambda endpoint → Lambda creates batch job
@@ -247,7 +246,7 @@ User Request → Schedule Deletion → Grace Period → Lambda Execution → Tom
 **App Reinstall After Deletion**:
 1. UserDefaults empty (cleared by iOS on uninstall)
 2. Show standard sign-in screen
-3. If user tries same identity → Lambda detects tombstone → Block with clear message
+3. If user tries same identity → No status.json found → Offer new signup
 
 **Network Failure Handling**:
 - Distinguish between 404 (deleted) and network errors
@@ -273,7 +272,7 @@ User Request → Schedule Deletion → Grace Period → Lambda Execution → Tom
 - New account creation includes status.json initialization
 - Prevents existing users from appearing deleted post-deployment
 
-**State Detection**: Parse identity mapping value to determine state
+**State Detection**: Check status.json to determine account state
 
 #### 4.2 Swift Authentication Handler
 
@@ -295,10 +294,10 @@ User Request → Schedule Deletion → Grace Period → Lambda Execution → Tom
 ### Step 2: Update Authentication Lambda
 1. Add status.json creation for all new accounts
 2. Update status.json on every sign-in
-3. Add support for SCHEDULED and DELETED states
+3. Add support for scheduledForDeletion and deleted states in status.json
 
 ### Step 3: Update Client
-1. Deploy updated S3Service with tombstone support
+1. Deploy updated S3Service with status.json checks
 2. Update AccountManager with scheduled deletion logic
 3. Simple detection: No status.json = No account
 4. Add UI for deletion options (hidden behind feature flag)
@@ -322,10 +321,10 @@ User Request → Schedule Deletion → Grace Period → Lambda Execution → Tom
 ## Testing Strategy
 
 ### Unit Tests
-- Verify identity mapping state transitions
+- Verify identity mappings store only UUID
 - Test scheduling and cancellation logic
-- Confirm tombstones prevent sign-in
-- Validate date-based key organization
+- Confirm deleted accounts (no status.json) allow new signup
+- Validate identity mappings deleted with account
 - Status polling mechanism
 - Force sign-out timing logic
 
@@ -474,4 +473,4 @@ If issues arise:
 
 ## Conclusion
 
-This soft deletion approach provides the optimal balance between user safety, platform compliance, and technical simplicity. The 30-day grace period for production gives users ample time to reconsider while meeting all regulatory requirements. The tombstone approach ensures deleted accounts cannot be recreated, maintaining data integrity while the scheduled deletion system provides flexibility and safety.
+This soft deletion approach provides the optimal balance between user safety, platform compliance, and technical simplicity. The 30-day grace period for production gives users ample time to reconsider while meeting all regulatory requirements. Using status.json as the single source of truth eliminates complexity - when an account is fully deleted (no status.json), the same identity can create a new account.
