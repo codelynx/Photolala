@@ -437,6 +437,9 @@ struct HomeView: View {
 					}
 				}
 		}
+		.sheet(isPresented: $model.showingAccountSettings) {
+			AccountSettingsView()
+		}
 	}
 
 	@ViewBuilder

@@ -752,69 +752,132 @@ extension S3Service {
 			throw S3Error.clientNotInitialized
 		}
 
-		// Identity mappings are stored as identities/{provider}/{providerID} -> userID
-		// Include all provider types: apple, google, and email
-		let identityPrefixes = [
-			"identities/apple/",
-			"identities/google/",
-			"identities/email/"
-		]
+		// Identity mappings can be stored in different patterns:
+		// Legacy: identities/{provider}/{providerID} -> userID
+		// Canonical: identities/{provider}:{providerID} -> userID
+		// We need to check both patterns to ensure complete deletion
 
+		// List all identities at once to handle any pattern
+		let identityPrefix = "identities/"
 		var totalDeleted = 0
-		var identitiesProcessed = 0
-		let totalIdentities = identityPrefixes.count
+		var keysToDelete: [String] = []
+		var failedDeletions: [String] = []
 
-		for prefix in identityPrefixes {
-			do {
-				var continuationToken: String?
-				var prefixDeleted = 0
+		// Capture actor-isolated properties before entering task groups
+		let capturedBucketName = bucketName
+		let capturedClient = client
 
-				repeat {
-					let listInput = ListObjectsV2Input(
-						bucket: bucketName,
-						continuationToken: continuationToken,
-						prefix: prefix
-					)
+		// First, collect all identity mappings that belong to this user
+		do {
+			var continuationToken: String?
 
-					let output = try await client.listObjectsV2(input: listInput)
+			repeat {
+				let listInput = ListObjectsV2Input(
+					bucket: capturedBucketName,
+					continuationToken: continuationToken,
+					prefix: identityPrefix
+				)
 
-					if let contents = output.contents {
-						for object in contents {
-							guard let key = object.key else { continue }
+				let output = try await client.listObjectsV2(input: listInput)
 
-							// Check if this identity maps to our user
-							let getInput = GetObjectInput(bucket: bucketName, key: key)
-							if let getOutput = try? await client.getObject(input: getInput),
-							   let data = try? await getOutput.body?.readData(),
-							   let content = String(data: data, encoding: .utf8),
-							   content.trimmingCharacters(in: .whitespacesAndNewlines) == userID {
+				if let contents = output.contents {
+					// Process in batches to avoid too many concurrent requests
+					let batchSize = 10
+					for batch in contents.chunked(into: batchSize) {
+						await withTaskGroup(of: String?.self) { group in
+							for object in batch {
+								guard let key = object.key else { continue }
 
-								// Delete this identity mapping
-								let deleteInput = DeleteObjectInput(bucket: bucketName, key: key)
-								_ = try? await client.deleteObject(input: deleteInput)
-								logger.info("[S3Service] Deleted identity mapping: \(key)")
-								prefixDeleted += 1
-								totalDeleted += 1
+								group.addTask {
+									// Check if this identity maps to our user
+									let getInput = GetObjectInput(bucket: capturedBucketName, key: key)
+									if let getOutput = try? await capturedClient.getObject(input: getInput),
+									   let data = try? await getOutput.body?.readData(),
+									   let content = String(data: data, encoding: .utf8),
+									   content.trimmingCharacters(in: .whitespacesAndNewlines) == userID {
+										return key
+									}
+									return nil
+								}
+							}
+
+							// Collect keys that belong to this user
+							for await key in group {
+								if let key = key {
+									keysToDelete.append(key)
+								}
 							}
 						}
 					}
-
-					continuationToken = output.nextContinuationToken
-				} while continuationToken != nil
-
-				identitiesProcessed += 1
-				if let progressDelegate = progressDelegate {
-					let progress = Double(identitiesProcessed) / Double(totalIdentities)
-					await progressDelegate.updateProgress(namespace: "identities", progress: progress, itemsDeleted: totalDeleted)
 				}
 
-			} catch {
-				logger.error("[S3Service] Error cleaning identity mappings from \(prefix): \(error)")
-				// Continue with other prefixes
+				continuationToken = output.nextContinuationToken
+			} while continuationToken != nil
+
+			// Now delete all collected keys
+			if !keysToDelete.isEmpty {
+				logger.info("[S3Service] Found \(keysToDelete.count) identity mappings to delete for user \(userID)")
+
+				for key in keysToDelete {
+					do {
+						let deleteInput = DeleteObjectInput(bucket: capturedBucketName, key: key)
+						_ = try await client.deleteObject(input: deleteInput)
+						logger.info("[S3Service] Deleted identity mapping: \(key)")
+						totalDeleted += 1
+
+						// Update progress
+						if let progressDelegate = progressDelegate {
+							let progress = Double(totalDeleted) / Double(keysToDelete.count)
+							await progressDelegate.updateProgress(namespace: "identities", progress: progress, itemsDeleted: totalDeleted)
+						}
+					} catch {
+						logger.error("[S3Service] Failed to delete identity mapping \(key): \(error)")
+						failedDeletions.append(key)
+					}
+				}
+
+				// Check if any deletions failed
+				if !failedDeletions.isEmpty {
+					let error = S3Error.partialDeletionFailure(
+						errors: failedDeletions.map { "Failed to delete: \($0)" },
+						deletedCount: totalDeleted
+					)
+
+					if let progressDelegate = progressDelegate {
+						await progressDelegate.namespaceFailed(namespace: "identities", error: error)
+					}
+
+					throw error
+				}
+			} else {
+				logger.warning("[S3Service] No identity mappings found for user \(userID)")
 			}
+
+			// Mark as completed only if all deletions succeeded
+			if let progressDelegate = progressDelegate {
+				await progressDelegate.namespaceCompleted(namespace: "identities", deletedCount: totalDeleted)
+			}
+
+		} catch {
+			logger.error("[S3Service] Error processing identity mappings: \(error)")
+			if let progressDelegate = progressDelegate {
+				await progressDelegate.namespaceFailed(namespace: "identities", error: error)
+			}
+			throw error
 		}
 
 		return totalDeleted
+	}
+}
+
+// MARK: - Array Extension
+
+extension Array {
+	/// Split array into chunks of specified size
+	func chunked(into size: Int) -> [[Element]] {
+		return stride(from: 0, to: count, by: size).map {
+			Array(self[$0..<Swift.min($0 + size, count)])
+		}
 	}
 }
 

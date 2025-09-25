@@ -11,31 +11,47 @@ import AuthenticationServices
 struct AccountSettingsView: View {
 	@State private var model = Model()
 	@Environment(\.dismiss) var dismiss
+	@Environment(\.colorScheme) var colorScheme
 
 	var body: some View {
 		NavigationStack {
-			Form {
-				// Profile Section
-				profileSection
+			ScrollView {
+				VStack(spacing: 24) {
+					// Profile Header Card
+					profileHeaderCard
+						.padding(.top)
 
-				// Storage Section
-				storageSection
+					// Quick Stats
+					statsGrid
 
-				// Linked Accounts Section
-				linkedAccountsSection
+					// Storage Card
+					storageCard
 
-				// Danger Zone
-				dangerZoneSection
+					// Linked Accounts Card
+					linkedAccountsCard
+
+					// Danger Zone
+					dangerZoneCard
+				}
+				.padding(.horizontal)
+				.padding(.bottom)
 			}
-			.navigationTitle("Account Settings")
+			.background(backgroundGradient)
+			.navigationTitle("Account")
 			#if os(iOS)
-			.navigationBarTitleDisplayMode(.inline)
+			.navigationBarTitleDisplayMode(.large)
 			#endif
 			.toolbar {
 				ToolbarItem(placement: .cancellationAction) {
-					Button("Done") {
+					Button {
 						dismiss()
+					} label: {
+						Image(systemName: "xmark.circle.fill")
+							.symbolRenderingMode(.hierarchical)
+							.font(.title2)
+							.foregroundStyle(.secondary)
 					}
+					.buttonStyle(.plain)
 				}
 			}
 			.alert("Sign Out", isPresented: $model.showingSignOutConfirmation) {
@@ -90,130 +106,469 @@ struct AccountSettingsView: View {
 		}
 	}
 
-	// MARK: - Sections
+	// MARK: - Components
 
-	private var profileSection: some View {
-		Section("Profile") {
-			// User Avatar/Icon
-			HStack {
-				Image(systemName: "person.crop.circle.fill")
-					.font(.system(size: 60))
-					.foregroundStyle(.secondary)
+	private var backgroundGradient: some View {
+		LinearGradient(
+			colors: [
+				Color(white: colorScheme == .dark ? 0.1 : 0.95),
+				Color(white: colorScheme == .dark ? 0.05 : 0.98)
+			],
+			startPoint: .topLeading,
+			endPoint: .bottomTrailing
+		)
+		.ignoresSafeArea()
+	}
 
-				VStack(alignment: .leading, spacing: 4) {
-					Text(model.displayName)
-						.font(.headline)
-					if let email = model.email {
-						Text(email)
-							.font(.caption)
-							.foregroundStyle(.secondary)
-					}
+	private var profileHeaderCard: some View {
+		VStack(spacing: 20) {
+			// Avatar with gradient border
+			ZStack {
+				Circle()
+					.fill(
+						LinearGradient(
+							colors: [Color.blue, Color.purple],
+							startPoint: .topLeading,
+							endPoint: .bottomTrailing
+						)
+					)
+					.frame(width: 96, height: 96)
+
+				Circle()
+					.fill(Color(XColor.systemBackground))
+					.frame(width: 90, height: 90)
+
+				Image(systemName: "person.fill")
+					.font(.system(size: 40))
+					.foregroundStyle(
+						LinearGradient(
+							colors: [Color.blue, Color.purple],
+							startPoint: .topLeading,
+							endPoint: .bottomTrailing
+						)
+					)
+			}
+			.shadow(color: Color.blue.opacity(0.3), radius: 10, y: 5)
+
+			VStack(spacing: 8) {
+				Text(model.displayName)
+					.font(.title2.bold())
+
+				if let email = model.email {
+					Text(email)
+						.font(.callout)
+						.foregroundStyle(.secondary)
 				}
+
+				// Member badge
+				HStack(spacing: 4) {
+					Image(systemName: "star.circle.fill")
+						.font(.caption)
+						.foregroundStyle(.yellow)
+					Text("Member since \(model.createdDate)")
+						.font(.caption)
+						.foregroundStyle(.secondary)
+				}
+				.padding(.horizontal, 12)
+				.padding(.vertical, 6)
+				.background(Color(XColor.secondarySystemBackground))
+				.clipShape(Capsule())
+			}
+
+			Button {
+				model.showingEditProfile = true
+			} label: {
+				Label("Edit Profile", systemImage: "pencil")
+					.font(.callout.weight(.medium))
+			}
+			.buttonStyle(.borderedProminent)
+			.controlSize(.large)
+		}
+		.frame(maxWidth: .infinity)
+		.padding(.vertical, 24)
+		.padding(.horizontal, 20)
+		.background(cardBackground)
+		.clipShape(RoundedRectangle(cornerRadius: 20))
+		.shadow(color: Color.black.opacity(0.05), radius: 10, y: 5)
+	}
+
+	private var cardBackground: some View {
+		RoundedRectangle(cornerRadius: 20)
+			.fill(Color(XColor.secondarySystemBackground))
+			.overlay(
+				RoundedRectangle(cornerRadius: 20)
+					.stroke(Color(XColor.separator).opacity(0.2), lineWidth: 1)
+			)
+	}
+
+	private var statsGrid: some View {
+		LazyVGrid(columns: [
+			GridItem(.flexible()),
+			GridItem(.flexible())
+		], spacing: 12) {
+			// Photos count
+			VStack(spacing: 8) {
+				Image(systemName: "photo.stack")
+					.font(.title2)
+					.foregroundStyle(
+						LinearGradient(
+							colors: [Color.blue, Color.cyan],
+							startPoint: .topLeading,
+							endPoint: .bottomTrailing
+						)
+					)
+
+				VStack(spacing: 2) {
+					Text("\(model.photoCount)")
+						.font(.title3.bold())
+					Text("Photos")
+						.font(.caption)
+						.foregroundStyle(.secondary)
+				}
+			}
+			.frame(maxWidth: .infinity)
+			.padding(.vertical, 16)
+			.background(
+				RoundedRectangle(cornerRadius: 16)
+					.fill(Color(XColor.tertiarySystemBackground))
+					.overlay(
+						RoundedRectangle(cornerRadius: 16)
+							.stroke(Color(XColor.separator).opacity(0.1), lineWidth: 1)
+					)
+			)
+
+			// Storage used
+			VStack(spacing: 8) {
+				Image(systemName: "internaldrive")
+					.font(.title2)
+					.foregroundStyle(
+						LinearGradient(
+							colors: [Color.purple, Color.pink],
+							startPoint: .topLeading,
+							endPoint: .bottomTrailing
+						)
+					)
+
+				VStack(spacing: 2) {
+					Text(model.storageUsedText)
+						.font(.title3.bold())
+					Text("Used")
+						.font(.caption)
+						.foregroundStyle(.secondary)
+				}
+			}
+			.frame(maxWidth: .infinity)
+			.padding(.vertical, 16)
+			.background(
+				RoundedRectangle(cornerRadius: 16)
+					.fill(Color(XColor.tertiarySystemBackground))
+					.overlay(
+						RoundedRectangle(cornerRadius: 16)
+							.stroke(Color(XColor.separator).opacity(0.1), lineWidth: 1)
+					)
+			)
+		}
+		.padding(.horizontal, 20)
+		.padding(.vertical, 4)
+	}
+
+	private var storageCard: some View {
+		VStack(alignment: .leading, spacing: 16) {
+			// Header with icon
+			HStack {
+				Image(systemName: "cloud.fill")
+					.font(.title3)
+					.foregroundStyle(
+						LinearGradient(
+							colors: [Color.blue, Color.cyan],
+							startPoint: .topLeading,
+							endPoint: .bottomTrailing
+						)
+					)
+
+				Text("Cloud Storage")
+					.font(.headline)
 
 				Spacer()
 
-				Button("Edit") {
-					model.showingEditProfile = true
+				if model.isLoadingStorage {
+					ProgressView()
+						.scaleEffect(0.7)
+				} else {
+					Button {
+						Task {
+							await model.calculateStorage()
+						}
+					} label: {
+						Image(systemName: "arrow.clockwise")
+							.font(.footnote)
+							.foregroundStyle(.secondary)
+					}
+					.buttonStyle(.plain)
 				}
-				.buttonStyle(.bordered)
 			}
-			.padding(.vertical, 8)
 
-			// User Details
-			LabeledContent("User ID", value: model.userID)
-				.font(.caption)
-				.textSelection(.enabled)
+			// Storage bar
+			VStack(alignment: .leading, spacing: 12) {
+				// Progress bar with gradient
+				ZStack(alignment: .leading) {
+					RoundedRectangle(cornerRadius: 8)
+						.fill(Color(XColor.tertiarySystemBackground))
+						.frame(height: 24)
 
-			LabeledContent("Member Since", value: model.createdDate)
-				.font(.caption)
+					GeometryReader { geometry in
+						RoundedRectangle(cornerRadius: 8)
+							.fill(
+								LinearGradient(
+									colors: model.storageProgress > 0.9 ? [.red, .orange] :
+											model.storageProgress > 0.7 ? [.yellow, .orange] :
+											[.blue, .cyan],
+									startPoint: .leading,
+									endPoint: .trailing
+								)
+							)
+							.frame(width: geometry.size.width * model.storageProgress)
+					}
+					.frame(height: 24)
+
+					// Percentage text
+					Text("\(Int(model.storageProgress * 100))%")
+						.font(.caption.bold())
+						.foregroundStyle(.white)
+						.padding(.horizontal, 8)
+				}
+
+				// Storage details
+				HStack {
+					VStack(alignment: .leading, spacing: 2) {
+						Text("\(model.storageUsedText) used")
+							.font(.callout)
+							.foregroundStyle(.primary)
+						Text("of \(model.storageQuotaText)")
+							.font(.caption)
+							.foregroundStyle(.secondary)
+					}
+
+					Spacer()
+
+					if model.storageProgress > 0.9 {
+						Label("Nearly Full", systemImage: "exclamationmark.triangle.fill")
+							.font(.caption)
+							.foregroundStyle(.red)
+					}
+				}
+			}
 		}
+		.padding(20)
+		.background(cardBackground)
+		.clipShape(RoundedRectangle(cornerRadius: 20))
+		.shadow(color: Color.black.opacity(0.05), radius: 10, y: 5)
 	}
 
-	private var storageSection: some View {
-		Section("Storage") {
-			VStack(alignment: .leading, spacing: 8) {
-				HStack {
-					Text("Used")
-					Spacer()
-					Text("\(model.storageUsedText) of \(model.storageQuotaText)")
-						.foregroundStyle(.secondary)
+	private var linkedAccountsCard: some View {
+		VStack(alignment: .leading, spacing: 16) {
+			// Header
+			HStack {
+				Image(systemName: "link.circle.fill")
+					.font(.title3)
+					.foregroundStyle(
+						LinearGradient(
+							colors: [Color.green, Color.mint],
+							startPoint: .topLeading,
+							endPoint: .bottomTrailing
+						)
+					)
+
+				Text("Linked Accounts")
+					.font(.headline)
+			}
+
+			// Account list
+			VStack(spacing: 12) {
+				if model.hasAppleProvider {
+					HStack {
+						Image(systemName: "apple.logo")
+							.font(.title3)
+							.frame(width: 30)
+
+						VStack(alignment: .leading, spacing: 2) {
+							Text("Apple ID")
+								.font(.callout)
+							Text("Sign in with Apple")
+								.font(.caption)
+								.foregroundStyle(.secondary)
+						}
+
+						Spacer()
+
+						Text("Primary")
+							.font(.caption)
+							.padding(.horizontal, 8)
+							.padding(.vertical, 4)
+							.background(Color.blue.opacity(0.2))
+							.foregroundStyle(.blue)
+							.clipShape(Capsule())
+					}
+					.padding(12)
+					.background(Color(XColor.tertiarySystemBackground))
+					.clipShape(RoundedRectangle(cornerRadius: 12))
 				}
 
-				ProgressView(value: model.storageProgress)
-					.tint(model.storageProgress > 0.9 ? .red : .accentColor)
+				if model.hasGoogleProvider {
+					HStack {
+						Image(systemName: "g.circle.fill")
+							.font(.title3)
+							.foregroundStyle(.red)
+							.frame(width: 30)
 
-				HStack {
-					Label("\(model.photoCount) Photos", systemImage: "photo")
-						.font(.caption)
-						.foregroundStyle(.secondary)
-
-					Spacer()
-
-					if model.isLoadingStorage {
-						ProgressView()
-							.scaleEffect(0.8)
-					} else {
-						Button("Refresh") {
-							Task {
-								await model.calculateStorage()
+						VStack(alignment: .leading, spacing: 2) {
+							Text("Google")
+								.font(.callout)
+							if let email = model.email {
+								Text(email)
+									.font(.caption)
+									.foregroundStyle(.secondary)
+									.lineLimit(1)
 							}
 						}
-						.font(.caption)
+
+						Spacer()
+
+						if !model.hasAppleProvider {
+							Text("Primary")
+								.font(.caption)
+								.padding(.horizontal, 8)
+								.padding(.vertical, 4)
+								.background(Color.blue.opacity(0.2))
+								.foregroundStyle(.blue)
+								.clipShape(Capsule())
+						}
 					}
+					.padding(12)
+					.background(Color(XColor.tertiarySystemBackground))
+					.clipShape(RoundedRectangle(cornerRadius: 12))
+				}
+
+				// Add account button
+				if !model.hasAppleProvider || !model.hasGoogleProvider {
+					Button {
+						Task {
+							await model.linkProvider(!model.hasAppleProvider ? .apple : .google)
+						}
+					} label: {
+						HStack {
+							Image(systemName: "plus.circle.fill")
+								.font(.title3)
+								.foregroundStyle(.secondary)
+							Text("Link Another Account")
+								.font(.callout)
+								.foregroundStyle(.primary)
+							Spacer()
+							Image(systemName: "chevron.right")
+								.font(.caption)
+								.foregroundStyle(.tertiary)
+						}
+					}
+					.padding(12)
+					.background(Color(XColor.tertiarySystemBackground))
+					.clipShape(RoundedRectangle(cornerRadius: 12))
+					.buttonStyle(.plain)
 				}
 			}
-			.padding(.vertical, 4)
 		}
+		.padding(20)
+		.background(cardBackground)
+		.clipShape(RoundedRectangle(cornerRadius: 20))
+		.shadow(color: Color.black.opacity(0.05), radius: 10, y: 5)
 	}
 
-	private var linkedAccountsSection: some View {
-		Section("Linked Accounts") {
-			if model.hasAppleProvider {
-				Label("Apple", systemImage: "apple.logo")
-					.badge("Primary")
+	private var dangerZoneCard: some View {
+		VStack(alignment: .leading, spacing: 16) {
+			// Header with warning icon
+			HStack {
+				Image(systemName: "exclamationmark.triangle.fill")
+					.font(.title3)
+					.foregroundStyle(.red)
+
+				Text("Account Actions")
+					.font(.headline)
 			}
 
-			if model.hasGoogleProvider {
-				Label {
-					Text("Google")
-				} icon: {
-					Image(systemName: "g.circle.fill")
-						.foregroundStyle(.red)
-				}
-				.badge(model.hasAppleProvider ? "Linked" : "Primary")
-			}
-
-			if !model.hasAppleProvider || !model.hasGoogleProvider {
-				Button {
-					Task {
-						await model.linkProvider(!model.hasAppleProvider ? .apple : .google)
-					}
-				} label: {
-					Label("Link Another Account", systemImage: "link")
-				}
-			}
-		}
-	}
-
-	private var dangerZoneSection: some View {
-		Section {
-			Button(role: .destructive) {
-				model.showingSignOutConfirmation = true
-			} label: {
-				Label("Sign Out", systemImage: "rectangle.portrait.and.arrow.right")
-			}
-
-			Button(role: .destructive) {
-				model.showingDeleteConfirmation = true
-			} label: {
-				Label("Delete Account", systemImage: "trash")
-			}
-		} header: {
-			Text("Account Actions")
-		} footer: {
-			Text("Deleting your account will permanently remove all your photos and data from Photolala cloud storage.")
+			// Warning message
+			Text("These actions affect your account and data")
 				.font(.caption)
+				.foregroundStyle(.secondary)
+
+			// Action buttons
+			VStack(spacing: 12) {
+				// Sign Out button
+				Button {
+					model.showingSignOutConfirmation = true
+				} label: {
+					HStack {
+						Image(systemName: "rectangle.portrait.and.arrow.right")
+							.frame(width: 20)
+						Text("Sign Out")
+						Spacer()
+						Image(systemName: "chevron.right")
+							.font(.caption)
+							.foregroundStyle(.tertiary)
+					}
+					.foregroundStyle(.orange)
+					.padding(14)
+					.frame(maxWidth: .infinity)
+					.background(Color.orange.opacity(0.1))
+					.clipShape(RoundedRectangle(cornerRadius: 12))
+					.overlay(
+						RoundedRectangle(cornerRadius: 12)
+							.stroke(Color.orange.opacity(0.3), lineWidth: 1)
+					)
+				}
+				.buttonStyle(.plain)
+
+				// Delete Account button
+				Button {
+					model.showingDeleteConfirmation = true
+				} label: {
+					HStack {
+						Image(systemName: "trash.fill")
+							.frame(width: 20)
+						Text("Delete Account")
+						Spacer()
+						Image(systemName: "chevron.right")
+							.font(.caption)
+							.foregroundStyle(.tertiary)
+					}
+					.foregroundStyle(.red)
+					.padding(14)
+					.frame(maxWidth: .infinity)
+					.background(Color.red.opacity(0.1))
+					.clipShape(RoundedRectangle(cornerRadius: 12))
+					.overlay(
+						RoundedRectangle(cornerRadius: 12)
+							.stroke(Color.red.opacity(0.3), lineWidth: 1)
+					)
+				}
+				.buttonStyle(.plain)
+			}
+
+			// Footer warning
+			Text("Deleting your account permanently removes all photos and data from cloud storage")
+				.font(.caption2)
+				.foregroundStyle(.secondary)
+				.padding(.top, 4)
 		}
+		.padding(20)
+		.background(
+			RoundedRectangle(cornerRadius: 20)
+				.fill(Color(XColor.secondarySystemBackground))
+				.overlay(
+					RoundedRectangle(cornerRadius: 20)
+						.stroke(Color.red.opacity(0.2), lineWidth: 1)
+				)
+		)
+		.clipShape(RoundedRectangle(cornerRadius: 20))
+		.shadow(color: Color.red.opacity(0.1), radius: 10, y: 5)
 	}
 }
 
