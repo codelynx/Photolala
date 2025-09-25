@@ -145,6 +145,29 @@ final class AccountManager: ObservableObject {
 		print("[AccountManager] Sign-out complete")
 	}
 
+	@MainActor
+	func deleteAccount() async throws {
+		guard let user = currentUser else {
+			throw AccountError.notSignedIn
+		}
+
+		print("[AccountManager] Starting account deletion for user: \(user.id.uuidString)")
+
+		// Get S3 service for current environment
+		let s3Service = try await S3Service.forCurrentEnvironment()
+
+		// Delete all user data from S3
+		try await s3Service.deleteAllUserData(userID: user.id.uuidString)
+
+		// TODO: Call Lambda to remove identity mappings from DynamoDB
+		// For now, S3Service.deleteIdentityMappings handles S3-stored mappings
+
+		// Sign out locally (this also clears all caches)
+		await signOut()
+
+		print("[AccountManager] Account deletion complete")
+	}
+
 	/// Clear all application caches
 	private func clearAllCaches() async {
 		print("[AccountManager] Clearing all caches")

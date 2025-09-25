@@ -10,7 +10,7 @@ import AuthenticationServices
 
 struct AccountSettingsView: View {
 	@State private var model = Model()
-	@Environment(\.dismiss) private var dismiss: DismissAction
+	@Environment(\.dismiss) private var dismiss
 
 	var body: some View {
 		NavigationStack {
@@ -333,63 +333,19 @@ extension AccountSettingsView {
 		}
 
 		func signOut() async {
-			// Stop any ongoing operations
-			await PhotoBasket.shared.cancelCurrentOperation()
-
-			// Clear caches
-			await clearAllCaches()
-
-			// Sign out from AccountManager
+			// AccountManager.signOut() now handles all cleanup
 			await AccountManager.shared.signOut()
 		}
 
 		func deleteAccount() async {
 			do {
-				guard let user = AccountManager.shared.getCurrentUser() else { return }
+				// Use centralized account deletion in AccountManager
+				try await AccountManager.shared.deleteAccount()
 
-				// Get S3 service
-				let s3Service = try await S3Service.forCurrentEnvironment()
-
-				// Delete all user data from S3
-				try await s3Service.deleteAllUserData(userID: user.id.uuidString)
-
-				// TODO: Call Lambda to remove identity mappings
-				// For now, just sign out locally
-
-				// Clear all local data
-				await clearAllCaches()
-				PhotoBasket.shared.clear()
-
-				// Sign out
-				await AccountManager.shared.signOut()
+				print("[AccountSettingsView] Account deleted successfully")
 			} catch {
 				errorMessage = "Failed to delete account: \(error.localizedDescription)"
 				showingError = true
-			}
-		}
-
-		private func clearAllCaches() async {
-			// Clear photo caches
-			let cacheDir = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first!
-			if let enumerator = FileManager.default.enumerator(at: cacheDir, includingPropertiesForKeys: nil) {
-				for case let url as URL in enumerator {
-					try? FileManager.default.removeItem(at: url)
-				}
-			}
-
-			// Clear app support data (except essential files)
-			let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
-			let photolalaDir = appSupport.appendingPathComponent("Photolala")
-
-			// Keep only essential directories, clear the rest
-			let essentialDirs = ["GlobalCatalog", "Checkpoints"]
-			if let enumerator = FileManager.default.enumerator(at: photolalaDir, includingPropertiesForKeys: nil) {
-				for case let url as URL in enumerator {
-					let lastComponent = url.lastPathComponent
-					if !essentialDirs.contains(lastComponent) && url.deletingLastPathComponent() == photolalaDir {
-						try? FileManager.default.removeItem(at: url)
-					}
-				}
 			}
 		}
 
@@ -404,7 +360,7 @@ extension AccountSettingsView {
 struct EditProfileView: View {
 	@State private var displayName: String
 	let onSave: (String) -> Void
-	@Environment(\.dismiss) private var dismiss: DismissAction
+	@Environment(\.dismiss) private var dismiss
 
 	init(displayName: String, onSave: @escaping (String) -> Void) {
 		_displayName = State(initialValue: displayName)
@@ -443,7 +399,7 @@ struct EditProfileView: View {
 
 struct ReauthenticationView: View {
 	let onAuthenticated: (Bool) -> Void
-	@Environment(\.dismiss) private var dismiss: DismissAction
+	@Environment(\.dismiss) private var dismiss
 	@State private var isAuthenticating = false
 
 	var body: some View {
@@ -531,5 +487,7 @@ struct ReauthenticationView: View {
 // MARK: - Preview
 
 #Preview {
-	AccountSettingsView()
+	NavigationStack {
+		AccountSettingsView()
+	}
 }

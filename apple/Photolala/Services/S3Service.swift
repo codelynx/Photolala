@@ -486,6 +486,152 @@ extension S3Service {
 	/// Note: Uses lazy initialization - credentials fetched on first use
 	/// New code should use forEnvironment() or forCurrentEnvironment() instead
 	static let shared = S3Service(environment: .development, lazy: true)
+
+	// MARK: - Account Deletion
+
+	/// Delete all user data from S3 with pagination support
+	func deleteAllUserData(userID: String) async throws {
+		try await ensureInitialized()
+		guard let client = client else {
+			throw S3Error.clientNotInitialized
+		}
+
+		logger.warning("[S3Service] Starting deletion of all data for user: \(userID)")
+
+		// Track deletion progress
+		var totalDeleted = 0
+		var errors: [String] = []
+
+		// Delete all objects under user's directories
+		let prefixes = [
+			"photos/\(userID)/",
+			"thumbnails/\(userID)/",
+			"catalogs/\(userID)/",
+			"users/\(userID)/"
+		]
+
+		for prefix in prefixes {
+			do {
+				let deleted = try await deleteObjectsWithPrefix(prefix, client: client)
+				totalDeleted += deleted
+				logger.info("[S3Service] Deleted \(deleted) objects from \(prefix)")
+			} catch {
+				let errorMsg = "Failed to delete from \(prefix): \(error)"
+				errors.append(errorMsg)
+				logger.error("[S3Service] \(errorMsg)")
+			}
+		}
+
+		// Also try to delete identity mappings
+		await deleteIdentityMappings(userID: userID)
+
+		// If any errors occurred, throw an error with details
+		if !errors.isEmpty {
+			logger.error("[S3Service] Deletion completed with errors: \(errors)")
+			throw S3Error.partialDeletionFailure(errors: errors, deletedCount: totalDeleted)
+		}
+
+		logger.info("[S3Service] Account deletion complete. Total objects deleted: \(totalDeleted)")
+	}
+
+	/// Delete all objects with a given prefix (with pagination)
+	private func deleteObjectsWithPrefix(_ prefix: String, client: S3Client) async throws -> Int {
+		var continuationToken: String?
+		var totalDeleted = 0
+
+		repeat {
+			// List objects (max 1000 per request)
+			let listInput = ListObjectsV2Input(
+				bucket: bucketName,
+				continuationToken: continuationToken,
+				maxKeys: 1000,
+				prefix: prefix
+			)
+
+			let output = try await client.listObjectsV2(input: listInput)
+
+			// Delete objects in this batch
+			if let contents = output.contents, !contents.isEmpty {
+				let objects = contents.compactMap { object -> ObjectIdentifier? in
+					guard let key = object.key else { return nil }
+					return ObjectIdentifier(key: key)
+				}
+
+				if !objects.isEmpty {
+					let deleteInput = DeleteObjectsInput(
+						bucket: bucketName,
+						delete: Delete(objects: objects, quiet: true)
+					)
+
+					let deleteOutput = try await client.deleteObjects(input: deleteInput)
+
+					if let errors = deleteOutput.errors, !errors.isEmpty {
+						logger.error("[S3Service] Batch deletion errors: \(errors)")
+						// Continue despite errors
+					}
+
+					totalDeleted += objects.count
+				}
+			}
+
+			continuationToken = output.nextContinuationToken
+		} while continuationToken != nil
+
+		return totalDeleted
+	}
+
+	/// Delete identity mappings for a user
+	func deleteIdentityMappings(userID: String) async {
+		guard let client = client else { return }
+
+		// Identity mappings are stored as identities/{provider}/{providerID} -> userID
+		// Include all provider types: apple, google, and email
+		let identityPrefixes = [
+			"identities/apple/",
+			"identities/google/",
+			"identities/email/"
+		]
+
+		for prefix in identityPrefixes {
+			do {
+				var continuationToken: String?
+
+				repeat {
+					let listInput = ListObjectsV2Input(
+						bucket: bucketName,
+						continuationToken: continuationToken,
+						prefix: prefix
+					)
+
+					let output = try await client.listObjectsV2(input: listInput)
+
+					if let contents = output.contents {
+						for object in contents {
+							guard let key = object.key else { continue }
+
+							// Check if this identity maps to our user
+							let getInput = GetObjectInput(bucket: bucketName, key: key)
+							if let getOutput = try? await client.getObject(input: getInput),
+							   let data = try? await getOutput.body?.readData(),
+							   let content = String(data: data, encoding: .utf8),
+							   content.trimmingCharacters(in: .whitespacesAndNewlines) == userID {
+
+								// Delete this identity mapping
+								let deleteInput = DeleteObjectInput(bucket: bucketName, key: key)
+								_ = try? await client.deleteObject(input: deleteInput)
+								logger.info("[S3Service] Deleted identity mapping: \(key)")
+							}
+						}
+					}
+
+					continuationToken = output.nextContinuationToken
+				} while continuationToken != nil
+
+			} catch {
+				logger.error("[S3Service] Error cleaning identity mappings from \(prefix): \(error)")
+			}
+		}
+	}
 }
 
 // MARK: - Error Types
@@ -497,6 +643,7 @@ enum S3Error: LocalizedError {
 	case downloadFailed
 	case invalidData
 	case notFound
+	case partialDeletionFailure(errors: [String], deletedCount: Int)
 
 	var errorDescription: String? {
 		switch self {
@@ -514,6 +661,8 @@ enum S3Error: LocalizedError {
 			return "Invalid data format"
 		case .notFound:
 			return "Object not found in S3"
+		case .partialDeletionFailure(let errors, let deletedCount):
+			return "Account deletion partially failed. Deleted \(deletedCount) objects. Errors: \(errors.joined(separator: "; "))"
 		}
 	}
 }
