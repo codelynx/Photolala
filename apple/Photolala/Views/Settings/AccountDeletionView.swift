@@ -2,7 +2,7 @@ import SwiftUI
 
 struct AccountDeletionView: View {
 	@State private var model = Model()
-	@Environment(\.dismiss) var dismiss
+	@Environment(\.dismiss) private var dismiss
 	@Environment(\.colorScheme) var colorScheme
 
 	var body: some View {
@@ -48,7 +48,9 @@ struct AccountDeletionView: View {
 			) {
 				Button(model.confirmButtonTitle, role: .destructive) {
 					Task {
-						await model.performDeletion()
+						await model.performDeletion {
+							dismiss()
+						}
 					}
 				}
 				Button("Cancel", role: .cancel) { }
@@ -453,7 +455,7 @@ extension AccountDeletionView {
 			}
 		}
 
-		func performDeletion() async {
+		func performDeletion(onImmediateDeletionComplete: @escaping () -> Void) async {
 			processingMessage = deletionOption == .immediate ? "Deleting account..." : "Scheduling deletion..."
 			isProcessing = true
 			defer { isProcessing = false }
@@ -474,6 +476,12 @@ extension AccountDeletionView {
 
 					// Sign out immediately
 					await AccountManager.shared.signOut()
+
+					// Dismiss the sheet after successful deletion
+					// No need to show success alert since account is gone
+					await MainActor.run {
+						onImmediateDeletionComplete()
+					}
 				} else {
 					// Schedule deletion with grace period
 					try await scheduler.scheduleAccountDeletion(user: user)
