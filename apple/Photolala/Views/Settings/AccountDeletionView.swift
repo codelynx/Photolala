@@ -466,34 +466,52 @@ extension AccountDeletionView {
 			isProcessing = true
 			defer { isProcessing = false }
 
+			print("[AccountDeletionView] Starting performDeletion")
+			print("[AccountDeletionView] Deletion option: \(deletionOption)")
+
 			do {
 				guard let user = AccountManager.shared.getCurrentUser() else {
+					print("[AccountDeletionView] No current user found")
 					throw AccountError.notSignedIn
 				}
 
+				print("[AccountDeletionView] User ID: \(user.id)")
+
 				// Get current environment
 				let environment = getCurrentAWSEnvironment()
+				print("[AccountDeletionView] Environment: \(environment)")
+
 				let s3Service = try await S3Service.forEnvironment(environment)
+				print("[AccountDeletionView] S3 Service created for environment: \(environment)")
+
 				let scheduler = DeletionScheduler(s3Service: s3Service, environment: environment)
+				print("[AccountDeletionView] DeletionScheduler created")
 
 				if deletionOption == .immediate && isDevelopment {
+					print("[AccountDeletionView] Attempting immediate deletion")
 					// Development only: immediate deletion
 					try await scheduler.expediteDeletion(user: user)
 
+					print("[AccountDeletionView] Immediate deletion successful, signing out")
 					// Sign out immediately
 					await AccountManager.shared.signOut()
 
 					// Dismiss the sheet after successful deletion
 					// No need to show success alert since account is gone
 					await MainActor.run {
+						print("[AccountDeletionView] Calling onImmediateDeletionComplete callback")
 						onImmediateDeletionComplete()
 					}
 				} else {
+					print("[AccountDeletionView] Attempting to schedule deletion")
 					// Schedule deletion with grace period
 					try await scheduler.scheduleAccountDeletion(user: user)
+					print("[AccountDeletionView] Deletion scheduled successfully")
 					showingSuccess = true
 				}
 			} catch {
+				print("[AccountDeletionView] Error during deletion: \(error)")
+				print("[AccountDeletionView] Error details: \(String(describing: error))")
 				errorMessage = error.localizedDescription
 				showingError = true
 			}

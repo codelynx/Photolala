@@ -45,8 +45,12 @@ struct BasketItem: Identifiable, Hashable, Codable {
 
 		do {
 			var isStale = false
-			// Use security scope only when in sandboxed environment
+			// Use security scope only when in sandboxed environment on macOS
+			#if os(macOS)
 			let options: URL.BookmarkResolutionOptions = BasketItem.isSandboxed() ? .withSecurityScope : []
+			#else
+			let options: URL.BookmarkResolutionOptions = []
+			#endif
 			let url = try URL(
 				resolvingBookmarkData: bookmark,
 				options: options,
@@ -72,10 +76,14 @@ struct BasketItem: Identifiable, Hashable, Codable {
 	/// Create a security-scoped bookmark from a URL
 	static func createBookmark(from url: URL) -> Data? {
 		do {
-			// Use security scope for sandboxed environments
+			// Use security scope for sandboxed environments on macOS
 			// Note: minimalBookmark cannot be used with withSecurityScope
+			#if os(macOS)
 			let options: URL.BookmarkCreationOptions = isSandboxed() ?
 				[.withSecurityScope] : []
+			#else
+			let options: URL.BookmarkCreationOptions = []
+			#endif
 			let bookmark = try url.bookmarkData(
 				options: options,
 				includingResourceValuesForKeys: nil,

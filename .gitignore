@@ -80,4 +80,6 @@ logs/**
 *.log
 
 untracked/
-untracked/**
+untracked/**# Lambda test response files
+aws/response*.json
+aws/lambda/*/response*.json

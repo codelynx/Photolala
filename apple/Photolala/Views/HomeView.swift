@@ -447,7 +447,7 @@ struct HomeView: View {
 		switch destination {
 		case .localFolder(let url, let scopeStarted):
 			#if os(iOS)
-			let source = LocalPhotoSource(directoryURL: url, requiresSecurityScope: true, securityScopeAlreadyStarted: scopeStarted)
+			let source = LocalPhotoSource(directoryURL: url, requiresSecurityScope: true, securityScopedURL: scopeStarted ? url : nil)
 			#else
 			let source = LocalPhotoSource(directoryURL: url)
 			#endif

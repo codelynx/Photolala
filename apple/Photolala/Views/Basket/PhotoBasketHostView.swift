@@ -29,7 +29,6 @@ struct PhotoBasketHostView: View {
 			mode: .basket
 		)
 		.navigationTitle("Photo Basket")
-		.navigationSubtitle("\(basket.count) items")
 		#if os(macOS)
 		.navigationSubtitle(subtitle)
 		#endif

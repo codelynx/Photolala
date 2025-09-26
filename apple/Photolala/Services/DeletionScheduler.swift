@@ -28,7 +28,11 @@ actor DeletionScheduler {
 		let scheduledDate = Date()
 		let deleteDate = scheduledDate.addingTimeInterval(gracePeriodSeconds)
 
-		logger.info("Scheduling deletion for user \(user.id) at \(deleteDate)")
+		logger.info("[DeletionScheduler] Starting account deletion scheduling")
+		logger.info("[DeletionScheduler] User ID: \(user.id.uuidString)")
+		logger.info("[DeletionScheduler] Environment: \(self.environment.rawValue)")
+		logger.info("[DeletionScheduler] Grace period: \(self.gracePeriodSeconds) seconds")
+		logger.info("[DeletionScheduler] Delete date: \(deleteDate)")
 
 		// Note: Identity mappings remain unchanged during scheduling
 		// They will be deleted when the grace period expires
@@ -36,6 +40,7 @@ actor DeletionScheduler {
 		// Create scheduled deletion entry
 		let dateKey = ISO8601DateFormatter().string(from: deleteDate).prefix(10) // YYYY-MM-DD
 		let deletionKey = "scheduled-deletions/\(dateKey)/\(user.id.uuidString).json"
+		logger.info("[DeletionScheduler] Writing to S3 key: \(deletionKey)")
 
 		struct ScheduledDeletionData: Codable {
 			let userId: String
@@ -59,20 +64,37 @@ actor DeletionScheduler {
 		encoder.dateEncodingStrategy = .iso8601
 		let data = try encoder.encode(deletionData)
 
-		try await s3Service.putObject(
-			key: deletionKey,
-			data: data,
-			contentType: "application/json"
-		)
+		do {
+			logger.info("[DeletionScheduler] Attempting to write scheduled deletion data...")
+			logger.info("[DeletionScheduler] Attempting to write scheduled deletion data...")
+			try await s3Service.putObject(
+				key: deletionKey,
+				data: data,
+				contentType: "application/json"
+			)
+			logger.info("[DeletionScheduler] Successfully wrote scheduled deletion data")
+		} catch {
+			logger.error("[DeletionScheduler] Failed to write scheduled deletion: \(error)")
+			logger.error("[DeletionScheduler] Error details: \(String(describing: error))")
+			throw error
+		}
 
 		// Update user status file
 		let status = UserStatusFile(
 			status: .scheduledForDeletion(deleteDate: deleteDate)
 		)
 
-		try await s3Service.writeUserStatus(status, for: user.id.uuidString)
+		do {
+			logger.info("[DeletionScheduler] Updating user status to scheduled_for_deletion...")
+			try await s3Service.writeUserStatus(status, for: user.id.uuidString)
+			logger.info("[DeletionScheduler] Successfully updated user status")
+		} catch {
+			logger.error("[DeletionScheduler] Failed to update user status: \(error)")
+			logger.error("[DeletionScheduler] Error details: \(String(describing: error))")
+			throw error
+		}
 
-		logger.info("Account deletion scheduled for user \(user.id)")
+		logger.info("[DeletionScheduler] Account deletion scheduled successfully for user \(user.id)")
 	}
 
 	/// Cancel scheduled deletion
@@ -109,22 +131,34 @@ actor DeletionScheduler {
 
 	/// Expedite deletion (development only)
 	func expediteDeletion(user: PhotolalaUser) async throws {
+		logger.info("[DeletionScheduler] Expedite deletion requested")
+		logger.info("[DeletionScheduler] Current environment: \(self.environment.rawValue)")
+
 		guard environment == .development else {
+			logger.error("[DeletionScheduler] Expedite deletion not allowed in \(self.environment.rawValue)")
 			throw DeletionError.notAllowedInEnvironment
 		}
 
-		logger.info("Expediting deletion for user \(user.id) (dev only)")
+		logger.info("[DeletionScheduler] Starting expedited deletion for user \(user.id) (dev only)")
 
 		// Delete all user data using the comprehensive method
 		// This includes photos, thumbnails, catalogs, user data, AND identity mappings
 		// Note: deleteAllUserData also removes status.json (under users/ prefix)
-		try await s3Service.deleteAllUserData(userID: user.id.uuidString)
-		logger.info("Deleted all data including identity mappings for user \(user.id)")
+		do {
+			logger.info("[DeletionScheduler] Calling s3Service.deleteAllUserData...")
+			logger.info("[DeletionScheduler] Attempting to write scheduled deletion data...")
+			try await s3Service.deleteAllUserData(userID: user.id.uuidString)
+			logger.info("[DeletionScheduler] Successfully deleted all data including identity mappings for user \(user.id)")
+		} catch {
+			logger.error("[DeletionScheduler] Failed to delete user data: \(error)")
+			logger.error("[DeletionScheduler] Error details: \(String(describing: error))")
+			throw error
+		}
 
 		// Note: After this point, the account no longer exists
 		// The user can sign up again with the same identity if desired
 
-		logger.info("Account deleted immediately for user \(user.id)")
+		logger.info("[DeletionScheduler] Account deleted immediately for user \(user.id)")
 	}
 }
 

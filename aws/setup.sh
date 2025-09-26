@@ -40,7 +40,7 @@ echo "Bucket: $BUCKET_NAME"
 echo "Creating S3 Batch Operations role..."
 aws iam create-role \
   --role-name S3BatchOperationsRole \
-  --assume-role-policy-document file://iam/s3-batch-operations-role.json \
+  --assume-role-policy-document "$(cat iam/s3-batch-operations-role.json | jq -r '.TrustPolicy')" \
   --description "Role for S3 Batch Operations to delete user data" \
   2>/dev/null || echo "Role already exists"
 
@@ -112,7 +112,7 @@ aws events put-rule \
 # Add Lambda as target
 aws events put-targets \
   --rule photolala-deletion-schedule-$ENVIRONMENT \
-  --targets "Id"="1","Arn"="arn:aws:lambda:$REGION:$ACCOUNT_ID:function:photolala-deletion-$ENVIRONMENT","Input"='{"type":"scheduled"}'
+  --targets '[{"Id":"1","Arn":"arn:aws:lambda:'$REGION':'$ACCOUNT_ID':function:photolala-deletion-'$ENVIRONMENT'","Input":"{\"type\":\"scheduled\"}"}]'
 
 # Grant EventBridge permission to invoke Lambda
 aws lambda add-permission \

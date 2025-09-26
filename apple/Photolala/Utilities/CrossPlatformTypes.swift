@@ -54,18 +54,21 @@ class XHStackView: XStackView {
 		#endif
 	}
 
+	#if os(macOS)
 	required init?(coder: NSCoder) {
 		super.init(coder: coder)
-		#if os(macOS)
 		self.orientation = .horizontal
 		self.distribution = .fill
 		self.alignment = .centerY
-		#else
+	}
+	#else
+	required init(coder: NSCoder) {
+		super.init(coder: coder)
 		self.axis = .horizontal
 		self.distribution = .fill
 		self.alignment = .center
-		#endif
 	}
+	#endif
 
 	convenience init(spacing: CGFloat = 0) {
 		self.init(frame: .zero)
@@ -88,18 +91,21 @@ class XVStackView: XStackView {
 		#endif
 	}
 
+	#if os(macOS)
 	required init?(coder: NSCoder) {
 		super.init(coder: coder)
-		#if os(macOS)
 		self.orientation = .vertical
 		self.distribution = .fill
 		self.alignment = .centerX
-		#else
+	}
+	#else
+	required init(coder: NSCoder) {
+		super.init(coder: coder)
 		self.axis = .vertical
 		self.distribution = .fill
 		self.alignment = .center
-		#endif
 	}
+	#endif
 
 	convenience init(spacing: CGFloat = 0) {
 		self.init(frame: .zero)

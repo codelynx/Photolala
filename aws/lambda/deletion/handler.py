@@ -388,7 +388,8 @@ def process_scheduled_deletions() -> Dict[str, Any]:
     """
     Process all accounts scheduled for deletion today.
     """
-    now = datetime.utcnow()
+    from datetime import timezone
+    now = datetime.now(timezone.utc)
     date_key = now.strftime('%Y-%m-%d')
 
     logger.info(f"Processing scheduled deletions for {date_key}")
