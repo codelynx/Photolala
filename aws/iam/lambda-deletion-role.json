@@ -1,0 +1,81 @@
+{
+  "RoleName": "PhotolalaDeletionLambdaRole",
+  "Description": "Role for Lambda function to manage account deletions",
+  "TrustPolicy": {
+    "Version": "2012-10-17",
+    "Statement": [
+      {
+        "Effect": "Allow",
+        "Principal": {
+          "Service": "lambda.amazonaws.com"
+        },
+        "Action": "sts:AssumeRole"
+      }
+    ]
+  },
+  "ManagedPolicies": [
+    "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+  ],
+  "Policies": [
+    {
+      "PolicyName": "PhotolalaDeletionPolicy",
+      "PolicyDocument": {
+        "Version": "2012-10-17",
+        "Statement": [
+          {
+            "Sid": "S3Operations",
+            "Effect": "Allow",
+            "Action": [
+              "s3:ListBucket",
+              "s3:GetObject",
+              "s3:DeleteObject",
+              "s3:PutObject",
+              "s3:HeadObject"
+            ],
+            "Resource": [
+              "arn:aws:s3:::photolala-dev",
+              "arn:aws:s3:::photolala-dev/*",
+              "arn:aws:s3:::photolala-stage",
+              "arn:aws:s3:::photolala-stage/*",
+              "arn:aws:s3:::photolala-prod",
+              "arn:aws:s3:::photolala-prod/*"
+            ]
+          },
+          {
+            "Sid": "S3BatchOperations",
+            "Effect": "Allow",
+            "Action": [
+              "s3:CreateJob",
+              "s3:DescribeJob",
+              "s3:ListJobs",
+              "s3:UpdateJobPriority",
+              "s3:UpdateJobStatus",
+              "s3:GetJobTagging",
+              "s3:PutJobTagging"
+            ],
+            "Resource": "*"
+          },
+          {
+            "Sid": "PassRoleToS3Batch",
+            "Effect": "Allow",
+            "Action": "iam:PassRole",
+            "Resource": "arn:aws:iam::*:role/S3BatchOperationsRole",
+            "Condition": {
+              "StringEquals": {
+                "iam:PassedToService": "batchoperations.s3.amazonaws.com"
+              }
+            }
+          },
+          {
+            "Sid": "GetAccountInfo",
+            "Effect": "Allow",
+            "Action": [
+              "sts:GetCallerIdentity"
+            ],
+            "Resource": "*"
+          }
+        ]
+      }
+    }
+  ]
+}

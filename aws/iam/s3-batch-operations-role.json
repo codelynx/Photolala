@@ -1,0 +1,63 @@
+{
+  "RoleName": "S3BatchOperationsRole",
+  "Description": "Role for S3 Batch Operations to delete user data",
+  "TrustPolicy": {
+    "Version": "2012-10-17",
+    "Statement": [
+      {
+        "Effect": "Allow",
+        "Principal": {
+          "Service": "batchoperations.s3.amazonaws.com"
+        },
+        "Action": "sts:AssumeRole"
+      }
+    ]
+  },
+  "Policies": [
+    {
+      "PolicyName": "S3BatchOperationsDeletePolicy",
+      "PolicyDocument": {
+        "Version": "2012-10-17",
+        "Statement": [
+          {
+            "Effect": "Allow",
+            "Action": [
+              "s3:GetObject",
+              "s3:GetObjectVersion",
+              "s3:DeleteObject",
+              "s3:DeleteObjectVersion"
+            ],
+            "Resource": [
+              "arn:aws:s3:::photolala-dev/*",
+              "arn:aws:s3:::photolala-stage/*",
+              "arn:aws:s3:::photolala-prod/*"
+            ]
+          },
+          {
+            "Effect": "Allow",
+            "Action": [
+              "s3:GetBucketLocation",
+              "s3:ListBucket"
+            ],
+            "Resource": [
+              "arn:aws:s3:::photolala-dev",
+              "arn:aws:s3:::photolala-stage",
+              "arn:aws:s3:::photolala-prod"
+            ]
+          },
+          {
+            "Effect": "Allow",
+            "Action": [
+              "s3:PutObject"
+            ],
+            "Resource": [
+              "arn:aws:s3:::photolala-dev/batch-jobs/reports/*",
+              "arn:aws:s3:::photolala-stage/batch-jobs/reports/*",
+              "arn:aws:s3:::photolala-prod/batch-jobs/reports/*"
+            ]
+          }
+        ]
+      }
+    }
+  ]
+}
