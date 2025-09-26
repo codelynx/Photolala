@@ -12,20 +12,32 @@ final class AccountManager: ObservableObject {
 
 	@Published private(set) var currentUser: PhotolalaUser?
 	@Published private(set) var isSignedIn: Bool = false
+	@Published private(set) var accountStatus: AccountStatus = .active
 	internal var stsCredentials: STSCredentials?
 	private var currentNonce: String?
 	private var googleSignInCoordinator: GoogleSignInCoordinator?
+	private var statusCheckTimer: Timer?
 
+	private let userUUIDKey = "com.electricwoods.photolala.account.uuid"
 
 	private init() {
 		Task {
 			await loadStoredSession()
+			await checkAccountStatus()
+			startStatusPolling()
 		}
 	}
 
 
 	func getCurrentUser() -> PhotolalaUser? {
 		currentUser
+	}
+
+	@MainActor
+	func updateUser(_ user: PhotolalaUser) async {
+		currentUser = user
+		// The STS credentials don't change when user profile updates
+		// User profile is stored separately in S3
 	}
 
 	func getSTSCredentials() async throws -> STSCredentials {
@@ -84,6 +96,13 @@ final class AccountManager: ObservableObject {
 		print("[AccountManager] Setting isSignedIn = true after Google sign-in")
 		self.isSignedIn = true
 		print("[AccountManager] isSignedIn is now: \(self.isSignedIn)")
+
+		// Ensure status.json exists for new or returning users
+		await ensureStatusFileExists(for: result.user)
+
+		// Store user UUID for status checking
+		storeUserUUID(result.user.id.uuidString)
+
 		await saveSession()
 
 		return result.user
@@ -118,6 +137,13 @@ final class AccountManager: ObservableObject {
 		print("[AccountManager] Setting isSignedIn = true after Apple sign-in")
 		self.isSignedIn = true
 		print("[AccountManager] isSignedIn is now: \(self.isSignedIn)")
+
+		// Ensure status.json exists for new or returning users
+		await ensureStatusFileExists(for: result.user)
+
+		// Store user UUID for status checking
+		storeUserUUID(result.user.id.uuidString)
+
 		await saveSession()
 
 		return result.user
@@ -125,13 +151,79 @@ final class AccountManager: ObservableObject {
 
 	@MainActor
 	func signOut() async {
+		print("[AccountManager] Starting sign-out process")
+
+		// Cancel any ongoing basket operations
+		await PhotoBasket.shared.cancelCurrentOperation()
+
+		// Clear user session
 		currentUser = nil
 		stsCredentials = nil
 		isSignedIn = false
+		accountStatus = .active
+
+		// Clear stored UUID
+		clearStoredUUID()
+
 		await clearStoredSession()
+
+		// Clear all caches
+		await clearAllCaches()
 
 		// Clear shared Lambda client
 		await LambdaClientManager.shared.reset()
+
+		print("[AccountManager] Sign-out complete")
+	}
+
+	@MainActor
+	func deleteAccount(progressDelegate: (any DeletionProgressDelegate)? = nil) async throws {
+		guard let user = currentUser else {
+			throw AccountError.notSignedIn
+		}
+
+		print("[AccountManager] Starting account deletion for user: \(user.id.uuidString)")
+
+		// Get S3 service for current environment
+		let s3Service = try await S3Service.forCurrentAWSEnvironment()
+
+		// Delete all user data from S3 with progress tracking
+		try await s3Service.deleteAllUserData(userID: user.id.uuidString, progressDelegate: progressDelegate)
+
+		// TODO: Call Lambda to remove identity mappings from DynamoDB
+		// For now, S3Service.deleteIdentityMappings handles S3-stored mappings
+
+		// Sign out locally (this also clears all caches)
+		await signOut()
+
+		print("[AccountManager] Account deletion complete")
+	}
+
+	/// Clear all application caches
+	private func clearAllCaches() async {
+		print("[AccountManager] Clearing all caches")
+
+		// Clear photo identity cache
+		await LocalPhotoIdentityCache.shared.clear()
+
+		// Clear catalog cache - MUST clear in-memory cache before deleting directory
+		await BasketActionService.shared.clearCatalogCache()
+
+		// Now safe to delete the catalog cache directory
+		let appSupport = FileManager.default.urls(for: .applicationSupportDirectory,
+												   in: .userDomainMask).first!
+		let catalogCacheDir = appSupport
+			.appendingPathComponent("Photolala")
+			.appendingPathComponent("CatalogCache")
+		try? FileManager.default.removeItem(at: catalogCacheDir)
+
+		// Clear thumbnail cache
+		await ThumbnailCache.shared.clearAll()
+
+		// Clear basket items
+		PhotoBasket.shared.clear()
+
+		print("[AccountManager] All caches cleared")
 	}
 
 	#if DEBUG || DEVELOPER
@@ -374,7 +466,7 @@ final class AccountManager: ObservableObject {
 	nonisolated private func createLambdaClient() async throws -> LambdaClient {
 		// Get current environment from UserDefaults
 		let environmentPreference = UserDefaults.standard.string(forKey: "environment_preference") ?? "development"
-		let environment: Environment
+		let environment: AWSEnvironment
 		switch environmentPreference {
 		case "production":
 			environment = .production
@@ -469,7 +561,7 @@ final class LambdaClientManager {
 	private func createClient() async throws -> LambdaClient {
 		// Get current environment from UserDefaults
 		let environmentPreference = UserDefaults.standard.string(forKey: "environment_preference") ?? "development"
-		let environment: Environment
+		let environment: AWSEnvironment
 		switch environmentPreference {
 		case "production":
 			environment = .production
@@ -622,3 +714,132 @@ extension AccountManager {
 	}
 }
 #endif
+
+// MARK: - Account Status Management
+
+extension AccountManager {
+	/// Check account status from S3
+	@MainActor
+	func checkAccountStatus() async {
+		// Get stored UUID from UserDefaults
+		guard let userUUID = UserDefaults.standard.string(forKey: userUUIDKey) else {
+			// No stored UUID = no account or fresh install
+			accountStatus = .active
+			return
+		}
+
+		do {
+			// Get S3 service for current environment
+			let environment = getCurrentAWSEnvironment()
+			let s3Service = try await S3Service.forEnvironment(environment)
+
+			// Check status.json
+			if let status = try await s3Service.getUserStatus(for: userUUID) {
+				accountStatus = status.typedStatus
+
+				// Handle different states
+				switch status.typedStatus {
+				case .scheduledForDeletion(let deleteDate):
+					// Account is scheduled for deletion, show warning UI
+					print("[AccountManager] Account scheduled for deletion on \(deleteDate)")
+				case .active:
+					// Normal operation
+					break
+				}
+			} else {
+				// No status.json found - account has been deleted
+				print("[AccountManager] Account deleted (no status.json)")
+				await handleDeletedAccount()
+			}
+		} catch {
+			print("[AccountManager] Failed to check account status: \(error)")
+			// On error, assume active to not block the user
+			accountStatus = .active
+		}
+	}
+
+	/// Start polling for status updates
+	private func startStatusPolling() {
+		// Poll every 10 minutes while app is active
+		statusCheckTimer = Timer.scheduledTimer(withTimeInterval: 600, repeats: true) { _ in
+			Task { @MainActor in
+				await self.checkAccountStatus()
+			}
+		}
+	}
+
+	/// Stop polling
+	private func stopStatusPolling() {
+		statusCheckTimer?.invalidate()
+		statusCheckTimer = nil
+	}
+
+	/// Handle deleted account state
+	@MainActor
+	private func handleDeletedAccount() async {
+		// Clear all local data
+		currentUser = nil
+		stsCredentials = nil
+		isSignedIn = false
+		accountStatus = .active  // Reset to active (account no longer exists)
+
+		// Clear stored UUID
+		UserDefaults.standard.removeObject(forKey: userUUIDKey)
+
+		// Clear stored session
+		await clearStoredSession()
+
+		// Stop polling
+		stopStatusPolling()
+	}
+
+	/// Store user UUID on successful sign-in
+	@MainActor
+	func storeUserUUID(_ uuid: String) {
+		UserDefaults.standard.set(uuid, forKey: userUUIDKey)
+	}
+
+	/// Ensure status.json exists for a user (create if missing)
+	private func ensureStatusFileExists(for user: PhotolalaUser) async {
+		do {
+			let environment = getCurrentAWSEnvironment()
+			let s3Service = try await S3Service.forEnvironment(environment)
+
+			// Check if status.json already exists
+			if let existingStatus = try await s3Service.getUserStatus(for: user.id.uuidString) {
+				// Status exists, update accountStatus
+				accountStatus = existingStatus.typedStatus
+				print("[AccountManager] Existing status.json found: \(existingStatus.accountStatus)")
+			} else {
+				// Create new status.json for active account
+				let status = UserStatusFile(status: .active)
+				try await s3Service.writeUserStatus(status, for: user.id.uuidString)
+				accountStatus = .active
+				print("[AccountManager] Created new status.json for user \(user.id)")
+			}
+		} catch {
+			print("[AccountManager] Failed to ensure status.json: \(error)")
+			// Don't block sign-in on status.json creation failure
+			accountStatus = .active
+		}
+	}
+
+	/// Clear stored UUID on sign-out
+	@MainActor
+	func clearStoredUUID() {
+		UserDefaults.standard.removeObject(forKey: userUUIDKey)
+	}
+
+	/// Get current AWS environment
+	private func getCurrentAWSEnvironment() -> AWSEnvironment {
+		let environmentPreference = UserDefaults.standard.string(forKey: "environment_preference") ?? "development"
+		switch environmentPreference {
+		case "production":
+			return .production
+		case "staging":
+			return .staging
+		default:
+			return .development
+		}
+	}
+}

@@ -82,3 +82,5 @@ Environment selection is handled in-app via UserDefaults (iOS/macOS), not throug
 - Production builds locked to production environment
 - See `docs/security.md` and `docs/credential-security.md` for details
 - try not to commit before review
+- we don't use dynamodb in this project
+- we have not released v1 yet, we don't have to consider migration for old version users

@@ -25,6 +25,9 @@ final class PhotoBasket: ObservableObject {
 	// No max items limit - user may need to retrieve 100K+ deep archive photos
 	private var cancellables = Set<AnyCancellable>()
 
+	// Track current operation for cancellation
+	private var currentOperationTask: Task<Void, Error>?
+
 	// Persistence keys
 	private let userDefaults = UserDefaults.standard
 	private let basketItemsKey = "PhotolalaBasketItems"
@@ -141,6 +144,27 @@ final class PhotoBasket: ObservableObject {
 	func clear() {
 		items.removeAll()
 		lastError = nil
+	}
+
+	/// Cancel any ongoing basket operation
+	func cancelCurrentOperation() async {
+		// Cancel the current operation task if it exists
+		currentOperationTask?.cancel()
+		currentOperationTask = nil
+
+		// Also cancel any operations in BasketActionService
+		await BasketActionService.shared.cancelCurrentOperation()
+
+		// Reset processing state
+		isProcessing = false
+
+		print("[PhotoBasket] Cancelled current operation")
+	}
+
+	/// Set the current operation task (used by BasketActionService)
+	func setCurrentOperationTask(_ task: Task<Void, Error>?) {
+		currentOperationTask = task
+		isProcessing = task != nil
 	}
 
 	/// Get basket item by ID

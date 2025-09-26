@@ -48,7 +48,7 @@ final class BasketActionService: ObservableObject {
 	private var catalogService: CatalogService?
 	private var uploadCoordinator: BasketUploadCoordinator?
 	private var catalogCache: LocalCatalogCache?
-	private let identityCache = LocalPhotoIdentityCache()
+	private let identityCache = LocalPhotoIdentityCache.shared
 	private let checkpointManager: StarCheckpointManager
 
 	// Current operation
@@ -216,6 +216,17 @@ final class BasketActionService: ObservableObject {
 		Task {
 			await uploadCoordinator?.cancelUpload()
 		}
+	}
+
+	/// Clear catalog cache (for sign-out/account deletion)
+	func clearCatalogCache() async {
+		// Clear the in-memory catalog cache
+		if let cache = catalogCache {
+			await cache.clear()
+			print("[BasketActionService] Cleared catalog cache")
+		}
+		// Reset the catalog cache reference
+		catalogCache = nil
 	}
 
 	/// Resume from a checkpoint

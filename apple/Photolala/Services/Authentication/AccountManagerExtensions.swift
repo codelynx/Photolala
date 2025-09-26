@@ -214,7 +214,7 @@ extension AccountManager {
 	/// Create Lambda client for specific environment (test only)
 	nonisolated private func createTestLambdaClient(for testEnv: TestEnvironment) async throws -> LambdaClient {
 		// Map TestEnvironment to Environment
-		let environment: Environment = switch testEnv {
+		let environment: AWSEnvironment = switch testEnv {
 		case .development: .development
 		case .staging: .staging
 		case .production: .production

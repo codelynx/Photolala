@@ -10,6 +10,8 @@ import OSLog
 
 /// Caches photo identities for local file paths to avoid expensive MD5 computations
 actor LocalPhotoIdentityCache {
+	static let shared = LocalPhotoIdentityCache()
+
 	private let logger = Logger(subsystem: "com.photolala", category: "LocalPhotoIdentityCache")
 
 	// Cache persistence
@@ -22,7 +24,7 @@ actor LocalPhotoIdentityCache {
 	private var hits = 0
 	private var misses = 0
 
-	init() {
+	private init() {
 		// Setup cache directory
 		let appSupport = FileManager.default.urls(for: .applicationSupportDirectory,
 												   in: .userDomainMask).first!
@@ -121,6 +123,23 @@ actor LocalPhotoIdentityCache {
 	/// Force save cache to disk
 	func flush() async {
 		await saveCache()
+	}
+
+	// MARK: - Clear Cache
+
+	/// Clear all cached entries
+	func clear() async {
+		cache.removeAll()
+		hits = 0
+		misses = 0
+
+		// Delete cache file from disk
+		do {
+			try FileManager.default.removeItem(at: cacheURL)
+			logger.info("Cleared cache and deleted cache file")
+		} catch {
+			logger.error("Error deleting cache file: \(error)")
+		}
 	}
 
 	// MARK: - Private Methods
