@@ -5,6 +5,9 @@ struct AccountDeletionView: View {
 	@Environment(\.dismiss) private var dismiss
 	@Environment(\.colorScheme) var colorScheme
 
+	// Callback when account is deleted immediately
+	var onAccountDeleted: (() -> Void)?
+
 	var body: some View {
 		NavigationStack {
 			ScrollView {
@@ -49,7 +52,10 @@ struct AccountDeletionView: View {
 				Button(model.confirmButtonTitle, role: .destructive) {
 					Task {
 						await model.performDeletion {
+							// First dismiss the sheet
 							dismiss()
+							// Then notify parent to dismiss AccountSettingsView
+							onAccountDeleted?()
 						}
 					}
 				}
@@ -510,5 +516,5 @@ extension AccountDeletionView {
 // MARK: - Preview
 
 #Preview {
-	AccountDeletionView()
+	AccountDeletionView(onAccountDeleted: nil)
 }

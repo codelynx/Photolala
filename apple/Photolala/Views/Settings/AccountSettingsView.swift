@@ -72,7 +72,10 @@ struct AccountSettingsView: View {
 				Text("Are you sure you want to sign out? Your local data will remain on this device.")
 			}
 			.sheet(isPresented: $model.showingDeletionOptions) {
-				AccountDeletionView()
+				AccountDeletionView(onAccountDeleted: {
+					// Dismiss AccountSettingsView when account is deleted
+					dismiss()
+				})
 			}
 			.alert("Error", isPresented: $model.showingError) {
 				Button("OK") { }
