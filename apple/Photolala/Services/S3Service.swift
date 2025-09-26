@@ -580,7 +580,7 @@ extension S3Service {
 	// MARK: - Account Deletion
 
 	/// Delete all user data from S3 with pagination support and progress tracking
-	func deleteAllUserData(userID: String, progressDelegate: (any DeletionProgressDelegate)? = nil) async throws {
+	func deleteAllUserData(userID: String, appleUserID: String? = nil, googleUserID: String? = nil, progressDelegate: (any DeletionProgressDelegate)? = nil) async throws {
 		try await ensureInitialized()
 		guard let client = client else {
 			throw S3Error.clientNotInitialized
@@ -597,6 +597,7 @@ extension S3Service {
 			("photos", "photos/\(userID)/"),
 			("thumbnails", "thumbnails/\(userID)/"),
 			("catalogs", "catalogs/\(userID)/"),
+			("metadata", "metadata/\(userID)/"),  // Add metadata deletion
 			("users", "users/\(userID)/")
 		]
 
@@ -635,7 +636,12 @@ extension S3Service {
 		// Also try to delete identity mappings
 		await progressDelegate?.updateOperation("Deleting identity mappings...")
 		do {
-			let deletedIdentities = try await deleteIdentityMappings(userID: userID, progressDelegate: progressDelegate)
+			let deletedIdentities = try await deleteIdentityMappings(
+				userID: userID,
+				appleUserID: appleUserID,
+				googleUserID: googleUserID,
+				progressDelegate: progressDelegate
+			)
 			totalDeleted += deletedIdentities
 			await progressDelegate?.namespaceCompleted(namespace: "identities", deletedCount: deletedIdentities)
 		} catch {
@@ -747,28 +753,40 @@ extension S3Service {
 	}
 
 	/// Delete identity mappings for a user and return count
-	func deleteIdentityMappings(userID: String, progressDelegate: (any DeletionProgressDelegate)? = nil) async throws -> Int {
+	/// Now accepts optional provider IDs for direct deletion
+	func deleteIdentityMappings(userID: String, appleUserID: String? = nil, googleUserID: String? = nil, progressDelegate: (any DeletionProgressDelegate)? = nil) async throws -> Int {
 		guard let client = client else {
 			throw S3Error.clientNotInitialized
 		}
 
-		// Identity mappings can be stored in different patterns:
-		// Legacy: identities/{provider}/{providerID} -> userID
-		// Canonical: identities/{provider}:{providerID} -> userID
-		// We need to check both patterns to ensure complete deletion
+		// Identity mappings are stored as flat keys:
+		// Format: identities/{provider}:{providerID} -> userID
+		// Example: identities/apple:001196.xyz -> user-uuid
 
-		// List all identities at once to handle any pattern
-		let identityPrefix = "identities/"
 		var totalDeleted = 0
 		var keysToDelete: [String] = []
 		var failedDeletions: [String] = []
+
+		// If we have provider IDs, use them directly for efficient deletion
+		if let appleUserID = appleUserID {
+			keysToDelete.append("identities/apple:\(appleUserID)")
+			logger.info("[S3Service] Will delete Apple identity mapping: identities/apple:\(appleUserID)")
+		}
+		if let googleUserID = googleUserID {
+			keysToDelete.append("identities/google:\(googleUserID)")
+			logger.info("[S3Service] Will delete Google identity mapping: identities/google:\(googleUserID)")
+		}
 
 		// Capture actor-isolated properties before entering task groups
 		let capturedBucketName = bucketName
 		let capturedClient = client
 
-		// First, collect all identity mappings that belong to this user
-		do {
+		// If no provider IDs given, fall back to searching (less efficient)
+		if keysToDelete.isEmpty {
+			logger.warning("[S3Service] No provider IDs given, searching all identity mappings for user \(userID)")
+
+			// List all identities at once to handle any pattern
+			let identityPrefix = "identities/"
 			var continuationToken: String?
 
 			repeat {
@@ -813,57 +831,50 @@ extension S3Service {
 
 				continuationToken = output.nextContinuationToken
 			} while continuationToken != nil
+		}  // End of searching when no provider IDs given
 
-			// Now delete all collected keys
-			if !keysToDelete.isEmpty {
-				logger.info("[S3Service] Found \(keysToDelete.count) identity mappings to delete for user \(userID)")
+		// Now delete all collected keys
+		if !keysToDelete.isEmpty {
+			logger.info("[S3Service] Found \(keysToDelete.count) identity mappings to delete for user \(userID)")
 
-				for key in keysToDelete {
-					do {
-						let deleteInput = DeleteObjectInput(bucket: capturedBucketName, key: key)
-						_ = try await client.deleteObject(input: deleteInput)
-						logger.info("[S3Service] Deleted identity mapping: \(key)")
-						totalDeleted += 1
+			for key in keysToDelete {
+				do {
+					let deleteInput = DeleteObjectInput(bucket: capturedBucketName, key: key)
+					_ = try await client.deleteObject(input: deleteInput)
+					logger.info("[S3Service] Deleted identity mapping: \(key)")
+					totalDeleted += 1
 
-						// Update progress
-						if let progressDelegate = progressDelegate {
-							let progress = Double(totalDeleted) / Double(keysToDelete.count)
-							await progressDelegate.updateProgress(namespace: "identities", progress: progress, itemsDeleted: totalDeleted)
-						}
-					} catch {
-						logger.error("[S3Service] Failed to delete identity mapping \(key): \(error)")
-						failedDeletions.append(key)
-					}
-				}
-
-				// Check if any deletions failed
-				if !failedDeletions.isEmpty {
-					let error = S3Error.partialDeletionFailure(
-						errors: failedDeletions.map { "Failed to delete: \($0)" },
-						deletedCount: totalDeleted
-					)
-
+					// Update progress
 					if let progressDelegate = progressDelegate {
-						await progressDelegate.namespaceFailed(namespace: "identities", error: error)
+						let progress = Double(totalDeleted) / Double(keysToDelete.count)
+						await progressDelegate.updateProgress(namespace: "identities", progress: progress, itemsDeleted: totalDeleted)
 					}
-
-					throw error
+				} catch {
+					logger.error("[S3Service] Failed to delete identity mapping \(key): \(error)")
+					failedDeletions.append(key)
 				}
-			} else {
-				logger.warning("[S3Service] No identity mappings found for user \(userID)")
 			}
 
-			// Mark as completed only if all deletions succeeded
-			if let progressDelegate = progressDelegate {
-				await progressDelegate.namespaceCompleted(namespace: "identities", deletedCount: totalDeleted)
-			}
+			// Check if any deletions failed
+			if !failedDeletions.isEmpty {
+				let error = S3Error.partialDeletionFailure(
+					errors: failedDeletions.map { "Failed to delete: \($0)" },
+					deletedCount: totalDeleted
+				)
 
-		} catch {
-			logger.error("[S3Service] Error processing identity mappings: \(error)")
-			if let progressDelegate = progressDelegate {
-				await progressDelegate.namespaceFailed(namespace: "identities", error: error)
+				if let progressDelegate = progressDelegate {
+					await progressDelegate.namespaceFailed(namespace: "identities", error: error)
+				}
+
+				throw error
 			}
-			throw error
+		} else {
+			logger.warning("[S3Service] No identity mappings found for user \(userID)")
+		}
+
+		// Mark as completed only if all deletions succeeded
+		if let progressDelegate = progressDelegate {
+			await progressDelegate.namespaceCompleted(namespace: "identities", deletedCount: totalDeleted)
 		}
 
 		return totalDeleted
@@ -1054,6 +1065,30 @@ extension S3Service {
 			}
 			throw error
 		}
+	}
+
+	/// Write identity mapping for a provider
+	/// Format: identities/{provider}:{providerID} -> userID
+	func writeIdentityMapping(provider: String, providerID: String, userID: String) async throws {
+		try await ensureInitialized()
+		guard let client = client else {
+			throw S3Error.clientNotInitialized
+		}
+
+		let key = "identities/\(provider):\(providerID)"
+
+		// The content is just the user ID
+		let data = Data(userID.utf8)
+
+		let putInput = PutObjectInput(
+			body: .data(data),
+			bucket: bucketName,
+			contentType: "text/plain",
+			key: key
+		)
+
+		_ = try await client.putObject(input: putInput)
+		logger.info("Created identity mapping: \(key) -> \(userID)")
 	}
 
 }

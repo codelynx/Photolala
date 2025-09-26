@@ -28,6 +28,229 @@ final class AccountManager: ObservableObject {
 		}
 	}
 
+	// MARK: - OAuth Authentication (Step 1)
+
+	func authenticateWithGoogle() async throws -> OAuthTokens {
+		print("[AccountManager] Getting Google OAuth tokens")
+
+		// Create and hold a strong reference to the coordinator
+		let coordinator = GoogleSignInCoordinator()
+		self.googleSignInCoordinator = coordinator
+		defer {
+			// Release the coordinator when the function completes
+			self.googleSignInCoordinator = nil
+		}
+
+		// Use the GoogleSignInCoordinator to perform OAuth flow
+		let credential = try await coordinator.performSignIn()
+
+		print("[AccountManager] Got Google credential for: \(credential.claims.email ?? "unknown")")
+
+		return OAuthTokens(
+			googleIdToken: credential.idToken,
+			accessToken: credential.accessToken,
+			email: credential.claims.email,
+			name: credential.claims.name,
+			subject: credential.claims.subject
+		)
+	}
+
+	func authenticateWithApple() async throws -> OAuthTokens {
+		print("[AccountManager] Getting Apple OAuth tokens")
+
+		let credential = try await performAppleSignIn()
+		guard let identityToken = credential.identityToken,
+		      let tokenString = String(data: identityToken, encoding: .utf8) else {
+			throw AccountError.invalidCredential
+		}
+
+		let authCode = credential.authorizationCode != nil ?
+			String(data: credential.authorizationCode!, encoding: .utf8) : nil
+
+		return OAuthTokens(
+			appleIdentityToken: tokenString,
+			authorizationCode: authCode,
+			nonce: currentNonce,
+			userIdentifier: credential.user
+		)
+	}
+
+	// MARK: - Account Check (Step 2)
+
+	func checkAccountExists(provider: String, oauthTokens: OAuthTokens) async throws -> Bool {
+		print("[AccountManager] Checking if account exists for \(provider)")
+
+		// TEMPORARY: Until Lambda supports check_only, we'll call the regular endpoint
+		// and check the isNewUser flag in the response
+
+		// Prepare payload (without check_only for now since Lambda doesn't support it)
+		let payload: [String: Any] = [
+			"id_token": oauthTokens.idToken,
+			"provider": provider,
+			"access_token": oauthTokens.accessToken ?? "",
+			"nonce": oauthTokens.nonce ?? "",
+			"authorization_code": oauthTokens.authorizationCode ?? "",
+			"user": oauthTokens.userIdentifier,
+			"email": oauthTokens.email ?? "",
+			"name": oauthTokens.displayName ?? ""
+		]
+
+		// Lambda expects API Gateway format with body as JSON string
+		let bodyData = try JSONSerialization.data(withJSONObject: payload)
+		let bodyString = String(data: bodyData, encoding: .utf8) ?? "{}"
+		let lambdaPayload = ["body": bodyString]
+		let jsonData = try JSONSerialization.data(withJSONObject: lambdaPayload)
+
+		// Call Lambda - this will create account if it doesn't exist (temporary behavior)
+		do {
+			let result = try await callAuthLambdaWithData("photolala-auth", payloadData: jsonData)
+
+			// TEMPORARY: Check if this was a new user
+			// Once Lambda supports check_only, this should be replaced
+			if result.isNewUser {
+				print("[AccountManager] Account was just created (isNewUser=true) - treating as no existing account")
+				// TODO: This is problematic because account is already created
+				// We need Lambda to support check_only to properly implement this
+
+				// For now, we'll store these credentials temporarily
+				// and return false to trigger the signup flow
+				// The signup flow will need to handle this edge case
+				return false
+			} else {
+				print("[AccountManager] Existing account found (isNewUser=false)")
+				// Store credentials since we already have them
+				self.currentUser = result.user
+				self.stsCredentials = result.credentials
+				return true
+			}
+		} catch {
+			// Check if error indicates no account
+			let errorMessage = error.localizedDescription.lowercased()
+			if errorMessage.contains("no account") || errorMessage.contains("not found") {
+				return false
+			}
+			// Re-throw other errors
+			throw error
+		}
+	}
+
+	// MARK: - Sign In / Create Account (Step 3)
+
+	func completeSignIn(provider: String, oauthTokens: OAuthTokens) async throws -> PhotolalaUser {
+		print("[AccountManager] Completing sign-in for \(provider)")
+
+		// Check if we already have credentials from checkAccountExists
+		if let user = currentUser, let creds = stsCredentials, !creds.isExpired {
+			print("[AccountManager] Using cached credentials from checkAccountExists")
+			self.isSignedIn = true
+
+			// Ensure status.json exists
+			await ensureStatusFileExists(for: user)
+
+			// Store user UUID for status checking
+			storeUserUUID(user.id.uuidString)
+
+			await saveSession()
+			return user
+		}
+
+		// Otherwise, call Lambda to sign in
+		let payload: [String: Any] = [
+			"id_token": oauthTokens.idToken,
+			"provider": provider,
+			"access_token": oauthTokens.accessToken ?? "",
+			"nonce": oauthTokens.nonce ?? "",
+			"authorization_code": oauthTokens.authorizationCode ?? "",
+			"user": oauthTokens.userIdentifier,
+			"email": oauthTokens.email ?? "",
+			"name": oauthTokens.displayName ?? ""
+		]
+
+		// Lambda expects API Gateway format with body as JSON string
+		let bodyData = try JSONSerialization.data(withJSONObject: payload)
+		let bodyString = String(data: bodyData, encoding: .utf8) ?? "{}"
+		let lambdaPayload = ["body": bodyString]
+		let jsonData = try JSONSerialization.data(withJSONObject: lambdaPayload)
+
+		let result = try await callAuthLambdaWithData("photolala-auth", payloadData: jsonData)
+
+		self.currentUser = result.user
+		self.stsCredentials = result.credentials
+		self.isSignedIn = true
+
+		// Ensure status.json exists
+		await ensureStatusFileExists(for: result.user)
+
+		// Store user UUID for status checking
+		storeUserUUID(result.user.id.uuidString)
+
+		await saveSession()
+
+		return result.user
+	}
+
+	func createAccount(provider: String, oauthTokens: OAuthTokens, termsAccepted: Bool) async throws -> PhotolalaUser {
+		print("[AccountManager] Creating new account for \(provider)")
+
+		guard termsAccepted else {
+			throw AccountError.termsNotAccepted
+		}
+
+		// TEMPORARY: Account might already be created due to Lambda not supporting check_only
+		// If we have cached credentials, use them
+		if let user = currentUser, let creds = stsCredentials, !creds.isExpired {
+			print("[AccountManager] Account was already created during checkAccountExists")
+			self.isSignedIn = true
+
+			// Ensure status.json exists
+			await ensureStatusFileExists(for: user)
+
+			// Store user UUID for status checking
+			storeUserUUID(user.id.uuidString)
+
+			await saveSession()
+			return user
+		}
+
+		// Prepare payload for account creation
+		// Lambda currently ignores create_account flag but we include it for future compatibility
+		let payload: [String: Any] = [
+			"id_token": oauthTokens.idToken,
+			"provider": provider,
+			"create_account": true,  // For future Lambda compatibility
+			"terms_accepted": termsAccepted,
+			"terms_version": "1.0",
+			"access_token": oauthTokens.accessToken ?? "",
+			"nonce": oauthTokens.nonce ?? "",
+			"authorization_code": oauthTokens.authorizationCode ?? "",
+			"user": oauthTokens.userIdentifier,
+			"email": oauthTokens.email ?? "",
+			"name": oauthTokens.displayName ?? ""
+		]
+
+		// Lambda expects API Gateway format with body as JSON string
+		let bodyData = try JSONSerialization.data(withJSONObject: payload)
+		let bodyString = String(data: bodyData, encoding: .utf8) ?? "{}"
+		let lambdaPayload = ["body": bodyString]
+		let jsonData = try JSONSerialization.data(withJSONObject: lambdaPayload)
+
+		let result = try await callAuthLambdaWithData("photolala-auth", payloadData: jsonData)
+
+		self.currentUser = result.user
+		self.stsCredentials = result.credentials
+		self.isSignedIn = true
+
+		// Ensure status.json exists
+		await ensureStatusFileExists(for: result.user)
+
+		// Store user UUID for status checking
+		storeUserUUID(result.user.id.uuidString)
+
+		await saveSession()
+
+		return result.user
+	}
+
 
 	func getCurrentUser() -> PhotolalaUser? {
 		currentUser
@@ -57,6 +280,10 @@ final class AccountManager: ObservableObject {
 
 	func signInWithGoogle() async throws -> PhotolalaUser {
 		print("[AccountManager] Starting Google Sign-In")
+
+		// NOTE: This is the OLD method kept for compatibility
+		// The NEW flow should use authenticateWithGoogle() + checkAccountExists() + completeSignIn()
+		// For now, we'll just call the old Lambda endpoint which auto-creates accounts
 
 		// Create and hold a strong reference to the coordinator
 		let coordinator = GoogleSignInCoordinator()
@@ -89,6 +316,12 @@ final class AccountManager: ObservableObject {
 
 		print("[AccountManager] Sending to Lambda for validation...")
 		let result = try await callAuthLambdaWithData("photolala-auth", payloadData: jsonData)
+
+		// Check if this is a new user
+		if result.isNewUser {
+			print("[AccountManager] WARNING: New user auto-created without explicit consent")
+			// TODO: Once Lambda supports check_only, this should trigger the signup flow instead
+		}
 
 		print("[AccountManager] ✓ Sign-in successful, user ID: \(result.user.id)")
 		self.currentUser = result.user
@@ -188,15 +421,28 @@ final class AccountManager: ObservableObject {
 		let s3Service = try await S3Service.forCurrentAWSEnvironment()
 
 		// Delete all user data from S3 with progress tracking
-		try await s3Service.deleteAllUserData(userID: user.id.uuidString, progressDelegate: progressDelegate)
+		// Pass provider IDs for efficient identity mapping deletion
+		try await s3Service.deleteAllUserData(
+			userID: user.id.uuidString,
+			appleUserID: user.appleUserID,
+			googleUserID: user.googleUserID,
+			progressDelegate: progressDelegate
+		)
 
-		// TODO: Call Lambda to remove identity mappings from DynamoDB
-		// For now, S3Service.deleteIdentityMappings handles S3-stored mappings
+		// IMPORTANT: Lambda may cache or store account data separately
+		// Since Lambda returns is_new_user:false after deletion, it means:
+		// 1. Lambda has its own account storage (not just S3 identity mappings)
+		// 2. We need to call Lambda to delete the account from its storage
+
+		// For now, print a warning about this limitation
+		print("[AccountManager] WARNING: Lambda account data may not be fully deleted")
+		print("[AccountManager] Lambda may still have cached account data")
+		print("[AccountManager] To fully test signup flow, use a different Apple/Google account")
 
 		// Sign out locally (this also clears all caches)
 		await signOut()
 
-		print("[AccountManager] Account deletion complete")
+		print("[AccountManager] Account deletion complete (S3 data deleted)")
 	}
 
 	/// Clear all application caches
@@ -212,10 +458,24 @@ final class AccountManager: ObservableObject {
 		// Now safe to delete the catalog cache directory
 		let appSupport = FileManager.default.urls(for: .applicationSupportDirectory,
 												   in: .userDomainMask).first!
-		let catalogCacheDir = appSupport
-			.appendingPathComponent("Photolala")
-			.appendingPathComponent("CatalogCache")
+		let photolalaDir = appSupport.appendingPathComponent("Photolala")
+
+		// Delete CatalogCache directory
+		let catalogCacheDir = photolalaDir.appendingPathComponent("CatalogCache")
 		try? FileManager.default.removeItem(at: catalogCacheDir)
+
+		// Delete Checkpoints directory (star operation checkpoints)
+		let checkpointsDir = photolalaDir.appendingPathComponent("Checkpoints")
+		try? FileManager.default.removeItem(at: checkpointsDir)
+		print("[AccountManager] Cleared star checkpoints")
+
+		// Delete any stray metadata files in Photolala root
+		let metadataFile = photolalaDir.appendingPathComponent("thumbnail-metadata.json")
+		try? FileManager.default.removeItem(at: metadataFile)
+
+		// Delete starred mapping file
+		let starredMappingFile = photolalaDir.appendingPathComponent("starred-md5-mapping.json")
+		try? FileManager.default.removeItem(at: starredMappingFile)
 
 		// Clear thumbnail cache
 		await ThumbnailCache.shared.clearAll()
@@ -816,6 +1076,25 @@ extension AccountManager {
 				try await s3Service.writeUserStatus(status, for: user.id.uuidString)
 				accountStatus = .active
 				print("[AccountManager] Created new status.json for user \(user.id)")
+
+				// Also create identity mappings for this new account
+				if let appleUserID = user.appleUserID {
+					try await s3Service.writeIdentityMapping(
+						provider: "apple",
+						providerID: appleUserID,
+						userID: user.id.uuidString
+					)
+					print("[AccountManager] Created Apple identity mapping for user \(user.id)")
+				}
+
+				if let googleUserID = user.googleUserID {
+					try await s3Service.writeIdentityMapping(
+						provider: "google",
+						providerID: googleUserID,
+						userID: user.id.uuidString
+					)
+					print("[AccountManager] Created Google identity mapping for user \(user.id)")
+				}
 			}
 		} catch {
 			print("[AccountManager] Failed to ensure status.json: \(error)")

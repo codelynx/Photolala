@@ -7,6 +7,7 @@ enum AccountError: LocalizedError {
 	case networkError(Error)
 	case decodingError(Error)
 	case providerAlreadyLinked
+	case termsNotAccepted
 	case unknown
 
 	var errorDescription: String? {
@@ -23,6 +24,8 @@ enum AccountError: LocalizedError {
 			return "Failed to process response: \(error.localizedDescription)"
 		case .providerAlreadyLinked:
 			return "This provider is already linked to another account."
+		case .termsNotAccepted:
+			return "You must accept the Terms of Service to create an account."
 		case .unknown:
 			return "An unknown error occurred."
 		}

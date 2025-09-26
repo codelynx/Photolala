@@ -147,7 +147,11 @@ actor DeletionScheduler {
 		do {
 			logger.info("[DeletionScheduler] Calling s3Service.deleteAllUserData...")
 			logger.info("[DeletionScheduler] Attempting to write scheduled deletion data...")
-			try await s3Service.deleteAllUserData(userID: user.id.uuidString)
+			try await s3Service.deleteAllUserData(
+				userID: user.id.uuidString,
+				appleUserID: user.appleUserID,
+				googleUserID: user.googleUserID
+			)
 			logger.info("[DeletionScheduler] Successfully deleted all data including identity mappings for user \(user.id)")
 		} catch {
 			logger.error("[DeletionScheduler] Failed to delete user data: \(error)")
