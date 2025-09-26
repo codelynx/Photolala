@@ -17,9 +17,15 @@ struct AccountSettingsView: View {
 		NavigationStack {
 			ScrollView {
 				VStack(spacing: 24) {
+					// Show deletion warning if scheduled
+					if model.isScheduledForDeletion {
+						scheduledDeletionWarning
+							.padding(.top)
+					}
+
 					// Profile Header Card
 					profileHeaderCard
-						.padding(.top)
+						.padding(.top, model.isScheduledForDeletion ? 0 : nil)
 
 					// Quick Stats
 					statsGrid
@@ -102,6 +108,86 @@ struct AccountSettingsView: View {
 	}
 
 	// MARK: - Components
+
+	private var scheduledDeletionWarning: some View {
+		VStack(spacing: 16) {
+			HStack(spacing: 12) {
+				Image(systemName: "exclamationmark.triangle.fill")
+					.font(.title2)
+					.foregroundStyle(.red)
+
+				VStack(alignment: .leading, spacing: 4) {
+					Text("Account Scheduled for Deletion")
+						.font(.headline)
+						.foregroundStyle(.red)
+
+					if let deleteDate = model.scheduledDeleteDate {
+						Text("Deletion date: \(deleteDate.formatted(date: .abbreviated, time: .shortened))")
+							.font(.caption)
+							.foregroundStyle(.secondary)
+					}
+
+					if let timeRemaining = model.timeRemainingText {
+						Label(timeRemaining, systemImage: "timer")
+							.font(.caption.bold())
+							.foregroundStyle(.orange)
+					}
+				}
+
+				Spacer()
+			}
+
+			HStack(spacing: 12) {
+				Button {
+					model.showingDeletionOptions = true
+				} label: {
+					Label("Manage", systemImage: "gear")
+						.font(.callout.weight(.medium))
+				}
+				.buttonStyle(.borderedProminent)
+				.controlSize(.small)
+
+				Button {
+					Task {
+						await model.cancelDeletion()
+					}
+				} label: {
+					Label("Cancel Deletion", systemImage: "arrow.uturn.backward")
+						.font(.callout.weight(.medium))
+				}
+				.buttonStyle(.bordered)
+				.controlSize(.small)
+				.tint(.green)
+			}
+		}
+		.frame(maxWidth: .infinity)
+		.padding()
+		.background(Color.red.opacity(0.1))
+		.clipShape(RoundedRectangle(cornerRadius: 16))
+		.overlay(
+			RoundedRectangle(cornerRadius: 16)
+				.stroke(Color.red.opacity(0.3), lineWidth: 1)
+		)
+		.shadow(color: Color.red.opacity(0.1), radius: 5, y: 2)
+		.confirmationDialog(
+			"Cancel Account Deletion",
+			isPresented: $model.showingCancelConfirmation
+		) {
+			Button("Yes, Keep My Account", role: .cancel) {
+				Task {
+					await model.confirmCancelDeletion()
+				}
+			}
+			Button("No, Continue with Deletion", role: .destructive) { }
+		} message: {
+			Text("Do you want to cancel the scheduled deletion and keep your account active?")
+		}
+		.alert("Deletion Cancelled", isPresented: $model.showingCancellationSuccess) {
+			Button("OK") { }
+		} message: {
+			Text("Your account deletion has been cancelled. Your account is now active.")
+		}
+	}
 
 	private var backgroundGradient: some View {
 		LinearGradient(
@@ -587,6 +673,12 @@ extension AccountSettingsView {
 		var photoCount = 0
 		var isLoadingStorage = false
 
+		// Account deletion status
+		var isScheduledForDeletion = false
+		var scheduledDeleteDate: Date?
+		var timer: Timer?
+		var countdownTick = 0  // Dedicated state for triggering countdown updates
+
 		// UI State
 		var showingSignOutConfirmation = false
 		var showingDeletionOptions = false
@@ -594,7 +686,10 @@ extension AccountSettingsView {
 		var showingDeletionProgress = false
 		var showingEditProfile = false
 		var showingError = false
+		var showingCancelConfirmation = false
+		var showingCancellationSuccess = false
 		var errorMessage = ""
+
 
 		// Computed properties
 		var storageUsedText: String {
@@ -608,6 +703,28 @@ extension AccountSettingsView {
 		var storageProgress: Double {
 			guard storageQuotaBytes > 0 else { return 0 }
 			return Double(storageUsedBytes) / Double(storageQuotaBytes)
+		}
+
+		var timeRemainingText: String? {
+			// Access countdownTick to ensure this recomputes on timer updates
+			_ = countdownTick
+
+			guard let deleteDate = scheduledDeleteDate else { return nil }
+
+			let remaining = deleteDate.timeIntervalSinceNow
+			guard remaining > 0 else { return "Deletion imminent" }
+
+			let formatter = DateComponentsFormatter()
+			formatter.unitsStyle = .full
+			formatter.allowedUnits = remaining > 86400 ? [.day, .hour] :
+									 remaining > 3600 ? [.hour, .minute] :
+									 [.minute, .second]
+			formatter.maximumUnitCount = 2
+
+			if let formatted = formatter.string(from: remaining) {
+				return "\(formatted) remaining"
+			}
+			return nil
 		}
 
 		// MARK: - Data Loading
@@ -625,7 +742,44 @@ extension AccountSettingsView {
 			formatter.dateStyle = .medium
 			createdDate = formatter.string(from: user.createdAt)
 
+			// Check account deletion status
+			await checkAccountStatus()
+
 			await calculateStorage()
+		}
+
+		func checkAccountStatus() async {
+			// Check the current account status
+			await AccountManager.shared.checkAccountStatus()
+
+			let status = AccountManager.shared.accountStatus
+
+			switch status {
+			case .scheduledForDeletion(let deleteDate):
+				isScheduledForDeletion = true
+				scheduledDeleteDate = deleteDate
+				startCountdownTimer()
+			case .active:
+				isScheduledForDeletion = false
+				scheduledDeleteDate = nil
+				stopCountdownTimer()
+			}
+		}
+
+		private func startCountdownTimer() {
+			timer?.invalidate()
+			timer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
+				Task { @MainActor in
+					guard let self = self else { return }
+					// Update countdown tick to trigger UI refresh
+					self.countdownTick += 1
+				}
+			}
+		}
+
+		private func stopCountdownTimer() {
+			timer?.invalidate()
+			timer = nil
 		}
 
 		func calculateStorage() async {
@@ -697,6 +851,43 @@ extension AccountSettingsView {
 			await AccountManager.shared.signOut()
 		}
 
+		func cancelDeletion() async {
+			showingCancelConfirmation = true
+		}
+
+		func confirmCancelDeletion() async {
+			do {
+				guard let user = AccountManager.shared.getCurrentUser() else {
+					throw AccountError.notSignedIn
+				}
+
+				// Get current environment
+				let environmentPreference = UserDefaults.standard.string(forKey: "environment_preference") ?? "development"
+				let environment: AWSEnvironment
+				switch environmentPreference {
+				case "production":
+					environment = .production
+				case "staging":
+					environment = .staging
+				default:
+					environment = .development
+				}
+
+				let s3Service = try await S3Service.forEnvironment(environment)
+				let scheduler = DeletionScheduler(s3Service: s3Service, environment: environment)
+
+				// Cancel the scheduled deletion
+				try await scheduler.cancelScheduledDeletion(user: user)
+
+				// Update account status
+				await checkAccountStatus()
+
+				showingCancellationSuccess = true
+			} catch {
+				errorMessage = error.localizedDescription
+				showingError = true
+			}
+		}
 
 		enum AuthProvider {
 			case apple, google
