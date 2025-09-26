@@ -67,9 +67,10 @@ User Request → Schedule Deletion → Grace Period → Lambda Execution → Ful
 
 ### S3 Structure
 
-**Identity Mappings** (simple UUID storage):
-- Active/Scheduled: `identities/apple:000123` → `"user-uuid"`
+**Identity Mappings** (flat structure with prefixed keys):
+- Active/Scheduled: `identities/apple:000123` → `"user-uuid"` (flat file containing UUID)
 - Deleted: Key removed entirely
+- Structure: Flat keys like `identities/{provider}:{externalId}` (not nested folders)
 
 **Scheduled Deletions** (organized by date for batch processing):
 - `scheduled-deletions/2024-02-14/user-uuid` → Deletion metadata
@@ -142,10 +143,12 @@ User Request → Schedule Deletion → Grace Period → Lambda Execution → Ful
 **Implementation Flow**:
 1. **Client**: Calls deletion Lambda API with user credentials
 2. **Lambda**: Validates request and determines account size
-3. **Lambda**: For large accounts, creates S3 Batch Operations job
-4. **Lambda**: Returns status to client for monitoring
-5. **Client**: Polls Lambda status endpoint only (no direct AWS API access)
-6. **Lambda**: Handles all backend work - deletion, notifications, cleanup
+3. **Lambda**: Immediately removes identity mappings and scheduled deletion entries (enables re-registration)
+4. **Lambda**: For large accounts (>1000 objects), creates S3 Batch Operations job
+5. **Lambda**: For small accounts (<1000 objects), performs direct deletion
+6. **Lambda**: Returns status to client for monitoring
+7. **Client**: Polls Lambda status endpoint only (no direct AWS API access)
+8. **Lambda**: Handles all backend work - deletion, notifications, cleanup
 
 **Key Security Boundaries**:
 - Client never touches S3Control or S3 APIs directly for deletion

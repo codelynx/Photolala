@@ -1,4 +1,6 @@
-# AWS Batch for Immediate Deletion (Dev Testing)
+# S3 Batch Operations for Account Deletion (IMPLEMENTED)
+
+**Status**: ✅ Fully implemented in production
 
 ## Current Limitation
 Direct S3 deletion from the app works but has limitations:
@@ -57,11 +59,23 @@ def handler(event, context):
 3. **Scalable** - Works for 10 objects or 10 million
 4. **Observable** - Batch console shows progress
 
-## Simple Alternative (Current Implementation)
+## Current Implementation
 
-For now, we're using `deleteAllUserData` directly from the app, which:
-- Works fine for typical accounts (<10K objects)
-- Provides immediate deletion in dev
-- Avoids additional Lambda complexity
+The system now uses a hybrid approach implemented in `aws/lambda/deletion/handler.py`:
 
-If we encounter timeout issues or need better progress tracking, implementing the batch approach would be the next step.
+### Deletion Strategy
+- **Small accounts (<1000 objects)**: Direct deletion via Lambda
+- **Large accounts (≥1000 objects)**: S3 Batch Operations job
+- **Threshold**: 1000 objects (configurable via DELETION_THRESHOLD)
+
+### Implementation Details
+- Lambda function: `photolala-deletion-{environment}`
+- Handles both immediate (dev) and scheduled deletions
+- Identity mappings cleaned up immediately (allows re-registration)
+- See `aws/lambda/deletion/handler.py` for full implementation
+
+### Benefits Achieved
+1. **No timeout issues** - Batch jobs handle millions of objects
+2. **Progress tracking** - Via S3 Batch job status
+3. **Production-ready** - Same code path for all environments
+4. **Cost-efficient** - ~$0.25 per batch job for 100K objects

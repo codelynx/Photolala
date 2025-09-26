@@ -11,8 +11,9 @@ open Photolala.xcodeproj
 ```
 
 2. **Verify environment is set to development**
-- In app: Settings → Developer → Environment → Development
+- In app: Tap the environment badge (under Photolala title) → Select Development
 - This enables 3-minute grace period and "Delete Now" option
+- Note: Environment switching is only available in DEVELOPER builds (includes TestFlight)
 
 ## Test Scenarios
 

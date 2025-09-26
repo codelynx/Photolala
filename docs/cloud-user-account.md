@@ -79,18 +79,16 @@ The system stores identity mappings directly in S3 without a database:
 ```
 photolala-{env}/
 └── identities/
-    ├── apple/
-    │   └── {apple-user-id}         → UUID file
-    ├── google/
-    │   └── {google-user-id}        → UUID file
-    └── email/
-        └── {sha256-email-hash}     → UUID file (optional)
+    ├── apple:{apple-user-id}       → UUID file (flat structure)
+    ├── google:{google-user-id}      → UUID file (flat structure)
+    └── email:{sha256-email-hash}    → UUID file (optional, for deduplication)
 ```
 
-**Provider Prefixes:**
-- `apple:` - Apple Sign-In identifiers
-- `google:` - Google Sign-In identifiers
-- Future: `microsoft:`, `facebook:`, etc.
+**Identity Mapping Format (UPDATED - Phase 1 Implementation):**
+- Flat key structure: `identities/{provider}:{external-id}`
+- Each file contains only the user's UUID
+- No nested folders - all identity files at same level
+- Provider prefixes: `apple:`, `google:`, future: `microsoft:`, `facebook:`, etc.
 
 **Identity Creation Flow:**
 
@@ -132,13 +130,13 @@ photolala-{env}/
 │       ├── .photolala.md5          # Current catalog pointer
 │       └── .photolala.{md5}.csv    # Catalog snapshots (Infrequent Access)
 ├── identities/
-│   ├── apple/
-│   │   └── {apple-user-id}         # Identity mapping to UUID
-│   └── email/
-│       └── {sha256-email-hash}     # Optional email mapping
+│   ├── apple:{apple-user-id}       # Identity mapping to UUID (flat file)
+│   ├── google:{google-user-id}     # Identity mapping to UUID (flat file)
+│   └── email:{sha256-email-hash}   # Optional email mapping
 └── users/
     └── {user-uuid}/
         ├── profile.json            # User profile data
+        ├── status.json             # Account status (active/scheduled_for_deletion)
         └── ...                     # Future: messages, settings, etc.
 ```
 
@@ -148,7 +146,30 @@ photolala-{env}/
 - **Standard Storage**: Keep thumbnails in Standard for fast access
 - **Infrequent Access**: Move old catalogs to IA storage class
 - **Cost Optimization**: Different retention and transition rules per prefix
-- **Scalability**: Clean separation allows independent scaling per data type
+
+### Account Deletion System
+
+The system implements soft deletion with a grace period:
+
+**Key Files:**
+- `users/{uuid}/status.json` - Authoritative source for account existence
+  - Present with `"active"` = Normal account
+  - Present with `"scheduled_for_deletion"` = Grace period active
+  - Missing (404) = Account deleted, can re-register
+- `scheduled-deletions/{date}/{uuid}.json` - Scheduled deletion metadata
+
+**Grace Periods:**
+- Development: 3 minutes (rapid testing)
+- Staging: 3 days (integration testing)
+- Production: 30 days (user safety)
+
+**Deletion Process:**
+1. User requests deletion → status.json updated to `scheduled_for_deletion`
+2. Grace period countdown (can cancel anytime)
+3. Lambda processes deletion → Removes all data including status.json
+4. Identity mappings removed → Same Apple/Google ID can create new account
+
+For full details, see `/plans/soft-account-deletion-plan.md`
 
 ## Multi-Provider Account Management
 
