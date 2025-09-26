@@ -15,6 +15,7 @@ import AppKit
 struct EnvironmentBadgeView: View {
 	@AppStorage("environment_preference") private var environmentPreference: String?
 	@State private var isHovering = false
+	@State private var showingSwitcher = false
 
 	private var currentEnvironment: String {
 		// Use the environment preference directly for reactivity
@@ -57,11 +58,14 @@ struct EnvironmentBadgeView: View {
 
 	var body: some View {
 		if shouldShowBadge {
-			VStack {
-				HStack {
-					Spacer()
-					#if os(macOS)
-					Button(action: openSettings) {
+			ZStack {
+				// Invisible background to not interfere with other UI
+				Color.clear
+
+				VStack {
+					HStack {
+						Spacer()
+						#if os(macOS)
 						Text(currentEnvironment)
 							.font(.caption2)
 							.fontWeight(.bold)
@@ -72,16 +76,14 @@ struct EnvironmentBadgeView: View {
 							.cornerRadius(4)
 							.scaleEffect(isHovering ? 1.05 : 1.0)
 							.animation(.easeInOut(duration: 0.1), value: isHovering)
-					}
-					.buttonStyle(.plain)
-					.help("Click to open Developer Settings")
-					.onHover { hovering in
-						isHovering = hovering
-					}
-					.padding(.trailing, 8)
-					.padding(.top, 8)
-					#else
-					Button(action: openSettings) {
+							.onTapGesture {
+								showingSwitcher = true
+							}
+							.onHover { hovering in
+								isHovering = hovering
+							}
+							.help("Click to switch environment")
+						#else
 						Text(currentEnvironment)
 							.font(.caption2)
 							.fontWeight(.bold)
@@ -90,28 +92,21 @@ struct EnvironmentBadgeView: View {
 							.padding(.vertical, 4)
 							.background(badgeColor)
 							.cornerRadius(4)
+							.onTapGesture {
+								showingSwitcher = true
+							}
+						#endif
+						Spacer()
+							.frame(width: 8)
 					}
-					.buttonStyle(.plain)
-					.padding(.trailing, 8)
 					.padding(.top, 8)
-					#endif
+					Spacer()
 				}
-				Spacer()
+			}
+			.sheet(isPresented: $showingSwitcher) {
+				EnvironmentSwitcherView(isPresented: $showingSwitcher)
 			}
 		}
-	}
-
-	private func openSettings() {
-		#if os(iOS)
-		if let url = URL(string: UIApplication.openSettingsURLString) {
-			UIApplication.shared.open(url)
-		}
-		#elseif os(macOS)
-		// Set flag to show developer tab when settings open
-		UserDefaults.standard.set(true, forKey: "ShowDeveloperTabOnOpen")
-		// Open preferences window
-		NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)
-		#endif
 	}
 }
 

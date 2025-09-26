@@ -654,6 +654,7 @@ struct AccountSettingsView: View {
 		.clipShape(RoundedRectangle(cornerRadius: 20))
 		.shadow(color: Color.red.opacity(0.1), radius: 10, y: 5)
 	}
+
 }
 
 // MARK: - View Model
@@ -692,7 +693,6 @@ extension AccountSettingsView {
 		var showingCancelConfirmation = false
 		var showingCancellationSuccess = false
 		var errorMessage = ""
-
 
 		// Computed properties
 		var storageUsedText: String {

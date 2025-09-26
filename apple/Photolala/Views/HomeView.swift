@@ -70,6 +70,7 @@ struct HomeView: View {
 	@State private var model = Model()
 	@StateObject private var accountManager = AccountManager.shared
 	@State private var environmentRefresh = UUID()  // For forcing refresh
+	@State private var showingEnvironmentSwitcher = false
 
 	#if DEVELOPER
 	private var environmentColor: Color {
@@ -157,19 +158,8 @@ struct HomeView: View {
 				.background(environmentColor)
 				.foregroundColor(.white)
 				.cornerRadius(4)
-				.contextMenu {
-					Button("Development") {
-						UserDefaults.standard.set("development", forKey: "environment_preference")
-						environmentRefresh = UUID()
-					}
-					Button("Staging") {
-						UserDefaults.standard.set("staging", forKey: "environment_preference")
-						environmentRefresh = UUID()
-					}
-					Button("Production") {
-						UserDefaults.standard.set("production", forKey: "environment_preference")
-						environmentRefresh = UUID()
-					}
+				.onTapGesture {
+					showingEnvironmentSwitcher = true
 				}
 				.id(environmentRefresh)  // Force refresh when environment changes
 				#endif
@@ -439,6 +429,13 @@ struct HomeView: View {
 		}
 		.sheet(isPresented: $model.showingAccountSettings) {
 			AccountSettingsView()
+		}
+		.sheet(isPresented: $showingEnvironmentSwitcher) {
+			EnvironmentSwitcherView(isPresented: $showingEnvironmentSwitcher)
+				.onDisappear {
+					// Refresh the environment indicator
+					environmentRefresh = UUID()
+				}
 		}
 	}
 

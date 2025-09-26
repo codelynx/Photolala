@@ -84,3 +84,4 @@ Environment selection is handled in-app via UserDefaults (iOS/macOS), not throug
 - try not to commit before review
 - we don't use dynamodb in this project
 - we have not released v1 yet, we don't have to consider migration for old version users
+- developer feature specified by #if DEVELOPER not #if DEBUG, we like use this feature for TestFlight

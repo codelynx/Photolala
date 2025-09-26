@@ -132,6 +132,20 @@ public class CredentialManager: CredentialProviding {
 		Credentials.clearCache()
 	}
 
+	/// Update environment preference (for environment switching)
+	public func updateEnvironment(to environment: AWSEnvironment) {
+		#if DEBUG || DEVELOPER
+		UserDefaults.standard.set(environment.rawValue, forKey: "environment_preference")
+		print("[CredentialManager] Environment updated to: \(environment.rawValue)")
+		#endif
+	}
+
+	/// Invalidate credential cache to force reload
+	public func invalidateCache() {
+		clearCache()
+		print("[CredentialManager] Credential cache invalidated")
+	}
+
 	/// Check if all required credentials are available
 	public func validateCredentials() -> Bool {
 		// Check AWS credentials
